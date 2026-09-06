@@ -137,7 +137,7 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 3 — Calendar Read Surface
 
 - **Goal:** Calendar list, bounded event reads, recurrence expansion via `@cal/domain`, day/week/month desktop calendar architecture, all-day event handling, hidden calendar filtering, and timezone correctness.
-- **Status:** Complete — ready for checkpoint
+- **Status:** Complete — checkpoint committed
 - **Starting SHA:** `d6b0af7ec654c2d306fecda95dec80907f59df82`
 - **Implementation Completed:**
   - Added a web-only calendar API boundary under `apps/web/src/features/calendar/api` with Zod-validated snake_case-to-camelCase mappings for calendars, events, and profile preferences.
@@ -153,7 +153,7 @@ This document is the single source of truth for web client implementation, archi
   - Added 7 focused Phase 3 tests covering Monday-first and six-week windows, DST boundaries, month navigation clamping, recurrence expansion, persisted/per-view hidden calendars, and multi-day all-day bucketing.
   - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
   - Authenticated browser inspection against the real local Supabase seed passed at 1440px, 900px, and 390px. Verified Day/Week/Month, previous/today/next, event selection/details, calendar hiding/showing, `America/New_York` rendering, zero narrow-width document overflow, and no browser console warnings/errors.
-- **Pushed SHA:** Pending checkpoint commit
+- **Pushed SHA:** `ba01e0c704f281cd2841e6e21a4df55fb63472b6`
 - **CI:** Pending push
 - **Blockers:** None
 - **Next Action:** Web Phase 4 — Calendar / Event Editing
