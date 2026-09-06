@@ -128,8 +128,8 @@ This document is the single source of truth for web client implementation, archi
 - **Meaningful UX Fixes:** Quick-add now preserves text and exposes an inline error when creation fails; task rows use native buttons without nested interactive semantics; destructive inspector actions are separated from save/cancel; narrow layouts use a reachable rail plus overlay inspector; the application is viewport-contained so task panes scroll independently instead of expanding the page.
 - **Browser Inspection:** Authenticated seeded data and placeholder routes checked at 1440px, 1200px, 900px, 768px, and 360px-equivalent viewports. Verified Inbox, All, Done-empty, list filtering, selected tasks, long-form inspector scrolling, visible focus, and zero horizontal document overflow.
 - **Verification:** `pnpm verify` passed (format, lint, typecheck, 156 tests, production build); focused `pnpm --filter @cal/web build` passed; `git diff --check` passed.
-- **Pushed SHA:** Pending checkpoint commit
-- **CI:** Pending push
+- **Pushed SHA:** `977536c46463f35ec9cccfe456a4757b820f5c52`
+- **CI:** PASS — [CI run 34040818259](https://github.com/Andrewy530/BCalAI/actions/runs/34040818259)
 - **Remaining Work:** Web Phase 3 — Calendar Read Surface. Future Today, Calendar, Search, and Settings work should reuse the restrained surface hierarchy, compact controls, selected-state treatment, viewport-contained panes, responsive overlay editor pattern, and accessible interaction states established here.
 
 ---
