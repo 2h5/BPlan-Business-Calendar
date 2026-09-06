@@ -23,7 +23,7 @@ interface TaskListPaneProps {
   onToggleComplete: (task: TaskWithTags, completed: boolean) => void;
   onSnooze: (task: TaskWithTags) => void;
   onDelete: (task: TaskWithTags) => void;
-  onQuickAdd: (title: string) => void;
+  onQuickAdd: (title: string) => Promise<void>;
   onNewTaskClick: () => void;
   onRetry: () => void;
 }
@@ -50,13 +50,27 @@ export function TaskListPane({
   onRetry,
 }: TaskListPaneProps) {
   const [quickTitle, setQuickTitle] = useState('');
+  const [quickAddError, setQuickAddError] = useState<string | null>(null);
+  const [isQuickAdding, setIsQuickAdding] = useState(false);
+  const completedCount = buckets.allCompleted.length;
+  const openCount = Math.max(0, allTasks.length - completedCount);
 
-  const handleQuickSubmit = (e: React.FormEvent) => {
+  const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = quickTitle.trim();
     if (!trimmed) return;
-    onQuickAdd(trimmed);
-    setQuickTitle('');
+    try {
+      setQuickAddError(null);
+      setIsQuickAdding(true);
+      await onQuickAdd(trimmed);
+      setQuickTitle('');
+    } catch (error) {
+      setQuickAddError(
+        error instanceof Error ? error.message : 'Could not add the task. Try again.',
+      );
+    } finally {
+      setIsQuickAdding(false);
+    }
   };
 
   const renderSection = (title: string, tasks: TaskWithTags[], isOverdue = false) => {
@@ -225,22 +239,28 @@ export function TaskListPane({
               type="button"
               className={`${styles.tabBtn} ${activeTab === 'inbox' ? styles.tabBtnActive : ''}`}
               onClick={() => onTabChange('inbox')}
+              aria-pressed={activeTab === 'inbox'}
             >
-              Inbox
+              <span>Inbox</span>
+              <span className={styles.tabCount}>{openCount}</span>
             </button>
             <button
               type="button"
               className={`${styles.tabBtn} ${activeTab === 'all' ? styles.tabBtnActive : ''}`}
               onClick={() => onTabChange('all')}
+              aria-pressed={activeTab === 'all'}
             >
-              All
+              <span>All</span>
+              <span className={styles.tabCount}>{allTasks.length}</span>
             </button>
             <button
               type="button"
               className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
               onClick={() => onTabChange('completed')}
+              aria-pressed={activeTab === 'completed'}
             >
-              Done
+              <span>Done</span>
+              <span className={styles.tabCount}>{completedCount}</span>
             </button>
           </div>
 
@@ -264,6 +284,7 @@ export function TaskListPane({
               className={styles.newTaskBtn}
               onClick={onNewTaskClick}
               title="Create task (Inspector)"
+              aria-label="Create a new task"
             >
               <svg
                 width="14"
@@ -300,9 +321,24 @@ export function TaskListPane({
             className={styles.quickAddInput}
             placeholder="Add task to inbox... Press Enter"
             value={quickTitle}
+            disabled={isQuickAdding}
+            aria-describedby={quickAddError ? 'quick-add-error' : undefined}
+            aria-invalid={!!quickAddError}
             onChange={(e) => setQuickTitle(e.target.value)}
           />
+          <button
+            type="submit"
+            className={styles.quickAddSubmit}
+            disabled={isQuickAdding || !quickTitle.trim()}
+          >
+            {isQuickAdding ? 'Adding…' : 'Add'}
+          </button>
         </form>
+        {quickAddError && (
+          <p id="quick-add-error" className={styles.inlineError} role="alert">
+            {quickAddError}
+          </p>
+        )}
       </div>
 
       <div className={styles.listScroll}>{renderContent()}</div>

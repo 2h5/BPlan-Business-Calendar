@@ -98,8 +98,8 @@ export function TasksView() {
   );
 
   const handleQuickAdd = useCallback(
-    (title: string) => {
-      createTask.mutate({
+    async (title: string) => {
+      await createTask.mutateAsync({
         title,
         listId: selectedListId,
         priority: 'normal',
@@ -149,19 +149,27 @@ export function TasksView() {
       />
 
       {(selectedTask || isDraft) && (
-        <TaskInspector
-          task={selectedTask}
-          isDraft={isDraft}
-          lists={lists}
-          tags={tags}
-          timeZone={timeZone}
-          isSaving={createTask.isPending || updateTask.isPending}
-          onClose={handleCloseInspector}
-          onSave={handleInspectorSave}
-          onToggleComplete={handleToggleComplete}
-          onSnooze={handleSnooze}
-          onDelete={handleDelete}
-        />
+        <>
+          <button
+            type="button"
+            className={styles.inspectorBackdrop}
+            aria-label="Close task inspector"
+            onClick={handleCloseInspector}
+          />
+          <TaskInspector
+            task={selectedTask}
+            isDraft={isDraft}
+            lists={lists}
+            tags={tags}
+            timeZone={timeZone}
+            isSaving={createTask.isPending || updateTask.isPending}
+            onClose={handleCloseInspector}
+            onSave={handleInspectorSave}
+            onToggleComplete={handleToggleComplete}
+            onSnooze={handleSnooze}
+            onDelete={handleDelete}
+          />
+        </>
       )}
     </div>
   );

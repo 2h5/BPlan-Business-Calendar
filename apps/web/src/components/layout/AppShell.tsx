@@ -166,12 +166,15 @@ export function AppShell() {
           <div className={styles.brandLogo} aria-hidden="true">
             B
           </div>
-          <span className={styles.brandName}>BCal</span>
-          <span className={styles.brandTag}>Web</span>
+          <div className={styles.brandCopy}>
+            <span className={styles.brandName}>BCal</span>
+            <span className={styles.brandTag}>Plan with clarity</span>
+          </div>
         </div>
 
         <nav className={styles.nav} aria-label="Main navigation">
           <div className={styles.navGroup}>
+            <span className={styles.navGroupLabel}>Workspace</span>
             {PRIMARY_NAV.map((item) => (
               <NavLink
                 key={item.to}
@@ -208,7 +211,13 @@ export function AppShell() {
         <div className={styles.sidebarFooter}>
           {email && (
             <div className={styles.userCard} title={email}>
-              <span className={styles.userEmail}>{email}</span>
+              <span className={styles.userAvatar} aria-hidden="true">
+                {email.slice(0, 1).toUpperCase()}
+              </span>
+              <span className={styles.userMeta}>
+                <span className={styles.userLabel}>Signed in</span>
+                <span className={styles.userEmail}>{email}</span>
+              </span>
             </div>
           )}
           <button
@@ -226,7 +235,10 @@ export function AppShell() {
       {/* Main Content Area */}
       <div className={styles.mainContent}>
         <header className={styles.topBar}>
-          <h1 className={styles.pageTitle}>{currentTitle}</h1>
+          <div>
+            <span className={styles.pageEyebrow}>Workspace</span>
+            <h1 className={styles.pageTitle}>{currentTitle}</h1>
+          </div>
         </header>
 
         <main

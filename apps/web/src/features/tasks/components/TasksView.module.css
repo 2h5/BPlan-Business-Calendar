@@ -1,16 +1,25 @@
 .container {
-  display: flex;
-  flex: 1;
-  height: 100%;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
+  flex: 1;
+  display: flex;
   overflow: hidden;
-  background-color: var(--color-bg-app);
+  background: var(--color-bg-app);
 }
 
-@media (max-width: 900px) {
-  .container {
-    flex-direction: column;
-    height: auto;
-    min-height: calc(100vh - var(--header-height));
+.inspectorBackdrop {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .inspectorBackdrop {
+    position: absolute;
+    z-index: 4;
+    inset: 0;
+    display: block;
+    background: var(--color-bg-overlay);
+    cursor: default;
   }
 }

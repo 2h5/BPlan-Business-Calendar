@@ -70,17 +70,7 @@ export const TaskRow = memo(function TaskRow({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={`${styles.row} ${isSelected ? styles.rowSelected : ''} ${isCompleted ? styles.rowCompleted : ''}`}
-      onClick={() => onSelect(task)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect(task);
-        }
-      }}
-      aria-label={`Task: ${task.title}`}
     >
       <button
         type="button"
@@ -104,7 +94,12 @@ export const TaskRow = memo(function TaskRow({
         )}
       </button>
 
-      <div className={styles.content}>
+      <button
+        type="button"
+        className={styles.content}
+        onClick={() => onSelect(task)}
+        aria-label={`Open task: ${task.title}`}
+      >
         <div className={styles.mainLine}>
           <span className={styles.title}>{task.title}</span>
         </div>
@@ -117,12 +112,12 @@ export const TaskRow = memo(function TaskRow({
           )}
 
           {dueInfo.tone !== 'none' && (
-            <span className={`${styles.badge} ${dueClass}`}>📅 {dueInfo.text}</span>
+            <span className={`${styles.badge} ${dueClass}`}>{dueInfo.text}</span>
           )}
 
           {task.estimatedMinutes !== null && task.estimatedMinutes > 0 && (
             <span className={`${styles.badge} ${styles.durationBadge}`}>
-              ⏱ {formatDuration(task.estimatedMinutes)}
+              {formatDuration(task.estimatedMinutes)}
             </span>
           )}
 
@@ -142,7 +137,7 @@ export const TaskRow = memo(function TaskRow({
             </span>
           )}
         </div>
-      </div>
+      </button>
 
       <div className={styles.actions}>
         <button

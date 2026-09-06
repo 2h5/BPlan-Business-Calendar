@@ -1,216 +1,221 @@
 .row {
+  position: relative;
+  min-height: 58px;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  cursor: pointer;
   transition:
     background-color var(--transition-fast),
-    border-color var(--transition-fast),
     box-shadow var(--transition-fast);
-  user-select: none;
-  position: relative;
 }
 
 .row:hover {
-  background-color: var(--color-bg-surface-elevated);
-  border-color: var(--color-border);
+  background: var(--color-hover);
 }
 
 .rowSelected {
-  background-color: var(--color-bg-surface-elevated);
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 1px var(--color-accent);
+  background: var(--color-selected);
+  box-shadow: inset 3px 0 var(--color-accent);
+}
+
+.rowSelected:hover {
+  background: var(--color-selected);
 }
 
 .rowCompleted {
-  opacity: 0.65;
+  opacity: 0.7;
 }
 
 .rowCompleted .title {
-  text-decoration: line-through;
   color: var(--color-text-tertiary);
+  text-decoration: line-through;
 }
 
 .checkboxBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--color-border-strong);
-  background-color: transparent;
-  cursor: pointer;
+  width: 19px;
+  height: 19px;
   padding: 0;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  color: var(--color-on-accent);
   transition:
     border-color var(--transition-fast),
-    background-color var(--transition-fast);
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .checkboxBtn:hover {
   border-color: var(--color-accent);
+  transform: scale(1.05);
 }
 
 .checkboxChecked {
-  background-color: var(--color-success);
   border-color: var(--color-success);
-  color: #ffffff;
+  background: var(--color-success);
 }
 
 .checkboxCheckmark {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
 }
 
 .content {
+  min-width: 0;
+  padding: var(--space-1) 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 3px;
+  text-align: left;
+}
+
+.content:focus-visible {
+  outline-offset: 4px;
+}
+
+.mainLine,
+.metaLine {
   min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .mainLine {
-  display: flex;
-  align-items: center;
   gap: var(--space-2);
-  min-width: 0;
 }
 
 .title {
+  overflow: hidden;
+  color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-  white-space: nowrap;
-  overflow: hidden;
+  line-height: 1.4;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metaLine {
-  display: flex;
-  align-items: center;
+  min-height: 18px;
   flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-xs);
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-weight: var(--font-weight-medium);
-  white-space: nowrap;
-}
-
-.priorityUrgent {
-  background-color: var(--color-danger-subtle);
-  color: var(--color-danger);
-}
-
-.priorityHigh {
-  background-color: var(--color-warning-subtle);
-  color: var(--color-warning);
-}
-
-.priorityNormal {
-  background-color: var(--color-bg-surface-pressed);
-  color: var(--color-text-secondary);
-}
-
-.priorityLow {
-  background-color: var(--color-bg-surface-pressed);
-  color: var(--color-text-tertiary);
-}
-
-.dueOverdue {
-  background-color: var(--color-danger-subtle);
-  color: var(--color-danger);
-  font-weight: var(--font-weight-semibold);
-}
-
-.dueToday {
-  background-color: var(--color-warning-subtle);
-  color: var(--color-warning);
-  font-weight: var(--font-weight-semibold);
-}
-
-.dueSoon {
-  background-color: var(--color-accent-subtle);
-  color: var(--color-accent);
-}
-
-.dueLater {
-  background-color: var(--color-bg-surface-pressed);
-  color: var(--color-text-secondary);
-}
-
-.durationBadge {
-  background-color: var(--color-bg-surface-pressed);
-  color: var(--color-text-secondary);
-}
-
+.badge,
 .listBadge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+}
+
+.badge {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+
+.priorityUrgent,
+.dueOverdue {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.priorityHigh,
+.dueToday {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.priorityNormal,
+.priorityLow,
+.dueLater,
+.durationBadge,
+.fixedBadge {
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-tertiary);
+}
+
+.dueSoon {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.dueOverdue,
+.dueToday {
+  font-weight: var(--font-weight-semibold);
+}
+
+.listBadge {
+  color: var(--color-text-tertiary);
 }
 
 .listDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: var(--radius-full);
 }
 
-.fixedBadge {
-  background-color: var(--color-bg-surface-pressed);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-}
-
 .actions {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 2px;
   opacity: 0;
   transition: opacity var(--transition-fast);
 }
 
 .row:hover .actions,
-.row:focus-within .actions {
+.row:focus-within .actions,
+.rowSelected .actions {
   opacity: 1;
 }
 
 .actionBtn {
-  background: transparent;
-  border: none;
-  padding: var(--space-1);
-  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
   color: var(--color-text-tertiary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xs);
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast);
 }
 
 .actionBtn:hover {
-  background-color: var(--color-bg-surface-pressed);
+  background: var(--color-bg-surface-pressed);
   color: var(--color-text-primary);
 }
 
 .actionBtnDanger:hover {
-  background-color: var(--color-danger-subtle);
+  background: var(--color-danger-subtle);
   color: var(--color-danger);
+}
+
+@media (hover: none) {
+  .actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 540px) {
+  .row {
+    padding-left: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .actions {
+    opacity: 1;
+  }
+
+  .actions .actionBtn:first-child {
+    display: none;
+  }
 }

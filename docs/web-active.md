@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASE 2 COMPLETED — READY FOR PUSH
+Status: WEB PHASE 2 UI/UX POLISH COMPLETE — READY FOR CHECKPOINT
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -117,6 +117,20 @@ This document is the single source of truth for web client implementation, archi
 - **Blockers:** None
 - **Remaining Work:** Web Phase 3 — Calendar Read Surface
 - **Next Action:** Proceed to Web Phase 3 planning
+
+---
+
+### Web Phase 2 — UI/UX Polish Checkpoint
+
+- **Status:** Complete
+- **Starting SHA:** `c9d4fad239b00d97cc013b0fb071104cb4a2203b`
+- **Visual Areas Changed:** Web visual tokens and global states; sign-in; authenticated sidebar, account area, and page header; Tasks filters, counts, list selector, quick-add, grouped rows, metadata hierarchy, selection/hover/focus states, empty/error/loading presentation, and task inspector.
+- **Meaningful UX Fixes:** Quick-add now preserves text and exposes an inline error when creation fails; task rows use native buttons without nested interactive semantics; destructive inspector actions are separated from save/cancel; narrow layouts use a reachable rail plus overlay inspector; the application is viewport-contained so task panes scroll independently instead of expanding the page.
+- **Browser Inspection:** Authenticated seeded data and placeholder routes checked at 1440px, 1200px, 900px, 768px, and 360px-equivalent viewports. Verified Inbox, All, Done-empty, list filtering, selected tasks, long-form inspector scrolling, visible focus, and zero horizontal document overflow.
+- **Verification:** `pnpm verify` passed (format, lint, typecheck, 156 tests, production build); focused `pnpm --filter @cal/web build` passed; `git diff --check` passed.
+- **Pushed SHA:** Pending checkpoint commit
+- **CI:** Pending push
+- **Remaining Work:** Web Phase 3 — Calendar Read Surface. Future Today, Calendar, Search, and Settings work should reuse the restrained surface hierarchy, compact controls, selected-state treatment, viewport-contained panes, responsive overlay editor pattern, and accessible interaction states established here.
 
 ---
 

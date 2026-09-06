@@ -191,7 +191,12 @@ export function TaskInspector({
   return (
     <aside className={styles.inspector} aria-label="Task inspector">
       <div className={styles.header}>
-        <span className={styles.headerTitle}>{isDraft ? 'New Task' : 'Task Details'}</span>
+        <div className={styles.headerCopy}>
+          <span className={styles.headerTitle}>{isDraft ? 'New task' : 'Task details'}</span>
+          <span className={styles.headerSubtitle}>
+            {isDraft ? 'Capture and schedule work' : 'Edit planning details'}
+          </span>
+        </div>
 
         <div className={styles.headerActions}>
           {task && onToggleComplete && (
@@ -237,28 +242,6 @@ export function TaskInspector({
             </button>
           )}
 
-          {task && onDelete && (
-            <button
-              type="button"
-              className={`${styles.iconBtn} ${styles.iconBtnDanger}`}
-              onClick={() => onDelete(task)}
-              title="Delete task"
-              aria-label="Delete task"
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
-            </button>
-          )}
-
           <button
             type="button"
             className={styles.iconBtn}
@@ -282,7 +265,11 @@ export function TaskInspector({
       </div>
 
       <form onSubmit={handleSave} className={styles.body}>
-        {errorMessage && <div className={styles.errorBanner}>{errorMessage}</div>}
+        {errorMessage && (
+          <div id="task-form-error" className={styles.errorBanner} role="alert">
+            {errorMessage}
+          </div>
+        )}
 
         <div className={styles.fieldGroup}>
           <label className={styles.fieldLabel} htmlFor="task-title">
@@ -297,6 +284,8 @@ export function TaskInspector({
             onChange={(e) => setTitle(e.target.value)}
             required
             autoFocus
+            aria-invalid={!!errorMessage}
+            aria-describedby={errorMessage ? 'task-form-error' : undefined}
           />
         </div>
 
@@ -314,8 +303,8 @@ export function TaskInspector({
         </div>
 
         <div className={styles.fieldGroup}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <label className={styles.fieldLabel}>Due Date &amp; Time</label>
+          <div className={styles.fieldHeader}>
+            <span className={styles.fieldLabel}>Due date &amp; time</span>
             {dueDate && (
               <button type="button" className={styles.clearFieldBtn} onClick={handleClearDue}>
                 Clear
@@ -328,6 +317,7 @@ export function TaskInspector({
               className={styles.dateInput}
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              aria-label="Due date"
             />
             {dueDate && (
               <label className={styles.timeToggle}>
@@ -345,14 +335,15 @@ export function TaskInspector({
                 className={styles.timeInput}
                 value={dueTime}
                 onChange={(e) => setDueTime(e.target.value)}
+                aria-label="Due time"
               />
             )}
           </div>
         </div>
 
         <div className={styles.fieldGroup}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <label className={styles.fieldLabel}>Estimated Duration</label>
+          <div className={styles.fieldHeader}>
+            <span className={styles.fieldLabel}>Estimated duration</span>
             {estimatedMinutes !== null && (
               <button
                 type="button"
@@ -363,7 +354,7 @@ export function TaskInspector({
               </button>
             )}
           </div>
-          <div className={styles.presetsGrid}>
+          <div className={styles.presetsGrid} role="group" aria-label="Estimated duration">
             {DURATION_PRESETS.map((minutes) => (
               <button
                 key={minutes}
@@ -417,7 +408,7 @@ export function TaskInspector({
         {tags.length > 0 && (
           <div className={styles.fieldGroup}>
             <label className={styles.fieldLabel}>Tags</label>
-            <div className={styles.tagsGrid}>
+            <div className={styles.tagsGrid} role="group" aria-label="Task tags">
               {tags.map((tag) => {
                 const isSelected = selectedTagIds.includes(tag.id);
                 return (
@@ -448,12 +439,31 @@ export function TaskInspector({
         </div>
 
         <div className={styles.footer}>
-          <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={isSaving}>
-            Cancel
-          </button>
-          <button type="submit" className={styles.saveBtn} disabled={isSaving || !title.trim()}>
-            {isSaving ? 'Saving...' : isDraft ? 'Create Task' : 'Save Changes'}
-          </button>
+          {task && onDelete ? (
+            <button
+              type="button"
+              className={styles.deleteBtn}
+              onClick={() => onDelete(task)}
+              disabled={isSaving}
+            >
+              Delete task
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className={styles.footerPrimary}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={onClose}
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className={styles.saveBtn} disabled={isSaving || !title.trim()}>
+              {isSaving ? 'Saving…' : isDraft ? 'Create task' : 'Save changes'}
+            </button>
+          </div>
         </div>
       </form>
     </aside>
