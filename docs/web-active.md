@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASE 2 UI/UX POLISH COMPLETE — READY FOR CHECKPOINT
+Status: WEB PHASE 3 CALENDAR READ SURFACE COMPLETE
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -153,7 +153,7 @@ This document is the single source of truth for web client implementation, archi
   - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
   - Authenticated browser inspection against the real local Supabase seed passed at 1440px, 900px, and 390px. Verified Day/Week/Month, previous/today/next, event selection/details, calendar hiding/showing, `America/New_York` rendering, zero narrow-width document overflow, and no browser console warnings/errors.
 - **Pushed SHA:** `ba01e0c704f281cd2841e6e21a4df55fb63472b6`
-- **CI:** Pending push
+- **CI:** PASS — [CI run 34055861246](https://github.com/Andrewy530/BCalAI/actions/runs/34055861246)
 - **Blockers:** None
 - **Next Action:** Web Phase 4 — Calendar / Event Editing
 
