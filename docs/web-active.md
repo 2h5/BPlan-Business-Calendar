@@ -147,10 +147,9 @@ This document is the single source of truth for web client implementation, archi
   - Added a calendar identity rail with per-view visibility controls that respects persisted `is_visible` state without adding Phase 4 calendar mutations.
   - Replaced the `/calendar` placeholder with desktop Day, Week, and Month views, previous/today/next navigation, current range headings, all-day lanes, calendar colors, current-time treatment, empty/loading/error states, and responsive contained scrolling.
   - Added a read-only event details inspector with occurrence-aware dates/times, calendar/source identity, location, recurrence summary, description, and provider ownership context.
-  - Added an explicit web Vitest script so web feature tests run inside the root verification gate.
 - **Tests / Verification:**
-  - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, 16 web tests, and production build.
-  - Added 7 focused Phase 3 tests covering Monday-first and six-week windows, DST boundaries, month navigation clamping, recurrence expansion, persisted/per-view hidden calendars, and multi-day all-day bucketing.
+  - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, and production build.
+  - Added and explicitly ran 7 focused Phase 3 web tests covering Monday-first and six-week windows, DST boundaries, month navigation clamping, recurrence expansion, persisted/per-view hidden calendars, and multi-day all-day bucketing.
   - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
   - Authenticated browser inspection against the real local Supabase seed passed at 1440px, 900px, and 390px. Verified Day/Week/Month, previous/today/next, event selection/details, calendar hiding/showing, `America/New_York` rendering, zero narrow-width document overflow, and no browser console warnings/errors.
 - **Pushed SHA:** `ba01e0c704f281cd2841e6e21a4df55fb63472b6`
