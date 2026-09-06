@@ -1,0 +1,927 @@
+.workspace {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: var(--color-bg-app);
+}
+
+.eyebrow {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.075em;
+  text-transform: uppercase;
+}
+
+.calendarSidebar {
+  width: 214px;
+  min-width: 188px;
+  padding: var(--space-5) var(--space-3) var(--space-4);
+  border-right: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  background: var(--color-bg-surface-raised);
+}
+
+.sidebarHeading {
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebarCount {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  text-align: center;
+}
+
+.calendarList {
+  min-height: 0;
+  flex: 1;
+  padding-top: var(--space-2);
+  overflow-y: auto;
+}
+
+.calendarToggle {
+  width: 100%;
+  min-height: 46px;
+  padding: 6px var(--space-2);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  transition:
+    background-color var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.calendarToggle:hover {
+  background: var(--color-hover);
+}
+
+.calendarToggleHidden {
+  opacity: 0.55;
+}
+
+.calendarCheckbox {
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid;
+  border-radius: 4px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #0a0d12;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+}
+
+.calendarIdentity,
+.timeZoneCard > span,
+.detailItem > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarName {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendarMeta {
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+  text-transform: capitalize;
+}
+
+.calendarEmpty {
+  padding: var(--space-3) var(--space-2);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.timeZoneCard {
+  padding: var(--space-3) var(--space-2) 0;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+.timeZoneLabel {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+}
+
+.timeZoneValue {
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendarMain {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarToolbar {
+  position: relative;
+  min-height: 78px;
+  padding: var(--space-3) clamp(1rem, 2.2vw, 1.75rem);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--color-bg-surface-raised);
+}
+
+.rangeBlock {
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rangeHeading {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.toolbarControls,
+.navigationGroup,
+.viewSwitcher {
+  display: flex;
+  align-items: center;
+}
+
+.toolbarControls {
+  gap: var(--space-3);
+}
+
+.navigationGroup,
+.viewSwitcher {
+  height: var(--control-height-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+}
+
+.iconButton,
+.todayButton,
+.viewButton,
+.closeButton {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.iconButton {
+  width: 32px;
+}
+
+.todayButton {
+  padding: 0 10px;
+  border-inline: 1px solid var(--color-border-subtle);
+}
+
+.iconButton:hover,
+.todayButton:hover,
+.viewButton:hover,
+.closeButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.viewSwitcher {
+  padding: 2px;
+}
+
+.viewButton {
+  min-width: 52px;
+  padding: 0 var(--space-2);
+  border-radius: 6px;
+}
+
+.viewButtonActive {
+  background: var(--color-bg-surface-elevated);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text-primary);
+}
+
+.fetchIndicator {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.calendarSurface {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  background: var(--color-bg-app);
+}
+
+.timelineViewport,
+.monthViewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.timelineCanvas {
+  position: relative;
+  min-height: calc(24 * var(--hour-height) + 96px);
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  grid-template-rows: 62px auto calc(24 * var(--hour-height));
+  background: var(--color-bg-app);
+}
+
+.weekCanvas {
+  min-width: 740px;
+}
+
+.dayCanvas {
+  min-width: 460px;
+}
+
+.timelineHeaderSpacer,
+.dayHeaders {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-bg-surface-raised) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.timelineHeaderSpacer {
+  left: 0;
+  z-index: 4;
+}
+
+.dayHeaders,
+.allDayGrid,
+.dayColumns {
+  display: grid;
+  grid-template-columns: repeat(var(--day-count), minmax(0, 1fr));
+}
+
+.dayHeader {
+  min-width: 0;
+  border-left: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.dayHeader:hover,
+.dayHeaderSelected {
+  background: var(--color-hover);
+  color: var(--color-text-secondary);
+}
+
+.dayHeader strong {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dayHeader .todayNumber,
+.monthDateToday {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.allDayLabel,
+.allDayGrid {
+  min-height: 34px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+
+.allDayLabel {
+  position: sticky;
+  z-index: 2;
+  left: 0;
+  padding: 9px 9px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+  text-align: right;
+}
+
+.allDayColumn {
+  min-width: 0;
+  padding: 4px;
+  border-left: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hourLabels {
+  position: sticky;
+  z-index: 2;
+  left: 0;
+  background: var(--color-bg-app);
+}
+
+.hourLabels span {
+  position: absolute;
+  right: 9px;
+  transform: translateY(-50%);
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dayColumns {
+  height: calc(24 * var(--hour-height));
+}
+
+.dayColumn {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.todayColumn {
+  background: color-mix(in srgb, var(--color-accent) 2.5%, transparent);
+}
+
+.hourLine {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--color-border-subtle);
+}
+
+.timelineEvent {
+  position: absolute;
+  z-index: 1;
+  min-width: 0;
+  padding: 5px 7px 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--event-color) 34%, transparent);
+  border-left: 3px solid var(--event-color);
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--event-color) 15%, var(--color-bg-surface));
+  color: var(--color-text-primary);
+  text-align: left;
+  transition:
+    filter var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.allDayColumn .timelineEvent {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 24px;
+}
+
+.timelineEvent:hover,
+.monthEvent:hover {
+  filter: brightness(1.16);
+}
+
+.timelineEvent:active {
+  transform: translateY(1px);
+}
+
+.timelineEventTitle {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelineEventTime {
+  color: var(--color-text-secondary);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.timelineEventCompact {
+  padding-block: 3px;
+  justify-content: center;
+}
+
+.nowLine {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--color-danger);
+  pointer-events: none;
+}
+
+.nowLine i {
+  position: absolute;
+  top: -3px;
+  left: -4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.monthViewport {
+  padding: var(--space-4);
+}
+
+.monthGrid {
+  min-width: 680px;
+  min-height: 590px;
+  height: 100%;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 34px minmax(540px, 1fr);
+  background: var(--color-bg-surface);
+}
+
+.monthWeekdays,
+.monthDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.monthWeekdays {
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-surface-raised);
+}
+
+.monthWeekdays span {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.monthDays {
+  grid-template-rows: repeat(6, minmax(86px, 1fr));
+}
+
+.monthDay {
+  min-width: 0;
+  padding: 6px;
+  border-right: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+  overflow: hidden;
+  background: var(--color-bg-app);
+}
+
+.monthDay:nth-child(7n) {
+  border-right: 0;
+}
+
+.monthDay:nth-last-child(-n + 7) {
+  border-bottom: 0;
+}
+
+.monthDaySelected {
+  background: var(--color-selected);
+}
+
+.monthDayOutside {
+  background: color-mix(in srgb, var(--color-bg-surface) 70%, var(--color-bg-app));
+}
+
+.monthDayOutside .monthDateButton,
+.monthDayOutside .monthEvent {
+  opacity: 0.5;
+}
+
+.monthDateButton {
+  width: 25px;
+  height: 25px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.monthDateButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.monthEvents {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.monthEvent {
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: color-mix(in srgb, var(--event-color) 10%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monthEvent span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--event-color);
+}
+
+.moreEvents {
+  padding-left: 5px;
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+}
+
+.statePanel {
+  min-height: 260px;
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.statePanel strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+}
+
+.statePanel span {
+  max-width: 330px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.statePanel button {
+  height: var(--control-height-sm);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.emptyOverlay {
+  position: absolute;
+  z-index: 2;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  width: 320px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg-surface-raised) 96%, transparent);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.emptyOverlay .statePanel {
+  min-height: 150px;
+  padding: var(--space-5);
+}
+
+.emptyOverlay svg {
+  display: none;
+}
+
+.eventDetails {
+  position: relative;
+  z-index: 5;
+  width: 360px;
+  min-width: 320px;
+  min-height: 0;
+  border-left: 1px solid var(--color-border);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  background: var(--color-bg-surface);
+  box-shadow: -12px 0 30px rgba(0, 0, 0, 0.08);
+}
+
+.detailsHeader {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-surface-raised);
+}
+
+.detailsHeader > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.readOnlyBadge,
+.statusBadge {
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary);
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.closeButton {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+}
+
+.detailsBody {
+  min-height: 0;
+  flex: 1;
+  padding: var(--space-6) var(--space-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.eventTitleBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.eventColorBar {
+  width: 4px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  flex: 0 0 auto;
+}
+
+.eventDetailsTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.025em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.statusBadge {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--color-warning);
+  text-transform: capitalize;
+}
+
+.detailList {
+  margin-top: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.detailItem {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--space-3);
+  color: var(--color-text-tertiary);
+}
+
+.detailItem > span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detailItem strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.detailItem small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-transform: capitalize;
+}
+
+.noteItem {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.detailsFooter {
+  margin-top: auto;
+  padding-top: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+}
+
+.detailsBackdrop {
+  display: none;
+}
+
+@media (max-width: 1500px) {
+  .eventDetails {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(380px, calc(100% - 56px));
+    min-width: 0;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .detailsBackdrop {
+    position: absolute;
+    z-index: 4;
+    inset: 0;
+    display: block;
+    background: var(--color-bg-overlay);
+  }
+}
+
+@media (max-width: 1050px) {
+  .workspace {
+    flex-direction: column;
+  }
+
+  .calendarSidebar {
+    width: 100%;
+    min-width: 0;
+    min-height: 58px;
+    max-height: 102px;
+    padding: 8px var(--space-3);
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .sidebarHeading {
+    display: none;
+  }
+
+  .calendarList {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .calendarToggle {
+    width: auto;
+    min-width: max-content;
+    min-height: 40px;
+    padding-inline: var(--space-2);
+  }
+
+  .calendarMeta {
+    display: none;
+  }
+
+  .timeZoneCard {
+    max-width: 130px;
+    padding: 0;
+    border: 0;
+  }
+
+  .timeZoneLabel {
+    display: none;
+  }
+
+  .calendarToolbar {
+    min-height: 104px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .toolbarControls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rangeHeading {
+    font-size: var(--font-size-lg);
+  }
+
+  .monthViewport {
+    padding: var(--space-2);
+  }
+}
+
+@media (max-width: 520px) {
+  .calendarSidebar {
+    min-height: 52px;
+  }
+
+  .timeZoneCard {
+    display: none;
+  }
+
+  .calendarToolbar {
+    min-height: 100px;
+    padding-inline: var(--space-3);
+  }
+
+  .viewButton {
+    min-width: 44px;
+    padding-inline: 5px;
+  }
+
+  .rangeHeading {
+    max-width: calc(100vw - 98px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .emptyOverlay {
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: calc(100% - var(--space-6));
+  }
+}

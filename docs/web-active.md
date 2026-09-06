@@ -137,14 +137,26 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 3 — Calendar Read Surface
 
 - **Goal:** Calendar list, bounded event reads, recurrence expansion via `@cal/domain`, day/week/month desktop calendar architecture, all-day event handling, hidden calendar filtering, and timezone correctness.
-- **Status:** Planned
-- **Starting SHA:** TBD
-- **Implementation Completed:** TBD
-- **Tests / Verification:** TBD
-- **Pushed SHA:** TBD
-- **CI:** TBD
+- **Status:** Complete — ready for checkpoint
+- **Starting SHA:** `d6b0af7ec654c2d306fecda95dec80907f59df82`
+- **Implementation Completed:**
+  - Added a web-only calendar API boundary under `apps/web/src/features/calendar/api` with Zod-validated snake_case-to-camelCase mappings for calendars, events, and profile preferences.
+  - Added bounded overlap reads for one visible Day, Week, or six-week Month range, including recurring masters and provider exception rows required for correct expansion.
+  - Added a shared calendar-window hook using TanStack Query for profile, calendar, and event server state; profile timezone, week start, and hour cycle drive the rendered range.
+  - Reused `expandSchedulingCalendarEvents`, local-day timezone helpers, and overlap layout from `@cal/domain`; web does not duplicate recurrence or scheduling rules.
+  - Added a calendar identity rail with per-view visibility controls that respects persisted `is_visible` state without adding Phase 4 calendar mutations.
+  - Replaced the `/calendar` placeholder with desktop Day, Week, and Month views, previous/today/next navigation, current range headings, all-day lanes, calendar colors, current-time treatment, empty/loading/error states, and responsive contained scrolling.
+  - Added a read-only event details inspector with occurrence-aware dates/times, calendar/source identity, location, recurrence summary, description, and provider ownership context.
+  - Added an explicit web Vitest script so web feature tests run inside the root verification gate.
+- **Tests / Verification:**
+  - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, 16 web tests, and production build.
+  - Added 7 focused Phase 3 tests covering Monday-first and six-week windows, DST boundaries, month navigation clamping, recurrence expansion, persisted/per-view hidden calendars, and multi-day all-day bucketing.
+  - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
+  - Authenticated browser inspection against the real local Supabase seed passed at 1440px, 900px, and 390px. Verified Day/Week/Month, previous/today/next, event selection/details, calendar hiding/showing, `America/New_York` rendering, zero narrow-width document overflow, and no browser console warnings/errors.
+- **Pushed SHA:** Pending checkpoint commit
+- **CI:** Pending push
 - **Blockers:** None
-- **Next Action:** Pending Phase 2
+- **Next Action:** Web Phase 4 — Calendar / Event Editing
 
 ---
 
@@ -158,7 +170,7 @@ This document is the single source of truth for web client implementation, archi
 - **Pushed SHA:** TBD
 - **CI:** TBD
 - **Blockers:** None
-- **Next Action:** Pending Phase 3
+- **Next Action:** Internal event CRUD, persisted calendar visibility/CRUD, recurrence editing, provider-owned write routing, and the desktop event editor
 
 ---
 

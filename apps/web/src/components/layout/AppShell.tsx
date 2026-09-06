@@ -242,7 +242,11 @@ export function AppShell() {
         </header>
 
         <main
-          className={location.pathname === '/tasks' ? styles.contentAreaFull : styles.contentArea}
+          className={
+            location.pathname === '/tasks' || location.pathname === '/calendar'
+              ? styles.contentAreaFull
+              : styles.contentArea
+          }
         >
           <Outlet />
         </main>
