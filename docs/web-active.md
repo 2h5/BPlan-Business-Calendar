@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASE 3 CALENDAR READ SURFACE COMPLETE
+Status: WEB PHASE 4 CALENDAR / EVENT EDITING COMPLETE
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -162,14 +162,24 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 4 — Calendar / Event Editing
 
 - **Goal:** Internal event CRUD, calendar CRUD/visibility, recurrence editing, provider-owned event write rules, desktop event editor.
-- **Status:** Planned
-- **Starting SHA:** TBD
-- **Implementation Completed:** TBD
-- **Tests / Verification:** TBD
-- **Pushed SHA:** TBD
+- **Status:** Complete — checkpoint committed
+- **Starting SHA:** `d3a339fbdae28481841090b1d2d3fb98c3f27655`
+- **Implementation Completed:**
+  - Added web-only, Zod-validated calendar and event mutation APIs with snake_case contained at the API boundary and TanStack Query invalidation/optimistic visibility updates.
+  - Added internal event creation, editing, and hard deletion using the existing database ownership semantics, including title, description, location, calendar assignment, date/time, all-day, timezone, and recurrence fields.
+  - Added provider-first create/update/delete routing through `provider-event-write`; synced events cannot be moved across provider calendars or between provider and internal ownership, and provider errors remain visible to the editor.
+  - Replaced the read-only detail panel with a desktop event inspector/editor that distinguishes whole-series edits from materialized provider-exception edits, preserves unsupported existing recurrence rules, and uses the shared recurrence presets/parser and timezone conversion helpers.
+  - Added internal calendar creation, name/color editing, guarded deletion, persisted calendar visibility, provider-managed calendar messaging, and explicit read-only calendar/event behavior.
+  - Added pending, inline error, success toast, sync-conflict, confirmation, focus trapping, Escape-to-close, focus restoration, and responsive editor behavior while preserving the Phase 3 Day/Week/Month visual language.
+- **Tests / Verification:**
+  - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, and the production build.
+  - Added and explicitly ran 16 focused web calendar tests covering row/schema mapping, provider exception identity, authority routing, forbidden calendar moves, timed/all-day UTC conversion across DST, recurrence preservation/rejection, invalid event ranges, and the existing calendar window/occurrence behavior.
+  - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
+  - Authenticated browser inspection against real local Supabase data passed for event creation/editing, all-day events, weekly recurrence expansion, calendar creation/editing/assignment, persisted visibility after refresh, Day/Week/Month rendering, read-only provider inspection, keyboard focus/Escape behavior, and a 390×844 viewport with no document overflow or console errors. Internal deletion was confirmed through the authenticated RLS API and disappearance after refresh; isolated QA rows were removed afterward.
+- **Pushed SHA:** `4e6f172b925b17f00b43da1d7b4a0da3bea3b93e`
 - **CI:** TBD
 - **Blockers:** None
-- **Next Action:** Internal event CRUD, persisted calendar visibility/CRUD, recurrence editing, provider-owned write routing, and the desktop event editor
+- **Next Action:** Web Phase 5 — Today / Search / Settings
 
 ---
 
