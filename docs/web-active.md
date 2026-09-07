@@ -177,7 +177,7 @@ This document is the single source of truth for web client implementation, archi
   - `pnpm --filter @cal/web build` passed; `git diff --check` passed.
   - Authenticated browser inspection against real local Supabase data passed for event creation/editing, all-day events, weekly recurrence expansion, calendar creation/editing/assignment, persisted visibility after refresh, Day/Week/Month rendering, read-only provider inspection, keyboard focus/Escape behavior, and a 390×844 viewport with no document overflow or console errors. Internal deletion was confirmed through the authenticated RLS API and disappearance after refresh; isolated QA rows were removed afterward.
 - **Pushed SHA:** `4e6f172b925b17f00b43da1d7b4a0da3bea3b93e`
-- **CI:** TBD
+- **CI:** PASS — [CI run 34158010169](https://github.com/Andrewy530/BCalAI/actions/runs/34158010169)
 - **Blockers:** None
 - **Next Action:** Web Phase 5 — Today / Search / Settings
 
