@@ -1,13 +1,23 @@
 import { toZonedDateKey } from '@cal/domain';
 import type { Calendar } from '@cal/schemas';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
+import { CalendarEditor } from './CalendarEditor';
 import { CalendarSidebar } from './CalendarSidebar';
 import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
-import { EventDetails } from './EventDetails';
+import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { TimelineView } from './TimelineView';
+import {
+  useCreateCalendar,
+  useCreateEvent,
+  useDeleteCalendar,
+  useDeleteEvent,
+  useToggleCalendarVisibility,
+  useUpdateCalendar,
+  useUpdateEvent,
+} from '../hooks/useCalendarMutations';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
 
@@ -59,10 +69,21 @@ export function CalendarView() {
   const [selectedDateKey, setSelectedDateKey] = useState(() =>
     toZonedDateKey(new Date(), initialTimeZone),
   );
-  const [visibilityOverrides, setVisibilityOverrides] = useState<Record<string, boolean>>({});
   const [selectedOccurrence, setSelectedOccurrence] = useState<EventOccurrence | null>(null);
+  const [isDraft, setIsDraft] = useState(false);
+  const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
+  const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const openingControlRef = useRef<HTMLElement | null>(null);
 
-  const result = useCalendarWindow(mode, selectedDateKey, visibilityOverrides);
+  const result = useCalendarWindow(mode, selectedDateKey);
+  const toggleVisibility = useToggleCalendarVisibility();
+  const createCalendar = useCreateCalendar();
+  const updateCalendar = useUpdateCalendar();
+  const removeCalendar = useDeleteCalendar();
+  const createEvent = useCreateEvent(result.calendars);
+  const updateEvent = useUpdateEvent(result.calendars);
+  const removeEvent = useDeleteEvent(result.calendars);
   const { window, timeZone } = result;
   const heading = useMemo(
     () => formatRangeHeading(mode, selectedDateKey, window, timeZone),
@@ -71,18 +92,22 @@ export function CalendarView() {
 
   const handleToggleVisibility = useCallback(
     (calendar: Calendar) => {
-      setVisibilityOverrides((current) => ({
-        ...current,
-        [calendar.id]: !(current[calendar.id] ?? calendar.isVisible),
-      }));
+      toggleVisibility.mutate(
+        { id: calendar.id, isVisible: !calendar.isVisible },
+        {
+          onError: (error) =>
+            setToast(error instanceof Error ? error.message : 'Visibility could not be saved.'),
+        },
+      );
       if (selectedOccurrence?.event.calendarId === calendar.id) setSelectedOccurrence(null);
     },
-    [selectedOccurrence],
+    [selectedOccurrence, toggleVisibility],
   );
 
   const changeMode = useCallback((nextMode: CalendarViewMode) => {
     setMode(nextMode);
     setSelectedOccurrence(null);
+    setIsDraft(false);
   }, []);
 
   const selectMonthDate = useCallback((dateKey: string) => {
@@ -94,13 +119,43 @@ export function CalendarView() {
     setSelectedDateKey(toZonedDateKey(new Date(), timeZone));
   }, [timeZone]);
 
+  const closeEventEditor = useCallback(() => {
+    setSelectedOccurrence(null);
+    setIsDraft(false);
+    globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
+  }, []);
+
+  const rememberOpeningControl = useCallback(() => {
+    openingControlRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, []);
+
+  const closeCalendarEditor = useCallback(() => {
+    setCalendarEditorOpen(false);
+    globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
+  }, []);
+
+  const showSuccess = useCallback((message: string) => {
+    setToast(message);
+    globalThis.setTimeout(() => setToast(null), 3000);
+  }, []);
+
   return (
     <div className={styles.workspace}>
       <CalendarSidebar
         calendars={result.calendars}
-        visibilityOverrides={visibilityOverrides}
         timeZone={timeZone}
         onToggleVisibility={handleToggleVisibility}
+        onCreateCalendar={() => {
+          rememberOpeningControl();
+          setEditingCalendar(null);
+          setCalendarEditorOpen(true);
+        }}
+        onEditCalendar={(calendar) => {
+          rememberOpeningControl();
+          setEditingCalendar(calendar);
+          setCalendarEditorOpen(true);
+        }}
       />
 
       <section className={styles.calendarMain} aria-label="Calendar">
@@ -112,6 +167,15 @@ export function CalendarView() {
           onPrevious={() => setSelectedDateKey(shiftDateKey(selectedDateKey, mode, -1, timeZone))}
           onToday={goToToday}
           onNext={() => setSelectedDateKey(shiftDateKey(selectedDateKey, mode, 1, timeZone))}
+          onCreateEvent={() => {
+            if (!result.calendars.some((calendar) => !calendar.isReadOnly)) {
+              setToast('Create or connect a writable calendar first.');
+              return;
+            }
+            rememberOpeningControl();
+            setSelectedOccurrence(null);
+            setIsDraft(true);
+          }}
         />
 
         <div className={styles.calendarSurface}>
@@ -127,7 +191,11 @@ export function CalendarView() {
               timeZone={timeZone}
               now={new Date()}
               onSelectDate={selectMonthDate}
-              onSelectEvent={setSelectedOccurrence}
+              onSelectEvent={(occurrence) => {
+                rememberOpeningControl();
+                setIsDraft(false);
+                setSelectedOccurrence(occurrence);
+              }}
             />
           ) : (
             <TimelineView
@@ -138,7 +206,11 @@ export function CalendarView() {
               hourCycle={result.hourCycle}
               now={new Date()}
               onSelectDate={setSelectedDateKey}
-              onSelectEvent={setSelectedOccurrence}
+              onSelectEvent={(occurrence) => {
+                rememberOpeningControl();
+                setIsDraft(false);
+                setSelectedOccurrence(occurrence);
+              }}
             />
           )}
 
@@ -150,21 +222,64 @@ export function CalendarView() {
         </div>
       </section>
 
-      {selectedOccurrence ? (
+      {selectedOccurrence || isDraft ? (
         <>
           <button
             type="button"
             className={styles.detailsBackdrop}
-            onClick={() => setSelectedOccurrence(null)}
-            aria-label="Close event details"
+            onClick={closeEventEditor}
+            aria-label="Close event editor"
           />
-          <EventDetails
+          <EventEditor
             occurrence={selectedOccurrence}
+            isDraft={isDraft}
+            selectedDateKey={selectedDateKey}
+            calendars={result.calendars}
             timeZone={timeZone}
-            hourCycle={result.hourCycle}
-            onClose={() => setSelectedOccurrence(null)}
+            defaultDurationMinutes={result.defaultEventMinutes}
+            isSaving={createEvent.isPending || updateEvent.isPending || removeEvent.isPending}
+            onClose={closeEventEditor}
+            onCreate={async (input) => {
+              await createEvent.mutateAsync(input);
+              closeEventEditor();
+              showSuccess('Event created.');
+            }}
+            onUpdate={async (event, input) => {
+              await updateEvent.mutateAsync({ event, input });
+              closeEventEditor();
+              showSuccess('Event updated.');
+            }}
+            onDelete={async (event) => {
+              await removeEvent.mutateAsync(event);
+              showSuccess('Event deleted.');
+            }}
           />
         </>
+      ) : null}
+
+      {calendarEditorOpen ? (
+        <CalendarEditor
+          calendar={editingCalendar}
+          onClose={closeCalendarEditor}
+          onCreate={async (input) => {
+            await createCalendar.mutateAsync(input);
+            showSuccess('Calendar created.');
+          }}
+          onUpdate={async (calendar, input) => {
+            await updateCalendar.mutateAsync({ calendar, input });
+            showSuccess('Calendar updated.');
+          }}
+          onDelete={async (calendar) => {
+            await removeCalendar.mutateAsync(calendar);
+            showSuccess('Calendar deleted.');
+          }}
+        />
+      ) : null}
+
+      {toast ? (
+        <div className={styles.toast} role="status" aria-live="polite">
+          {toast}
+        </div>
       ) : null}
     </div>
   );

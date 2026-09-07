@@ -22,6 +22,7 @@ interface CalendarWindowResult {
   timeZone: string;
   weekStartsOn: number;
   hourCycle: HourCycle;
+  defaultEventMinutes: number;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -31,7 +32,6 @@ interface CalendarWindowResult {
 export function useCalendarWindow(
   mode: CalendarViewMode,
   selectedDateKey: string,
-  visibilityOverrides: Readonly<Record<string, boolean>>,
 ): CalendarWindowResult {
   const { isAuthenticated } = useAuth();
   const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -73,9 +73,9 @@ export function useCalendarWindow(
         calendarsQuery.data ?? [],
         window,
         timeZone,
-        visibilityOverrides,
+        {},
       ),
-    [calendarsQuery.data, eventsQuery.data, timeZone, visibilityOverrides, window],
+    [calendarsQuery.data, eventsQuery.data, timeZone, window],
   );
 
   return {
@@ -86,6 +86,7 @@ export function useCalendarWindow(
     timeZone,
     weekStartsOn,
     hourCycle,
+    defaultEventMinutes: profileQuery.data?.defaultEventMinutes ?? 60,
     isLoading: profileQuery.isLoading || calendarsQuery.isLoading || eventsQuery.isLoading,
     isFetching: eventsQuery.isFetching,
     isError: profileQuery.isError || calendarsQuery.isError || eventsQuery.isError,

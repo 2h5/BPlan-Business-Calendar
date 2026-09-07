@@ -45,6 +45,35 @@
   text-align: center;
 }
 
+.sidebarHeadingActions,
+.editorFooter > div,
+.colorField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.addCalendarButton,
+.calendarEditButton {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-tertiary);
+}
+
+.addCalendarButton {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+}
+
+.addCalendarButton:hover,
+.calendarEditButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
 .calendarList {
   min-height: 0;
   flex: 1;
@@ -52,22 +81,38 @@
   overflow-y: auto;
 }
 
-.calendarToggle {
+.calendarRow {
   width: 100%;
   min-height: 46px;
-  padding: 6px var(--space-2);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
-  gap: 10px;
-  text-align: left;
-  transition:
-    background-color var(--transition-fast),
-    opacity var(--transition-fast);
+  transition: opacity var(--transition-fast);
 }
 
-.calendarToggle:hover {
+.calendarToggle {
+  min-width: 0;
+  min-height: 46px;
+  padding: 6px var(--space-2);
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  transition: background-color var(--transition-fast);
+}
+
+.calendarRow:hover {
   background: var(--color-hover);
+}
+
+.calendarEditButton {
+  width: 32px;
+  height: 32px;
+  margin-right: 3px;
+  border-radius: var(--radius-md);
+  font-size: 0.65rem;
+  letter-spacing: -0.08em;
 }
 
 .calendarToggleHidden {
@@ -182,6 +227,27 @@
 
 .toolbarControls {
   gap: var(--space-3);
+}
+
+.newEventButton,
+.primaryButton {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newEventButton:hover,
+.primaryButton:hover {
+  background: var(--color-accent-hover);
+}
+
+.newEventButton span {
+  margin-right: 4px;
+  font-size: var(--font-size-base);
 }
 
 .navigationGroup,
@@ -667,7 +733,8 @@
   display: none;
 }
 
-.eventDetails {
+.eventDetails,
+.eventEditor {
   position: relative;
   z-index: 5;
   width: 360px;
@@ -679,6 +746,265 @@
   flex-direction: column;
   background: var(--color-bg-surface);
   box-shadow: -12px 0 30px rgba(0, 0, 0, 0.08);
+}
+
+.eventEditor {
+  width: 408px;
+}
+
+.editorHeader {
+  min-height: 68px;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: var(--color-bg-surface-raised);
+}
+
+.editorHeader > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorHeader strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editorSubtitle {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: capitalize;
+}
+
+.editorBody {
+  min-height: 0;
+  flex: 1;
+  padding: var(--space-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.editorField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.editorField label,
+.dateTimeFields legend,
+.dateTimeFields span {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+.editorField input,
+.editorField select,
+.editorField textarea,
+.dateTimeFields input {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.editorField textarea {
+  min-height: 94px;
+  resize: vertical;
+}
+
+.editorField input:disabled,
+.editorField select:disabled,
+.editorField textarea:disabled,
+.dateTimeFields:disabled input {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.editorField small,
+.editorMeta {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  line-height: var(--line-height-normal);
+}
+
+.allDayToggle {
+  min-height: 36px;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.allDayToggle input {
+  accent-color: var(--color-accent);
+}
+
+.dateTimeFields {
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.dateTimeFields legend {
+  grid-column: 1 / -1;
+  margin-bottom: 6px;
+}
+
+.dateTimeFields label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoBanner,
+.errorBanner,
+.successBanner {
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+.infoBanner {
+  border-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  background: var(--color-accent-muted);
+}
+
+.errorBanner {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.successBanner {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.editorFooter {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.secondaryButton,
+.deleteButton {
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.secondaryButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.deleteButton {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.deleteButton:hover {
+  background: var(--color-danger-subtle);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.deleteButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modalLayer {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.modalBackdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg-overlay);
+}
+
+.calendarEditor {
+  position: relative;
+  width: min(430px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.calendarEditorBody {
+  padding: var(--space-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.colorField input {
+  width: 50px;
+  padding: 3px;
+}
+
+.colorField span {
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+}
+
+.toast {
+  position: absolute;
+  z-index: 20;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--color-success);
+  font-size: var(--font-size-sm);
 }
 
 .detailsHeader {
@@ -804,7 +1130,8 @@
 }
 
 @media (max-width: 1500px) {
-  .eventDetails {
+  .eventDetails,
+  .eventEditor {
     position: absolute;
     inset: 0 0 0 auto;
     width: min(380px, calc(100% - 56px));
@@ -859,6 +1186,15 @@
     padding-inline: var(--space-2);
   }
 
+  .calendarRow {
+    width: auto;
+    min-width: max-content;
+  }
+
+  .calendarEditButton {
+    display: none;
+  }
+
   .calendarMeta {
     display: none;
   }
@@ -883,6 +1219,10 @@
   .toolbarControls {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .newEventButton {
+    order: 3;
   }
 
   .rangeHeading {
@@ -911,6 +1251,35 @@
   .viewButton {
     min-width: 44px;
     padding-inline: 5px;
+  }
+
+  .newEventButton {
+    padding-inline: 9px;
+  }
+
+  .newEventButton span {
+    margin: 0;
+  }
+
+  .newEventLabel {
+    display: none;
+  }
+
+  .eventEditor {
+    width: calc(100% - 44px);
+  }
+
+  .dateTimeFields {
+    grid-template-columns: 1fr;
+  }
+
+  .editorFooter {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .editorFooter > div {
+    justify-content: flex-end;
   }
 
   .rangeHeading {

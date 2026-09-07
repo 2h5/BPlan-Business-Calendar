@@ -4,22 +4,35 @@ import styles from './CalendarView.module.css';
 
 interface CalendarSidebarProps {
   calendars: readonly Calendar[];
-  visibilityOverrides: Readonly<Record<string, boolean>>;
   timeZone: string;
   onToggleVisibility: (calendar: Calendar) => void;
+  onCreateCalendar: () => void;
+  onEditCalendar: (calendar: Calendar) => void;
 }
 
 export function CalendarSidebar({
   calendars,
-  visibilityOverrides,
   timeZone,
   onToggleVisibility,
+  onCreateCalendar,
+  onEditCalendar,
 }: CalendarSidebarProps) {
   return (
     <aside className={styles.calendarSidebar} aria-label="My calendars">
       <div className={styles.sidebarHeading}>
         <span className={styles.eyebrow}>Calendars</span>
-        <span className={styles.sidebarCount}>{calendars.length}</span>
+        <div className={styles.sidebarHeadingActions}>
+          <span className={styles.sidebarCount}>{calendars.length}</span>
+          <button
+            type="button"
+            className={styles.addCalendarButton}
+            onClick={onCreateCalendar}
+            aria-label="Create calendar"
+            title="Create calendar"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div className={styles.calendarList}>
@@ -27,35 +40,49 @@ export function CalendarSidebar({
           <p className={styles.calendarEmpty}>No calendars are available yet.</p>
         ) : (
           calendars.map((calendar) => {
-            const isVisible = visibilityOverrides[calendar.id] ?? calendar.isVisible;
+            const isVisible = calendar.isVisible;
             return (
-              <button
+              <div
                 key={calendar.id}
-                type="button"
-                className={`${styles.calendarToggle} ${isVisible ? '' : styles.calendarToggleHidden}`}
-                onClick={() => onToggleVisibility(calendar)}
-                aria-pressed={isVisible}
-                aria-label={`${isVisible ? 'Hide' : 'Show'} ${calendar.name}`}
-                title={`${isVisible ? 'Hide' : 'Show'} ${calendar.name} in this view`}
+                className={`${styles.calendarRow} ${isVisible ? '' : styles.calendarToggleHidden}`}
               >
-                <span
-                  className={styles.calendarCheckbox}
-                  style={{
-                    borderColor: calendar.color,
-                    backgroundColor: isVisible ? calendar.color : 'transparent',
-                  }}
-                  aria-hidden="true"
+                <button
+                  type="button"
+                  className={styles.calendarToggle}
+                  onClick={() => onToggleVisibility(calendar)}
+                  aria-pressed={isVisible}
+                  aria-label={`${isVisible ? 'Hide' : 'Show'} ${calendar.name}`}
+                  title={`${isVisible ? 'Hide' : 'Show'} ${calendar.name}`}
                 >
-                  {isVisible ? '✓' : ''}
-                </span>
-                <span className={styles.calendarIdentity}>
-                  <span className={styles.calendarName}>{calendar.name}</span>
-                  <span className={styles.calendarMeta}>
-                    {calendar.isDefault ? 'Default · ' : ''}
-                    {calendar.sourceType === 'internal' ? 'BCal' : calendar.sourceType}
+                  <span
+                    className={styles.calendarCheckbox}
+                    style={{
+                      borderColor: calendar.color,
+                      backgroundColor: isVisible ? calendar.color : 'transparent',
+                    }}
+                    aria-hidden="true"
+                  >
+                    {isVisible ? '✓' : ''}
                   </span>
-                </span>
-              </button>
+                  <span className={styles.calendarIdentity}>
+                    <span className={styles.calendarName}>{calendar.name}</span>
+                    <span className={styles.calendarMeta}>
+                      {calendar.isDefault ? 'Default · ' : ''}
+                      {calendar.sourceType === 'internal' ? 'BCal' : calendar.sourceType}
+                      {calendar.isReadOnly ? ' · Read only' : ''}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className={styles.calendarEditButton}
+                  onClick={() => onEditCalendar(calendar)}
+                  aria-label={`Edit ${calendar.name}`}
+                  title={`Calendar settings for ${calendar.name}`}
+                >
+                  •••
+                </button>
+              </div>
             );
           })
         )}

@@ -9,6 +9,7 @@ interface CalendarToolbarProps {
   onPrevious: () => void;
   onToday: () => void;
   onNext: () => void;
+  onCreateEvent: () => void;
 }
 
 const MODES: { value: CalendarViewMode; label: string }[] = [
@@ -41,6 +42,7 @@ export function CalendarToolbar({
   onPrevious,
   onToday,
   onNext,
+  onCreateEvent,
 }: CalendarToolbarProps) {
   return (
     <header className={styles.calendarToolbar}>
@@ -50,6 +52,15 @@ export function CalendarToolbar({
       </div>
 
       <div className={styles.toolbarControls}>
+        <button
+          type="button"
+          className={styles.newEventButton}
+          onClick={onCreateEvent}
+          aria-label="New event"
+        >
+          <span aria-hidden="true">+</span>
+          <span className={styles.newEventLabel}>New event</span>
+        </button>
         <div className={styles.navigationGroup} aria-label="Calendar navigation">
           <button
             type="button"
