@@ -1,8 +1,9 @@
 .inspector {
+  --inspector-min-width: 360px;
   position: relative;
   z-index: 5;
-  width: var(--inspector-width);
-  min-width: 360px;
+  width: min(var(--inspector-width), 100%);
+  min-width: var(--inspector-min-width);
   min-height: 0;
   flex: 0 0 auto;
   border-left: 1px solid var(--color-border);
@@ -10,6 +11,44 @@
   flex-direction: column;
   background: var(--color-bg-surface);
   box-shadow: -12px 0 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  animation: inspector-enter 200ms ease-out both;
+}
+
+@keyframes inspector-enter {
+  from {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    width: min(var(--inspector-width), 100%);
+    min-width: var(--inspector-min-width);
+    transform: translateX(0);
+  }
+}
+
+.inspectorClosing {
+  animation: inspector-exit 180ms ease-in both;
+}
+
+@keyframes inspector-exit {
+  from {
+    opacity: 1;
+    width: min(var(--inspector-width), 100%);
+    min-width: var(--inspector-min-width);
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    transform: translateX(12px);
+  }
 }
 
 .header {
@@ -98,7 +137,6 @@
 
 .titleInput,
 .descriptionInput,
-.selectInput,
 .dateInput,
 .timeInput {
   width: 100%;
@@ -115,7 +153,6 @@
 
 .titleInput:hover,
 .descriptionInput:hover,
-.selectInput:hover,
 .dateInput:hover,
 .timeInput:hover {
   border-color: var(--color-border-strong);
@@ -123,7 +160,6 @@
 
 .titleInput:focus,
 .descriptionInput:focus,
-.selectInput:focus,
 .dateInput:focus,
 .timeInput:focus {
   border-color: var(--color-accent);
@@ -148,7 +184,6 @@
   line-height: var(--line-height-relaxed);
 }
 
-.selectInput,
 .dateInput,
 .timeInput {
   height: var(--control-height);
@@ -335,6 +370,7 @@
 
 @media (max-width: 1100px) {
   .inspector {
+    --inspector-min-width: 0px;
     position: absolute;
     inset: 0 0 0 auto;
     width: min(var(--inspector-width), 100%);
@@ -362,5 +398,12 @@
   .deleteBtn::after {
     content: 'Delete';
     font-size: var(--font-size-xs);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector,
+  .inspectorClosing {
+    animation-duration: 1ms;
   }
 }

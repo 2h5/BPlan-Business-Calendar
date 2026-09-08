@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { AccountPanel } from './AccountPanel';
 import { ConnectionsSection } from './ConnectionsSection';
 import styles from './SettingsView.module.css';
+import { Select } from '../../../components/forms/Select';
 import { useAuth } from '../../auth';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
 import { callbackResultFromNavigationState, oauthCallbackMessage } from '../utils/oauth-callback';
@@ -146,53 +147,45 @@ export function SettingsView() {
                 </datalist>
               </Field>
               <Field label="Week starts on">
-                <select
-                  value={draft.weekStartsOn}
-                  onChange={(e) => setDraft({ ...draft, weekStartsOn: Number(e.target.value) })}
-                >
-                  {WEEKDAYS.map((day, index) => (
-                    <option key={day} value={index}>
-                      {day}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  value={String(draft.weekStartsOn)}
+                  options={WEEKDAYS.map((day, index) => ({ value: String(index), label: day }))}
+                  onChange={(value) => setDraft({ ...draft, weekStartsOn: Number(value) })}
+                  ariaLabel="Week starts on"
+                />
               </Field>
               <Field label="Clock">
-                <select
+                <Select
                   value={draft.hourCycle}
-                  onChange={(e) => setDraft({ ...draft, hourCycle: e.target.value as HourCycle })}
-                >
-                  <option value="h12">12-hour</option>
-                  <option value="h23">24-hour</option>
-                </select>
+                  options={[
+                    { value: 'h12', label: '12-hour' },
+                    { value: 'h23', label: '24-hour' },
+                  ]}
+                  onChange={(value) => setDraft({ ...draft, hourCycle: value as HourCycle })}
+                  ariaLabel="Clock"
+                />
               </Field>
               <Field label="Default task duration">
-                <select
-                  value={draft.defaultTaskMinutes}
-                  onChange={(e) =>
-                    setDraft({ ...draft, defaultTaskMinutes: Number(e.target.value) })
-                  }
-                >
-                  {[15, 30, 45, 60, 90, 120].map((n) => (
-                    <option key={n} value={n}>
-                      {n} minutes
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  value={String(draft.defaultTaskMinutes)}
+                  options={[15, 30, 45, 60, 90, 120].map((minutes) => ({
+                    value: String(minutes),
+                    label: `${minutes} minutes`,
+                  }))}
+                  onChange={(value) => setDraft({ ...draft, defaultTaskMinutes: Number(value) })}
+                  ariaLabel="Default task duration"
+                />
               </Field>
               <Field label="Default event duration">
-                <select
-                  value={draft.defaultEventMinutes}
-                  onChange={(e) =>
-                    setDraft({ ...draft, defaultEventMinutes: Number(e.target.value) })
-                  }
-                >
-                  {[15, 30, 45, 60, 90, 120].map((n) => (
-                    <option key={n} value={n}>
-                      {n} minutes
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  value={String(draft.defaultEventMinutes)}
+                  options={[15, 30, 45, 60, 90, 120].map((minutes) => ({
+                    value: String(minutes),
+                    label: `${minutes} minutes`,
+                  }))}
+                  onChange={(value) => setDraft({ ...draft, defaultEventMinutes: Number(value) })}
+                  ariaLabel="Default event duration"
+                />
               </Field>
             </div>
             <div className={styles.working}>

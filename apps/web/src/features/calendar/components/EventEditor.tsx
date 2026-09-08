@@ -3,6 +3,7 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import styles from './CalendarView.module.css';
+import { Select } from '../../../components/forms/Select';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import {
   eventInputFromForm,
@@ -14,12 +15,14 @@ import {
 interface EventEditorProps {
   occurrence: EventOccurrence | null;
   isDraft: boolean;
+  isClosing: boolean;
   selectedDateKey: string;
   calendars: readonly Calendar[];
   timeZone: string;
   defaultDurationMinutes: number;
   isSaving: boolean;
   onClose: () => void;
+  onCloseAnimationEnd: () => void;
   onCreate: (input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onUpdate: (event: CalendarEvent, input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onDelete: (event: CalendarEvent) => Promise<void>;
@@ -39,12 +42,14 @@ function writableCalendars(
 export function EventEditor({
   occurrence,
   isDraft,
+  isClosing,
   selectedDateKey,
   calendars,
   timeZone,
   defaultDurationMinutes,
   isSaving,
   onClose,
+  onCloseAnimationEnd,
   onCreate,
   onUpdate,
   onDelete,
@@ -61,6 +66,8 @@ export function EventEditor({
   const readOnly = !!event && (!currentCalendar || currentCalendar.isReadOnly);
   const providerOwned = !!event && event.sourceType !== 'internal';
   const eventTimeZone = event?.timezone ?? timeZone;
+  const editorClassName = `${styles.eventEditor} ${isClosing ? styles.eventEditorClosing : ''}`;
+  const handleAnimationEnd = isClosing ? onCloseAnimationEnd : undefined;
 
   useEffect(() => {
     setMessage(null);
@@ -144,8 +151,9 @@ export function EventEditor({
   return (
     <aside
       ref={panelRef}
-      className={styles.eventEditor}
+      className={editorClassName}
       aria-label={isDraft ? 'Create event' : 'Event inspector'}
+      onAnimationEnd={handleAnimationEnd}
     >
       <div className={styles.editorHeader}>
         <div>
@@ -215,19 +223,17 @@ export function EventEditor({
 
         <div className={styles.editorField}>
           <label htmlFor="event-calendar">Calendar</label>
-          <select
+          <Select
             id="event-calendar"
             value={form.calendarId}
-            onChange={(changeEvent) => set('calendarId', changeEvent.target.value)}
+            options={availableCalendars.map((calendar) => ({
+              value: calendar.id,
+              label: `${calendar.name}${calendar.sourceType === 'internal' ? '' : ` (${calendar.sourceType})`}`,
+            }))}
+            onChange={(value) => set('calendarId', value)}
             disabled={readOnly || availableCalendars.length <= 1}
-          >
-            {availableCalendars.map((calendar) => (
-              <option key={calendar.id} value={calendar.id}>
-                {calendar.name}{' '}
-                {calendar.sourceType === 'internal' ? '' : `(${calendar.sourceType})`}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Calendar"
+          />
         </div>
 
         <label className={styles.allDayToggle}>
@@ -287,19 +293,20 @@ export function EventEditor({
 
         <div className={styles.editorField}>
           <label htmlFor="event-repeat">Repeat</label>
-          <select
+          <Select
             id="event-repeat"
             value={presetMatch ? (form.recurrenceRule ?? '') : 'custom'}
-            onChange={(changeEvent) => set('recurrenceRule', changeEvent.target.value || null)}
+            options={[
+              ...RECURRENCE_PRESETS.map((preset) => ({
+                value: preset.rrule ?? '',
+                label: preset.label,
+              })),
+              ...(!presetMatch ? [{ value: 'custom', label: 'Existing custom rule' }] : []),
+            ]}
+            onChange={(value) => set('recurrenceRule', value || null)}
             disabled={readOnly || !!event?.recurringEventId}
-          >
-            {RECURRENCE_PRESETS.map((preset) => (
-              <option key={preset.label} value={preset.rrule ?? ''}>
-                {preset.label}
-              </option>
-            ))}
-            {!presetMatch ? <option value="custom">Existing custom rule</option> : null}
-          </select>
+            ariaLabel="Repeat"
+          />
           {form.recurrenceRule ? (
             <small>
               {parsedRule

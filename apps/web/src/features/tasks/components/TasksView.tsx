@@ -25,6 +25,7 @@ export function TasksView() {
     searchParams.get('task'),
   );
   const [isDraft, setIsDraft] = useState(false);
+  const [isInspectorClosing, setIsInspectorClosing] = useState(false);
   const [activeTab, setActiveTab] = useState<TaskFilter>('inbox');
   const [selectedListId, setSelectedListId] = useState<string | null>(() =>
     searchParams.get('list'),
@@ -52,18 +53,25 @@ export function TasksView() {
     null;
 
   const handleSelectTask = useCallback((task: TaskWithTags) => {
+    setIsInspectorClosing(false);
     setIsDraft(false);
     setSelectedTaskId(task.id);
   }, []);
 
   const handleNewTaskClick = useCallback(() => {
+    setIsInspectorClosing(false);
     setSelectedTaskId(null);
     setIsDraft(true);
   }, []);
 
   const handleCloseInspector = useCallback(() => {
+    setIsInspectorClosing(true);
+  }, []);
+
+  const handleInspectorCloseAnimationEnd = useCallback(() => {
     setSelectedTaskId(null);
     setIsDraft(false);
+    setIsInspectorClosing(false);
   }, []);
 
   const handleToggleComplete = useCallback(
@@ -157,22 +165,26 @@ export function TasksView() {
         onRetry={refetch}
       />
 
-      {(selectedTask || isDraft) && (
+      {(selectedTask || isDraft || isInspectorClosing) && (
         <>
           <button
             type="button"
-            className={styles.inspectorBackdrop}
+            className={`${styles.inspectorBackdrop} ${
+              isInspectorClosing ? styles.inspectorBackdropClosing : ''
+            }`}
             aria-label="Close task inspector"
             onClick={handleCloseInspector}
           />
           <TaskInspector
             task={selectedTask}
             isDraft={isDraft}
+            isClosing={isInspectorClosing}
             lists={lists}
             tags={tags}
             timeZone={timeZone}
             isSaving={createTask.isPending || updateTask.isPending}
             onClose={handleCloseInspector}
+            onCloseAnimationEnd={handleInspectorCloseAnimationEnd}
             onSave={handleInspectorSave}
             onToggleComplete={handleToggleComplete}
             onSnooze={handleSnooze}

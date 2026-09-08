@@ -3,16 +3,19 @@ import type { CreateTaskInput, Tag, TaskList, TaskPriority, UpdateTaskInput } fr
 import React, { useEffect, useState } from 'react';
 
 import styles from './TaskInspector.module.css';
+import { Select } from '../../../components/forms/Select';
 import type { TaskWithTags } from '../api/tasks.api';
 
 interface TaskInspectorProps {
   task: TaskWithTags | null;
   isDraft: boolean;
+  isClosing: boolean;
   lists?: TaskList[];
   tags?: Tag[];
   timeZone: string;
   isSaving: boolean;
   onClose: () => void;
+  onCloseAnimationEnd: () => void;
   onSave: (data: CreateTaskInput | UpdateTaskInput) => Promise<void> | void;
   onToggleComplete?: (task: TaskWithTags, completed: boolean) => void;
   onSnooze?: (task: TaskWithTags) => void;
@@ -22,16 +25,20 @@ interface TaskInspectorProps {
 export function TaskInspector({
   task,
   isDraft,
+  isClosing,
   lists = [],
   tags = [],
   timeZone,
   isSaving,
   onClose,
+  onCloseAnimationEnd,
   onSave,
   onToggleComplete,
   onSnooze,
   onDelete,
 }: TaskInspectorProps) {
+  const inspectorClassName = `${styles.inspector} ${isClosing ? styles.inspectorClosing : ''}`;
+  const handleAnimationEnd = isClosing ? onCloseAnimationEnd : undefined;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('normal');
@@ -93,7 +100,7 @@ export function TaskInspector({
 
   if (!task && !isDraft) {
     return (
-      <aside className={styles.inspector}>
+      <aside className={inspectorClassName} onAnimationEnd={handleAnimationEnd}>
         <div className={styles.emptyState}>
           <svg
             width="40"
@@ -189,7 +196,11 @@ export function TaskInspector({
   const isCompleted = task?.status === 'completed';
 
   return (
-    <aside className={styles.inspector} aria-label="Task inspector">
+    <aside
+      className={inspectorClassName}
+      aria-label="Task inspector"
+      onAnimationEnd={handleAnimationEnd}
+    >
       <div className={styles.header}>
         <div className={styles.headerCopy}>
           <span className={styles.headerTitle}>{isDraft ? 'New task' : 'Task details'}</span>
@@ -372,37 +383,32 @@ export function TaskInspector({
           <label className={styles.fieldLabel} htmlFor="task-priority">
             Priority
           </label>
-          <select
+          <Select
             id="task-priority"
-            className={styles.selectInput}
             value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-          >
-            {(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_LABELS[p]}
-              </option>
-            ))}
-          </select>
+            options={(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((priorityOption) => ({
+              value: priorityOption,
+              label: PRIORITY_LABELS[priorityOption],
+            }))}
+            onChange={(value) => setPriority(value as TaskPriority)}
+            ariaLabel="Priority"
+          />
         </div>
 
         <div className={styles.fieldGroup}>
           <label className={styles.fieldLabel} htmlFor="task-list">
             List
           </label>
-          <select
+          <Select
             id="task-list"
-            className={styles.selectInput}
             value={listId ?? ''}
-            onChange={(e) => setListId(e.target.value ? e.target.value : null)}
-          >
-            <option value="">Inbox (No List)</option>
-            {lists.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'Inbox (No List)' },
+              ...lists.map((list) => ({ value: list.id, label: list.name })),
+            ]}
+            onChange={(value) => setListId(value || null)}
+            ariaLabel="List"
+          />
         </div>
 
         {tags.length > 0 && (

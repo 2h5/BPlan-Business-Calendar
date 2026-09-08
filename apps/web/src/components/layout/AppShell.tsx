@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './AppShell.module.css';
+import { PageTransition } from './PageTransition';
 import { signOut, useAuth } from '../../features/auth';
 
 interface NavItemConfig {
@@ -248,7 +249,9 @@ export function AppShell() {
               : styles.contentArea
           }
         >
-          <Outlet />
+          <PageTransition contentKey={location.key}>
+            <Outlet />
+          </PageTransition>
         </main>
       </div>
     </div>

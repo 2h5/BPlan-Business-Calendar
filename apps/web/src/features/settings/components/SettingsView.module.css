@@ -62,7 +62,6 @@
   font-weight: var(--font-weight-medium);
 }
 .field input,
-.field select,
 .dayRow input[type='time'] {
   width: 100%;
   height: var(--control-height);
@@ -74,7 +73,6 @@
   font-size: var(--font-size-sm);
 }
 .field input:focus,
-.field select:focus,
 .dayRow input:focus {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px var(--color-focus-ring);

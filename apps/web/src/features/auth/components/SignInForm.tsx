@@ -45,9 +45,6 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <div className={styles.brandMark} aria-hidden="true">
-          B
-        </div>
         <span className={styles.eyebrow}>BCal workspace</span>
         <h1 className={styles.title}>Welcome back</h1>
         <p className={styles.subtitle}>Sign in to continue to your calendar and tasks.</p>
@@ -61,18 +58,16 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
         )}
 
         <div className={styles.field}>
-          <label htmlFor="signin-email" className={styles.label}>
-            Email address
-          </label>
           <input
             id="signin-email"
             type="email"
+            aria-label="Email address"
             autoComplete="email"
             required
             value={email}
             disabled={isSubmitting}
             className={`${styles.input} ${errorMessage ? styles.inputError : ''}`}
-            placeholder="you@example.com"
+            placeholder="Email"
             aria-invalid={!!errorMessage}
             aria-describedby={errorMessage ? 'signin-error' : undefined}
             onChange={(e) => setEmail(e.target.value)}
@@ -80,18 +75,16 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
         </div>
 
         <div className={styles.field}>
-          <label htmlFor="signin-password" className={styles.label}>
-            Password
-          </label>
           <input
             id="signin-password"
             type="password"
+            aria-label="Password"
             autoComplete="current-password"
             required
             value={password}
             disabled={isSubmitting}
             className={`${styles.input} ${errorMessage ? styles.inputError : ''}`}
-            placeholder="••••••••"
+            placeholder="Password"
             aria-invalid={!!errorMessage}
             aria-describedby={errorMessage ? 'signin-error' : undefined}
             onChange={(e) => setPassword(e.target.value)}

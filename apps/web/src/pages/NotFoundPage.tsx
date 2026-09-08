@@ -5,7 +5,7 @@ import styles from './pages.module.css';
 
 export function NotFoundPage() {
   useEffect(() => {
-    document.title = 'BCal — Page Not Found';
+    document.title = 'BCal | Page Not Found';
   }, []);
 
   return (

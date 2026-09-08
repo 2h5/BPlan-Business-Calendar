@@ -749,7 +749,48 @@
 }
 
 .eventEditor {
-  width: 408px;
+  --editor-width: 408px;
+  --editor-min-width: 320px;
+  width: var(--editor-width);
+  min-width: var(--editor-min-width);
+  overflow: hidden;
+  animation: event-editor-enter 200ms ease-out both;
+}
+
+@keyframes event-editor-enter {
+  from {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    width: var(--editor-width);
+    min-width: var(--editor-min-width);
+    transform: translateX(0);
+  }
+}
+
+.eventEditorClosing {
+  animation: event-editor-exit 180ms ease-in both;
+}
+
+@keyframes event-editor-exit {
+  from {
+    opacity: 1;
+    width: var(--editor-width);
+    min-width: var(--editor-min-width);
+    transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    width: 0;
+    min-width: 0;
+    transform: translateX(12px);
+  }
 }
 
 .editorHeader {
@@ -811,7 +852,6 @@
 }
 
 .editorField input,
-.editorField select,
 .editorField textarea,
 .dateTimeFields input {
   width: 100%;
@@ -831,7 +871,6 @@
 }
 
 .editorField input:disabled,
-.editorField select:disabled,
 .editorField textarea:disabled,
 .dateTimeFields:disabled input {
   opacity: 0.65;
@@ -1129,6 +1168,26 @@
   display: none;
 }
 
+@keyframes event-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes event-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 1500px) {
   .eventDetails,
   .eventEditor {
@@ -1139,12 +1198,24 @@
     box-shadow: var(--shadow-lg);
   }
 
+  .eventEditor {
+    --editor-width: min(380px, calc(100% - 56px));
+    --editor-min-width: 0px;
+    width: var(--editor-width);
+    min-width: var(--editor-min-width);
+  }
+
   .detailsBackdrop {
     position: absolute;
     z-index: 4;
     inset: 0;
     display: block;
     background: var(--color-bg-overlay);
+    animation: event-backdrop-enter 200ms ease-out both;
+  }
+
+  .detailsBackdropClosing {
+    animation: event-backdrop-exit 180ms ease-in both;
   }
 }
 
@@ -1266,7 +1337,7 @@
   }
 
   .eventEditor {
-    width: calc(100% - 44px);
+    --editor-width: calc(100% - 44px);
   }
 
   .dateTimeFields {
@@ -1292,5 +1363,14 @@
     right: var(--space-3);
     bottom: var(--space-3);
     width: calc(100% - var(--space-6));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eventEditor,
+  .eventEditorClosing,
+  .detailsBackdrop,
+  .detailsBackdropClosing {
+    animation-duration: 1ms;
   }
 }

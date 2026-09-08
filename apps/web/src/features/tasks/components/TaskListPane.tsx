@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 
 import styles from './TaskListPane.module.css';
 import { TaskRow } from './TaskRow';
+import { Select } from '../../../components/forms/Select';
 import type { TaskWithTags } from '../api/tasks.api';
 import type { TaskFilter, WebTaskBuckets } from '../hooks/useTaskBuckets';
 
@@ -265,19 +266,17 @@ export function TaskListPane({
           </div>
 
           <div className={styles.headerActions}>
-            <select
+            <Select
               className={styles.listSelect}
+              size="sm"
               value={selectedListId ?? ''}
-              onChange={(e) => onListChange(e.target.value ? e.target.value : null)}
-              aria-label="Filter by list"
-            >
-              <option value="">All Lists</option>
-              {lists.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'All Lists' },
+                ...lists.map((list) => ({ value: list.id, label: list.name })),
+              ]}
+              onChange={(value) => onListChange(value || null)}
+              ariaLabel="Filter by list"
+            />
 
             <button
               type="button"

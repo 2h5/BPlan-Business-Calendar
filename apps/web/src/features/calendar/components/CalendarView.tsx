@@ -76,6 +76,7 @@ export function CalendarView() {
   );
   const [selectedOccurrence, setSelectedOccurrence] = useState<EventOccurrence | null>(null);
   const [isDraft, setIsDraft] = useState(false);
+  const [isEventEditorClosing, setIsEventEditorClosing] = useState(false);
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -94,6 +95,7 @@ export function CalendarView() {
     if (!requestedEventId) return;
     const occurrence = result.occurrences.find((item) => item.event.id === requestedEventId);
     if (occurrence) {
+      setIsEventEditorClosing(false);
       setSelectedOccurrence(occurrence);
       setRequestedEventId(null);
     }
@@ -121,6 +123,7 @@ export function CalendarView() {
     setMode(nextMode);
     setSelectedOccurrence(null);
     setIsDraft(false);
+    setIsEventEditorClosing(false);
   }, []);
 
   const selectMonthDate = useCallback((dateKey: string) => {
@@ -133,8 +136,13 @@ export function CalendarView() {
   }, [timeZone]);
 
   const closeEventEditor = useCallback(() => {
+    setIsEventEditorClosing(true);
+  }, []);
+
+  const handleEventEditorCloseAnimationEnd = useCallback(() => {
     setSelectedOccurrence(null);
     setIsDraft(false);
+    setIsEventEditorClosing(false);
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
@@ -186,6 +194,7 @@ export function CalendarView() {
               return;
             }
             rememberOpeningControl();
+            setIsEventEditorClosing(false);
             setSelectedOccurrence(null);
             setIsDraft(true);
           }}
@@ -206,6 +215,7 @@ export function CalendarView() {
               onSelectDate={selectMonthDate}
               onSelectEvent={(occurrence) => {
                 rememberOpeningControl();
+                setIsEventEditorClosing(false);
                 setIsDraft(false);
                 setSelectedOccurrence(occurrence);
               }}
@@ -221,6 +231,7 @@ export function CalendarView() {
               onSelectDate={setSelectedDateKey}
               onSelectEvent={(occurrence) => {
                 rememberOpeningControl();
+                setIsEventEditorClosing(false);
                 setIsDraft(false);
                 setSelectedOccurrence(occurrence);
               }}
@@ -235,23 +246,27 @@ export function CalendarView() {
         </div>
       </section>
 
-      {selectedOccurrence || isDraft ? (
+      {selectedOccurrence || isDraft || isEventEditorClosing ? (
         <>
           <button
             type="button"
-            className={styles.detailsBackdrop}
+            className={`${styles.detailsBackdrop} ${
+              isEventEditorClosing ? styles.detailsBackdropClosing : ''
+            }`}
             onClick={closeEventEditor}
             aria-label="Close event editor"
           />
           <EventEditor
             occurrence={selectedOccurrence}
             isDraft={isDraft}
+            isClosing={isEventEditorClosing}
             selectedDateKey={selectedDateKey}
             calendars={result.calendars}
             timeZone={timeZone}
             defaultDurationMinutes={result.defaultEventMinutes}
             isSaving={createEvent.isPending || updateEvent.isPending || removeEvent.isPending}
             onClose={closeEventEditor}
+            onCloseAnimationEnd={handleEventEditorCloseAnimationEnd}
             onCreate={async (input) => {
               await createEvent.mutateAsync(input);
               closeEventEditor();
