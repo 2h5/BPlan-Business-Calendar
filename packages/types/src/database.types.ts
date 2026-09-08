@@ -551,11 +551,45 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_events: {
+        Row: {
+          applied: boolean
+          event_at: string
+          event_id: string
+          event_type: string
+          payload: Json
+          received_at: string
+          skipped_reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          applied?: boolean
+          event_at: string
+          event_id: string
+          event_type: string
+          payload: Json
+          received_at?: string
+          skipped_reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          applied?: boolean
+          event_at?: string
+          event_id?: string
+          event_type?: string
+          payload?: Json
+          received_at?: string
+          skipped_reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           entitlement: string
           expires_at: string | null
           id: string
+          last_event_at: string | null
           provider: string
           raw_customer_id: string | null
           status: string
@@ -566,6 +600,7 @@ export type Database = {
           entitlement: string
           expires_at?: string | null
           id?: string
+          last_event_at?: string | null
           provider?: string
           raw_customer_id?: string | null
           status: string
@@ -576,6 +611,7 @@ export type Database = {
           entitlement?: string
           expires_at?: string | null
           id?: string
+          last_event_at?: string | null
           provider?: string
           raw_customer_id?: string | null
           status?: string
@@ -885,6 +921,17 @@ export type Database = {
           p_anchor_date: string
           p_candidate_date: string
           p_rule: string
+        }
+        Returns: boolean
+      }
+      apply_revenuecat_event: {
+        Args: {
+          p_customer_id?: string
+          p_entitlement: string
+          p_event_at: string
+          p_expires_at: string
+          p_status: string
+          p_user_id: string
         }
         Returns: boolean
       }

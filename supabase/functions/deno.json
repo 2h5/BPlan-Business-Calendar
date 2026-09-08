@@ -3,6 +3,7 @@
     "@cal/domain/scheduling": "../../packages/domain/src/scheduling/index.ts",
     "@cal/domain/time": "../../packages/domain/src/time/index.ts",
     "@cal/schemas/scheduling": "../../packages/schemas/src/scheduling.schema.ts",
+    "@cal/schemas/subscription": "../../packages/schemas/src/subscription.schema.ts",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.45.4",
     "zod": "npm:zod@^3.23.8"
   },

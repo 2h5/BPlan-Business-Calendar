@@ -79,6 +79,10 @@ verify_jwt = false
 [functions.webhook-microsoft]
 verify_jwt = false
 
+# RevenueCat signs deliveries with a shared secret header, not a Supabase JWT.
+[functions.revenuecat-webhook]
+verify_jwt = false
+
 # Called by pg_cron with a shared secret, not by a signed-in user.
 [functions.sync-cron]
 verify_jwt = false
