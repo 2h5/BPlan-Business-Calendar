@@ -6,6 +6,7 @@ import { ConnectionsSection } from './ConnectionsSection';
 import styles from './SettingsView.module.css';
 import { useAuth } from '../../auth';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
+import { minuteOfDayToTimeInput, timeInputToMinute } from '../utils/working-hours-time';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIME_ZONES = [
@@ -210,12 +211,12 @@ export function SettingsView() {
                           <input
                             aria-label={`${day} start`}
                             type="time"
-                            value={minuteValue(window.startMinute)}
+                            value={minuteOfDayToTimeInput(window.startMinute)}
                             onChange={(e) =>
                               updateWorking(
                                 draft.workingHours.map((item) =>
                                   item.weekday === weekday
-                                    ? { ...item, startMinute: valueMinute(e.target.value) }
+                                    ? { ...item, startMinute: timeInputToMinute(e.target.value) }
                                     : item,
                                 ),
                               )
@@ -223,19 +224,36 @@ export function SettingsView() {
                           />
                           <span>to</span>
                           <input
-                            aria-label={`${day} end`}
+                            aria-label={`${day} end${window.endMinute === 1440 ? ' (end of day)' : ''}`}
                             type="time"
-                            value={minuteValue(window.endMinute)}
+                            value={minuteOfDayToTimeInput(window.endMinute)}
+                            disabled={window.endMinute === 1440}
                             onChange={(e) =>
                               updateWorking(
                                 draft.workingHours.map((item) =>
                                   item.weekday === weekday
-                                    ? { ...item, endMinute: valueMinute(e.target.value) }
+                                    ? { ...item, endMinute: timeInputToMinute(e.target.value) }
                                     : item,
                                 ),
                               )
                             }
                           />
+                          <label className={styles.endOfDayToggle}>
+                            <input
+                              type="checkbox"
+                              checked={window.endMinute === 1440}
+                              onChange={(e) =>
+                                updateWorking(
+                                  draft.workingHours.map((item) =>
+                                    item.weekday === weekday
+                                      ? { ...item, endMinute: e.target.checked ? 1440 : 1439 }
+                                      : item,
+                                  ),
+                                )
+                              }
+                            />
+                            End of day
+                          </label>
                         </>
                       ) : (
                         <span className={styles.off}>Not working</span>
@@ -301,11 +319,4 @@ function SettingsState({
       )}
     </div>
   );
-}
-function minuteValue(minutes: number) {
-  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-}
-function valueMinute(value: string) {
-  const [hours = '0', minutes = '0'] = value.split(':');
-  return Number(hours) * 60 + Number(minutes);
 }

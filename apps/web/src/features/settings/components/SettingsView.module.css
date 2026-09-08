@@ -119,6 +119,15 @@
   font-size: var(--font-size-xs);
   text-align: center;
 }
+.endOfDayToggle {
+  grid-column: 1 / -1;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
 .off {
   grid-column: 1 / -1;
 }

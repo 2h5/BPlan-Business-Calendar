@@ -18,6 +18,7 @@ export interface EventFormValues {
   endTime: string;
   allDay: boolean;
   recurrenceRule: string | null;
+  alerts: number[];
 }
 
 const pad = (value: number): string => String(value).padStart(2, '0');
@@ -54,7 +55,8 @@ function parseDateAndTime(
   };
 }
 
-export function eventToFormValues(event: CalendarEvent, timeZone: string): EventFormValues {
+export function eventToFormValues(event: CalendarEvent): EventFormValues {
+  const timeZone = event.timezone;
   const start = wallClockFields(new Date(event.startAt), timeZone);
   const endInstant = event.allDay
     ? addZonedDays(new Date(event.endAt), -1, timeZone)
@@ -71,6 +73,7 @@ export function eventToFormValues(event: CalendarEvent, timeZone: string): Event
     endTime: end.time,
     allDay: event.allDay,
     recurrenceRule: event.recurrenceRule,
+    alerts: [...event.alerts],
   };
 }
 
@@ -97,23 +100,30 @@ export function newEventFormValues(
     endTime: end.time,
     allDay: false,
     recurrenceRule: null,
+    alerts: [],
   };
 }
 
-export function eventInputFromForm(values: EventFormValues, timeZone: string): CreateEventInput {
-  if (values.recurrenceRule && !parseRRule(values.recurrenceRule)) {
+export function eventInputFromForm(
+  values: EventFormValues,
+  timeZone: string,
+  existingEvent: Pick<CalendarEvent, 'recurrenceRule' | 'timezone'> | null = null,
+): CreateEventInput {
+  const eventTimeZone = existingEvent?.timezone ?? timeZone;
+  const recurrenceWasChanged = values.recurrenceRule !== (existingEvent?.recurrenceRule ?? null);
+  if (recurrenceWasChanged && values.recurrenceRule && !parseRRule(values.recurrenceRule)) {
     throw new Error('Choose a supported repeat pattern.');
   }
 
   const start = zonedWallClockToUtc(
     parseDateAndTime(values.startDate, values.allDay ? '00:00' : values.startTime),
-    timeZone,
+    eventTimeZone,
   );
   let end = zonedWallClockToUtc(
     parseDateAndTime(values.endDate, values.allDay ? '00:00' : values.endTime),
-    timeZone,
+    eventTimeZone,
   );
-  if (values.allDay) end = addZonedDays(end, 1, timeZone);
+  if (values.allDay) end = addZonedDays(end, 1, eventTimeZone);
 
   if (end.getTime() <= start.getTime()) {
     throw new Error('The event must end after it starts.');
@@ -127,8 +137,8 @@ export function eventInputFromForm(values: EventFormValues, timeZone: string): C
     startAt: start.toISOString(),
     endAt: end.toISOString(),
     allDay: values.allDay,
-    timezone: timeZone,
+    timezone: eventTimeZone,
     recurrenceRule: values.recurrenceRule,
-    alerts: [],
+    alerts: values.alerts,
   });
 }

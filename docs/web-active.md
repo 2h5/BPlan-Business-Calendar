@@ -207,6 +207,28 @@ This document is the single source of truth for web client implementation, archi
 
 ---
 
+### Web Phases 4/5 — Review Hardening Checkpoint
+
+- **Goal:** Fix concrete review findings in the completed web event editor, search, Today, settings, and calendar-window surfaces without changing ownership or shared-domain architecture.
+- **Status:** Complete — targeted hardening
+- **Starting SHA:** `b359fe4`
+- **Implementation Completed:**
+  - Existing event edits now use the event's stored timezone for both wall-clock form conversion and submitted writes; new events retain the profile/device default. Existing alerts are carried through edits.
+  - Unchanged unsupported recurrence strings remain editable and are submitted byte-for-byte unchanged. Replaced recurrence rules still require the supported shared parser, and the same rule is safe for internal and provider-first writes.
+  - Added `@cal/web`'s Vitest script and dependency so the existing root recursive `pnpm test` and CI unit-test step execute all web tests.
+  - Replaced search punctuation stripping with bounded whitespace normalization, literal LIKE escaping, and quoted PostgREST OR values. Search remains browser-anon-key/RLS-backed and capped per entity.
+  - Today schedules one timeout for the next profile-local midnight and recomputes its day window after rollover, including timezone offset changes.
+  - Working-hours end-of-day `1440` is represented by an explicit end-of-day toggle while the HTML time input receives only the valid `23:59` display boundary; the shared schema/domain meaning is unchanged.
+  - Item 7 remains intentionally unchanged in code. `recurrence_rule` is opaque text at the web API boundary, so a safe database expiry predicate cannot be derived without risking infinite, finite, provider, or moved/cancelled exception occurrences. The bounded view read therefore continues to include all recurring masters and lets `@cal/domain` preserve correctness.
+- **Tests / Verification:**
+  - Added or updated focused web tests for event timezone/alert preservation, unsupported recurrence preservation and replacement validation, special-character search filters, profile-local midnight rollover, and the `1440` HTML time conversion boundary.
+  - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm --filter @cal/web test`, `pnpm --filter @cal/web build`, and `git diff --check` passed locally. The normal root test ran 156 domain tests and 37 web tests across 11 web files.
+  - `.github/workflows/ci.yml` still runs the normal root `pnpm test` command for unit tests, so web tests participate in CI without a manual side path.
+- **Remaining Work:** Item 7 requires a future schema/provider-derived series-end field before a safe recurring-master query bound can be introduced.
+- **Next Action:** Web Phase 6 — Provider Integrations
+
+---
+
 ### Web Phase 6 — Provider Integrations
 
 - **Goal:** Google and Microsoft browser OAuth connection/reconnection, provider calendar discovery/import controls, detailed per-calendar sync health, and OAuth callback handling while preserving the provider-first write architecture. Basic existing-account status, manual sync, and secure disconnect controls are already present in Settings from Phase 5.

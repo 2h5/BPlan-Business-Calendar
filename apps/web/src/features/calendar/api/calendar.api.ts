@@ -92,8 +92,10 @@ export async function deleteCalendar(id: string): Promise<void> {
 
 /**
  * Fetch rows that can contribute an occurrence to one bounded view window.
- * Recurring masters are included even when their original start is older than
- * the window; @cal/domain expands them and applies provider exception rows.
+ * Recurring masters are intentionally included even when their original start
+ * is older than the window; `recurrence_rule` is opaque text here, so the API
+ * cannot safely derive a series end without risking valid finite or provider
+ * exception occurrences. @cal/domain expands them and applies exceptions.
  */
 export async function fetchEventsInWindow(start: Date, end: Date): Promise<CalendarEvent[]> {
   const startMs = start.getTime();

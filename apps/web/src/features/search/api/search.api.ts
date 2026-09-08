@@ -1,6 +1,6 @@
 import type { Calendar, CalendarEvent, TaskList } from '@cal/schemas';
 
-import { sanitizeSearchQuery } from './search-query';
+import { buildIlikeOrFilter, sanitizeSearchQuery, searchIlikePattern } from './search-query';
 import { toAppError } from '../../../lib/errors/app-error';
 import { supabase } from '../../../lib/supabase/client';
 import { calendarRowSchema, eventRowSchema } from '../../calendar/api/calendar-mappers';
@@ -22,21 +22,21 @@ export interface SearchResults {
 export async function searchEverything(query: string): Promise<SearchResults> {
   const safeQuery = sanitizeSearchQuery(query);
   if (safeQuery.length < 2) return { events: [], tasks: [], calendars: [], lists: [] };
-  const pattern = `%${safeQuery}%`;
+  const pattern = searchIlikePattern(safeQuery);
 
   const [eventsResult, tasksResult, calendarsResult, listsResult] = await Promise.all([
     supabase
       .from('events')
       .select(EVENT_COLUMNS)
       .neq('status', 'cancelled')
-      .or(`title.ilike.${pattern},description.ilike.${pattern},location.ilike.${pattern}`)
+      .or(buildIlikeOrFilter(['title', 'description', 'location'], safeQuery))
       .order('start_at', { ascending: false })
       .limit(40),
     supabase
       .from('tasks')
       .select(`${TASK_COLUMNS}, task_tags(tag_id)`)
       .neq('status', 'archived')
-      .or(`title.ilike.${pattern},description.ilike.${pattern}`)
+      .or(buildIlikeOrFilter(['title', 'description'], safeQuery))
       .order('updated_at', { ascending: false })
       .limit(40),
     supabase.from('calendars').select('*').ilike('name', pattern).order('name').limit(12),

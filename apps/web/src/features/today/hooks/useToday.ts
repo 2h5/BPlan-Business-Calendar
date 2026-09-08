@@ -1,15 +1,30 @@
 import { calculateFreeTime, deviceTimeZone, toZonedDateKey } from '@cal/domain';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useCalendarWindow } from '../../calendar/hooks/useCalendarWindow';
 import { useProfile } from '../../settings/hooks/useSettings';
 import { useTaskBuckets } from '../../tasks/hooks/useTaskBuckets';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
+import { millisecondsUntilNextLocalMidnight } from '../utils/today-clock';
+
+function useLocalNow(timeZone: string): Date {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setNow(new Date()),
+      millisecondsUntilNextLocalMidnight(now, timeZone) + 50,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [now, timeZone]);
+
+  return now;
+}
 
 export function useToday() {
-  const now = new Date();
   const profileQuery = useProfile();
   const timeZone = profileQuery.data?.timezone ?? deviceTimeZone();
+  const now = useLocalNow(timeZone);
   const todayKey = toZonedDateKey(now, timeZone);
   const calendar = useCalendarWindow('day', todayKey);
   const tasks = useTaskBuckets({ listId: null, filter: 'inbox', timeZone });

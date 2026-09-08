@@ -60,11 +60,12 @@ export function EventEditor({
   const currentCalendar = calendars.find((calendar) => calendar.id === event?.calendarId);
   const readOnly = !!event && (!currentCalendar || currentCalendar.isReadOnly);
   const providerOwned = !!event && event.sourceType !== 'internal';
+  const eventTimeZone = event?.timezone ?? timeZone;
 
   useEffect(() => {
     setMessage(null);
     if (event) {
-      setForm(eventToFormValues(event, timeZone));
+      setForm(eventToFormValues(event));
     } else if (isDraft && defaultCalendar) {
       setForm(
         newEventFormValues(selectedDateKey, defaultCalendar.id, timeZone, defaultDurationMinutes),
@@ -109,7 +110,7 @@ export function EventEditor({
     if (readOnly) return;
     try {
       setMessage(null);
-      const input = eventInputFromForm(form, timeZone);
+      const input = eventInputFromForm(form, timeZone, event);
       if (event) await onUpdate(event, input);
       else await onCreate(input);
       setMessage({ tone: 'success', text: event ? 'Event updated.' : 'Event created.' });
@@ -333,7 +334,7 @@ export function EventEditor({
         </div>
 
         <div className={styles.editorMeta}>
-          Times are stored in UTC and shown in {timeZone.replaceAll('_', ' ')}.
+          Times are stored in UTC and shown in {eventTimeZone.replaceAll('_', ' ')}.
         </div>
 
         <div className={styles.editorFooter}>
