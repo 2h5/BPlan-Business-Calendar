@@ -1,5 +1,9 @@
 import { createTaskSchema, updateTaskSchema } from '@cal/schemas';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// These tests cover the pure row/schema exports. Keep the production client
+// isolated so importing the module does not require browser Supabase config.
+vi.mock('../../../lib/supabase/client', () => ({ supabase: {} }));
 
 import { taskListRowSchema, tagRowSchema, taskRowSchema } from './tasks.api';
 

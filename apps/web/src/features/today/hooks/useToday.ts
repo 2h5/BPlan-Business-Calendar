@@ -5,7 +5,7 @@ import { useCalendarWindow } from '../../calendar/hooks/useCalendarWindow';
 import { useProfile } from '../../settings/hooks/useSettings';
 import { useTaskBuckets } from '../../tasks/hooks/useTaskBuckets';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
-import { millisecondsUntilNextLocalMidnight } from '../utils/today-clock';
+import { millisecondsUntilNextClockUpdate } from '../utils/today-clock';
 
 function useLocalNow(timeZone: string): Date {
   const [now, setNow] = useState(() => new Date());
@@ -13,7 +13,7 @@ function useLocalNow(timeZone: string): Date {
   useEffect(() => {
     const timeout = window.setTimeout(
       () => setNow(new Date()),
-      millisecondsUntilNextLocalMidnight(now, timeZone) + 50,
+      millisecondsUntilNextClockUpdate(now, timeZone),
     );
     return () => window.clearTimeout(timeout);
   }, [now, timeZone]);

@@ -227,6 +227,18 @@ This document is the single source of truth for web client implementation, archi
 - **Remaining Work:** Item 7 requires a future schema/provider-derived series-end field before a safe recurring-master query bound can be introduced.
 - **Next Action:** Web Phase 6 — Provider Integrations
 
+#### Remaining hardening follow-up
+
+- **Starting SHA:** `8d381c8`
+- **Implementation Completed:**
+  - Isolated the task row/schema tests from the eagerly validated browser Supabase client with a Vitest module mock. Production environment validation remains unchanged, and the schema tests still import and exercise the intended exports from `tasks.api.ts`.
+  - Kept Today’s profile-local midnight rollover while scheduling current-time recalculation at most once per minute, with the midnight boundary taking priority when it is near.
+- **Tests / Verification:**
+  - `pnpm test` passed with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` unset: 156 shared domain tests and 39 web tests across 11 files.
+  - Focused task API and Today clock tests passed: 10 tests.
+  - `pnpm verify` passed: formatting, lint, strict typecheck, all repository tests, and the production web build. The build retained the existing non-blocking large-chunk warning.
+- **Scope:** Phase 6 remains planned; no provider integration work was started.
+
 ---
 
 ### Web Phase 6 — Provider Integrations
