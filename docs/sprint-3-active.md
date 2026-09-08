@@ -4,9 +4,10 @@ Status: **CLOSED / HISTORICAL — implementation complete**
 Last updated: **2026-09-01**
 
 This document records the Sprint 3 implementation and its verification state at
-handoff. It is not the current implementation plan. The current source of truth
-is [`docs/sprint-6-active.md`](sprint-6-active.md); use this file only for Sprint
-3 history and evidence.
+handoff. It is not the current implementation plan. Current work is split
+between [`docs/sprint-6-active.md`](sprint-6-active.md) for mobile/AI and
+[`docs/web-active.md`](web-active.md) for web; use this file only for Sprint 3
+history and evidence.
 
 ## Goal
 
@@ -108,5 +109,6 @@ polish that makes the internal calendar and task inbox feel like one product.
 
 Sprint 3 has no remaining implementation work in this tracker. Do not treat its
 old unchecked-at-handoff notes as the active task list, and do not reopen Sprint
-3 for the current work. Continue from the current Sprint 5 handoff and inspect
-the repository before making any new change.
+3 for the current work. Read [`docs/sprint-6-active.md`](sprint-6-active.md) for
+mobile/AI work and [`docs/web-active.md`](web-active.md) for web work; Sprint 5
+is historical Microsoft implementation and external-verification evidence.

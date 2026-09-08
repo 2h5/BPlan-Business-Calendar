@@ -34,3 +34,14 @@ When the engine finds nothing, no model call is made at all.
 what the constraint schema can express, so genuinely novel requests need schema
 changes rather than prompt changes. This is the right trade: schema changes are
 reviewable.
+
+## Amendment — Sprint 6 v1 implementation
+
+The deterministic-engine/model-ranking decision remains accepted. The
+consequence above that heuristic ranking would be a production fallback was
+superseded by the later Sprint 6 implementation: the current v1 has no silent
+heuristic production fallback. The server uses the configured model for an
+entitled proposal request and returns a controlled provider-unavailable failure
+when that model cannot be used; `rankSlotsHeuristically` remains an explainable
+evaluation/offline baseline and test oracle. Proposal persistence and explicit
+server-side confirmation remain part of the accepted safety boundary.

@@ -27,8 +27,8 @@ interface CalendarProvider {
 
 Both normalise into the same internal event model. Nothing above this interface
 knows which provider it is talking to — `providers/registry.ts` is the only
-place a provider kind becomes a concrete implementation, and Sprint 5 adds
-Microsoft by registering two entries there.
+place a provider kind becomes a concrete implementation, and Sprint 5
+registered Microsoft by adding its two provider entries there.
 
 Every method takes an explicit `ProviderContext` rather than resolving an
 account internally, which is a deviation from the original sketch. Edge
@@ -89,6 +89,19 @@ user edits  →  provider mutation FIRST  →  provider confirms  →  update lo
 
 Writing locally first and pushing later produces divergence that users
 experience as their calendar "changing back".
+
+Mobile and web event APIs send provider-owned create/update/delete operations to
+the `provider-event-write` Edge Function. The function resolves the provider
+account from owned database state, invokes the adapter, and mirrors the result
+only after the provider confirms it. Internal database-owned events do not need
+this boundary. Database RLS therefore controls who can access a row, while this
+application path controls which system is authoritative for a provider-owned
+mutation.
+
+The implementation and provider/unit tests do not prove a live provider flow.
+Microsoft OAuth/read-sync evidence exists in the Sprint 5 tracker, but live
+provider CRUD, Graph subscription delivery/lifecycle, and device/deep-link
+verification remain external/manual gaps.
 
 ## Preventing loops
 

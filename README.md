@@ -1,7 +1,8 @@
 # Calendar + Reminders App
 
 A premium personal planning app: calendar, reminders, tasks, and AI-assisted
-time blocking. iOS-first, cross-platform-ready.
+time blocking. It has a React Native mobile client and a browser web client
+over shared backend, schema, and domain contracts.
 
 The full product and technical plan is in
 [`calendar_app_product_technical_plan.md`](calendar_app_product_technical_plan.md).
@@ -15,7 +16,9 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 **Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); live model evaluation and Phase 5 RevenueCat remain pending.** Sprints 0 through 4 are
 complete/implemented. Sprint 5's Microsoft
 implementation is complete in code with external lifecycle/device verification
-still tracked separately. The Phase 0 audit used
+still tracked separately. The web client has completed Phases 0–5 plus its
+latest hardening follow-up; Web Phase 6 provider integrations is next. The
+Phase 0 audit used
 `4678adc381cd0e85326772a5e7d6864af9589a1c` on `main`.
 
 Google live OAuth, calendar import, initial/incremental sync, and
@@ -24,10 +27,10 @@ calendar listing/import, and initial/incremental delta sync have live evidence;
 real provider CRUD, webhook delivery/renewal/teardown, and device/deep-link
 verification remain open in the Sprint 5 tracker.
 
-The current source-of-truth handoff is
-[`docs/sprint-6-active.md`](docs/sprint-6-active.md). The Sprint 3 and Sprint 4
-trackers are closed historical records; the Sprint 5 tracker retains Microsoft
-external-verification evidence.
+There are two current source-of-truth handoffs: [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
+for mobile/AI work and [`docs/web-active.md`](docs/web-active.md) for the web
+client. The Sprint 3 and Sprint 4 trackers are closed historical records; the
+Sprint 5 tracker retains Microsoft external-verification evidence.
 
 | Area                                                                          | State                                                                  |
 | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -46,19 +49,20 @@ external-verification evidence.
 | Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain |
 | Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                     |
 | AI Find Time, RevenueCat                                                      | Phases 1–4 done; live model eval and Phase 5 RevenueCat pending        |
+| Web client                                                                    | Phases 0–5 + hardening done; Phase 6 provider integrations next        |
 
 ---
 
 ## Prerequisites
 
-| Tool           | Version | Install                                                      |
-| -------------- | ------- | ------------------------------------------------------------ |
-| Node.js        | 20.18+  | https://nodejs.org (or `nvm install 20`)                     |
-| pnpm           | 9+      | `corepack enable && corepack prepare pnpm@9.12.0 --activate` |
-| Docker Desktop | latest  | Required by the local Supabase stack                         |
-| Supabase CLI   | 1.200+  | `brew install supabase/tap/supabase`                         |
-| Xcode          | 16+     | Mac App Store, for the iOS build                             |
-| Watchman       | latest  | `brew install watchman` (optional, faster reloads)           |
+| Tool           | Version                     | Install                                                      |
+| -------------- | --------------------------- | ------------------------------------------------------------ |
+| Node.js        | >=20.18.0 (CI uses Node 20) | https://nodejs.org (or `nvm install 20`)                     |
+| pnpm           | 9.12.0                      | `corepack enable && corepack prepare pnpm@9.12.0 --activate` |
+| Docker Desktop | latest                      | Required by the local Supabase stack                         |
+| Supabase CLI   | 2.116.0                     | `brew install supabase/tap/supabase`                         |
+| Xcode          | 16+                         | Mac App Store, for the iOS build                             |
+| Watchman       | latest                      | `brew install watchman` (optional, faster reloads)           |
 
 ## First-time setup
 
@@ -77,9 +81,19 @@ template and paste them in:
 cp apps/mobile/.env.example apps/mobile/.env
 ```
 
+For the browser client, copy its Vite env template separately:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
+
+Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_APP_ENV` in that
+file before running `pnpm web`. These are public browser values; do not place
+server-only secrets in either client env file.
+
 Keep server-only secrets (service role, Google and Microsoft OAuth client
 credentials, OAuth redirect settings, webhook URLs, and cron secrets) in the
-Supabase/Edge Function secret store; never put them in the mobile env file.
+Supabase/Edge Function secret store; never put them in either client env file.
 Microsoft uses `MICROSOFT_OAUTH_CLIENT_ID`,
 `MICROSOFT_OAUTH_CLIENT_SECRET`, optional `MICROSOFT_OAUTH_TENANT` and
 `MICROSOFT_OAUTH_REDIRECT_URI`, plus `MICROSOFT_WEBHOOK_URL` when the public
@@ -132,8 +146,11 @@ Sign in with the seeded account: `dev@example.com` / `password123`.
 pnpm verify
 ```
 
-Runs format check, lint, typecheck, unit tests, and production web build — the same set CI runs.
-Database tests need the local stack running:
+`pnpm verify` runs the workspace format check, lint, typechecks, tests, and
+builds. CI's static job also explicitly builds `@cal/web`; its separate
+database job runs Supabase migrations/pgTAP and checks generated types. Those
+database checks are not included in `pnpm verify`. Database tests need the local
+stack running:
 
 ```bash
 supabase test db

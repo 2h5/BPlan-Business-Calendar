@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASE 5 TODAY / SEARCH / SETTINGS COMPLETE
+Status: WEB PHASES 0–5 COMPLETE + HARDENING; PHASE 6 PROVIDER INTEGRATIONS NEXT
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -218,6 +218,9 @@ This document is the single source of truth for web client implementation, archi
   - Added `@cal/web`'s Vitest script and dependency so the existing root recursive `pnpm test` and CI unit-test step execute all web tests.
   - Replaced search punctuation stripping with bounded whitespace normalization, literal LIKE escaping, and quoted PostgREST OR values. Search remains browser-anon-key/RLS-backed and capped per entity.
   - Today schedules one timeout for the next profile-local midnight and recomputes its day window after rollover, including timezone offset changes.
+  - Historical checkpoint note: the follow-up below supersedes the midnight-only
+    current-time refresh detail with recalculation at most once per minute; this
+    earlier checkpoint remains historical evidence.
   - Working-hours end-of-day `1440` is represented by an explicit end-of-day toggle while the HTML time input receives only the valid `23:59` display boundary; the shared schema/domain meaning is unchanged.
   - Item 7 remains intentionally unchanged in code. `recurrence_rule` is opaque text at the web API boundary, so a safe database expiry predicate cannot be derived without risking infinite, finite, provider, or moved/cancelled exception occurrences. The bounded view read therefore continues to include all recurring masters and lets `@cal/domain` preserve correctness.
 - **Tests / Verification:**
@@ -230,6 +233,7 @@ This document is the single source of truth for web client implementation, archi
 #### Remaining hardening follow-up
 
 - **Starting SHA:** `8d381c8`
+- **Completed/pushed SHA:** `8eda12cc00a542a79b1ac942845e86816c6f5c35`
 - **Implementation Completed:**
   - Isolated the task row/schema tests from the eagerly validated browser Supabase client with a Vitest module mock. Production environment validation remains unchanged, and the schema tests still import and exercise the intended exports from `tasks.api.ts`.
   - Kept Today’s profile-local midnight rollover while scheduling current-time recalculation at most once per minute, with the midnight boundary taking priority when it is near.
@@ -251,7 +255,8 @@ This document is the single source of truth for web client implementation, archi
 - **Pushed SHA:** TBD
 - **CI:** TBD
 - **Blockers:** None
-- **Next Action:** Pending Phase 5
+- **Next Action:** Proceed with Web Phase 6 — Provider Integrations; preserve the
+  existing provider-first write path and validate live/manual behavior separately.
 
 ---
 

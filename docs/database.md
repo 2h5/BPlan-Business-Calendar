@@ -16,20 +16,20 @@ Postgres via Supabase. Every table below is created by a migration in
 
 ## Tables
 
-| Table                     | Purpose                             | Client access                           |
-| ------------------------- | ----------------------------------- | --------------------------------------- |
-| `profiles`                | Planning preferences, working hours | Own row, full CRUD                      |
-| `calendars`               | Internal and synced calendars       | Own rows, full CRUD                     |
-| `events`                  | Events and time blocks              | Own rows, full CRUD                     |
-| `task_lists`              | Lists / projects                    | Own rows, full CRUD                     |
-| `tasks`                   | Tasks and reminders                 | Own rows, full CRUD                     |
-| `tags`, `task_tags`       | Labelling                           | Own rows, via task ownership            |
-| `provider_accounts`       | Connected Google/Microsoft accounts | Read only; disconnect via Edge Function |
-| `calendar_sync_states`    | Sync cursors, webhook bookkeeping   | **None**                                |
-| `sync_jobs`               | Durable retry queue                 | Read only                               |
-| `ai_schedule_requests`    | Find Time requests                  | Read + update                           |
-| `ai_schedule_suggestions` | Ranked proposals                    | Read only                               |
-| `subscriptions`           | RevenueCat entitlement mirror       | Read only                               |
+| Table                     | Purpose                             | Client access                                          |
+| ------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| `profiles`                | Planning preferences, working hours | Own row, full CRUD                                     |
+| `calendars`               | Internal and synced calendars       | Own rows, full CRUD                                    |
+| `events`                  | Events and time blocks              | Own rows, full CRUD; provider writes use server path   |
+| `task_lists`              | Lists / projects                    | Own rows, full CRUD                                    |
+| `tasks`                   | Tasks and reminders                 | Own rows, full CRUD                                    |
+| `tags`, `task_tags`       | Labelling                           | Own rows, via task ownership                           |
+| `provider_accounts`       | Connected Google/Microsoft accounts | Read only; disconnect via Edge Function                |
+| `calendar_sync_states`    | Sync cursors, webhook bookkeeping   | **None**                                               |
+| `sync_jobs`               | Durable retry queue                 | Read only                                              |
+| `ai_schedule_requests`    | Find Time requests                  | Read own requests; server-managed                      |
+| `ai_schedule_suggestions` | Ranked proposals                    | Read own proposed/accepted suggestions; server-managed |
+| `subscriptions`           | RevenueCat entitlement mirror       | Read only                                              |
 
 Provider watch ownership is deliberate. Google keeps one channel per imported
 calendar in `calendar_sync_states`; Microsoft Graph keeps its mailbox/account-
@@ -38,6 +38,12 @@ scoped subscription identifiers, clientState, and expiry on
 safe status projection is readable by the mobile client. Provider-account
 creation, updates, and disconnect deletion are server-managed; the client can
 read the safe projection and must use `integrations-disconnect` for teardown.
+
+RLS authorization and application authority are separate concerns. The `events`
+table policies allow an owner to read and modify owned rows, but a provider-owned
+event is still a provider mirror: application create/update/delete must go
+through the provider-first `provider-event-write` path. Internal events remain
+database-authoritative.
 
 ## Invariants enforced in the database
 
@@ -62,6 +68,43 @@ thing that writes to this database:
 - `claim_sync_jobs` locks provider-account rows while selecting work and claims
   at most one due job per connected account. `SKIP LOCKED` still allows jobs for
   unrelated accounts to progress.
+
+## AI scheduling schema and access
+
+The AI tables are server-managed proposal records, not a client-side write API.
+The final migrations add the following fields and constraints:
+
+- `ai_schedule_requests` stores `id`, `user_id`, `task_id`, `status`,
+  `constraints`, `target_calendar_id`, `task_version`, `profile_version`,
+  `target_calendar_version`, `candidate_count`, timestamps, and nullable
+  provider/model/prompt/latency/token/error metadata. Candidate count and token
+  counters are non-negative; status is constrained to `pending`, `proposed`,
+  `accepted`, `rejected`, or `failed`. An accepted request may reference its
+  resulting `accepted_event_id`.
+
+  The task/profile/target-calendar version fields are the snapshots used for
+  stale-input checks; the proposal does not copy raw calendar-event content.
+
+- `ai_schedule_suggestions` stores an opaque non-empty `slot_id`, UTC
+  `start_at`/`end_at`, a `score` from 0 to 1, a bounded `reason`, a rank from 1
+  to 5, and nullable `accepted_at`. Slot identity and rank are unique within a
+  request, and at most one suggestion can be accepted for a request.
+
+Migration 15 removed the broad user update policy that existed in the initial AI
+schema. Clients can read their own request/suggestion records under the final
+select policies, but inserts, status changes, proposal persistence, and quota
+claims are server-managed. `claim_ai_schedule_request` atomically enforces the
+per-user limit of 10 claims in a rolling 60-minute window and is not a client
+write path.
+
+`confirm_ai_schedule_suggestion(p_user_id, p_suggestion_id)` is a server-only,
+security-definer confirmation RPC added and hardened by migrations 16–18. It
+locks the relevant user write path, rechecks task/profile/calendar versions and
+recurrence-aware conflicts, and atomically creates or returns the internal
+time-block event while updating the suggestion and request. Retrying an already
+accepted suggestion returns its canonical event. Only proposal generation
+requires the server-side Pro entitlement check; confirmation uses the persisted
+proposal's controlled state.
 
 ## Indexes that matter
 

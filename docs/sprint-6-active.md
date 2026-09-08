@@ -1,7 +1,7 @@
 # Sprint 6 — AI Pro / Find Time
 
 Status: PHASE 4 SAFE CONFIRMATION AND RECURRENCE HARDENING IMPLEMENTED,
-VERIFIED, AND PUSHED — LIVE MODEL EVALUATION AND PHASE 5 REMAIN OUT OF SCOPE
+VERIFIED, AND PUSHED — LIVE MODEL EVALUATION AND PHASE 5 / REVENUECAT PENDING
 
 This file is the source of truth for Sprint 6 implementation and handoff.
 
@@ -158,9 +158,14 @@ Record any differences between documentation and implementation here before codi
 ### Audit result at `33fc8d3`
 
 The repository already has more deterministic scheduling foundation than the
-older product-plan checklist implies, but it has no Sprint 6 endpoint, model
-adapter, confirmation path, RevenueCat runtime integration, or mobile Find Time
-feature.
+older product-plan checklist implies, but at this historical Phase 0 audit it
+had no Sprint 6 endpoint, model adapter, confirmation path, RevenueCat runtime
+integration, or mobile Find Time feature.
+
+Later Sprint 6 phases implemented and hardened the endpoint, model adapter,
+proposal persistence, and safe confirmation path. The historical audit result
+above is retained as evidence of the starting state; it is not the current
+status.
 
 What is present and should be reused:
 
@@ -2146,7 +2151,7 @@ Verification:
 - `(cd supabase/functions && deno task test)` — PASS (141 tests)
 - `git diff --check` — PASS
 
-Remaining manual/external work:
+Remaining manual/external work at this dated checkpoint:
 
 - Live Luna / Terra production model evaluation remains pending server-side API
   key and cost authorization. Docker-backed local database reset/pgTAP verification
@@ -2265,13 +2270,15 @@ The next implementer must:
 
 Current phase:
 
-`Phase 4 safe confirmation and recurrence hardening complete; Phase 5 not
-started`
+`Phase 4 safe confirmation and recurrence hardening complete; live model
+evaluation and Phase 5 / RevenueCat remain pending. The independent web track
+has completed Web Phases 0–5 plus hardening; Web Phase 6 is next.`
 
-Last verified checkpoint:
+Latest verified Sprint 6 checkpoint:
 
-`fca72669c4501ee8f97ba3236165db2c482c1b54` (Phase 3 hardening checkpoint; GitHub CI
-run #40 is green)
+`d01cb11518693f57340a25b3ba2e8fc017204729` (latest Sprint 6 verification
+record after the Phase 4 closeout; records GitHub CI run #40 green for the
+verified implementation at `fca72669c4501ee8f97ba3236165db2c482c1b54`)
 
 Phase 1 hardening checkpoint:
 
@@ -2318,4 +2325,18 @@ Next exact action:
 
 Await authorized live model evaluation when the server-side key and cost
 authorization are available. Do not begin Phase 5. Preserve deterministic
-candidate membership as the sole availability authority.
+candidate membership as the sole availability authority. Web work can proceed
+independently to Web Phase 6 according to [`docs/web-active.md`](web-active.md).
+
+Current Sprint 6 verification evidence:
+
+- `pnpm verify` passed at the latest Sprint 6 hardening checkpoint (Prettier,
+  ESLint, six workspace typechecks, and 156 domain tests).
+- `deno task check` passed and `deno task test` passed 143 tests at that
+  checkpoint.
+- GitHub CI run [33839322098](https://github.com/Andrewy530/BCalAI/actions/runs/33839322098)
+  passed both the static and hosted migrations/RLS/generated-types jobs.
+
+Repository HEAD may be later than this Sprint 6 checkpoint because the latest
+commits are web-only documentation/hardening changes; inspect Git before
+continuing Sprint 6 work.

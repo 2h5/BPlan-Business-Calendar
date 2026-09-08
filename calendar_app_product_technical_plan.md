@@ -2,32 +2,33 @@
 
 > **Working document**  
 > Research checked: **August 30, 2026**  
-> Target: **iOS-first, cross-platform-ready**  
+> Target: **iOS-first mobile plus browser web client over shared backend/domain/schema contracts**
 > Team: **2 developers / AI-assisted development**
 
 ---
 
-## Repository status after Sprint 5
+## Current repository status
 
 - Sprints 0–4 are complete/implemented. Sprint 4 delivered the Google
   provider, and its major OAuth, import, sync, and provider-first write flows
   were verified against the live Google API.
-- Sprint 5 Microsoft/Outlook implementation is complete in code: OAuth, Graph
-  calendar listing, fixed-window initial sync, delta sync, normalization,
-  recurrence translation, provider-first CRUD, account-scoped subscriptions,
-  webhook enqueueing, renewal/teardown, reconnect/disconnect, and shared mobile
-  integration are present behind the provider abstraction.
-- Automated verification is mixed by environment. Targeted TypeScript,
-  domain/mobile tests, ESLint, Prettier, and diff checks passed on the current
-  Windows host; Deno, Supabase CLI/Docker, and the aggregate `pnpm verify`
-  path were unavailable or did not reach project scripts there. The exact
-  evidence is maintained in [`docs/sprint-5-active.md`](docs/sprint-5-active.md).
-- Microsoft live webhook delivery, subscription renewal/teardown, provider
-  CRUD, and device/deep-link testing retain external-verification gaps recorded
-  in the Sprint 5 tracker. Sprint 6 — AI Pro prototype — has completed its
-  architecture audit and deterministic server Find Time path; model ranking,
-  persistence/confirmation, mobile UI, and RevenueCat remain. See
-  [`docs/sprint-6-active.md`](docs/sprint-6-active.md).
+- Sprint 5 Microsoft/Outlook implementation is complete in code. The recorded
+  2026-09-01 local run covered Azure OAuth, calendar listing/import, and
+  initial/incremental delta sync; Graph subscription creation/delivery,
+  provider-first CRUD, Outlook-side changes, lifecycle behavior, and
+  device/deep-link verification remain external gaps. See
+  [`docs/sprint-5-active.md`](docs/sprint-5-active.md).
+- Sprint 6 AI Phases 1–4 are implemented and hardened: deterministic candidate
+  preparation, provider abstraction, proposal persistence/ranking, and safe
+  confirmation/revalidation. Live model evaluation and Phase 5 RevenueCat
+  remain pending. See [`docs/sprint-6-active.md`](docs/sprint-6-active.md).
+- The web client has completed Web Phases 0–5 plus the latest hardening
+  follow-up. Web Phase 6 Provider Integrations is the next planned web phase;
+  it can proceed independently of the pending Sprint 6 AI work. See
+  [`docs/web-active.md`](docs/web-active.md).
+- `pnpm verify` covers workspace formatting, lint, typechecks, tests, and build.
+  CI additionally runs the Supabase migrations/RLS/pgTAP and generated-types
+  job; those database checks are tracked separately from the workspace gate.
 
 ## 1. Executive Summary
 
@@ -48,7 +49,9 @@ The first release should **not** try to become Notion, an email client, an AI ag
 ### Recommended tech stack
 
 - **Mobile:** React Native + Expo + TypeScript
-- **Navigation:** Expo Router
+- **Web:** Vite + React + React Router + browser-native HTML/CSS
+- **Mobile navigation:** Expo Router
+- **Web navigation:** React Router
 - **Backend:** Supabase PostgreSQL
 - **Auth:** Supabase Auth
 - **Server/API layer:** Supabase Edge Functions
@@ -109,16 +112,20 @@ A consumer productivity app with:
 - Clean visual organization.
 - AI-assisted time blocking as a premium feature.
 
-## What we are NOT building in v1
+## Original v1 exclusions and deferred work
 
-Do not build these before the core experience is excellent:
+These bullets preserve the original scope guardrails; current implementation
+status and the later web decision are recorded in the repository status above.
+Do not expand the product beyond the active handoffs before the core experience
+is excellent:
 
 - Full Notion-style page/database editor.
 - Team workspaces.
 - Slack replacement.
 - Full email inbox/client.
-- Desktop app.
-- Web app.
+- Desktop-native app.
+- A web app was outside the original v1 scope; the current project now includes
+  the implemented web client and its active roadmap.
 - Home-screen widgets.
 - Complex automation builder.
 - AI that autonomously modifies an entire calendar without confirmation.
@@ -312,8 +319,8 @@ Create these once rather than styling each screen independently:
 
 - [x] Start week on Sunday/Monday
 - [x] 12-hour / 24-hour clock
-- [ ] Default event duration
-- [ ] Visible calendars
+- [x] Default event duration (web Settings; shared profile field)
+- [x] Visible calendars (calendar picker and view filtering)
 - [ ] Default calendar selection
 - [x] Working hours
 - [ ] Theme preference
@@ -330,7 +337,7 @@ Create these once rather than styling each screen independently:
 - [x] Completed state
 - [ ] Repeating task UI
 - [x] List/project assignment
-- [ ] Tags UI
+- [x] Tags UI (web task inspector; mobile task creation still defaults to no tags)
 - [x] Snooze/postpone
 - [x] Search; filtering remains future work
 
@@ -599,17 +606,16 @@ Supabase Vault stores encrypted secrets in Postgres. Use server-controlled secre
 # 10. High-Level Architecture
 
 ```text
-┌─────────────────────────────────────────────┐
-│               React Native App              │
-│                                             │
-│  Screens → Features → Domain Services       │
-│       │             │                       │
-│       ├── TanStack Query                    │
-│       ├── Zustand (UI-only state)           │
-│       └── Local notification scheduling     │
-└─────────────────────┬───────────────────────┘
-                      │
-                      ▼
+┌─────────────────────────────┐  ┌─────────────────────────────┐
+│ React Native mobile app     │  │ Browser web client           │
+│                             │  │                             │
+│ screens → features → domain │  │ pages → features → domain    │
+│ TanStack Query + Zustand    │  │ TanStack Query + browser CSS │
+│ @cal/ui + native services   │  │ semantic HTML + CSS Modules  │
+└──────────────┬──────────────┘  └──────────────┬──────────────┘
+               │                                │
+               └────────────────┬───────────────┘
+                                ▼
 ┌─────────────────────────────────────────────┐
 │                 Supabase                    │
 │                                             │
@@ -657,6 +663,11 @@ Use an **Expo development build early**, not Expo Go as the long-term environmen
 **Expo Router**
 
 Keep route files intentionally small. Route files should compose feature screens rather than contain business logic.
+
+The web client uses React Router with thin page components under
+`apps/web/src/pages`. Its browser-native presentation layer is intentionally
+separate from mobile `@cal/ui`; both clients reuse the shared domain, schemas,
+generated types, and Supabase/Edge Function contracts.
 
 ## Server state
 
@@ -735,12 +746,14 @@ This avoids building StoreKit/Google Play Billing subscription infrastructure fr
 
 # 12. Professional Project Structure
 
-Use a monorepo-style structure even if only the mobile application exists initially. It creates clear boundaries for future web/admin tooling without forcing a rewrite.
+The monorepo contains independent mobile and browser web clients. They share
+domain, schema, generated-type, and Supabase contracts while keeping their
+presentation layers platform-specific.
 
 ```text
 calendar-app/
 ├── apps/
-│   └── mobile/
+│   ├── mobile/
 │       ├── app/                         # Expo Router routes ONLY
 │       │   ├── _layout.tsx
 │       │   ├── (auth)/
@@ -815,8 +828,20 @@ calendar-app/
 │           ├── utils/
 │           └── types/
 │
+│   └── web/
+│       ├── src/
+│       │   ├── routes.tsx                 # thin route/page composition
+│       │   ├── pages/                     # browser route pages
+│       │   ├── features/                 # feature APIs, hooks, components
+│       │   ├── components/                # web layout/auth composition
+│       │   ├── lib/                      # Supabase, query client, errors
+│       │   └── styles/                   # browser CSS tokens and global CSS
+│       │
+│       ├── .env.example
+│       └── package.json
+│
 ├── packages/
-│   ├── ui/                              # Reusable design-system primitives
+│   ├── ui/                              # Mobile React Native design-system primitives
 │   │   └── src/
 │   │       ├── button/
 │   │       ├── card/
@@ -864,7 +889,8 @@ calendar-app/
 │       ├── oauth-microsoft-start/
 │       ├── oauth-microsoft-callback/
 │       ├── webhook-microsoft/
-│       ├── ai-find-time/                # planned — Sprint 6
+│       ├── ai-find-time/                # implemented — Sprint 6 Phases 1–3
+│       ├── ai-confirm-time/             # implemented — Sprint 6 Phase 4
 │       ├── revenuecat-webhook/          # planned — Sprint 6
 │       └── delete-account/
 │
@@ -874,10 +900,13 @@ calendar-app/
 │   ├── sync-engine.md
 │   ├── ai-scheduling.md
 │   ├── design-system.md
+│   ├── sprint-6-active.md
+│   ├── web-active.md
 │   └── decisions/
 │       ├── 0001-react-native-expo.md
 │       ├── 0002-supabase.md
-│       └── 0003-provider-sync-model.md
+│       ├── 0003-provider-sync-model.md
+│       └── 0004-deterministic-scheduling.md
 │
 ├── .github/
 │   └── workflows/
@@ -887,7 +916,6 @@ calendar-app/
 ├── .env.example
 ├── package.json
 ├── pnpm-workspace.yaml
-├── turbo.json                         # Optional initially
 ├── tsconfig.base.json
 ├── eslint.config.js
 ├── prettier.config.js
@@ -935,7 +963,10 @@ Provider functionality should be separated by domain and reusable provider adapt
 
 # 14. Database Model
 
-Below is the recommended conceptual schema. Exact columns should be defined through migrations.
+The following is a compact view of the current schema. The migrations and
+`packages/types/src/database.types.ts` are authoritative for exact columns,
+types, defaults, and policies; the older planning examples below are retained
+only where they help explain the model.
 
 ## `profiles`
 
@@ -947,6 +978,8 @@ timezone            text
 week_starts_on      smallint
 hour_cycle          text
 default_task_minutes integer
+default_event_minutes integer
+working_hours       jsonb
 created_at          timestamptz
 updated_at          timestamptz
 ```
@@ -984,10 +1017,14 @@ timezone                text
 status                  confirmed | tentative | cancelled
 recurrence_rule         text/jsonb nullable
 source_type             internal | google | microsoft | device
+provider_account_id      uuid nullable
 provider_event_id       text nullable
 provider_etag           text nullable
 provider_updated_at     timestamptz nullable
+recurring_event_id      uuid nullable
+recurrence_original_start_at timestamptz nullable
 sync_status             synced | pending | failed | conflict
+alerts                  integer[]
 created_at
 updated_at
 ```
@@ -1058,7 +1095,7 @@ provider_user_id
 email
 status                  active | expired | revoked | error
 scopes                   text[]
-secret_reference_id      uuid/text    # reference to protected token storage
+secret_reference_id      uuid          # reference to protected token storage
 webhook_channel_id       text nullable # account-scoped watch, when applicable
 webhook_resource_id      text nullable
 webhook_subscription_id  text nullable
@@ -1102,27 +1139,49 @@ reconciled without changing the series master's RRULE.
 ## `ai_schedule_requests`
 
 ```text
-id
-user_id
-task_id
-status                  pending | proposed | accepted | rejected | failed
-constraints             jsonb
-created_at
-completed_at nullable
+id                         uuid PK
+user_id                    uuid FK
+task_id                    uuid FK
+status                     pending | proposed | accepted | rejected | failed
+constraints                jsonb
+target_calendar_id         uuid nullable
+task_version               timestamptz nullable
+profile_version            timestamptz nullable
+target_calendar_version    timestamptz nullable
+candidate_count            integer >= 0
+provider                   text nullable
+model                      text nullable
+prompt_version             text nullable
+latency_ms                 integer >= 0 nullable
+input_tokens               integer >= 0 nullable
+output_tokens              integer >= 0 nullable
+reasoning_tokens           integer >= 0 nullable
+total_tokens               integer >= 0 nullable
+error_code                 text nullable
+accepted_event_id          uuid nullable -> events
+created_at                 timestamptz
+completed_at               timestamptz nullable
 ```
+
+Requests are readable by their owner but are server-managed after creation.
 
 ## `ai_schedule_suggestions`
 
 ```text
-id
-request_id
-start_at
-end_at
-score
-reason
-rank
-accepted_at nullable
+id                         uuid PK
+request_id                 uuid FK
+slot_id                    text non-empty
+start_at                   timestamptz
+end_at                     timestamptz, after start_at
+score                      numeric(4,3), 0..1
+reason                     text, max 280 characters
+rank                       integer, 1..5
+accepted_at                timestamptz nullable
 ```
+
+`slot_id` and `rank` are unique within a request. At most one suggestion per
+request can be accepted. Clients can read their own proposed/accepted
+suggestions; inserts and state transitions are server-managed.
 
 ## `subscriptions`
 
@@ -1183,6 +1242,11 @@ Update normalized local copy
 ```
 
 This reduces divergence between provider and local state.
+
+The current mobile and web feature APIs send provider-owned mutations through
+the `provider-event-write` Edge Function. That server boundary resolves the
+owned provider account, calls the provider first, and mirrors the confirmed
+result. Internal events are database-owned and do not use this path.
 
 ## Prevent sync loops
 
@@ -1279,20 +1343,27 @@ AI handles the fuzzy part:
 - “I want gym before dinner.”
 - “Fit this somewhere this week.”
 
-## AI tools/functions
+## Production v1 model contract
 
-The model should have narrowly defined server tools such as:
+The implemented v1 contract is narrower than the original tool-oriented sketch:
 
 ```text
-get_task(task_id)
-get_calendar_window(start, end)
-get_available_slots(constraints)
-rank_schedule_slots(task, slots, preferences)
-create_time_block(task_id, slot_id)
-reschedule_time_block(event_id, slot_id)
+server-owned task/profile/calendar inputs
+  → deterministic candidate generation
+  → sanitized candidate-ranking input
+  → model returns opaque candidate id + rank/score/reason only
+  → Zod and candidate-set validation
+  → persisted proposal
+  → explicit confirmation by suggestion id
 ```
 
-The model should never receive permission to execute arbitrary SQL.
+The model receives no provider APIs, database tools, arbitrary SQL, raw
+calendar-event content, or authority to create/reschedule events. It cannot
+invent a time: only deterministic candidates may be ranked. `ai-find-time`
+persists the validated proposal, and `ai-confirm-time` accepts a suggestion id
+then revalidates and confirms it through the server/database confirmation path.
+`rankSlotsHeuristically` remains an explainable evaluation/offline baseline and
+test oracle, not a silent production fallback.
 
 ## Confirmation policy
 
@@ -1407,8 +1478,8 @@ If offline usage becomes a major differentiator, introduce a dedicated local per
 
 # 20. Security Checklist
 
-The checklist below records implemented controls; live/device verification is
-tracked separately in `docs/sprint-5-active.md`.
+The checklist below records implemented controls; live/device/provider
+verification is tracked separately in the Sprint 5 and active client handoffs.
 
 ## Database
 
@@ -1438,20 +1509,22 @@ tracked separately in `docs/sprint-5-active.md`.
 
 ## AI
 
-- [ ] AI key only server-side
-- [ ] Validate every model output
-- [ ] Structured schemas
-- [ ] No arbitrary database execution
-- [ ] Rate limits per user
-- [ ] Subscription entitlement check server-side
-- [ ] Avoid logging sensitive calendar/email content
+- [x] AI key only server-side (Edge Function environment; never client-exposed)
+- [x] Validate every model output (Zod plus deterministic candidate membership)
+- [x] Structured schemas (provider response and persisted proposal contracts)
+- [x] No arbitrary database execution (the v1 model has no tools)
+- [x] Rate limits per user (atomic server-side claim RPC)
+- [x] Subscription entitlement check server-side
+- [x] Avoid logging sensitive calendar/email content (raw calendar/email content
+      is outside the model and logging boundary)
 
 ## Privacy
 
 - [ ] Privacy policy before external beta
-- [ ] Account/data deletion flow
-- [ ] Connected-account deletion/revocation
-- [ ] Clear provider scopes
+- [x] Account/data deletion flow (server-side account deletion function)
+- [x] Connected-account deletion/revocation (server-side disconnect/delete path;
+      external provider results remain subject to live verification)
+- [x] Clear provider scopes (Google/Microsoft delegated calendar scopes)
 - [ ] Data retention policy
 - [ ] Email feature is explicit opt-in
 
@@ -1523,7 +1596,7 @@ Example:
 
 ```text
 0001-react-native-expo.md
-0002-use-supabase.md
+0002-supabase.md
 0003-provider-sync-model.md
 ```
 
@@ -1759,19 +1832,33 @@ device verification remain before this sprint is fully verified.
 
 ## Sprint 6 — AI Pro prototype
 
-Status: **PHASE 1 IMPLEMENTED AND VERIFIED — PHASE 2 NOT STARTED**
+Status: **PHASES 1–4 IMPLEMENTED/HARDENED — LIVE MODEL EVALUATION AND PHASE 5 REVENUECAT PENDING**
 
-- Availability engine (existing foundation)
-- Task constraints (existing schema; server normalization pending)
-- Candidate slot generation (existing whole-duration engine)
-- Deterministic server Find Time endpoint (implemented)
-- Structured proposals
-- Confirmation UI
-- RevenueCat entitlement gate
+- Deterministic candidate preparation and server Find Time endpoint — implemented
+- Provider abstraction and narrow model-ranking contract — implemented; live
+  model evaluation pending
+- Proposal persistence, candidate validation, and token/model metadata — implemented
+- Safe confirmation/revalidation and recurrence-aware conflict checks — implemented
+- Mobile Find Time UI — not started
+- RevenueCat entitlement runtime — Phase 5, not started
 
 ### Deliverable
 
-A paid user can ask the app to find time for an unscheduled task.
+A paid user can ask the server to find time for an unscheduled task and receive
+a persisted, confirmable proposal. Live model evaluation, mobile Find Time UI,
+and RevenueCat remain outside the completed Phase 1–4 implementation.
+
+---
+
+## Web client — current implementation track
+
+Status: **PHASES 0–5 AND HARDENING COMPLETE — PHASE 6 PROVIDER INTEGRATIONS PLANNED**
+
+The browser client has its own Vite/React presentation layer and shares the
+Supabase, schema, generated-type, and `@cal/domain` contracts with mobile. Web
+Phases 0–5 cover the authenticated shell, Tasks, Calendar, Today, Search,
+Settings, and hardening. Provider OAuth/discovery/import/sync-health work is the
+next web phase; see [`docs/web-active.md`](docs/web-active.md).
 
 ---
 
@@ -1943,7 +2030,8 @@ If we aggressively protect scope, the first public beta should contain:
 - Gmail scanning
 - Outlook email scanning
 - Widgets
-- Web app
+- Web app was not required in the original beta scope; the current project now
+  includes an implemented web client and active web roadmap.
 - Collaboration
 - Notion-style editor
 - Complex automation
@@ -2093,11 +2181,13 @@ The following sources were reviewed while preparing this plan.
 
 ---
 
-# 33. Next Planning Documents to Create
+# 33. Current Planning Documents
 
-The core repository documents below now exist and are maintained alongside the
-implementation. The current sprint handoff is `docs/sprint-6-active.md`;
-`docs/sprint-5-active.md` retains Sprint 5 external-verification evidence.
+The core repository documents below exist and are maintained alongside the
+implementation. Current work has two active handoffs: `docs/sprint-6-active.md`
+for mobile/AI and `docs/web-active.md` for the browser client.
+`docs/sprint-5-active.md` is retained as historical Microsoft implementation and
+external-verification evidence.
 
 1. `docs/database.md` — exact tables, indexes, constraints, RLS policies.
 2. `docs/design-system.md` — exact visual tokens and reusable UI component rules.
@@ -2106,5 +2196,10 @@ implementation. The current sprint handoff is `docs/sprint-6-active.md`;
 5. `AGENTS.md` — engineering and architecture rules for repository development.
 6. `README.md` — setup instructions so either developer can clone and run the app quickly.
 
-They are reference documents, not a replacement for the live sprint handoff or
-for the code when the two disagree.
+They are reference documents, not a replacement for the active handoffs or the
+code when the two disagree. The active handoffs are:
+
+- `docs/sprint-6-active.md` — Sprint 6 mobile/AI phases and pending live model
+  evaluation/RevenueCat work.
+- `docs/web-active.md` — web phases 0–5/hardening and the planned Web Phase 6
+  provider integrations.

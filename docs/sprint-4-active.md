@@ -4,9 +4,10 @@ Status: **CLOSED / HISTORICAL — Google implementation complete; major live pro
 Last updated: **2026-09-01**
 
 This document records the Sprint 4 implementation and verification history. It
-is not the current implementation plan. The current source of truth is
-[`docs/sprint-6-active.md`](sprint-6-active.md); use this file for Google
-provider history and inherited verification evidence.
+is not the current implementation plan. Current work is split between
+[`docs/sprint-6-active.md`](sprint-6-active.md) for mobile/AI and
+[`docs/web-active.md`](web-active.md) for web; use this file for Google provider
+history and inherited verification evidence.
 
 ## Mac continuation note
 
@@ -343,4 +344,6 @@ provider flow; the later verification entries above record that the major live
 OAuth, import, sync, and provider-first write work was completed. Real Google
 webhook delivery and some device-level flows remain historical gaps. Sprint 4
 has no active implementation checklist. For current work, read
-`docs/sprint-5-active.md` and do not use this tracker as an active task list.
+`docs/sprint-6-active.md` for mobile/AI work and `docs/web-active.md` for web
+work. `docs/sprint-5-active.md` remains historical Microsoft implementation and
+external-verification evidence; do not use this tracker as an active task list.

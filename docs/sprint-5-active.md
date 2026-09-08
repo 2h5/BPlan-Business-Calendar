@@ -1,4 +1,4 @@
-# Sprint 5 — Microsoft implementation and external-verification handoff
+# Sprint 5 — Microsoft implementation and external-verification history
 
 Status: **IMPLEMENTATION COMPLETE / EXTERNAL VERIFICATION REMAINING**
 Implementation: **Microsoft/Outlook provider, OAuth, Graph delta sync,
@@ -7,18 +7,22 @@ coexistence are implemented.**
 Automated verification: **Mac verification passed for Deno checks/tests,
 Supabase reset/database/RLS tests, full `pnpm verify`, and the unsigned iOS
 simulator build/smoke check.**
-External verification: **Microsoft OAuth/Graph/delta/CRUD, webhook delivery,
-renewal/teardown, and device/deep-link flows remain unexercised.**
-Current blocker: **Azure app registration/credentials and a public HTTPS
-webhook are required for the remaining Microsoft verification.**
-Next action: **Provision the Azure Web app and public HTTPS callback, then run
-the live Microsoft lifecycle matrix. Sprint 6 remains out of scope for this
-verification.**
+External verification: **recorded local evidence covers Microsoft OAuth,
+calendar listing/import, and initial/incremental delta sync; provider-first CRUD,
+Outlook-side changes, Graph webhook delivery, renewal/teardown, and
+device/deep-link flows remain unexercised.**
+Current blocker: **Graph subscription creation/lifecycle, provider-first CRUD,
+Outlook-side changes, public callback delivery, and device/deep-link verification
+remain.**
+Next action: **Using the recorded Azure registration and a public HTTPS callback,
+run the live Microsoft lifecycle matrix. Sprint 6 and the web track remain
+separate from this historical verification record.**
 Last updated: **2026-09-01**
 
-Sprint 6 is now the current implementation plan; see
-[`docs/sprint-6-active.md`](sprint-6-active.md). This file remains authoritative
-for Sprint 5 implementation and external-verification evidence.
+Sprint 6 and the web tracker are the current implementation handoffs; see
+[`docs/sprint-6-active.md`](sprint-6-active.md) and
+[`docs/web-active.md`](web-active.md). This file remains historical evidence for
+Sprint 5 implementation and Microsoft external verification.
 
 Prior implementation checkpoint: **`1e2361910b1ae83dcc9441a45204722a1ddf79fa`**
 Current code baseline: **`186baffeb811970c41d056c108a8be262d8a743e`**
@@ -380,13 +384,12 @@ preserved for review; nothing was pushed.
   Docker being stopped, the Expo target/signing behavior, and the undeclared
   Babel preset are environment or pre-existing issues.
 
-Still requires external/manual verification: Azure Web app registration and
-real credentials; Microsoft OAuth callback and refresh-token flow; Graph
-calendar listing, initial/delta sync, provider-first create/update/delete,
-Outlook-side edits and deletions; a public HTTPS webhook validation and
-notification delivery; renewal/replacement/teardown and reauthentication; and
-real device/deep-link return from the mobile Settings flow. Microsoft E2E is
-not claimed here because no live Microsoft/Azure provider flow was exercised.
+After the live setup above, still requires external/manual verification:
+provider-first create/update/delete, Outlook-side edits and deletions, live
+Graph subscription creation/delivery, renewal/replacement/teardown and
+reauthentication, and real device/deep-link return from the mobile Settings
+flow. The recorded local run covered OAuth, calendar listing/import, and
+initial/incremental delta sync; it does not establish full Microsoft E2E.
 
 ### Inherited Sprint 4 evidence — 2026-09-01
 
@@ -595,12 +598,13 @@ verify.
   `186baffeb811970c41d056c108a8be262d8a743e`. The prior `1e23619` checkpoint
   remains historical baseline evidence. The code worktree was clean before the
   Mac verification began.
-- README, the technical plan, architecture/database/sync references, and this
-  tracker now agree that Sprint 5 implementation is complete but external
-  Microsoft verification remains. Sprint 6 is next planned work and is not
-  started.
+- At this dated reconciliation, README, the technical plan,
+  architecture/database/sync references, and this tracker agreed that Sprint 5
+  implementation was complete but external Microsoft verification remained;
+  Sprint 6 was next planned work and was not started. Current implementation
+  handoffs are now `docs/sprint-6-active.md` and `docs/web-active.md`.
 - Sprint 3 and Sprint 4 trackers are explicitly closed/historical; this file is
-  the active Sprint 5 source of truth.
+  historical Sprint 5 evidence, not the current task list.
 - Files reconciled: `README.md`,
   `calendar_app_product_technical_plan.md`, `docs/architecture.md`,
   `docs/database.md`, `docs/sync-engine.md`,
@@ -615,10 +619,10 @@ verify.
 
 ## Follow-up work (not Sprint 5 blockers)
 
-- Supply the Azure app registration, tenant/client configuration, delegated
-  scopes, redirect URI, and public HTTPS webhook deployment; run the complete
-  Microsoft OAuth, calendar import, initial/delta sync, provider-first CRUD,
-  Outlook-side change, webhook, lifecycle, renewal, teardown, and reauth flow.
+- Reconfirm the Azure app registration, tenant/client configuration, delegated
+  scopes, redirect URI, and public HTTPS webhook deployment; then run the
+  complete Microsoft provider-first CRUD, Outlook-side change, webhook,
+  lifecycle, renewal, teardown, and reauth flow.
 - Keep the local Deno, Supabase CLI, Docker, and generated-type checks in the
   verification loop for future Sprint 5 changes.
 - For the standard Expo iOS command, declare the already-used

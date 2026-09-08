@@ -1,5 +1,11 @@
 # Design system
 
+`@cal/ui` is the React Native/mobile implementation of this design system. The
+browser client is an independent presentation layer: it uses semantic HTML,
+plain CSS, CSS custom properties in `apps/web/src/styles/theme.css`, and CSS
+Modules under `apps/web`, with shared design principles and token roles but
+without importing `@cal/ui` or React Native components.
+
 Reference points: **Copilot Money** for visual quality and information
 hierarchy, **Business Calendar 2** for scheduling density, **Notion** for
 flexible organisation. We take the principles, not the pixels.
@@ -62,7 +68,8 @@ keeps capture fast and the context behind it visible.
 
 ## Where the theme lives
 
-Tokens live in `@cal/ui` rather than the app so the primitives are
-self-contained and a future web or admin surface can adopt the same scale.
+Tokens live in `@cal/ui` rather than the mobile app so the primitives are
+self-contained. The existing web client maintains browser/CSS equivalents for
+the same visual language rather than adopting the React Native package.
 `apps/mobile/src/theme` re-exports them and is the only place app-specific
 product palettes belong.

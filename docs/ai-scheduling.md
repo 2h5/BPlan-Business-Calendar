@@ -3,7 +3,9 @@
 Status: **engine, deterministic server Find Time path, provider foundation,
 Phase 3 proposal implementation, and Phase 4 confirmation path are built; full
 verification is tracked in** [`sprint-6-active.md`](sprint-6-active.md). The
-engine is `packages/domain/src/scheduling/availability.ts`.
+engine is `packages/domain/src/scheduling/availability.ts`. Live model
+evaluation, the mobile Find Time UI, and Sprint 6 Phase 5 RevenueCat remain
+pending.
 
 ## The division of labour
 

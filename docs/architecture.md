@@ -75,6 +75,12 @@ The current implementation writes provider-owned events first, then updates the
 normalised local copy. Google and Microsoft both use this path; see
 [`sync-engine.md`](sync-engine.md).
 
+Client create/update/delete operations for provider-owned events go through the
+`provider-event-write` Edge Function via the feature API. It resolves the
+owned provider account from database state, calls the provider first, and only
+then mirrors the confirmed result locally. Internal events use the database as
+their authority and do not use this provider mutation boundary.
+
 Watch ownership follows the provider boundary: Google calendar-scoped channels
 are stored with `calendar_sync_states`, while Microsoft Graph account-scoped
 subscriptions are stored on `provider_accounts`. The shared renewal and

@@ -2,27 +2,34 @@
 
 How the calendar renders, and why it is split the way it is.
 
-## One window, four views
+## One bounded window, platform views
 
-`useCalendarWindow` is the single source of drawable data. It:
+Both clients have a `useCalendarWindow` hook and platform-specific view
+components. The hooks share the same bounded-window pipeline:
 
-1. Computes the window the current view needs (`utils/window.ts`).
+1. Computes the window the current view needs.
 2. Fetches the events overlapping it.
 3. Expands recurring events into occurrences.
 4. Filters hidden calendars.
 5. Buckets occurrences by local date key.
 
-The day, week, month, and agenda views all consume that same result. None of
-them fetches, expands, or filters on its own — a view that did would drift from
-the others the first time a rule changed.
+Mobile exposes day, week, month, and agenda views; the current web toolbar
+exposes day, week, and month. None of the view components fetches, expands, or
+filters on its own — a view that did would drift from the others the first time
+a recurrence or visibility rule changed. Shared recurrence, timezone, and
+layout behavior lives in `@cal/domain`; window hooks and rendering remain
+platform-specific.
 
 ## Why occurrences, not events
 
-A recurring event is **one row** in `events` with an RRULE. It is never stored
-expanded. The window read therefore cannot filter recurring events by start
-time — a weekly series that began last year still has occurrences this week —
-so `fetchEventsInWindow` pulls master rows for any event with a recurrence rule
-and lets `expandOccurrences` decide what actually lands in range.
+A recurring series is represented by a master row in `events` with an RRULE;
+provider-materialized exception rows may also be present. The window read
+therefore cannot filter recurring masters by start time — a weekly series that
+began last year still has occurrences this week — so the platform API modules
+pull master rows and `@cal/domain` decides what lands in range. Moved or
+cancelled provider instances retain their recurring-series identity and
+original occurrence start so they can override the master without changing its
+RRULE.
 
 Each occurrence gets a key of `<eventId>:<occurrenceIndex>`. Using the event id
 alone would collapse a whole series into one item.
@@ -59,16 +66,27 @@ Tapping a day drops into the day view for the detail.
 
 ## Recurrence support
 
-`parseRRule` implements a deliberate subset: daily, weekly (including WKST),
-absolute and ordinal monthly/yearly patterns, INTERVAL, COUNT, and UNTIL.
-Anything else returns `null`, and the event is drawn as a single occurrence.
+`parseRRule` implements a deliberate expansion subset: daily, weekly (including
+WKST), absolute and ordinal monthly/yearly patterns, INTERVAL, COUNT, and UNTIL.
+Anything outside that subset returns `null`. That parser capability is not a
+persistence gate: provider recurrence data is stored as provider-supplied
+opaque text and must not be silently rewritten into a different series.
 
-That is a safety property, not a limitation to fix casually. Provider adapters
-must reject unsupported recurrence before persistence; silently dropping an
-unsupported part such as `BYSETPOS` would generate occurrences that should not
-exist. For legacy local rows that predate adapter validation, the domain
-fallback treats an unsupported rule as one occurrence rather than inventing
-availability.
+The adapters have provider-specific behavior. Google currently extracts and
+stores the `RRULE` line; auxiliary `EXDATE`, `RDATE`, and `EXRULE` lines are not
+represented in the single `recurrence_rule` field, while separately synced
+exception rows retain their identity. Microsoft translates supported Graph
+patterns and fails closed for unsupported or malformed inbound patterns; its
+outbound translator likewise rejects constructs Graph cannot represent. This
+is an implementation limitation worth preserving in the documentation, not a
+reason to claim that every provider rule is rejected before persistence.
+
+For rendering, an unsupported stored rule is treated as one occurrence. For
+availability, `schedulingEventsToBusyIntervals` fails closed for an unsupported
+non-cancelled recurrence rather than inventing free time. The web editor keeps
+an unchanged unsupported recurrence string and requires a supported replacement
+when the user edits the recurrence. This separates safe provider-data
+preservation from the subset the local recurrence engine can expand.
 
 ## Alerts
 
