@@ -1,10 +1,12 @@
 import { addZonedDays, getZonedParts, zonedWallClockToUtc } from '@cal/domain';
 import type { CreateTaskInput, UpdateTaskInput } from '@cal/schemas';
 import { useCallback, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { TaskInspector } from './TaskInspector';
 import { TaskListPane } from './TaskListPane';
 import styles from './TasksView.module.css';
+import { useProfile } from '../../settings/hooks/useSettings';
 import type { TaskWithTags } from '../api/tasks.api';
 import { type TaskFilter, useTaskBuckets } from '../hooks/useTaskBuckets';
 import {
@@ -18,14 +20,21 @@ import {
 } from '../hooks/useTasks';
 
 export function TasksView() {
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() =>
+    searchParams.get('task'),
+  );
   const [isDraft, setIsDraft] = useState(false);
   const [activeTab, setActiveTab] = useState<TaskFilter>('inbox');
-  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [selectedListId, setSelectedListId] = useState<string | null>(() =>
+    searchParams.get('list'),
+  );
+  const { data: profile } = useProfile();
 
   const { buckets, tasks, timeZone, now, isLoading, isError, refetch } = useTaskBuckets({
     listId: selectedListId,
     filter: activeTab,
+    timeZone: profile?.timezone,
   });
 
   const { data: lists } = useTaskLists();

@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASE 4 CALENDAR / EVENT EDITING COMPLETE
+Status: WEB PHASE 5 TODAY / SEARCH / SETTINGS COMPLETE
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -186,20 +186,30 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 5 — Today / Search / Settings
 
 - **Goal:** Merged Today surface, unified search across events/tasks, planning preferences, account settings, and integration overview.
-- **Status:** Planned
-- **Starting SHA:** TBD
-- **Implementation Completed:** TBD
-- **Tests / Verification:** TBD
+- **Status:** Complete — checkpoint ready to commit
+- **Starting SHA:** `5a053bc`
+- **Implementation Completed:**
+  - Replaced `/today` with a timezone-correct daily workspace using the existing profile, task buckets, bounded Day calendar window, shared recurrence expansion, and `calculateFreeTime`. The surface includes timed and all-day events, overdue/due-today/eligible unscheduled tasks, completion toggles, completed-today handling, useful day summaries, and direct navigation into task and event inspectors.
+  - Replaced `/search` with a 260ms-debounced, keyboard-operable unified search across non-archived tasks, non-cancelled events, calendars, and task lists. PostgREST search text is sanitized, input is length-bounded, entity reads are capped, results are grouped, and Enter/arrow navigation opens the relevant inspector or context.
+  - Replaced `/settings` with profile/account information, timezone, week start, clock, default task/event durations, editable per-day working hours, persistence feedback, sign-out, and supported account deletion.
+  - Added a client-safe Google/Microsoft connection overview using `provider_accounts_public`, with existing-account status, last-sync context, manual sync, and secure Edge Function disconnect controls. New browser OAuth connection setup and provider calendar import remain Phase 6.
+  - Added query keys and web-only feature API/hook/component boundaries under `apps/web`; pages and components do not call Supabase directly, secrets are not selected, and snake_case remains at API mapping boundaries.
+  - Added query-parameter deep links so Today and Search can open the existing Tasks and Calendar inspectors without duplicating their editors.
+- **Tests / Verification:**
+  - Focused web suite passed (29 tests across nine files), including four new Phase 5 contract tests for PostgREST search sanitization/input bounds, client-safe provider-account mapping, and profile patch mapping.
+  - Authenticated browser inspection against real local Supabase data passed for Today with open tasks, a timed event and an all-day event; completion behavior; the empty Today state; search matches/no matches and keyboard result navigation; settings load/save; timezone, clock, and working-hours refresh persistence; provider empty-state/status copy; and task/event inspector deep links.
+  - Today, Search, and Settings passed responsive inspection at a 390px viewport with no horizontal document overflow. A clean browser session reported no console warnings or errors.
+  - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, and production build. Focused `pnpm --filter @cal/web build` and final `git diff --check` also passed.
 - **Pushed SHA:** TBD
 - **CI:** TBD
 - **Blockers:** None
-- **Next Action:** Pending Phase 4
+- **Next Action:** Web Phase 6 — Provider Integrations
 
 ---
 
 ### Web Phase 6 — Provider Integrations
 
-- **Goal:** Google and Microsoft connection management, calendar import/visibility/sync health, browser OAuth callback handling, preserving provider-first write architecture.
+- **Goal:** Google and Microsoft browser OAuth connection/reconnection, provider calendar discovery/import controls, detailed per-calendar sync health, and OAuth callback handling while preserving the provider-first write architecture. Basic existing-account status, manual sync, and secure disconnect controls are already present in Settings from Phase 5.
 - **Status:** Planned
 - **Starting SHA:** TBD
 - **Implementation Completed:** TBD

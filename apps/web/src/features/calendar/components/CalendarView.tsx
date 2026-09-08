@@ -1,6 +1,7 @@
 import { toZonedDateKey } from '@cal/domain';
 import type { Calendar } from '@cal/schemas';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { CalendarEditor } from './CalendarEditor';
 import { CalendarSidebar } from './CalendarSidebar';
@@ -64,10 +65,14 @@ function CalendarState({
 }
 
 export function CalendarView() {
+  const [searchParams] = useSearchParams();
   const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const [mode, setMode] = useState<CalendarViewMode>('week');
-  const [selectedDateKey, setSelectedDateKey] = useState(() =>
-    toZonedDateKey(new Date(), initialTimeZone),
+  const [selectedDateKey, setSelectedDateKey] = useState(
+    () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
+  );
+  const [requestedEventId, setRequestedEventId] = useState<string | null>(() =>
+    searchParams.get('event'),
   );
   const [selectedOccurrence, setSelectedOccurrence] = useState<EventOccurrence | null>(null);
   const [isDraft, setIsDraft] = useState(false);
@@ -85,6 +90,14 @@ export function CalendarView() {
   const updateEvent = useUpdateEvent(result.calendars);
   const removeEvent = useDeleteEvent(result.calendars);
   const { window, timeZone } = result;
+  useEffect(() => {
+    if (!requestedEventId) return;
+    const occurrence = result.occurrences.find((item) => item.event.id === requestedEventId);
+    if (occurrence) {
+      setSelectedOccurrence(occurrence);
+      setRequestedEventId(null);
+    }
+  }, [requestedEventId, result.occurrences]);
   const heading = useMemo(
     () => formatRangeHeading(mode, selectedDateKey, window, timeZone),
     [mode, selectedDateKey, timeZone, window],

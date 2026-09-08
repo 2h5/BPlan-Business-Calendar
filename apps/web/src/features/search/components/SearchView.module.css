@@ -1,0 +1,183 @@
+.page {
+  width: min(100%, 900px);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-5);
+}
+.intro h2 {
+  font-size: var(--font-size-2xl);
+  letter-spacing: -0.035em;
+}
+.intro p {
+  margin-top: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.searchBox {
+  position: relative;
+  height: 54px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  gap: var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+.searchBox:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.searchBox svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--color-text-tertiary);
+  stroke-width: 2;
+}
+.searchBox input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: var(--font-size-base);
+}
+.searchBox input::placeholder {
+  color: var(--color-text-tertiary);
+}
+.searchBox kbd {
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-family-mono);
+  font-size: 0.6875rem;
+}
+.searchBox > button {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  color: var(--color-text-tertiary);
+  font-size: 1.2rem;
+}
+.searchBox > button:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+.results {
+  display: grid;
+  gap: var(--space-5);
+}
+.results section {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+.results section > header {
+  min-height: 45px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.results h3 {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.results header span {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+.results section > div > button {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: left;
+}
+.results section > div > button:last-child {
+  border-bottom: 0;
+}
+.results section > div > button:hover,
+.results .active {
+  background: var(--color-selected);
+}
+.icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+.event,
+.calendar {
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+.task,
+.list {
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+}
+.results button > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.results strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+.results small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+.arrow {
+  color: var(--color-text-tertiary);
+}
+.state {
+  min-height: 280px;
+  padding: var(--space-8);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.state strong {
+  font-size: var(--font-size-lg);
+}
+.state span {
+  max-width: 52ch;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.state button {
+  margin-top: var(--space-3);
+  min-height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+@media (max-width: 540px) {
+  .searchBox kbd {
+    display: none;
+  }
+  .results section > div > button {
+    padding-inline: var(--space-3);
+  }
+}

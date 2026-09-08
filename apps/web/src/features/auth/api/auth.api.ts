@@ -18,3 +18,8 @@ export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
   if (error) throw toAppError(error);
 }
+
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+  if (error) throw toAppError(error);
+}
