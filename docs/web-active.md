@@ -186,7 +186,7 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 5 — Today / Search / Settings
 
 - **Goal:** Merged Today surface, unified search across events/tasks, planning preferences, account settings, and integration overview.
-- **Status:** Complete — checkpoint ready to commit
+- **Status:** Complete — checkpoint committed
 - **Starting SHA:** `5a053bc`
 - **Implementation Completed:**
   - Replaced `/today` with a timezone-correct daily workspace using the existing profile, task buckets, bounded Day calendar window, shared recurrence expansion, and `calculateFreeTime`. The surface includes timed and all-day events, overdue/due-today/eligible unscheduled tasks, completion toggles, completed-today handling, useful day summaries, and direct navigation into task and event inspectors.
@@ -200,8 +200,8 @@ This document is the single source of truth for web client implementation, archi
   - Authenticated browser inspection against real local Supabase data passed for Today with open tasks, a timed event and an all-day event; completion behavior; the empty Today state; search matches/no matches and keyboard result navigation; settings load/save; timezone, clock, and working-hours refresh persistence; provider empty-state/status copy; and task/event inspector deep links.
   - Today, Search, and Settings passed responsive inspection at a 390px viewport with no horizontal document overflow. A clean browser session reported no console warnings or errors.
   - `pnpm verify` passed: formatting, lint, strict typecheck, 156 shared domain tests, and production build. Focused `pnpm --filter @cal/web build` and final `git diff --check` also passed.
-- **Pushed SHA:** TBD
-- **CI:** TBD
+- **Pushed SHA:** `a1e418c1ab3399479099e67a76821b5871c3fa3a`
+- **CI:** PASS — [CI run 34172447318](https://github.com/Andrewy530/BCalAI/actions/runs/34172447318)
 - **Blockers:** None
 - **Next Action:** Web Phase 6 — Provider Integrations
 
