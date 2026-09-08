@@ -232,7 +232,7 @@ export function AppShell() {
               : styles.contentArea
           }
         >
-          <PageTransition contentKey={location.key}>
+          <PageTransition contentKey={location.pathname}>
             <Outlet />
           </PageTransition>
         </main>
