@@ -154,6 +154,18 @@ authenticates itself:
 | `webhook-microsoft`        | Microsoft Graph    | subscription id plus `clientState`, generated at subscription creation and compared against `provider_accounts.webhook_token` |
 | `sync-cron`                | `pg_cron`          | `X-Sync-Cron-Secret`, and the function refuses to run at all if the secret is unset                                           |
 
+OAuth start functions accept only the provider-neutral targets `mobile` and
+`web`; they never accept a client-supplied callback URL. The selected target is
+stored with the short-lived `oauth_states` row (`mobile` is the database
+default for backward compatibility). `mobile` uses `APP_OAUTH_RETURN_URL`
+(defaulting to `calendarapp://settings/integrations`), while `web` requires the
+server-only `WEB_OAUTH_RETURN_URL`, which should point to the web callback route
+such as `/settings/integrations/callback`. Callbacks consume the state before a
+code exchange or denial result and append only the fixed `provider` and
+`status` reason codes to that server-selected destination. If callback
+configuration has drifted, the callback uses the safe mobile destination rather
+than an open redirect.
+
 Provider webhook POSTs are acknowledged with 2xx responses, including safely
 ignorable or internally failed notifications; the Microsoft validation
 handshake returns the required plain-text 200 response. Unsupported HTTP

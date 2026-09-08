@@ -61,5 +61,9 @@ export const queryKeys = {
   search: (query: string) => ['search', query] as const,
   integrations: {
     all: () => ['integrations'] as const,
+    accounts: () => ['integrations', 'accounts'] as const,
+    health: () => ['integrations', 'health'] as const,
+    calendars: (providerAccountId: string) =>
+      ['integrations', 'calendars', providerAccountId] as const,
   },
 } as const;

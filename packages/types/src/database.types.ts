@@ -418,6 +418,7 @@ export type Database = {
           id: string
           provider: Database["public"]["Enums"]["provider_kind"]
           redirect_uri: string
+          return_target: string
           state: string
           user_id: string
         }
@@ -428,6 +429,7 @@ export type Database = {
           id?: string
           provider: Database["public"]["Enums"]["provider_kind"]
           redirect_uri: string
+          return_target?: string
           state: string
           user_id: string
         }
@@ -438,6 +440,7 @@ export type Database = {
           id?: string
           provider?: Database["public"]["Enums"]["provider_kind"]
           redirect_uri?: string
+          return_target?: string
           state?: string
           user_id?: string
         }

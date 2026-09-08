@@ -1,4 +1,11 @@
-import { type UpdateProfileInput, providerAccountSchema, updateProfileSchema } from '@cal/schemas';
+import {
+  type UpdateProfileInput,
+  calendarSyncHealthSchema,
+  externalCalendarSchema,
+  providerAccountSchema,
+  updateProfileSchema,
+  uuidSchema,
+} from '@cal/schemas';
 import type { TablesUpdate } from '@cal/types';
 import { z } from 'zod';
 
@@ -24,6 +31,48 @@ export const providerAccountRowSchema = z
     lastSyncAt: row.last_sync_at,
   }))
   .pipe(providerAccountSchema);
+
+export const calendarSyncHealthRowSchema = z
+  .object({
+    calendar_id: z.string().uuid().nullable(),
+    provider_account_id: z.string().uuid(),
+    provider: z.string(),
+    account_status: z.string(),
+    last_full_sync_at: z.string().nullable(),
+    last_incremental_sync_at: z.string().nullable(),
+    webhook_expires_at: z.string().nullable(),
+    needs_full_resync: z.boolean(),
+    has_error: z.boolean(),
+    retry_count: z.number().int().min(0),
+  })
+  .transform((row) => ({
+    calendarId: row.calendar_id,
+    providerAccountId: row.provider_account_id,
+    provider: row.provider,
+    accountStatus: row.account_status,
+    lastFullSyncAt: row.last_full_sync_at,
+    lastIncrementalSyncAt: row.last_incremental_sync_at,
+    webhookExpiresAt: row.webhook_expires_at,
+    needsFullResync: row.needs_full_resync,
+    hasError: row.has_error,
+    retryCount: row.retry_count,
+  }))
+  .pipe(calendarSyncHealthSchema);
+
+export const providerCalendarsResponseSchema = z.object({
+  calendars: z.array(externalCalendarSchema),
+});
+
+export const calendarImportRequestSchema = z.object({
+  providerAccountId: uuidSchema,
+  providerCalendarId: z.string().min(1),
+  imported: z.boolean(),
+});
+
+export const calendarImportResultSchema = z.object({
+  calendarId: uuidSchema.nullable(),
+  syncing: z.boolean(),
+});
 
 export function profileUpdatePayload(input: UpdateProfileInput): TablesUpdate<'profiles'> {
   const patch = updateProfileSchema.parse(input);

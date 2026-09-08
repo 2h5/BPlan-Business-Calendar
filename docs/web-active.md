@@ -1,6 +1,6 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASES 0–5 COMPLETE + HARDENING; PHASE 6 PROVIDER INTEGRATIONS NEXT
+Status: WEB PHASES 0–6 COMPLETE + HARDENING; PHASE 7 FIND TIME NEXT
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -248,15 +248,20 @@ This document is the single source of truth for web client implementation, archi
 ### Web Phase 6 — Provider Integrations
 
 - **Goal:** Google and Microsoft browser OAuth connection/reconnection, provider calendar discovery/import controls, detailed per-calendar sync health, and OAuth callback handling while preserving the provider-first write architecture. Basic existing-account status, manual sync, and secure disconnect controls are already present in Settings from Phase 5.
-- **Status:** Planned
-- **Starting SHA:** TBD
-- **Implementation Completed:** TBD
-- **Tests / Verification:** TBD
-- **Pushed SHA:** TBD
-- **CI:** TBD
-- **Blockers:** None
-- **Next Action:** Proceed with Web Phase 6 — Provider Integrations; preserve the
-  existing provider-first write path and validate live/manual behavior separately.
+- **Status:** Complete — checkpoint committed
+- **Starting SHA:** `9a99ccf6ca6a0ec1c787bb410e0811e37ebd7be0`
+- **Implementation Completed:**
+  - Added provider-neutral, server-controlled OAuth return targets (`mobile` / `web`) with a forward `oauth_states.return_target` migration, validation, safe fallback behavior, and preserved mobile defaults. Google and Microsoft callbacks consume valid state before success, denial, or code exchange and return only fixed provider/status values.
+  - Extended the web Settings feature boundary with browser connect/reconnect, client-safe sync-health mapping and polling, provider calendar discovery, import/un-import mutations, and stable Edge Function error-code handling. The browser uses a same-tab OAuth redirect into `/settings/integrations/callback` and refreshes integration/calendar/event state after success.
+  - Expanded the existing ConnectionsSection with provider actions, account recovery states, manual sync, secure disconnect, and a keyboard-accessible native calendar picker with per-row pending/failure state. Import remains distinct from visibility and never deletes provider data; provider-first event writes and server-only secrets/watch details are unchanged.
+- **Tests / Verification:**
+  - `pnpm verify` passed: format check, lint, strict typecheck, 156 domain tests, 50 web tests across 14 files, and production build (existing non-blocking large-chunk warning only).
+  - Deno format/lint/check passed for changed functions; `deno task test` passed with 147 tests. Local Supabase reset, `supabase test db --local` passed all 113 database tests, `pnpm db:types` completed with only the intended `return_target` generated-type additions, and `git diff --check` passed.
+  - Authenticated local browser inspection used the real seeded account at the normal 1280×720 desktop viewport. Verified the empty provider state, safe simulated connected/failed/invalid callback messages, no horizontal document overflow, and no browser console errors. A narrow-width harness was blocked by the browser URL policy, so the responsive CSS remains locally reviewed but was not claimed as browser-verified in this checkpoint.
+- **Pushed SHA:** Pending checkpoint commit record
+- **CI:** Not checked after this push
+- **Blockers:** Live Google/Microsoft OAuth requires provider client credentials and deployed callback configuration; live provider sync/import/webhook behavior was not exercised. Local automated implementation is complete.
+- **Next Action:** Web Phase 7 — Find Time
 
 ---
 

@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { adminClient } from '../_shared/auth/index.ts';
 import { EdgeError } from '../_shared/errors/index.ts';
-import { appReturnUrl } from '../_shared/providers/config.ts';
+import {
+  type OAuthReturnTarget,
+  oauthReturnTargetSchema,
+  safeOAuthReturnUrl,
+} from '../_shared/providers/config.ts';
 import { authFor } from '../_shared/providers/registry.ts';
 
 /**
@@ -23,8 +27,11 @@ const oauthStateSchema = z.object({
   provider: z.literal('google'),
   code_verifier: z.string().min(1),
   redirect_uri: z.string().url(),
+  return_target: oauthReturnTargetSchema,
   expires_at: z.string().min(1),
 });
+
+type ConnectStatus = 'connected' | 'cancelled' | 'expired' | 'failed' | 'invalid_request';
 
 Deno.serve(async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
@@ -32,21 +39,23 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const state = url.searchParams.get('state');
   const denied = url.searchParams.get('error');
 
-  // The user pressed "Cancel" on the consent screen. Not an error worth logging.
-  if (denied) return redirect('cancelled');
-  if (!code || !state) return redirect('invalid_request');
+  if (!state) return redirect('invalid_request', 'mobile');
+
+  let returnTarget: OAuthReturnTarget = 'mobile';
 
   try {
     const admin = adminClient();
 
     const { data: handshake, error: stateError } = await admin
       .from('oauth_states')
-      .select('id, user_id, provider, code_verifier, redirect_uri, expires_at')
+      .select('id, user_id, provider, code_verifier, redirect_uri, return_target, expires_at')
       .eq('state', state)
       .maybeSingle();
 
-    if (stateError) throw new EdgeError('UNKNOWN', 'Could not read the handshake.', 500);
-    if (!handshake) return redirect('expired');
+    if (stateError) {
+      throw new EdgeError('UNKNOWN', 'Could not read the handshake.', 500);
+    }
+    if (!handshake) return redirect('expired', 'mobile');
 
     const parsedHandshake = oauthStateSchema.safeParse(handshake);
     if (!parsedHandshake.success) {
@@ -54,6 +63,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       throw new EdgeError('UNKNOWN', 'Could not read the handshake.', 500);
     }
     const validHandshake = parsedHandshake.data;
+    returnTarget = validHandshake.return_target;
 
     // Delete before exchanging: a replayed callback must not be able to mint a
     // second grant, even if the exchange below is slow.
@@ -64,15 +74,23 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
     if (consumeError) {
       console.error(
-        JSON.stringify({ code: 'OAUTH_STATE_CONSUME_FAILED', detail: consumeError.code }),
+        JSON.stringify({
+          code: 'OAUTH_STATE_CONSUME_FAILED',
+          detail: consumeError.code,
+        }),
       );
       throw new EdgeError('UNKNOWN', 'Could not consume the handshake.', 500);
     }
-    if (count !== 1) return redirect('expired');
+    if (count !== 1) return redirect('expired', returnTarget);
 
     if (new Date(validHandshake.expires_at).getTime() < Date.now()) {
-      return redirect('expired');
+      return redirect('expired', returnTarget);
     }
+
+    // Denials also consume a valid state, and must return to the client that
+    // initiated the handshake rather than falling back to the mobile scheme.
+    if (denied) return redirect('cancelled', returnTarget);
+    if (!code) return redirect('invalid_request', returnTarget);
 
     const auth = authFor(validHandshake.provider);
     const tokens = await auth.exchangeCode({
@@ -129,7 +147,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
       if (accountError || !insertedAccount) {
         console.error(
-          JSON.stringify({ code: 'PROVIDER_ACCOUNT_INSERT_FAILED', detail: accountError?.code }),
+          JSON.stringify({
+            code: 'PROVIDER_ACCOUNT_INSERT_FAILED',
+            detail: accountError?.code,
+          }),
         );
         throw new EdgeError('UNKNOWN', 'Could not save the connection.', 500);
       }
@@ -160,7 +181,12 @@ Deno.serve(async (request: Request): Promise<Response> => {
           );
         }
       }
-      console.error(JSON.stringify({ code: 'VAULT_STORE_FAILED', detail: secretError.code }));
+      console.error(
+        JSON.stringify({
+          code: 'VAULT_STORE_FAILED',
+          detail: secretError.code,
+        }),
+      );
       throw new EdgeError('UNKNOWN', 'Could not store the credential.', 500);
     }
 
@@ -172,7 +198,10 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
       if (updateError) {
         console.error(
-          JSON.stringify({ code: 'PROVIDER_ACCOUNT_UPDATE_FAILED', detail: updateError.code }),
+          JSON.stringify({
+            code: 'PROVIDER_ACCOUNT_UPDATE_FAILED',
+            detail: updateError.code,
+          }),
         );
         throw new EdgeError('UNKNOWN', 'Could not save the connection.', 500);
       }
@@ -186,11 +215,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
       }),
     );
 
-    return redirect('connected');
+    return redirect('connected', returnTarget);
   } catch (error) {
     const reason = error instanceof EdgeError ? error.code : 'UNKNOWN';
     console.error(JSON.stringify({ code: 'OAUTH_CALLBACK_FAILED', reason }));
-    return redirect('failed');
+    return redirect('failed', returnTarget);
   }
 });
 
@@ -200,8 +229,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
  * Only a fixed reason code travels in the URL — never an email, an account id,
  * or a provider message.
  */
-function redirect(status: string): Response {
-  const target = new URL(appReturnUrl());
+function redirect(status: ConnectStatus, returnTarget: OAuthReturnTarget): Response {
+  const target = new URL(safeOAuthReturnUrl(returnTarget));
   target.searchParams.set('provider', 'google');
   target.searchParams.set('status', status);
 

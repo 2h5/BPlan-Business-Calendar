@@ -1,11 +1,13 @@
 import type { HourCycle, Profile, WorkingHours } from '@cal/schemas';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { AccountPanel } from './AccountPanel';
 import { ConnectionsSection } from './ConnectionsSection';
 import styles from './SettingsView.module.css';
 import { useAuth } from '../../auth';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
+import { callbackResultFromNavigationState, oauthCallbackMessage } from '../utils/oauth-callback';
 import { minuteOfDayToTimeInput, timeInputToMinute } from '../utils/working-hours-time';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -25,13 +27,29 @@ const TIME_ZONES = [
 
 export function SettingsView() {
   const { email } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const profile = useProfile();
   const update = useUpdateProfile();
   const [draft, setDraft] = useState<Profile | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [integrationMessage, setIntegrationMessage] = useState<string | null>(null);
+  const callbackResult = useMemo(
+    () => callbackResultFromNavigationState(location.state),
+    [location.state],
+  );
+
   useEffect(() => {
     if (profile.data) setDraft(profile.data);
   }, [profile.data]);
+
+  useEffect(() => {
+    if (!callbackResult) return;
+    setIntegrationMessage(oauthCallbackMessage(callbackResult));
+    // Consume the transient navigation state so forward/back and refresh do
+    // not replay a previous OAuth result.
+    navigate(location.pathname, { replace: true, state: null });
+  }, [callbackResult, location.pathname, navigate]);
 
   if (profile.isLoading)
     return (
@@ -283,7 +301,7 @@ export function SettingsView() {
             </footer>
           </section>
 
-          <ConnectionsSection />
+          <ConnectionsSection notice={integrationMessage} />
         </div>
         <AccountPanel fullName={draft.fullName} />
       </div>

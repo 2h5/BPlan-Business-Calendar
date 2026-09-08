@@ -31,6 +31,10 @@ Postgres via Supabase. Every table below is created by a migration in
 | `ai_schedule_suggestions` | Ranked proposals                    | Read own proposed/accepted suggestions; server-managed |
 | `subscriptions`           | RevenueCat entitlement mirror       | Read only                                              |
 
+`oauth_states` is a short-lived, server-only table for OAuth state and PKCE
+verifiers. Its `return_target` is constrained to `mobile` or `web` and defaults
+to `mobile`; client roles have no policies or write path for the table.
+
 Provider watch ownership is deliberate. Google keeps one channel per imported
 calendar in `calendar_sync_states`; Microsoft Graph keeps its mailbox/account-
 scoped subscription identifiers, clientState, and expiry on

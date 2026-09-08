@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppShell } from './components/layout/AppShell';
 import { useAuth } from './features/auth';
 import { CalendarPage } from './pages/CalendarPage';
+import { IntegrationsCallbackPage } from './pages/IntegrationsCallbackPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -28,6 +29,7 @@ export function AppRoutes() {
       <Route path="/login" element={<SignInPage />} />
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/settings/integrations/callback" element={<IntegrationsCallbackPage />} />
         <Route element={<AppShell />}>
           <Route path="/today" element={<TodayPage />} />
           <Route path="/calendar" element={<CalendarPage />} />

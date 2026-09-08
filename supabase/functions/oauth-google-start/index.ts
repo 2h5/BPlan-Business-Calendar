@@ -1,7 +1,10 @@
+import { z } from 'zod';
+
 import { adminClient, requireUser } from '../_shared/auth/index.ts';
 import { EdgeError, withErrorHandling } from '../_shared/errors/index.ts';
 import { jsonResponse, preflight } from '../_shared/http/cors.ts';
 import { createPkcePair } from '../_shared/providers/crypto.ts';
+import { oauthReturnUrl, parseOAuthReturnTarget } from '../_shared/providers/config.ts';
 import { googleRedirectUri } from '../_shared/providers/google/config.ts';
 import { authFor } from '../_shared/providers/registry.ts';
 
@@ -13,13 +16,25 @@ import { authFor } from '../_shared/providers/registry.ts';
  * held by the app, because the leg that completes the flow is a request from
  * Google to our server that the app never sees.
  */
+const bodySchema = z.object({ returnTarget: z.unknown().optional() }).strict();
+
 const handler = withErrorHandling(async (request) => {
   if (request.method === 'OPTIONS') return preflight();
-  if (request.method !== 'POST') throw new EdgeError('METHOD_NOT_ALLOWED', 'Use POST.', 405);
+  if (request.method !== 'POST') {
+    throw new EdgeError('METHOD_NOT_ALLOWED', 'Use POST.', 405);
+  }
 
   const user = await requireUser(request);
+  const body = bodySchema.safeParse(await request.json().catch(() => ({})));
+  if (!body.success) {
+    throw new EdgeError('VALIDATION_FAILED', 'Invalid OAuth request.', 400);
+  }
+  const returnTarget = parseOAuthReturnTarget(body.data.returnTarget);
   const admin = adminClient();
 
+  // Resolve this before writing a handshake so a misconfigured web deploy
+  // cannot leave behind a state that can never return to the browser.
+  oauthReturnUrl(returnTarget);
   const redirectUri = googleRedirectUri();
   const { verifier, challenge } = await createPkcePair();
   const state = crypto.randomUUID();
@@ -30,6 +45,7 @@ const handler = withErrorHandling(async (request) => {
     state,
     code_verifier: verifier,
     redirect_uri: redirectUri,
+    return_target: returnTarget,
   });
 
   if (error) {
@@ -47,7 +63,13 @@ const handler = withErrorHandling(async (request) => {
     redirectUri,
   });
 
-  console.log(JSON.stringify({ event: 'oauth_started', provider: 'google', userId: user.id }));
+  console.log(
+    JSON.stringify({
+      event: 'oauth_started',
+      provider: 'google',
+      userId: user.id,
+    }),
+  );
 
   return jsonResponse({ authorizationUrl, state });
 });

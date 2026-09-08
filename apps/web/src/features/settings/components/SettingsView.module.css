@@ -161,7 +161,7 @@
   display: grid;
 }
 .connection {
-  min-height: 78px;
+  min-height: 96px;
   padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border-subtle);
   display: grid;
@@ -182,7 +182,7 @@
   color: var(--color-accent);
   font-weight: var(--font-weight-semibold);
 }
-.connection > div:nth-child(2) {
+.connectionDetails {
   min-width: 0;
   display: grid;
   gap: 2px;
@@ -190,9 +190,12 @@
 .connection strong {
   font-size: var(--font-size-sm);
 }
-.connection span {
+.connectionDetails > span {
   color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
+}
+.connectionSummary {
+  color: var(--color-text-secondary) !important;
 }
 .status {
   padding: 3px 8px;
@@ -214,9 +217,12 @@
 }
 .connectionActions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 .connectionActions button,
+.connectOptions button,
 .account > button,
 .state button {
   min-height: var(--control-height-sm);
@@ -227,6 +233,32 @@
 }
 .dangerLink {
   color: var(--color-danger);
+}
+.primaryAction {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.buttonMark {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+.connectionActions button:disabled,
+.connectOptions button:disabled {
+  opacity: 0.6;
 }
 .sectionState {
   min-height: 110px;
@@ -240,6 +272,49 @@
 }
 .sectionState span {
   color: var(--color-text-tertiary);
+}
+.integrationNotice,
+.integrationError,
+.healthUnavailable {
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-xs);
+}
+.integrationNotice {
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+}
+.integrationError {
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+}
+.healthUnavailable {
+  color: var(--color-text-tertiary);
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 0;
+}
+.connectOptions {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.connectOptions > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.connectOptions > div:first-child span {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+.connectButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 .account {
   position: sticky;
@@ -312,6 +387,13 @@
   .connectionActions {
     grid-column: 2 / -1;
   }
+  .connectOptions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .connectButtons {
+    justify-content: flex-start;
+  }
 }
 @media (max-width: 480px) {
   .formGrid,
@@ -330,6 +412,19 @@
   }
   .connection {
     padding-inline: var(--space-4);
+  }
+  .integrationNotice,
+  .integrationError,
+  .healthUnavailable,
+  .connectOptions {
+    padding-inline: var(--space-4);
+  }
+  .connectButtons,
+  .connectButtons button {
+    width: 100%;
+  }
+  .connectButtons button {
+    justify-content: center;
   }
   .status {
     display: none;
