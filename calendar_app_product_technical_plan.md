@@ -15,8 +15,8 @@
 - Sprint 5 Microsoft/Outlook implementation is complete in code. The recorded
   2026-09-01 local run covered Azure OAuth, calendar listing/import, and
   initial/incremental delta sync; Graph subscription creation/delivery,
-  provider-first CRUD, Outlook-side changes, lifecycle behavior, and
-  device/deep-link verification remain external gaps. See
+  provider-first CRUD, Outlook-side changes, lifecycle/renewal/teardown, reauth
+  where applicable, and device/deep-link verification remain external gaps. See
   [`docs/sprint-5-active.md`](docs/sprint-5-active.md).
 - Sprint 6 AI Phases 1–4 are implemented and hardened: deterministic candidate
   preparation, provider abstraction, proposal persistence/ranking, and safe
@@ -383,9 +383,11 @@ flows remain unexercised; see `docs/sprint-4-active.md` for historical evidence.
 - [x] Create/update/delete events
 - [x] Disconnect integration
 
-Implementation is complete, but live Microsoft/Azure verification remains for
-OAuth, Graph listing/import, delta sync, CRUD, webhook delivery, renewal,
-teardown, and device/deep-link behavior.
+Implementation is complete. Recorded local evidence from 2026-09-01 covers
+Azure OAuth, Graph calendar listing/import, and initial/incremental delta sync.
+External verification remains for provider-first CRUD, Outlook-side changes,
+Graph subscription/webhook delivery and lifecycle, renewal/replacement/teardown,
+reauth where applicable, and device/deep-link behavior.
 
 ### Apple/iOS device calendar
 
@@ -1825,8 +1827,12 @@ Status: **IMPLEMENTATION COMPLETE / EXTERNAL VERIFICATION REMAINING**
 ### Deliverable
 
 Both major external calendar ecosystems are implemented behind the provider
-abstraction. Microsoft live OAuth, Graph, webhook, subscription-lifecycle, and
-device verification remain before this sprint is fully verified.
+abstraction. Recorded local evidence from 2026-09-01 covers Microsoft Azure
+OAuth, Graph calendar listing/import, and initial/incremental delta sync.
+Provider-first CRUD, Outlook-side changes, Graph subscription/webhook delivery
+and lifecycle, renewal/replacement/teardown, reauth where applicable, and
+device/deep-link verification remain external work before this sprint is fully
+verified.
 
 ---
 

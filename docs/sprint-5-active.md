@@ -9,11 +9,12 @@ Supabase reset/database/RLS tests, full `pnpm verify`, and the unsigned iOS
 simulator build/smoke check.**
 External verification: **recorded local evidence covers Microsoft OAuth,
 calendar listing/import, and initial/incremental delta sync; provider-first CRUD,
-Outlook-side changes, Graph webhook delivery, renewal/teardown, and
-device/deep-link flows remain unexercised.**
-Current blocker: **Graph subscription creation/lifecycle, provider-first CRUD,
-Outlook-side changes, public callback delivery, and device/deep-link verification
-remain.**
+Outlook-side changes, Graph webhook/subscription delivery and lifecycle,
+renewal/teardown, reauth where applicable, and device/deep-link flows remain
+unexercised.**
+Current blocker: **Graph subscription creation/delivery and lifecycle,
+provider-first CRUD, Outlook-side changes, renewal/teardown, reauth where
+applicable, and device/deep-link verification remain.**
 Next action: **Using the recorded Azure registration and a public HTTPS callback,
 run the live Microsoft lifecycle matrix. Sprint 6 and the web track remain
 separate from this historical verification record.**
@@ -94,21 +95,21 @@ branch above it.
       sync, and provider-first create/update/delete were exercised from the
       local stack. The adapter has spoken to Google; these results clear the
       provider seam for local Sprint 5 implementation.
-- [ ] **Azure app registration.** The Microsoft counterpart to the Google
-      console step. Register a **Web** application (not a public client), so
-      the client secret stays server-side and the refresh token can go to
-      Vault exactly as Google's does. Redirect URI is the callback function.
-      This is required before live Microsoft OAuth and subscription delivery,
-      but does not block locally testable seam, adapter, recurrence, or Edge
-      Function work.
+- [x] **Azure app registration used for the recorded Microsoft verification
+      (2026-09-01).** A Web app registration with a server-side client secret,
+      delegated calendar permission, and local OAuth callback was used for the
+      successful OAuth, calendar listing/import, and initial/incremental
+      delta-sync run. A public HTTPS callback and live Graph subscription setup
+      are still required for external webhook/lifecycle verification.
 
 The remaining Google gaps are narrower than this gate list: the iOS app-side
 OAuth/deep-link flow and provider-owned UI write flow have not been exercised;
 real Google webhook delivery (including replay/idempotency) has not been
 exercised because local `127.0.0.1` is not publicly reachable; and no deliberate
 expired-cursor or revoked-credential run has been performed. None blocks local
-Microsoft implementation. Azure registration blocks only the corresponding
-live Microsoft OAuth/subscription verification.
+Microsoft implementation. The recorded Azure registration is sufficient for the
+recorded Microsoft OAuth/read/delta run; a public HTTPS callback and live Graph
+subscription setup remain required for webhook/lifecycle verification.
 
 ## What the seam already gets right
 
@@ -216,9 +217,10 @@ security/integrity checks that apply equally to Google and Microsoft.
 
 ## Implementation checklist
 
-- [x] Clear the toolchain and live Google backend/provider gates above. Azure
-      remains a prerequisite only for live Microsoft OAuth/subscription
-      verification.
+- [x] Clear the toolchain and live Google backend/provider gates above. The
+      recorded Azure registration was used for the 2026-09-01 Microsoft OAuth,
+      calendar listing/import, and initial/incremental delta-sync run; live
+      Graph subscription verification remains pending.
 - [x] Fix and review the six seam defects as one slice. Shared Google behavior
       was regression-checked by Deno, mobile, and static verification; no new
       live Google run occurred.
@@ -268,10 +270,12 @@ security/integrity checks that apply equally to Google and Microsoft.
 - [x] Full local verification pass: root `pnpm verify`, Deno check/tests,
       Supabase reset/database/RLS tests, and the unsigned iOS simulator
       build/smoke check passed on the Mac; see the dated log below.
-- [ ] External Microsoft verification: Azure OAuth round trip, calendar
-      listing/import, delta sync, provider-first CRUD, Outlook-side changes,
-      webhook delivery, renewal/replacement/teardown, reauth, and device/deep
-      link behavior.
+- [x] External Microsoft verification recorded on 2026-09-01: Azure OAuth
+      round trip, calendar listing/import, and initial/incremental delta sync.
+- [ ] Remaining external Microsoft verification: provider-first CRUD,
+      Outlook-side changes, Graph subscription/webhook delivery and lifecycle,
+      renewal/replacement/teardown, reauth where applicable, and device/deep-link
+      behavior.
 
 ## Where Graph differs from Google
 
@@ -619,10 +623,10 @@ verify.
 
 ## Follow-up work (not Sprint 5 blockers)
 
-- Reconfirm the Azure app registration, tenant/client configuration, delegated
-  scopes, redirect URI, and public HTTPS webhook deployment; then run the
-  complete Microsoft provider-first CRUD, Outlook-side change, webhook,
-  lifecycle, renewal, teardown, and reauth flow.
+- Use the recorded Azure app registration, confirming tenant/client
+  configuration, delegated scopes, redirect URI, and public HTTPS webhook
+  deployment; then run the complete Microsoft provider-first CRUD, Outlook-side
+  change, webhook, lifecycle, renewal, teardown, and reauth flow.
 - Keep the local Deno, Supabase CLI, Docker, and generated-type checks in the
   verification loop for future Sprint 5 changes.
 - For the standard Expo iOS command, declare the already-used
