@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="BCal — Calendar, tasks, and intelligent planning" />
     <title>BCal | Calendar &amp; Tasks</title>
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem('bcal_theme') || 'auto';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,6 @@
 import { addZonedDays, getZonedParts, zonedWallClockToUtc } from '@cal/domain';
 import type { CreateTaskInput, UpdateTaskInput } from '@cal/schemas';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { TaskInspector } from './TaskInspector';
@@ -20,11 +20,13 @@ import {
 } from '../hooks/useTasks';
 
 export function TasksView() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() =>
     searchParams.get('task'),
   );
-  const [isDraft, setIsDraft] = useState(false);
+  const [isDraft, setIsDraft] = useState(
+    () => searchParams.get('new') === 'true' || searchParams.get('newTask') === 'true',
+  );
   const [isInspectorClosing, setIsInspectorClosing] = useState(false);
   const [activeTab, setActiveTab] = useState<TaskFilter>('inbox');
   const [selectedListId, setSelectedListId] = useState<string | null>(() =>
@@ -64,15 +66,55 @@ export function TasksView() {
     setIsDraft(true);
   }, []);
 
+  useEffect(() => {
+    const isNew = searchParams.get('new') === 'true' || searchParams.get('newTask') === 'true';
+    if (isNew) {
+      setIsInspectorClosing(false);
+      setSelectedTaskId(null);
+      setIsDraft(true);
+    }
+  }, [searchParams]);
+
+  const taskParam = searchParams.get('task');
+  useEffect(() => {
+    if (taskParam) {
+      setIsInspectorClosing(false);
+      setIsDraft(false);
+      setSelectedTaskId(taskParam);
+    }
+  }, [taskParam]);
+
+  const isInspectorOpen = Boolean(selectedTask || isDraft);
+
   const handleCloseInspector = useCallback(() => {
+    if (!selectedTask && !isDraft) {
+      if (selectedTaskId) {
+        setSelectedTaskId(null);
+      }
+      return;
+    }
+    if (isInspectorClosing) return;
     setIsInspectorClosing(true);
-  }, []);
+  }, [selectedTask, isDraft, selectedTaskId, isInspectorClosing]);
 
   const handleInspectorCloseAnimationEnd = useCallback(() => {
     setSelectedTaskId(null);
     setIsDraft(false);
     setIsInspectorClosing(false);
-  }, []);
+
+    if (searchParams.has('newTask') || searchParams.has('new') || searchParams.has('task')) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('newTask');
+          next.delete('new');
+          next.delete('task');
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleToggleComplete = useCallback(
     (task: TaskWithTags, completed: boolean) => {
@@ -163,6 +205,7 @@ export function TasksView() {
         onQuickAdd={handleQuickAdd}
         onNewTaskClick={handleNewTaskClick}
         onRetry={refetch}
+        onEmptySpaceClick={isInspectorOpen ? handleCloseInspector : undefined}
       />
 
       {(selectedTask || isDraft || isInspectorClosing) && (

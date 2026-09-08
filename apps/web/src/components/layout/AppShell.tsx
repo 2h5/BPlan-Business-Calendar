@@ -134,20 +134,10 @@ const PRIMARY_NAV: NavItemConfig[] = [
   { to: '/search', label: 'Search', icon: SearchIcon },
 ];
 
-const ROUTE_TITLES: Record<string, string> = {
-  '/today': 'Today',
-  '/calendar': 'Calendar',
-  '/tasks': 'Tasks',
-  '/search': 'Search',
-  '/settings': 'Settings',
-};
-
 export function AppShell() {
   const { email } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const currentTitle = ROUTE_TITLES[location.pathname] ?? 'BCal';
 
   async function handleSignOut() {
     try {
@@ -235,13 +225,6 @@ export function AppShell() {
 
       {/* Main Content Area */}
       <div className={styles.mainContent}>
-        <header className={styles.topBar}>
-          <div>
-            <span className={styles.pageEyebrow}>Workspace</span>
-            <h1 className={styles.pageTitle}>{currentTitle}</h1>
-          </div>
-        </header>
-
         <main
           className={
             location.pathname === '/tasks' || location.pathname === '/calendar'

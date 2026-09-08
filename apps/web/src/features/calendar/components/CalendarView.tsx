@@ -20,6 +20,7 @@ import {
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
+import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
 
 function CalendarState({
@@ -65,9 +66,14 @@ function CalendarState({
 }
 
 export function CalendarView() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  const [mode, setMode] = useState<CalendarViewMode>('week');
+  const [mode, setMode] = useState<CalendarViewMode>(() => {
+    const viewParam = searchParams.get('view');
+    if (isValidCalendarViewMode(viewParam)) return viewParam;
+    return getDefaultCalendarView();
+  });
+  const [transitionDirection, setTransitionDirection] = useState<'in' | 'out' | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState(
     () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
   );
@@ -91,6 +97,30 @@ export function CalendarView() {
   const updateEvent = useUpdateEvent(result.calendars);
   const removeEvent = useDeleteEvent(result.calendars);
   const { window, timeZone } = result;
+
+  const dateParam = searchParams.get('date');
+  useEffect(() => {
+    if (dateParam) {
+      setSelectedDateKey(dateParam);
+    }
+  }, [dateParam]);
+
+  const hasRequestedNewEvent =
+    searchParams.get('new') === 'true' || searchParams.get('newEvent') === 'true';
+
+  useEffect(() => {
+    if (!hasRequestedNewEvent) return;
+    if (result.isLoading) return;
+
+    if (result.calendars.some((calendar) => !calendar.isReadOnly)) {
+      setIsEventEditorClosing(false);
+      setSelectedOccurrence(null);
+      setIsDraft(true);
+    } else {
+      setToast('Create or connect a writable calendar first.');
+    }
+  }, [hasRequestedNewEvent, result.isLoading, result.calendars]);
+
   useEffect(() => {
     if (!requestedEventId) return;
     const occurrence = result.occurrences.find((item) => item.event.id === requestedEventId);
@@ -119,17 +149,27 @@ export function CalendarView() {
     [selectedOccurrence, toggleVisibility],
   );
 
-  const changeMode = useCallback((nextMode: CalendarViewMode) => {
-    setMode(nextMode);
-    setSelectedOccurrence(null);
-    setIsDraft(false);
-    setIsEventEditorClosing(false);
-  }, []);
+  const changeMode = useCallback(
+    (nextMode: CalendarViewMode) => {
+      if (nextMode === mode) return;
+      const order: Record<CalendarViewMode, number> = { day: 0, week: 1, month: 2 };
+      const dir = order[nextMode] < order[mode] ? 'in' : 'out';
+      setTransitionDirection(dir);
+      setMode(nextMode);
+      setSelectedOccurrence(null);
+      setIsDraft(false);
+      setIsEventEditorClosing(false);
+    },
+    [mode],
+  );
 
-  const selectMonthDate = useCallback((dateKey: string) => {
-    setSelectedDateKey(dateKey);
-    setMode('day');
-  }, []);
+  const selectMonthDate = useCallback(
+    (dateKey: string) => {
+      setSelectedDateKey(dateKey);
+      changeMode('day');
+    },
+    [changeMode],
+  );
 
   const goToToday = useCallback(() => {
     setSelectedDateKey(toZonedDateKey(new Date(), timeZone));
@@ -144,7 +184,20 @@ export function CalendarView() {
     setIsDraft(false);
     setIsEventEditorClosing(false);
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
-  }, []);
+
+    if (searchParams.has('newEvent') || searchParams.has('new') || searchParams.has('event')) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('newEvent');
+          next.delete('new');
+          next.delete('event');
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   const rememberOpeningControl = useCallback(() => {
     openingControlRef.current =
@@ -205,37 +258,50 @@ export function CalendarView() {
             <CalendarState kind="loading" />
           ) : result.isError ? (
             <CalendarState kind="error" onRetry={result.refetch} />
-          ) : mode === 'month' ? (
-            <MonthView
-              dateKeys={window.dateKeys}
-              byDateKey={result.byDateKey}
-              selectedDateKey={selectedDateKey}
-              timeZone={timeZone}
-              now={new Date()}
-              onSelectDate={selectMonthDate}
-              onSelectEvent={(occurrence) => {
-                rememberOpeningControl();
-                setIsEventEditorClosing(false);
-                setIsDraft(false);
-                setSelectedOccurrence(occurrence);
-              }}
-            />
           ) : (
-            <TimelineView
-              dateKeys={window.dateKeys}
-              byDateKey={result.byDateKey}
-              selectedDateKey={selectedDateKey}
-              timeZone={timeZone}
-              hourCycle={result.hourCycle}
-              now={new Date()}
-              onSelectDate={setSelectedDateKey}
-              onSelectEvent={(occurrence) => {
-                rememberOpeningControl();
-                setIsEventEditorClosing(false);
-                setIsDraft(false);
-                setSelectedOccurrence(occurrence);
-              }}
-            />
+            <div
+              key={mode}
+              className={`${styles.calendarViewTransition} ${
+                transitionDirection === 'in'
+                  ? styles.viewTransitionZoomIn
+                  : transitionDirection === 'out'
+                    ? styles.viewTransitionZoomOut
+                    : styles.viewTransitionFade
+              }`}
+            >
+              {mode === 'month' ? (
+                <MonthView
+                  dateKeys={window.dateKeys}
+                  byDateKey={result.byDateKey}
+                  selectedDateKey={selectedDateKey}
+                  timeZone={timeZone}
+                  now={new Date()}
+                  onSelectDate={selectMonthDate}
+                  onSelectEvent={(occurrence) => {
+                    rememberOpeningControl();
+                    setIsEventEditorClosing(false);
+                    setIsDraft(false);
+                    setSelectedOccurrence(occurrence);
+                  }}
+                />
+              ) : (
+                <TimelineView
+                  dateKeys={window.dateKeys}
+                  byDateKey={result.byDateKey}
+                  selectedDateKey={selectedDateKey}
+                  timeZone={timeZone}
+                  hourCycle={result.hourCycle}
+                  now={new Date()}
+                  onSelectDate={setSelectedDateKey}
+                  onSelectEvent={(occurrence) => {
+                    rememberOpeningControl();
+                    setIsEventEditorClosing(false);
+                    setIsDraft(false);
+                    setSelectedOccurrence(occurrence);
+                  }}
+                />
+              )}
+            </div>
           )}
 
           {!result.isLoading && !result.isError && result.occurrences.length === 0 ? (

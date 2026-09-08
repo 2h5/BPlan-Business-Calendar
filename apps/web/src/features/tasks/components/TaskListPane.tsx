@@ -27,6 +27,7 @@ interface TaskListPaneProps {
   onQuickAdd: (title: string) => Promise<void>;
   onNewTaskClick: () => void;
   onRetry: () => void;
+  onEmptySpaceClick?: () => void;
 }
 
 export function TaskListPane({
@@ -49,6 +50,7 @@ export function TaskListPane({
   onQuickAdd,
   onNewTaskClick,
   onRetry,
+  onEmptySpaceClick,
 }: TaskListPaneProps) {
   const [quickTitle, setQuickTitle] = useState('');
   const [quickAddError, setQuickAddError] = useState<string | null>(null);
@@ -232,7 +234,26 @@ export function TaskListPane({
   };
 
   return (
-    <div className={styles.pane}>
+    <div
+      className={styles.pane}
+      onClick={(e) => {
+        const target = e.target as HTMLElement | null;
+        if (
+          target &&
+          !target.closest('[data-task-row]') &&
+          !target.closest('button') &&
+          !target.closest('input') &&
+          !target.closest('select') &&
+          !target.closest('textarea') &&
+          !target.closest('a') &&
+          !target.closest('[role="button"]') &&
+          !target.closest('[role="listbox"]') &&
+          !target.closest('[role="option"]')
+        ) {
+          onEmptySpaceClick?.();
+        }
+      }}
+    >
       <div className={styles.header}>
         <div className={styles.toolbar}>
           <div className={styles.filterTabs}>

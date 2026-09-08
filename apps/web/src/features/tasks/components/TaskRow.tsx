@@ -1,6 +1,6 @@
 import { describeTaskDue, formatDuration, isNotablePriority, PRIORITY_LABELS } from '@cal/domain';
 import type { TaskList } from '@cal/schemas';
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 
 import styles from './TaskRow.module.css';
 import type { TaskWithTags } from '../api/tasks.api';
@@ -31,23 +31,58 @@ export const TaskRow = memo(function TaskRow({
   onDelete,
 }: TaskRowProps) {
   const isCompleted = task.status === 'completed';
+  const [isExiting, setIsExiting] = useState<
+    'completing' | 'uncompleting' | 'deleting' | 'snoozing' | null
+  >(null);
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    };
+  }, []);
+
+  const effectiveCompleted =
+    isExiting === 'completing' ? true : isExiting === 'uncompleting' ? false : isCompleted;
 
   const dueInfo = describeTaskDue(task, { now, timeZone, hourCycle });
   const list = lists?.find((l) => l.id === task.listId);
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleComplete(task, !isCompleted);
+    if (isExiting) return;
+
+    if (!isCompleted) {
+      setIsExiting('completing');
+      exitTimerRef.current = setTimeout(() => {
+        onToggleComplete(task, true);
+      }, 260);
+    } else {
+      setIsExiting('uncompleting');
+      exitTimerRef.current = setTimeout(() => {
+        onToggleComplete(task, false);
+      }, 260);
+    }
   };
 
   const handleSnoozeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSnooze(task);
+    if (isExiting) return;
+
+    setIsExiting('snoozing');
+    exitTimerRef.current = setTimeout(() => {
+      onSnooze(task);
+    }, 260);
   };
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onDelete(task);
+    if (isExiting) return;
+
+    setIsExiting('deleting');
+    exitTimerRef.current = setTimeout(() => {
+      onDelete(task);
+    }, 260);
   };
 
   const priorityClass =
@@ -68,18 +103,32 @@ export const TaskRow = memo(function TaskRow({
           ? styles.dueSoon
           : styles.dueLater;
 
+  const exitClass =
+    isExiting === 'completing'
+      ? styles.rowCompletingExit
+      : isExiting === 'uncompleting'
+        ? styles.rowUncompletingExit
+        : isExiting === 'deleting'
+          ? styles.rowDeletingExit
+          : isExiting === 'snoozing'
+            ? styles.rowSnoozingExit
+            : '';
+
   return (
     <div
-      className={`${styles.row} ${isSelected ? styles.rowSelected : ''} ${isCompleted ? styles.rowCompleted : ''}`}
+      data-task-row="true"
+      className={`${styles.row} ${isSelected ? styles.rowSelected : ''} ${
+        effectiveCompleted ? styles.rowCompleted : ''
+      } ${exitClass}`}
     >
       <button
         type="button"
-        className={`${styles.checkboxBtn} ${isCompleted ? styles.checkboxChecked : ''}`}
+        className={`${styles.checkboxBtn} ${effectiveCompleted ? styles.checkboxChecked : ''}`}
         onClick={handleCheckboxClick}
-        title={isCompleted ? 'Mark open' : 'Mark complete'}
-        aria-label={isCompleted ? 'Mark open' : 'Mark complete'}
+        title={effectiveCompleted ? 'Mark open' : 'Mark complete'}
+        aria-label={effectiveCompleted ? 'Mark open' : 'Mark complete'}
       >
-        {isCompleted && (
+        {effectiveCompleted && (
           <svg
             className={styles.checkboxCheckmark}
             viewBox="0 0 24 24"
