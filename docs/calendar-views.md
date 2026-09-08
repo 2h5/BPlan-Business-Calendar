@@ -69,8 +69,10 @@ Tapping a day drops into the day view for the detail.
 `parseRRule` implements a deliberate expansion subset: daily, weekly (including
 WKST), absolute and ordinal monthly/yearly patterns, INTERVAL, COUNT, and UNTIL.
 Anything outside that subset returns `null`. That parser capability is not a
-persistence gate: provider recurrence data is stored as provider-supplied
-opaque text and must not be silently rewritten into a different series.
+persistence gate: `recurrence_rule` is opaque text at the database/API
+boundary. An adapter may preserve provider text or translate it into the
+normalized RRULE representation, but it must not silently rewrite a series into
+a different meaning.
 
 The adapters have provider-specific behavior. Google currently extracts and
 stores the `RRULE` line; auxiliary `EXDATE`, `RDATE`, and `EXRULE` lines are not
