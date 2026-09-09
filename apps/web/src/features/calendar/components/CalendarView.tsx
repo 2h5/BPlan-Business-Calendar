@@ -20,6 +20,7 @@ import {
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
+import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
 
 function CalendarState({
@@ -65,9 +66,14 @@ function CalendarState({
 }
 
 export function CalendarView() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  const [mode, setMode] = useState<CalendarViewMode>('week');
+  const [mode, setMode] = useState<CalendarViewMode>(() => {
+    const viewParam = searchParams.get('view');
+    if (isValidCalendarViewMode(viewParam)) return viewParam;
+    return getDefaultCalendarView();
+  });
+  const [transitionDirection, setTransitionDirection] = useState<'in' | 'out' | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState(
     () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
   );
@@ -76,6 +82,7 @@ export function CalendarView() {
   );
   const [selectedOccurrence, setSelectedOccurrence] = useState<EventOccurrence | null>(null);
   const [isDraft, setIsDraft] = useState(false);
+  const [isEventEditorClosing, setIsEventEditorClosing] = useState(false);
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -90,10 +97,35 @@ export function CalendarView() {
   const updateEvent = useUpdateEvent(result.calendars);
   const removeEvent = useDeleteEvent(result.calendars);
   const { window, timeZone } = result;
+
+  const dateParam = searchParams.get('date');
+  useEffect(() => {
+    if (dateParam) {
+      setSelectedDateKey(dateParam);
+    }
+  }, [dateParam]);
+
+  const hasRequestedNewEvent =
+    searchParams.get('new') === 'true' || searchParams.get('newEvent') === 'true';
+
+  useEffect(() => {
+    if (!hasRequestedNewEvent) return;
+    if (result.isLoading) return;
+
+    if (result.calendars.some((calendar) => !calendar.isReadOnly)) {
+      setIsEventEditorClosing(false);
+      setSelectedOccurrence(null);
+      setIsDraft(true);
+    } else {
+      setToast('Create or connect a writable calendar first.');
+    }
+  }, [hasRequestedNewEvent, result.isLoading, result.calendars]);
+
   useEffect(() => {
     if (!requestedEventId) return;
     const occurrence = result.occurrences.find((item) => item.event.id === requestedEventId);
     if (occurrence) {
+      setIsEventEditorClosing(false);
       setSelectedOccurrence(occurrence);
       setRequestedEventId(null);
     }
@@ -117,26 +149,55 @@ export function CalendarView() {
     [selectedOccurrence, toggleVisibility],
   );
 
-  const changeMode = useCallback((nextMode: CalendarViewMode) => {
-    setMode(nextMode);
-    setSelectedOccurrence(null);
-    setIsDraft(false);
-  }, []);
+  const changeMode = useCallback(
+    (nextMode: CalendarViewMode) => {
+      if (nextMode === mode) return;
+      const order: Record<CalendarViewMode, number> = { day: 0, week: 1, month: 2 };
+      const dir = order[nextMode] < order[mode] ? 'in' : 'out';
+      setTransitionDirection(dir);
+      setMode(nextMode);
+      setSelectedOccurrence(null);
+      setIsDraft(false);
+      setIsEventEditorClosing(false);
+    },
+    [mode],
+  );
 
-  const selectMonthDate = useCallback((dateKey: string) => {
-    setSelectedDateKey(dateKey);
-    setMode('day');
-  }, []);
+  const selectMonthDate = useCallback(
+    (dateKey: string) => {
+      setSelectedDateKey(dateKey);
+      changeMode('day');
+    },
+    [changeMode],
+  );
 
   const goToToday = useCallback(() => {
     setSelectedDateKey(toZonedDateKey(new Date(), timeZone));
   }, [timeZone]);
 
   const closeEventEditor = useCallback(() => {
+    setIsEventEditorClosing(true);
+  }, []);
+
+  const handleEventEditorCloseAnimationEnd = useCallback(() => {
     setSelectedOccurrence(null);
     setIsDraft(false);
+    setIsEventEditorClosing(false);
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
-  }, []);
+
+    if (searchParams.has('newEvent') || searchParams.has('new') || searchParams.has('event')) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('newEvent');
+          next.delete('new');
+          next.delete('event');
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   const rememberOpeningControl = useCallback(() => {
     openingControlRef.current =
@@ -186,6 +247,7 @@ export function CalendarView() {
               return;
             }
             rememberOpeningControl();
+            setIsEventEditorClosing(false);
             setSelectedOccurrence(null);
             setIsDraft(true);
           }}
@@ -196,35 +258,50 @@ export function CalendarView() {
             <CalendarState kind="loading" />
           ) : result.isError ? (
             <CalendarState kind="error" onRetry={result.refetch} />
-          ) : mode === 'month' ? (
-            <MonthView
-              dateKeys={window.dateKeys}
-              byDateKey={result.byDateKey}
-              selectedDateKey={selectedDateKey}
-              timeZone={timeZone}
-              now={new Date()}
-              onSelectDate={selectMonthDate}
-              onSelectEvent={(occurrence) => {
-                rememberOpeningControl();
-                setIsDraft(false);
-                setSelectedOccurrence(occurrence);
-              }}
-            />
           ) : (
-            <TimelineView
-              dateKeys={window.dateKeys}
-              byDateKey={result.byDateKey}
-              selectedDateKey={selectedDateKey}
-              timeZone={timeZone}
-              hourCycle={result.hourCycle}
-              now={new Date()}
-              onSelectDate={setSelectedDateKey}
-              onSelectEvent={(occurrence) => {
-                rememberOpeningControl();
-                setIsDraft(false);
-                setSelectedOccurrence(occurrence);
-              }}
-            />
+            <div
+              key={mode}
+              className={`${styles.calendarViewTransition} ${
+                transitionDirection === 'in'
+                  ? styles.viewTransitionZoomIn
+                  : transitionDirection === 'out'
+                    ? styles.viewTransitionZoomOut
+                    : styles.viewTransitionFade
+              }`}
+            >
+              {mode === 'month' ? (
+                <MonthView
+                  dateKeys={window.dateKeys}
+                  byDateKey={result.byDateKey}
+                  selectedDateKey={selectedDateKey}
+                  timeZone={timeZone}
+                  now={new Date()}
+                  onSelectDate={selectMonthDate}
+                  onSelectEvent={(occurrence) => {
+                    rememberOpeningControl();
+                    setIsEventEditorClosing(false);
+                    setIsDraft(false);
+                    setSelectedOccurrence(occurrence);
+                  }}
+                />
+              ) : (
+                <TimelineView
+                  dateKeys={window.dateKeys}
+                  byDateKey={result.byDateKey}
+                  selectedDateKey={selectedDateKey}
+                  timeZone={timeZone}
+                  hourCycle={result.hourCycle}
+                  now={new Date()}
+                  onSelectDate={setSelectedDateKey}
+                  onSelectEvent={(occurrence) => {
+                    rememberOpeningControl();
+                    setIsEventEditorClosing(false);
+                    setIsDraft(false);
+                    setSelectedOccurrence(occurrence);
+                  }}
+                />
+              )}
+            </div>
           )}
 
           {!result.isLoading && !result.isError && result.occurrences.length === 0 ? (
@@ -235,23 +312,27 @@ export function CalendarView() {
         </div>
       </section>
 
-      {selectedOccurrence || isDraft ? (
+      {selectedOccurrence || isDraft || isEventEditorClosing ? (
         <>
           <button
             type="button"
-            className={styles.detailsBackdrop}
+            className={`${styles.detailsBackdrop} ${
+              isEventEditorClosing ? styles.detailsBackdropClosing : ''
+            }`}
             onClick={closeEventEditor}
             aria-label="Close event editor"
           />
           <EventEditor
             occurrence={selectedOccurrence}
             isDraft={isDraft}
+            isClosing={isEventEditorClosing}
             selectedDateKey={selectedDateKey}
             calendars={result.calendars}
             timeZone={timeZone}
             defaultDurationMinutes={result.defaultEventMinutes}
             isSaving={createEvent.isPending || updateEvent.isPending || removeEvent.isPending}
             onClose={closeEventEditor}
+            onCloseAnimationEnd={handleEventEditorCloseAnimationEnd}
             onCreate={async (input) => {
               await createEvent.mutateAsync(input);
               closeEventEditor();

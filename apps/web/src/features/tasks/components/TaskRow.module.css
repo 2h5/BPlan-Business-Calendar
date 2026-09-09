@@ -8,7 +8,132 @@
   gap: var(--space-3);
   transition:
     background-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+    box-shadow var(--transition-fast),
+    opacity 240ms ease-out;
+  animation: task-row-enter 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes task-row-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.rowCompletingExit {
+  animation: task-completing-exit 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes task-completing-exit {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 80px;
+  }
+  45% {
+    opacity: 0.8;
+    transform: translateX(12px);
+    background-color: var(--color-success-subtle);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(24px);
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
+  }
+}
+
+.rowUncompletingExit {
+  animation: task-uncompleting-exit 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes task-uncompleting-exit {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 80px;
+  }
+  45% {
+    opacity: 0.8;
+    transform: translateX(-12px);
+    background-color: var(--color-accent-subtle);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-24px);
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
+  }
+}
+
+.rowDeletingExit {
+  animation: task-deleting-exit 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes task-deleting-exit {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    max-height: 80px;
+  }
+  40% {
+    opacity: 0.7;
+    transform: scale(0.98) translateX(-8px);
+    background-color: var(--color-danger-subtle);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92) translateX(-20px);
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
+  }
+}
+
+.rowSnoozingExit {
+  animation: task-snoozing-exit 260ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes task-snoozing-exit {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80px;
+  }
+  40% {
+    opacity: 0.7;
+    transform: translateY(-8px);
+    background-color: var(--color-warning-subtle);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-18px);
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom-color: transparent;
+    overflow: hidden;
+  }
 }
 
 .row:hover {
@@ -62,6 +187,22 @@
 .checkboxCheckmark {
   width: 11px;
   height: 11px;
+  animation: checkmarkPop 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes checkmarkPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .content {
@@ -217,5 +358,24 @@
 
   .actions .actionBtn:first-child {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row {
+    animation: none;
+    transition: none;
+  }
+
+  .rowCompletingExit,
+  .rowUncompletingExit,
+  .rowDeletingExit,
+  .rowSnoozingExit {
+    animation: none;
+    opacity: 0;
+  }
+
+  .checkboxCheckmark {
+    animation: none;
   }
 }

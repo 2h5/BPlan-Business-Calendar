@@ -1,27 +1,10 @@
 .container {
   width: min(100%, 420px);
-  padding: clamp(1.5rem, 5vw, 2.5rem);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-lg);
 }
 
 .header {
   margin-bottom: var(--space-8);
-}
-
-.brandMark {
-  width: 38px;
-  height: 38px;
-  margin-bottom: var(--space-5);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-bold);
+  text-align: center;
 }
 
 .eyebrow {
@@ -58,13 +41,7 @@
 }
 
 .field {
-  gap: var(--space-2);
-}
-
-.label {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
+  gap: var(--space-1);
 }
 
 .input {
@@ -81,6 +58,11 @@
     border-color var(--transition-fast),
     box-shadow var(--transition-fast),
     background-color var(--transition-fast);
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary);
+  opacity: 1;
 }
 
 .input:hover:not(:disabled) {

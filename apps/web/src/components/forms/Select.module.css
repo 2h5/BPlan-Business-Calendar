@@ -1,0 +1,138 @@
+.select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  color: var(--color-text-primary);
+}
+
+.trigger {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  outline: none;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.triggerSmall {
+  min-height: var(--control-height-sm);
+  font-size: var(--font-size-xs);
+}
+
+.trigger:hover:not(:disabled),
+.triggerOpen {
+  border-color: var(--color-border-strong);
+}
+
+.trigger:focus-visible,
+.triggerOpen {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.trigger:disabled {
+  opacity: 0.65;
+}
+
+.triggerValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  transition:
+    transform var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.triggerOpen .chevron {
+  color: var(--color-text-secondary);
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 280px;
+  padding: var(--space-1);
+  overflow-y: auto;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  box-shadow: var(--shadow-md);
+  transform-origin: top center;
+  animation: dropdown-enter 140ms ease-out both;
+}
+
+.option {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.option:hover:not(:disabled),
+.optionHighlighted {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.optionSelected {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.optionSelected.optionHighlighted {
+  background: var(--color-accent-muted);
+}
+
+.option:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+@keyframes dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu {
+    animation: none;
+  }
+}

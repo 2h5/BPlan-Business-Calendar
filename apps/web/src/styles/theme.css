@@ -30,6 +30,8 @@
   --color-danger: #ff7d84;
   --color-danger-hover: #ff9298;
   --color-danger-subtle: rgba(255, 111, 120, 0.11);
+  --color-focus-accent: #a78bfa;
+  --color-focus-subtle: rgba(167, 139, 250, 0.15);
   --color-focus-ring: rgba(138, 164, 255, 0.28);
   --font-family-sans:
     Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -76,8 +78,49 @@
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.36);
 }
 
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg-app: #f4f6f8;
+  --color-bg-sidebar: #f8f9fb;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-raised: #f9fafc;
+  --color-bg-surface-elevated: #f1f3f7;
+  --color-bg-surface-pressed: #e7eaf0;
+  --color-bg-input: #ffffff;
+  --color-bg-overlay: rgba(26, 31, 40, 0.28);
+  --color-border-subtle: #eaedf1;
+  --color-border: #d9dde5;
+  --color-border-strong: #c5cbd5;
+  --color-text-primary: #171b23;
+  --color-text-secondary: #596273;
+  --color-text-tertiary: #8991a0;
+  --color-text-inverse: #ffffff;
+  --color-accent: #4766db;
+  --color-accent-hover: #3b59c8;
+  --color-accent-pressed: #314cb4;
+  --color-accent-subtle: rgba(71, 102, 219, 0.11);
+  --color-accent-muted: rgba(71, 102, 219, 0.065);
+  --color-on-accent: #ffffff;
+  --color-selected: rgba(71, 102, 219, 0.085);
+  --color-hover: rgba(24, 31, 43, 0.035);
+  --color-success: #16865a;
+  --color-success-subtle: rgba(22, 134, 90, 0.1);
+  --color-warning: #a66a12;
+  --color-warning-subtle: rgba(166, 106, 18, 0.1);
+  --color-danger: #c94049;
+  --color-danger-hover: #ad3039;
+  --color-danger-subtle: rgba(201, 64, 73, 0.085);
+  --color-focus-accent: #7c3aed;
+  --color-focus-subtle: rgba(124, 58, 237, 0.12);
+  --color-focus-ring: rgba(71, 102, 219, 0.22);
+  --shadow-sm: 0 1px 2px rgba(20, 28, 40, 0.05);
+  --shadow-md: 0 12px 32px rgba(20, 28, 40, 0.1);
+  --shadow-lg: 0 24px 64px rgba(20, 28, 40, 0.14);
+}
+
 @media (prefers-color-scheme: light) {
-  :root[data-theme='auto'] {
+  :root[data-theme='auto'],
+  :root:not([data-theme]) {
     color-scheme: light;
     --color-bg-app: #f4f6f8;
     --color-bg-sidebar: #f8f9fb;

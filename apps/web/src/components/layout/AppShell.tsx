@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './AppShell.module.css';
+import { PageTransition } from './PageTransition';
 import { signOut, useAuth } from '../../features/auth';
 
 interface NavItemConfig {
@@ -133,20 +134,10 @@ const PRIMARY_NAV: NavItemConfig[] = [
   { to: '/search', label: 'Search', icon: SearchIcon },
 ];
 
-const ROUTE_TITLES: Record<string, string> = {
-  '/today': 'Today',
-  '/calendar': 'Calendar',
-  '/tasks': 'Tasks',
-  '/search': 'Search',
-  '/settings': 'Settings',
-};
-
 export function AppShell() {
   const { email } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const currentTitle = ROUTE_TITLES[location.pathname] ?? 'BCal';
 
   async function handleSignOut() {
     try {
@@ -234,13 +225,6 @@ export function AppShell() {
 
       {/* Main Content Area */}
       <div className={styles.mainContent}>
-        <header className={styles.topBar}>
-          <div>
-            <span className={styles.pageEyebrow}>Workspace</span>
-            <h1 className={styles.pageTitle}>{currentTitle}</h1>
-          </div>
-        </header>
-
         <main
           className={
             location.pathname === '/tasks' || location.pathname === '/calendar'
@@ -248,7 +232,9 @@ export function AppShell() {
               : styles.contentArea
           }
         >
-          <Outlet />
+          <PageTransition contentKey={location.pathname}>
+            <Outlet />
+          </PageTransition>
         </main>
       </div>
     </div>

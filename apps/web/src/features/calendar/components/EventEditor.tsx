@@ -3,6 +3,7 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import styles from './CalendarView.module.css';
+import { Select } from '../../../components/forms/Select';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import {
   eventInputFromForm,
@@ -14,12 +15,14 @@ import {
 interface EventEditorProps {
   occurrence: EventOccurrence | null;
   isDraft: boolean;
+  isClosing: boolean;
   selectedDateKey: string;
   calendars: readonly Calendar[];
   timeZone: string;
   defaultDurationMinutes: number;
   isSaving: boolean;
   onClose: () => void;
+  onCloseAnimationEnd: () => void;
   onCreate: (input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onUpdate: (event: CalendarEvent, input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onDelete: (event: CalendarEvent) => Promise<void>;
@@ -39,12 +42,14 @@ function writableCalendars(
 export function EventEditor({
   occurrence,
   isDraft,
+  isClosing,
   selectedDateKey,
   calendars,
   timeZone,
   defaultDurationMinutes,
   isSaving,
   onClose,
+  onCloseAnimationEnd,
   onCreate,
   onUpdate,
   onDelete,
@@ -55,12 +60,58 @@ export function EventEditor({
     calendars.find((calendar) => !calendar.isReadOnly);
   const [form, setForm] = useState<EventFormValues | null>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<{ tone: 'error' | 'success'; text: string } | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const deleteWrapperRef = useRef<HTMLDivElement>(null);
+
   const availableCalendars = useMemo(() => writableCalendars(calendars, event), [calendars, event]);
   const currentCalendar = calendars.find((calendar) => calendar.id === event?.calendarId);
   const readOnly = !!event && (!currentCalendar || currentCalendar.isReadOnly);
   const providerOwned = !!event && event.sourceType !== 'internal';
   const eventTimeZone = event?.timezone ?? timeZone;
+  const editorClassName = `${styles.eventEditor} ${isClosing ? styles.eventEditorClosing : ''}`;
+  const handleAnimationEnd = isClosing ? onCloseAnimationEnd : undefined;
+
+  // Close confirmation if event selection changes
+  useEffect(() => {
+    setIsConfirmOpen(false);
+  }, [event?.id]);
+
+  // Click outside and escape handling for delete confirmation popup
+  useEffect(() => {
+    if (!isConfirmOpen) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!deleteWrapperRef.current?.contains(e.target as Node)) {
+        setIsConfirmOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsConfirmOpen(false);
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isConfirmOpen]);
+
+  // Focus title input smoothly after entry animation completes (or on mount)
+  useEffect(() => {
+    if (isDraft && !readOnly) {
+      const timer = setTimeout(() => {
+        titleInputRef.current?.focus({ preventScroll: true });
+      }, 230);
+      return () => clearTimeout(timer);
+    }
+  }, [isDraft, readOnly]);
 
   useEffect(() => {
     setMessage(null);
@@ -124,8 +175,6 @@ export function EventEditor({
 
   const handleDelete = async () => {
     if (!event || readOnly) return;
-    const scope = event.recurrenceRule && !event.recurringEventId ? ' recurring series' : ' event';
-    if (!window.confirm(`Delete this${scope}? This cannot be undone.`)) return;
     try {
       setMessage(null);
       await onDelete(event);
@@ -144,228 +193,275 @@ export function EventEditor({
   return (
     <aside
       ref={panelRef}
-      className={styles.eventEditor}
+      className={editorClassName}
       aria-label={isDraft ? 'Create event' : 'Event inspector'}
+      onAnimationEnd={handleAnimationEnd}
     >
-      <div className={styles.editorHeader}>
-        <div>
-          <span className={styles.eyebrow}>{isDraft ? 'New event' : 'Event inspector'}</span>
-          <span className={styles.editorSubtitle}>
-            {readOnly
-              ? 'View only'
-              : providerOwned
-                ? `Changes are saved to ${event.sourceType} first`
-                : 'BCal calendar event'}
-          </span>
-        </div>
-        <button
-          type="button"
-          className={styles.closeButton}
-          onClick={onClose}
-          aria-label="Close event editor"
-          title="Close (Esc)"
-        >
-          ×
-        </button>
-      </div>
-
-      <form className={styles.editorBody} onSubmit={handleSubmit}>
-        {readOnly ? (
-          <div className={styles.infoBanner} role="status">
-            {currentCalendar?.name ?? 'This calendar'} is read only. Manage this event in its
-            provider.
-          </div>
-        ) : null}
-        {message ? (
-          <div
-            className={message.tone === 'error' ? styles.errorBanner : styles.successBanner}
-            role={message.tone === 'error' ? 'alert' : 'status'}
-          >
-            {message.text}
-          </div>
-        ) : null}
-        {event && event.syncStatus !== 'synced' ? (
-          <div className={styles.errorBanner} role="status">
-            {event.syncStatus === 'conflict'
-              ? 'This event changed at the provider. Refresh before trying another edit.'
-              : 'The last provider write did not finish. The local copy has not replaced provider data.'}
-          </div>
-        ) : null}
-        {event?.recurringEventId ? (
-          <div className={styles.infoBanner}>
-            This provider exception edits only this occurrence.
-          </div>
-        ) : event?.recurrenceRule ? (
-          <div className={styles.infoBanner}>Edits and deletion apply to the entire series.</div>
-        ) : null}
-
-        <div className={styles.editorField}>
-          <label htmlFor="event-title">Title</label>
-          <input
-            id="event-title"
-            value={form.title}
-            onChange={(changeEvent) => set('title', changeEvent.target.value)}
-            placeholder="Event title"
-            maxLength={300}
-            required
-            autoFocus={!readOnly}
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className={styles.editorField}>
-          <label htmlFor="event-calendar">Calendar</label>
-          <select
-            id="event-calendar"
-            value={form.calendarId}
-            onChange={(changeEvent) => set('calendarId', changeEvent.target.value)}
-            disabled={readOnly || availableCalendars.length <= 1}
-          >
-            {availableCalendars.map((calendar) => (
-              <option key={calendar.id} value={calendar.id}>
-                {calendar.name}{' '}
-                {calendar.sourceType === 'internal' ? '' : `(${calendar.sourceType})`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <label className={styles.allDayToggle}>
-          <input
-            type="checkbox"
-            checked={form.allDay}
-            onChange={(changeEvent) => set('allDay', changeEvent.target.checked)}
-            disabled={readOnly}
-          />
-          <span>All-day event</span>
-        </label>
-
-        <fieldset className={styles.dateTimeFields} disabled={readOnly}>
-          <legend>Date and time</legend>
-          <label>
-            <span>Starts</span>
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(changeEvent) => set('startDate', changeEvent.target.value)}
-              required
-            />
-          </label>
-          {!form.allDay ? (
-            <label>
-              <span>Start time</span>
-              <input
-                type="time"
-                value={form.startTime}
-                onChange={(changeEvent) => set('startTime', changeEvent.target.value)}
-                required
-              />
-            </label>
-          ) : null}
-          <label>
-            <span>Ends</span>
-            <input
-              type="date"
-              value={form.endDate}
-              min={form.startDate}
-              onChange={(changeEvent) => set('endDate', changeEvent.target.value)}
-              required
-            />
-          </label>
-          {!form.allDay ? (
-            <label>
-              <span>End time</span>
-              <input
-                type="time"
-                value={form.endTime}
-                onChange={(changeEvent) => set('endTime', changeEvent.target.value)}
-                required
-              />
-            </label>
-          ) : null}
-        </fieldset>
-
-        <div className={styles.editorField}>
-          <label htmlFor="event-repeat">Repeat</label>
-          <select
-            id="event-repeat"
-            value={presetMatch ? (form.recurrenceRule ?? '') : 'custom'}
-            onChange={(changeEvent) => set('recurrenceRule', changeEvent.target.value || null)}
-            disabled={readOnly || !!event?.recurringEventId}
-          >
-            {RECURRENCE_PRESETS.map((preset) => (
-              <option key={preset.label} value={preset.rrule ?? ''}>
-                {preset.label}
-              </option>
-            ))}
-            {!presetMatch ? <option value="custom">Existing custom rule</option> : null}
-          </select>
-          {form.recurrenceRule ? (
-            <small>
-              {parsedRule
-                ? describeRRule(parsedRule)
-                : 'This rule is not editable here and will be preserved unless replaced.'}
-            </small>
-          ) : null}
-        </div>
-
-        <div className={styles.editorField}>
-          <label htmlFor="event-location">Location</label>
-          <input
-            id="event-location"
-            value={form.location}
-            onChange={(changeEvent) => set('location', changeEvent.target.value)}
-            placeholder="Add a location"
-            maxLength={500}
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className={styles.editorField}>
-          <label htmlFor="event-description">Description</label>
-          <textarea
-            id="event-description"
-            value={form.description}
-            onChange={(changeEvent) => set('description', changeEvent.target.value)}
-            placeholder="Add notes or context"
-            maxLength={10_000}
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className={styles.editorMeta}>
-          Times are stored in UTC and shown in {eventTimeZone.replaceAll('_', ' ')}.
-        </div>
-
-        <div className={styles.editorFooter}>
-          {event && !readOnly ? (
-            <button
-              type="button"
-              className={styles.deleteButton}
-              onClick={() => void handleDelete()}
-              disabled={isSaving}
-            >
-              {providerOwned ? `Delete from ${event.sourceType}` : 'Delete event'}
-            </button>
-          ) : (
-            <span />
-          )}
+      <div className={styles.editorInner}>
+        <div className={styles.editorHeader}>
           <div>
-            <button type="button" className={styles.secondaryButton} onClick={onClose}>
-              {readOnly ? 'Close' : 'Cancel'}
-            </button>
-            {!readOnly ? (
-              <button
-                type="submit"
-                className={styles.primaryButton}
-                disabled={isSaving || !form.title.trim() || !form.calendarId}
-              >
-                {isSaving ? 'Saving…' : event ? 'Save changes' : 'Create event'}
-              </button>
+            <span className={styles.eyebrow}>{isDraft ? 'New event' : 'Event inspector'}</span>
+            <span className={styles.editorSubtitle}>
+              {readOnly
+                ? 'View only'
+                : providerOwned
+                  ? `Changes are saved to ${event.sourceType} first`
+                  : 'BCal calendar event'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={styles.closeButton}
+            onClick={onClose}
+            aria-label="Close event editor"
+            title="Close (Esc)"
+          >
+            ×
+          </button>
+        </div>
+
+        <form className={styles.editorBody} onSubmit={handleSubmit}>
+          {readOnly ? (
+            <div className={styles.infoBanner} role="status">
+              {currentCalendar?.name ?? 'This calendar'} is read only. Manage this event in its
+              provider.
+            </div>
+          ) : null}
+          {message ? (
+            <div
+              className={message.tone === 'error' ? styles.errorBanner : styles.successBanner}
+              role={message.tone === 'error' ? 'alert' : 'status'}
+            >
+              {message.text}
+            </div>
+          ) : null}
+          {event && event.syncStatus !== 'synced' ? (
+            <div className={styles.errorBanner} role="status">
+              {event.syncStatus === 'conflict'
+                ? 'This event changed at the provider. Refresh before trying another edit.'
+                : 'The last provider write did not finish. The local copy has not replaced provider data.'}
+            </div>
+          ) : null}
+          {event?.recurringEventId ? (
+            <div className={styles.infoBanner}>
+              This provider exception edits only this occurrence.
+            </div>
+          ) : event?.recurrenceRule ? (
+            <div className={styles.infoBanner}>Edits and deletion apply to the entire series.</div>
+          ) : null}
+
+          <div className={styles.editorField}>
+            <label htmlFor="event-title">Title</label>
+            <input
+              ref={titleInputRef}
+              id="event-title"
+              value={form.title}
+              onChange={(changeEvent) => set('title', changeEvent.target.value)}
+              placeholder="Event title"
+              maxLength={300}
+              required
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className={styles.editorField}>
+            <label htmlFor="event-calendar">Calendar</label>
+            <Select
+              id="event-calendar"
+              value={form.calendarId}
+              options={availableCalendars.map((calendar) => ({
+                value: calendar.id,
+                label: `${calendar.name}${calendar.sourceType === 'internal' ? '' : ` (${calendar.sourceType})`}`,
+              }))}
+              onChange={(value) => set('calendarId', value)}
+              disabled={readOnly || availableCalendars.length <= 1}
+              ariaLabel="Calendar"
+            />
+          </div>
+
+          <label className={styles.allDayToggle}>
+            <input
+              type="checkbox"
+              checked={form.allDay}
+              onChange={(changeEvent) => set('allDay', changeEvent.target.checked)}
+              disabled={readOnly}
+            />
+            <span>All-day event</span>
+          </label>
+
+          <fieldset className={styles.dateTimeFields} disabled={readOnly}>
+            <legend>Date and time</legend>
+            <label>
+              <span>Starts</span>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(changeEvent) => set('startDate', changeEvent.target.value)}
+                required
+              />
+            </label>
+            {!form.allDay ? (
+              <label>
+                <span>Start time</span>
+                <input
+                  type="time"
+                  value={form.startTime}
+                  onChange={(changeEvent) => set('startTime', changeEvent.target.value)}
+                  required
+                />
+              </label>
+            ) : null}
+            <label>
+              <span>Ends</span>
+              <input
+                type="date"
+                value={form.endDate}
+                min={form.startDate}
+                onChange={(changeEvent) => set('endDate', changeEvent.target.value)}
+                required
+              />
+            </label>
+            {!form.allDay ? (
+              <label>
+                <span>End time</span>
+                <input
+                  type="time"
+                  value={form.endTime}
+                  onChange={(changeEvent) => set('endTime', changeEvent.target.value)}
+                  required
+                />
+              </label>
+            ) : null}
+          </fieldset>
+
+          <div className={styles.editorField}>
+            <label htmlFor="event-repeat">Repeat</label>
+            <Select
+              id="event-repeat"
+              value={presetMatch ? (form.recurrenceRule ?? '') : 'custom'}
+              options={[
+                ...RECURRENCE_PRESETS.map((preset) => ({
+                  value: preset.rrule ?? '',
+                  label: preset.label,
+                })),
+                ...(!presetMatch ? [{ value: 'custom', label: 'Existing custom rule' }] : []),
+              ]}
+              onChange={(value) => set('recurrenceRule', value || null)}
+              disabled={readOnly || !!event?.recurringEventId}
+              ariaLabel="Repeat"
+            />
+            {form.recurrenceRule ? (
+              <small>
+                {parsedRule
+                  ? describeRRule(parsedRule)
+                  : 'This rule is not editable here and will be preserved unless replaced.'}
+              </small>
             ) : null}
           </div>
-        </div>
-      </form>
+
+          <div className={styles.editorField}>
+            <label htmlFor="event-location">Location</label>
+            <input
+              id="event-location"
+              value={form.location}
+              onChange={(changeEvent) => set('location', changeEvent.target.value)}
+              placeholder="Add a location"
+              maxLength={500}
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className={styles.editorField}>
+            <label htmlFor="event-description">Description</label>
+            <textarea
+              id="event-description"
+              value={form.description}
+              onChange={(changeEvent) => set('description', changeEvent.target.value)}
+              placeholder="Add notes or context"
+              maxLength={10_000}
+              disabled={readOnly}
+            />
+          </div>
+
+          <div className={styles.editorMeta}>
+            Times are stored in UTC and shown in {eventTimeZone.replaceAll('_', ' ')}.
+          </div>
+
+          <div className={styles.editorFooter}>
+            {event && !readOnly ? (
+              <div ref={deleteWrapperRef} className={styles.deleteWrapper}>
+                <button
+                  type="button"
+                  className={`${styles.deleteButton} ${isConfirmOpen ? styles.deleteButtonActive : ''}`}
+                  onClick={() => setIsConfirmOpen(true)}
+                  disabled={isSaving}
+                  aria-expanded={isConfirmOpen}
+                  aria-haspopup="dialog"
+                >
+                  {providerOwned ? `Delete from ${event.sourceType}` : 'Delete event'}
+                </button>
+
+                {isConfirmOpen && (
+                  <div
+                    className={styles.deleteConfirmPopup}
+                    role="dialog"
+                    aria-label="Confirm event deletion"
+                  >
+                    <div className={styles.deleteConfirmContent}>
+                      <span className={styles.deleteConfirmTitle}>
+                        {event.recurrenceRule && !event.recurringEventId
+                          ? 'Delete recurring series?'
+                          : 'Delete this event?'}
+                      </span>
+                      <span className={styles.deleteConfirmDesc}>
+                        {providerOwned
+                          ? `This will remove the event from ${event.sourceType}.`
+                          : 'This action cannot be undone.'}
+                      </span>
+                    </div>
+                    <div className={styles.deleteConfirmActions}>
+                      <button
+                        type="button"
+                        className={styles.deleteConfirmCancelBtn}
+                        onClick={() => setIsConfirmOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteConfirmBtn}
+                        onClick={() => {
+                          setIsConfirmOpen(false);
+                          void handleDelete();
+                        }}
+                        disabled={isSaving}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span />
+            )}
+            <div>
+              <button type="button" className={styles.secondaryButton} onClick={onClose}>
+                {readOnly ? 'Close' : 'Cancel'}
+              </button>
+              {!readOnly ? (
+                <button
+                  type="submit"
+                  className={styles.primaryButton}
+                  disabled={isSaving || !form.title.trim() || !form.calendarId}
+                >
+                  {isSaving ? 'Saving…' : event ? 'Save changes' : 'Create event'}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </form>
+      </div>
     </aside>
   );
 }
