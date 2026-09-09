@@ -951,7 +951,16 @@ earlier recurrence checkpoint `682d1d5f8f91e001d93e11a746fec06ab2596957`)
 
 # Phase 5 — RevenueCat
 
-Status: NOT STARTED
+Status: **PARTIALLY IMPLEMENTED — server webhook/mirror foundation and guarded
+web billing seam are present; mobile SDK, purchase/restore, and live E2E remain
+pending (2026-09-08).**
+
+The server implementation landed in `5e1e01d`; the web billing and provisional
+legal-page scaffolding are tracked in
+[`docs/revenuecat-stripe-setup.md`](revenuecat-stripe-setup.md). The seller
+identity remains a founder decision and is intentionally not represented as an
+engineering blocker. Production checkout must remain disabled until that
+identity and the final legal documents are approved.
 
 Goal: connect real mobile subscription state to the existing server entitlement architecture.
 
@@ -992,18 +1001,11 @@ Do not add a production entitlement bypass.
 
 ## Manual setup checklist
 
-TBD after implementation.
-
-Likely includes:
-
-- RevenueCat project
-- Apple app configuration
-- App Store Connect subscription products
-- RevenueCat entitlement
-- RevenueCat offering/packages
-- public webhook
-- Supabase secrets
-- sandbox purchase account/setup
+The current release uses web billing only. The external web setup checklist,
+including sandbox and production Stripe/RevenueCat steps, lives in
+[`docs/revenuecat-stripe-setup.md`](revenuecat-stripe-setup.md). Apple and Google
+products are not configured for this release. Mobile purchase/restore setup is
+future work.
 
 Record every manual external step explicitly so implementation status and live-verification status remain separate.
 

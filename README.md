@@ -13,7 +13,7 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ## Current status
 
-**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat webhook is implemented and the Stripe sandbox catalog is configured, with hosted checkout, live webhook deployment, and app integration remaining.** Sprints 0 through 4 are
+**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat webhook, sandbox catalog, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
 complete/implemented. Sprint 5's Microsoft
 implementation is complete in code with external lifecycle/device verification
 still tracked separately. The web client has completed Phases 0–5 plus its
@@ -32,24 +32,24 @@ for mobile/AI work and [`docs/web-active.md`](docs/web-active.md) for the web
 client. The Sprint 3 and Sprint 4 trackers are closed historical records; the
 Sprint 5 tracker retains Microsoft external-verification evidence.
 
-| Area                                                                          | State                                                                  |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Monorepo, TypeScript strict, ESLint, Prettier, CI                             | Implemented; verification is environment-dependent                     |
-| Design tokens + UI primitives (`@cal/ui`)                                     | Done                                                                   |
-| Database schema, RLS, pgTAP tests                                             | Done                                                                   |
-| Auth (email, Apple), session, account deletion                                | Done                                                                   |
-| Deterministic availability engine (`@cal/domain`)                             | Done, unit-tested                                                      |
-| Task inbox, editor, completion, snooze, delete                                | Done — Sprint 1                                                        |
-| Quick Add (task lane)                                                         | Done — Sprint 1                                                        |
-| Local task reminders + notification actions                                   | Done — Sprint 1                                                        |
-| Calendar views, event CRUD, recurrence, alerts, calendar colors               | Done — Sprint 2                                                        |
-| Today dashboard, merged timeline, overdue/unscheduled work, free-time summary | Done — Sprint 3                                                        |
-| Search across event/task titles, notes, and locations                         | Done — Sprint 3                                                        |
-| Settings planning preferences                                                 | Done — Sprint 3                                                        |
-| Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain |
-| Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                     |
+| Area                                                                          | State                                                                                                     |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Monorepo, TypeScript strict, ESLint, Prettier, CI                             | Implemented; verification is environment-dependent                                                        |
+| Design tokens + UI primitives (`@cal/ui`)                                     | Done                                                                                                      |
+| Database schema, RLS, pgTAP tests                                             | Done                                                                                                      |
+| Auth (email, Apple), session, account deletion                                | Done                                                                                                      |
+| Deterministic availability engine (`@cal/domain`)                             | Done, unit-tested                                                                                         |
+| Task inbox, editor, completion, snooze, delete                                | Done — Sprint 1                                                                                           |
+| Quick Add (task lane)                                                         | Done — Sprint 1                                                                                           |
+| Local task reminders + notification actions                                   | Done — Sprint 1                                                                                           |
+| Calendar views, event CRUD, recurrence, alerts, calendar colors               | Done — Sprint 2                                                                                           |
+| Today dashboard, merged timeline, overdue/unscheduled work, free-time summary | Done — Sprint 3                                                                                           |
+| Search across event/task titles, notes, and locations                         | Done — Sprint 3                                                                                           |
+| Settings planning preferences                                                 | Done — Sprint 3                                                                                           |
+| Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain                                    |
+| Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                                                        |
 | AI Find Time, RevenueCat                                                      | AI Phases 1–4 done; RevenueCat webhook and sandbox catalog done; hosted checkout and app integration next |
-| Web client                                                                    | Phases 0–5 + hardening done; Phase 6 provider integrations next        |
+| Web client                                                                    | Phases 0–5 + hardening done; Phase 6 provider integrations next                                           |
 
 ---
 

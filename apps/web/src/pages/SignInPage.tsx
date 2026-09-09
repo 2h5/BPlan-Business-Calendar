@@ -34,6 +34,10 @@ export function SignInPage() {
       <main className={styles.loginContent}>
         <SignInForm onSuccess={() => navigate(destination, { replace: true })} />
       </main>
+      <p className={styles.legalLinks}>
+        Review the <a href="/terms.html">Terms draft</a> and{' '}
+        <a href="/privacy.html">Privacy Policy draft</a>.
+      </p>
     </div>
   );
 }

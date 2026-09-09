@@ -149,6 +149,20 @@
   text-align: right;
 }
 
+.legalLinks {
+  width: min(100%, 760px);
+  margin-top: var(--space-3);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.legalLinks a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media (max-width: 540px) {
   .foundationCard {
     min-height: 0;

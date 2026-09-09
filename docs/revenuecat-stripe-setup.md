@@ -1,7 +1,8 @@
 # RevenueCat + Stripe Web Billing Setup
 
-Status: **Sandbox catalog configured; hosted checkout, webhook deployment, and
-app integration remain**
+Status: **Sandbox catalog and webhook implementation configured; provisional
+legal pages and guarded web billing UI are in the repository. Hosted checkout,
+webhook deployment, final legal documents, and app purchase integration remain.**
 
 Last verified: **2026-09-08**
 
@@ -29,16 +30,16 @@ gateway. Apple and Google products are not needed for this web-only path.
 
 These identifiers are safe project references, not secrets.
 
-| Item | Current value |
-| --- | --- |
-| RevenueCat project | `BPlan: Business Calendar` |
-| RevenueCat project ID | `d455e7e9` |
-| Stripe account | `BPlan: Business Calendar sandbox` |
-| Stripe account ID | `acct_1UDZowDPPGgNSwlS` |
+| Item                          | Current value                                   |
+| ----------------------------- | ----------------------------------------------- |
+| RevenueCat project            | `BPlan: Business Calendar`                      |
+| RevenueCat project ID         | `d455e7e9`                                      |
+| Stripe account                | `BPlan: Business Calendar sandbox`              |
+| Stripe account ID             | `acct_1UDZowDPPGgNSwlS`                         |
 | RevenueCat Billing web config | `BPlan: Business Calendar (RevenueCat Billing)` |
-| Web config ID | `app48a77253da` |
-| Default currency | USD |
-| RevenueCat support email | `info.bplanai@gmail.com` |
+| Web config ID                 | `app48a77253da`                                 |
+| Default currency              | USD                                             |
+| RevenueCat support email      | `info.bplanai@gmail.com`                        |
 
 The Stripe sandbox is linked to the RevenueCat project. Production Stripe must
 be configured separately before customer purchases are enabled.
@@ -58,23 +59,23 @@ contract are intentionally changed together.
 
 ### Products
 
-| Product identifier | Display name | Billing interval | Price | Entitlement |
-| --- | --- | --- | ---: | --- |
-| `bplan_pro_monthly` | BPlan Pro Monthly | Monthly | $4.99 | `pro` |
-| `bplan_pro_yearly` | BPlan Pro Yearly | Yearly | $49.99 | `pro` |
+| Product identifier  | Display name      | Billing interval |  Price | Entitlement |
+| ------------------- | ----------------- | ---------------- | -----: | ----------- |
+| `bplan_pro_monthly` | BPlan Pro Monthly | Monthly          |  $4.99 | `pro`       |
+| `bplan_pro_yearly`  | BPlan Pro Yearly  | Yearly           | $49.99 | `pro`       |
 
 Both products use the customer-facing name `BPlan Pro` and the description
 `Full access to BPlan Business Calendar.`
 
 ### Offering
 
-| Item | Value |
-| --- | --- |
-| Offering identifier | `bplan_web` |
-| Display name | `BPlan Pro Plans` |
-| Offering ID | `ofrng560c7ad85b` |
-| Annual package | `$rc_annual` → `bplan_pro_yearly` |
-| Monthly package | `$rc_monthly` → `bplan_pro_monthly` |
+| Item                | Value                               |
+| ------------------- | ----------------------------------- |
+| Offering identifier | `bplan_web`                         |
+| Display name        | `BPlan Pro Plans`                   |
+| Offering ID         | `ofrng560c7ad85b`                   |
+| Annual package      | `$rc_annual` → `bplan_pro_yearly`   |
+| Monthly package     | `$rc_monthly` → `bplan_pro_monthly` |
 
 ## What is already implemented in the repository
 
@@ -119,14 +120,20 @@ https://<cloudflare-project>.pages.dev/terms.html
 
 Use the stable production `pages.dev` address, not a temporary preview URL.
 
-The repository does not currently contain a public Terms page. The simplest
-implementation is a static file at:
+The repository now contains provisional public drafts at:
 
 ```text
 apps/web/public/terms.html
+apps/web/public/privacy.html
 ```
 
-Vite copies that file to `apps/web/dist/terms.html` during the web build.
+Vite copies these files to `apps/web/dist/terms.html` and
+`apps/web/dist/privacy.html` during the web build. Both pages intentionally show
+TBD values and a draft warning. They must not be treated as final legal documents
+or used to enable production checkout.
+
+The corresponding short decision sheet is
+[`docs/legal-business-decisions.md`](legal-business-decisions.md).
 
 Before publishing the page, confirm the legal/business details:
 
@@ -149,13 +156,13 @@ be sold.
 
 For the current Vite monorepo, configure the Pages project as follows:
 
-| Cloudflare Pages setting | Value |
-| --- | --- |
-| Repository root | Repository root |
-| Framework preset | Vite |
-| Build command | `pnpm build:web` |
-| Build output directory | `apps/web/dist` |
-| Node.js | 20 or newer |
+| Cloudflare Pages setting | Value            |
+| ------------------------ | ---------------- |
+| Repository root          | Repository root  |
+| Framework preset         | Vite             |
+| Build command            | `pnpm build:web` |
+| Build output directory   | `apps/web/dist`  |
+| Node.js                  | 20 or newer      |
 
 For the full web application, configure these browser-safe variables in
 Cloudflare Pages:
@@ -179,23 +186,27 @@ After deployment:
 
 ### 3. Create the RevenueCat hosted purchase link
 
+Create a sandbox link for testing only after the public Terms URL is available.
+Do not create or distribute a production purchase link while the seller
+identity or final legal documents remain unresolved.
+
 In the RevenueCat project:
 
 1. Open **Funnels → Purchase Links**.
 2. Click **Create a web purchase link**.
 3. Fill the form with these values:
 
-   | Field | Value |
-   | --- | --- |
-   | Internal name | `BPlan Web Checkout` |
-   | Offering | `BPlan Pro Plans` / `bplan_web` |
-   | Web config | `BPlan: Business Calendar (RevenueCat Billing)` |
-   | Paywall | Display default paywall |
-   | Header | `Choose your BPlan plan` |
-   | Subheader | `Get full access to BPlan Business Calendar` |
-   | Terms & Conditions URL | The deployed Cloudflare `terms.html` URL |
-   | Success | Show default success page |
-   | Repeat purchase behavior | Show the success page |
+   | Field                    | Value                                           |
+   | ------------------------ | ----------------------------------------------- |
+   | Internal name            | `BPlan Web Checkout`                            |
+   | Offering                 | `BPlan Pro Plans` / `bplan_web`                 |
+   | Web config               | `BPlan: Business Calendar (RevenueCat Billing)` |
+   | Paywall                  | Display default paywall                         |
+   | Header                   | `Choose your BPlan plan`                        |
+   | Subheader                | `Get full access to BPlan Business Calendar`    |
+   | Terms & Conditions URL   | The deployed Cloudflare `terms.html` URL        |
+   | Success                  | Show default success page                       |
+   | Repeat purchase behavior | Show the success page                           |
 
 4. Leave product descriptions off for now because both products already have
    the same general description.
@@ -251,13 +262,21 @@ variable, or a chat message.
 
 ### 6. Wire the application to RevenueCat
 
-The client integration is not complete yet. The implementation must:
+The web app now has a billing section that reads the safe subscription projection
+through a TanStack Query API/hook and can open an identified hosted checkout link
+when explicitly configured. Checkout is disabled by default and production is
+blocked unless seller-identity and final-document confirmations plus public Terms
+and Privacy URLs are present. The implementation must still:
 
 - Identify the RevenueCat customer with the Supabase auth UUID after sign-in.
 - Use the `pro` entitlement for the Pro experience.
 - Keep entitlement reads in the owning app's TanStack Query API/hook.
 - Keep provider calls out of React route and page components.
 - Never trust a client-only `isPro` flag for server authorization.
+
+The mobile RevenueCat SDK, purchase/restore flow, and customer-facing paywall
+remain future work. The current release decision is web billing only; Apple and
+Google products are not configured.
 
 The server-side AI gate already checks the persisted `pro` entitlement through
 the database function `has_active_entitlement()`.
@@ -299,15 +318,17 @@ supabase test db
 pnpm db:types
 ```
 
-The RevenueCat backend commit has already passed its focused Deno tests,
-database/RLS checks, generated-type checks, and git-diff checks. At the time of
-the last verification, `pnpm verify` was blocked by a Corepack failure to
-verify the pnpm registry signature; rerun it in an environment where Corepack
-can fetch the trusted signature.
+The RevenueCat backend commit passed its focused Deno tests, database/RLS
+checks, generated-type checks, and git-diff checks. The current focused webhook
+run passes 18/18 Deno tests. The web billing guard passes 4/4 Vitest tests and
+the web TypeScript check passes. At the time of the last full verification,
+`pnpm verify` was blocked by a Corepack environment failure; rerun it before
+publishing or merging a broader billing change.
 
 ## Production readiness checklist
 
 - [ ] Terms page published at a stable public URL
+- [x] Provisional Terms and Privacy page scaffolding exists in the repository
 - [ ] Terms URL added to the RevenueCat purchase link
 - [ ] Sandbox purchase link created and tested
 - [ ] Hosted Supabase webhook deployed

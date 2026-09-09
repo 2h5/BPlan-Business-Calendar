@@ -7,6 +7,7 @@ import { ConnectionsSection } from './ConnectionsSection';
 import styles from './SettingsView.module.css';
 import { Select } from '../../../components/forms/Select';
 import { useAuth } from '../../auth';
+import { BillingSection } from '../../billing/components/BillingSection';
 import { useCalendarViewPreference } from '../../calendar/utils/calendar-preferences';
 import type { CalendarViewMode } from '../../calendar/utils/calendar-window';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
@@ -462,6 +463,8 @@ export function SettingsView() {
               </button>
             </footer>
           </section>
+
+          <BillingSection />
 
           <ConnectionsSection notice={integrationMessage} />
         </div>

@@ -69,20 +69,56 @@ enabled = false
 # ---------------------------------------------------------------------------
 [functions.oauth-google-callback]
 verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.oauth-google-start]
+import_map = "./functions/deno.json"
 
 [functions.oauth-microsoft-callback]
 verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.oauth-microsoft-start]
+import_map = "./functions/deno.json"
 
 [functions.webhook-google]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 [functions.webhook-microsoft]
 verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.ai-confirm-time]
+import_map = "./functions/deno.json"
+
+[functions.ai-find-time]
+import_map = "./functions/deno.json"
+
+[functions.delete-account]
+import_map = "./functions/deno.json"
+
+[functions.integrations-calendars]
+import_map = "./functions/deno.json"
+
+[functions.integrations-disconnect]
+import_map = "./functions/deno.json"
+
+[functions.integrations-import]
+import_map = "./functions/deno.json"
+
+[functions.provider-event-write]
+import_map = "./functions/deno.json"
 
 # RevenueCat signs deliveries with a shared secret header, not a Supabase JWT.
 [functions.revenuecat-webhook]
 verify_jwt = false
+import_map = "./functions/deno.json"
 
 # Called by pg_cron with a shared secret, not by a signed-in user.
 [functions.sync-cron]
 verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.sync-run]
+import_map = "./functions/deno.json"

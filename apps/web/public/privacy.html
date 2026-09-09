@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Provisional Privacy Policy for BPlan: Business Calendar." />
+    <title>BPlan — Privacy Policy (Draft)</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        color: #172033;
+        background: #f5f7fb;
+        line-height: 1.6;
+      }
+      main {
+        width: min(760px, calc(100% - 32px));
+        margin: 40px auto;
+        padding: 32px;
+        background: #fff;
+        border: 1px solid #dfe4ee;
+        border-radius: 18px;
+      }
+      h1 {
+        margin-top: 0;
+        letter-spacing: -0.03em;
+      }
+      h2 {
+        margin-top: 32px;
+        font-size: 1.15rem;
+      }
+      .draft {
+        padding: 14px 16px;
+        border: 1px solid #e4b55f;
+        border-radius: 12px;
+        background: #fff8e7;
+        color: #694b0b;
+        font-weight: 600;
+      }
+      .meta {
+        color: #5d687d;
+        font-size: 0.92rem;
+      }
+      a {
+        color: #3756c7;
+      }
+      li {
+        margin: 8px 0;
+      }
+      footer {
+        margin-top: 36px;
+        padding-top: 18px;
+        border-top: 1px solid #e5e9f0;
+        color: #5d687d;
+        font-size: 0.9rem;
+      }
+      @media (max-width: 540px) {
+        main {
+          margin: 16px auto;
+          padding: 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="draft">DRAFT — NOT FINAL. This page must be reviewed before launch.</p>
+      <h1>BPlan: Business Calendar Privacy Policy</h1>
+      <p class="meta">Effective date: TBD — use the launch date once known.</p>
+      <p class="meta">
+        Seller: TBD — founder business-entity decision pending. This draft does not claim that an
+        LLC or other entity currently exists.
+      </p>
+
+      <h2>1. Scope</h2>
+      <p>
+        This draft describes the data flows currently represented in the BPlan repository as of
+        September 8, 2026. It is not final and must be reconciled with the deployed services,
+        provider contracts, and the launch jurisdictions.
+      </p>
+
+      <h2>2. Information processed</h2>
+      <ul>
+        <li>
+          <strong>Account and profile:</strong> authenticated account email, name, time zone, clock
+          preference, working hours, and planning defaults.
+        </li>
+        <li>
+          <strong>Workspace data:</strong> calendars, events, tasks, lists, tags, reminders,
+          recurrence, descriptions, locations, deadlines, and other content entered or imported by
+          the user.
+        </li>
+        <li>
+          <strong>Calendar connections:</strong> Google or Microsoft account identifiers, email,
+          granted scopes, sync status, and provider metadata. OAuth refresh credentials are stored
+          server-side through Vault references and are not client-readable.
+        </li>
+        <li>
+          <strong>Billing:</strong> subscription entitlement, status, expiry, provider customer
+          identifier, product/store metadata, and RevenueCat webhook records needed to reconcile
+          access. Checkout is hosted through RevenueCat Billing using Stripe; this repository has no
+          card-entry form.
+        </li>
+        <li>
+          <strong>Operations and security:</strong> timestamps, stable identifiers, sync/retry
+          state, error codes, webhook outcomes, and account-deletion events needed to operate and
+          secure the service.
+        </li>
+      </ul>
+
+      <h2>3. AI scheduling</h2>
+      <p>
+        When Find Time with AI is enabled for an entitled user, the server sends the configured AI
+        provider the task title, priority, duration, deadline, optional scheduling note, time
+        zone/preferences, and derived candidate-slot features. The current implementation does not
+        send raw event descriptions, locations, attendees, OAuth tokens, or provider credentials to
+        the model. OpenAI requests are configured with storage disabled; the application stores
+        scheduling metadata and suggestions needed for the feature, not full model prompts or
+        provider responses.
+      </p>
+
+      <h2>4. Services and sharing</h2>
+      <p>
+        Current service flows use Supabase for authentication, database, and server functions;
+        Google and Microsoft when the user connects those calendars; RevenueCat and Stripe for
+        subscription checkout and billing; OpenAI for the configured AI ranker; and Cloudflare Pages
+        for the web application and public pages. Final processor terms and international-transfer
+        details are still a launch-review item.
+      </p>
+
+      <h2>5. Use of information</h2>
+      <p>
+        BPlan uses this information to authenticate accounts, provide calendar and task features,
+        synchronize connected calendars, determine subscription entitlements, run Find Time when
+        enabled, prevent abuse, troubleshoot failures, and maintain service security.
+      </p>
+
+      <h2>6. Account deletion and retention</h2>
+      <p>
+        Users can delete their accounts through the current account controls. The implementation
+        revokes connected provider grants before deleting the authenticated user; user-linked
+        product rows are configured to cascade away. The repository does not establish a
+        user-visible backup or third-party retention timetable. Final retention, backup, legal-hold,
+        and processor-deletion language is TBD and must be added before publication as a final
+        policy.
+      </p>
+
+      <h2>7. Contact</h2>
+      <p>
+        Email <a href="mailto:info.bplanai@gmail.com">info.bplanai@gmail.com</a>. Public business
+        address: TBD.
+      </p>
+
+      <footer>
+        <a href="/terms.html">Terms and Conditions draft</a> ·
+        <a href="/privacy.html">Privacy Policy draft</a><br />
+        This is an implementation draft, not legal advice or legal sign-off.
+      </footer>
+    </main>
+  </body>
+</html>
