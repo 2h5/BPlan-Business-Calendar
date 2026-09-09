@@ -15,6 +15,11 @@ import { EdgeError } from '../errors/index.ts';
 const MAX_HORIZON_DAYS = 14;
 const MAX_DURATION_MINUTES = 12 * 60;
 const GRANULARITY_MINUTES = 15;
+/**
+ * An ad-hoc block from the free-text box has no deadline to bound the search,
+ * so it gets a default horizon instead of the task deadline.
+ */
+const DEFAULT_ADHOC_HORIZON_DAYS = 7;
 
 export interface FindTimeTask {
   id: string;
@@ -63,13 +68,17 @@ export interface DeterministicCandidate {
 }
 
 export interface DeterministicFindTimeResult {
+  /**
+   * What is being scheduled. An ad-hoc block described in the Find Time box
+   * has no backing task row, so `id` and `version` are null for it.
+   */
   task: {
-    id: string;
+    id: string | null;
     title: string;
     priority: FindTimeTask['priority'];
     durationMinutes: number;
     deadlineAt: string | null;
-    version: string;
+    version: string | null;
   };
   profileVersion: string;
   note: string | null;
@@ -92,11 +101,19 @@ export async function prepareDeterministicFindTime(
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
 ): Promise<DeterministicFindTimeResult> {
   const now = input.now ?? new Date();
-  const task = await source.loadTask(input.userId, input.request.taskId);
-  if (!task) throw new EdgeError('NOT_FOUND', 'That task was not found.', 404);
+  const { taskId } = input.request;
 
-  requireSchedulableTask(task);
-  const durationMinutes = requireDuration(task.estimatedMinutes);
+  // An ad-hoc request loads no task: the box supplied the title and duration.
+  let task: FindTimeTask | null = null;
+  if (taskId !== undefined) {
+    task = await source.loadTask(input.userId, taskId);
+    if (!task) throw new EdgeError('NOT_FOUND', 'That task was not found.', 404);
+    requireSchedulableTask(task);
+  }
+
+  const durationMinutes = requireDuration(
+    task ? task.estimatedMinutes : (input.request.durationMinutes ?? null),
+  );
 
   const profile = await source.loadProfile(input.userId);
   if (!profile) throw new EdgeError('UNKNOWN', 'Could not load planning preferences.', 500);
@@ -166,12 +183,13 @@ export async function prepareDeterministicFindTime(
 
   return {
     task: {
-      id: task.id,
-      title: task.title,
-      priority: task.priority,
+      id: task?.id ?? null,
+      title: task ? task.title : requireAdHocTitle(input.request.title),
+      // An ad-hoc block carries no priority signal; rank it as ordinary work.
+      priority: task?.priority ?? 'normal',
       durationMinutes,
       deadlineAt: window.taskDeadline?.toISOString() ?? null,
-      version: task.updatedAt,
+      version: task?.updatedAt ?? null,
     },
     profileVersion: profile.updatedAt,
     note: input.request.note ?? null,
@@ -209,6 +227,18 @@ function requireDuration(duration: number | null): number {
   return duration;
 }
 
+/**
+ * The schema already guarantees an ad-hoc request carries a title; this keeps
+ * the invariant checked at the point of use rather than trusting the caller.
+ */
+function requireAdHocTitle(title: string | undefined): string {
+  const trimmed = title?.trim();
+  if (!trimmed) {
+    throw new EdgeError('VALIDATION_FAILED', 'Describe what you want to schedule.', 400);
+  }
+  return trimmed;
+}
+
 function requireSupportedTimeZone(timezone: string): void {
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
@@ -222,22 +252,28 @@ function requireSupportedTimeZone(timezone: string): void {
 }
 
 function resolveWindow(
-  task: FindTimeTask,
+  task: FindTimeTask | null,
   request: AiScheduleRequest,
   timezone: string,
   now: Date,
 ): { start: Date; end: Date; taskDeadline: Date | null } {
   const requestedStart = request.windowStart ? new Date(request.windowStart) : now;
   const start = new Date(Math.max(now.getTime(), requestedStart.getTime()));
-  const taskDeadline = task.dueAt ? taskDeadlineFor(task, timezone) : null;
+  const taskDeadline = task?.dueAt ? taskDeadlineFor(task, timezone) : null;
   const requestedEnd = request.windowEnd ? new Date(request.windowEnd) : null;
 
+  // A task must be bounded by its own deadline or an explicit horizon; an
+  // ad-hoc block has neither, so it falls back to the default horizon.
+  let defaultEnd: Date | null = null;
   if (!taskDeadline && !requestedEnd) {
-    throw new EdgeError(
-      'AI_SCHEDULING_WINDOW_INVALID',
-      'Add a deadline or choose a scheduling horizon.',
-      422,
-    );
+    if (task) {
+      throw new EdgeError(
+        'AI_SCHEDULING_WINDOW_INVALID',
+        'Add a deadline or choose a scheduling horizon.',
+        422,
+      );
+    }
+    defaultEnd = addZonedDays(now, DEFAULT_ADHOC_HORIZON_DAYS, timezone);
   }
 
   const cap = addZonedDays(now, MAX_HORIZON_DAYS, timezone);
@@ -246,6 +282,7 @@ function resolveWindow(
       cap.getTime(),
       taskDeadline?.getTime() ?? Number.POSITIVE_INFINITY,
       requestedEnd?.getTime() ?? Number.POSITIVE_INFINITY,
+      defaultEnd?.getTime() ?? Number.POSITIVE_INFINITY,
     ),
   );
 

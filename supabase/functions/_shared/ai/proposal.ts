@@ -14,6 +14,7 @@ import {
 } from './ranking.ts';
 import {
   type AiRequestSnapshot,
+  type AiRequestTarget,
   type AiScheduleRepository,
   type AiSuggestionToPersist,
   type PersistedAiSuggestion,
@@ -23,10 +24,12 @@ export interface AiFindTimeProposal {
   status: 'proposed';
   requestId: string;
   task: {
-    id: string;
+    /** Null when the proposal is for an ad-hoc block rather than a task. */
+    id: string | null;
+    title: string;
     durationMinutes: number;
     deadlineAt: string | null;
-    version: string;
+    version: string | null;
   };
   targetCalendar: DeterministicFindTimeResult['targetCalendar'];
   constraints: ScheduleConstraints;
@@ -53,7 +56,7 @@ export async function generateAiFindTimeProposal(
   const snapshot = requestSnapshot(result);
   const completedAt = (deps.clock ?? (() => new Date()))().toISOString();
 
-  const requestId = await deps.repository.claimRatedRequest(input.userId, input.request.taskId);
+  const requestId = await deps.repository.claimRatedRequest(input.userId, findTimeTarget(result));
   if (requestId === null) {
     throw new EdgeError('AI_RATE_LIMITED', 'Find Time is limited to 10 attempts per hour.', 429);
   }
@@ -129,6 +132,7 @@ export async function generateAiFindTimeProposal(
       requestId,
       task: {
         id: result.task.id,
+        title: result.task.title,
         durationMinutes: result.task.durationMinutes,
         deadlineAt: result.task.deadlineAt,
         version: result.task.version,
@@ -143,6 +147,13 @@ export async function generateAiFindTimeProposal(
     }
     throw error;
   }
+}
+
+/** The ad-hoc title and duration are persisted with the claimed request. */
+function findTimeTarget(result: DeterministicFindTimeResult): AiRequestTarget {
+  return result.task.id === null
+    ? { taskId: null, title: result.task.title, durationMinutes: result.task.durationMinutes }
+    : { taskId: result.task.id };
 }
 
 function requestSnapshot(result: DeterministicFindTimeResult): AiRequestSnapshot {

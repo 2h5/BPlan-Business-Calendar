@@ -8,14 +8,22 @@ import { EdgeError, type EdgeErrorCode } from '../errors/index.ts';
 const uuidSchema = z.string().uuid();
 
 export interface AiRequestSnapshot {
-  taskId: string;
+  /** Null for an ad-hoc block described in the Find Time box. */
+  taskId: string | null;
   targetCalendarId: string;
-  taskVersion: string;
+  taskVersion: string | null;
   profileVersion: string;
   targetCalendarVersion: string;
   constraints: ScheduleConstraints;
   candidateCount: number;
 }
+
+/**
+ * What a claimed request is for: an existing task, or an ad-hoc block whose
+ * title and duration came from the deterministic intent parser.
+ */
+export type AiRequestTarget =
+  { taskId: string } | { taskId: null; title: string; durationMinutes: number };
 
 export interface AiSuggestionToPersist {
   slotId: string;
@@ -34,7 +42,7 @@ export interface AiRequestUpdate {
   status?: 'pending' | 'proposed' | 'failed';
   constraints?: ScheduleConstraints;
   targetCalendarId?: string;
-  taskVersion?: string;
+  taskVersion?: string | null;
   profileVersion?: string;
   targetCalendarVersion?: string;
   candidateCount?: number;
@@ -52,7 +60,7 @@ export interface AiRequestUpdate {
 
 export interface AiScheduleRepository {
   /** Returns null when the atomic per-user attempt limit is exhausted. */
-  claimRatedRequest(userId: string, taskId: string): Promise<string | null>;
+  claimRatedRequest(userId: string, target: AiRequestTarget): Promise<string | null>;
   updateRequest(userId: string, requestId: string, patch: AiRequestUpdate): Promise<void>;
   insertSuggestions(
     requestId: string,
@@ -62,10 +70,12 @@ export interface AiScheduleRepository {
 
 export function supabaseAiScheduleRepository(admin: SupabaseClient): AiScheduleRepository {
   return {
-    async claimRatedRequest(userId, taskId) {
+    async claimRatedRequest(userId, target) {
       const { data, error } = await admin.rpc('claim_ai_schedule_request', {
         p_user_id: userId,
-        p_task_id: taskId,
+        p_task_id: target.taskId,
+        p_ad_hoc_title: target.taskId === null ? target.title : null,
+        p_ad_hoc_duration_minutes: target.taskId === null ? target.durationMinutes : null,
       });
       if (error) throw persistenceError('claim', error.code);
       if (data === null) return null;

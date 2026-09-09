@@ -411,3 +411,90 @@ Deno.test('request schema rejects engine-owned overrides and inverted local band
     false,
   );
 });
+
+// --- Ad-hoc requests from the free-text Find Time box -----------------------
+
+const adHocRequest = () => ({ title: 'Meeting with Andrew', durationMinutes: 15 });
+
+Deno.test('schedules an ad-hoc block without loading any task', async () => {
+  let loadTaskCalls = 0;
+  const result = await prepareDeterministicFindTime(
+    { userId: USER_ID, request: adHocRequest(), now: NOW },
+    dataSource({
+      loadTask: () => {
+        loadTaskCalls += 1;
+        return Promise.resolve(task());
+      },
+    }),
+    candidateId,
+  );
+
+  assertEquals(loadTaskCalls, 0);
+  assertEquals(result.task.id, null);
+  assertEquals(result.task.version, null);
+  assertEquals(result.task.title, 'Meeting with Andrew');
+  assertEquals(result.task.priority, 'normal');
+  assertEquals(result.task.durationMinutes, 15);
+  assertEquals(result.task.deadlineAt, null);
+  assert(result.candidates.length > 0);
+});
+
+Deno.test('every ad-hoc candidate is the requested duration and genuinely free', async () => {
+  const busyStart = '2026-08-31T13:00:00.000Z'; // 09:00 New York
+  const busyEnd = '2026-08-31T14:00:00.000Z';
+  const busy = [
+    {
+      id: 'event-1',
+      calendarId: CALENDAR_ID,
+      startAt: busyStart,
+      endAt: busyEnd,
+      isAllDay: false,
+      status: 'confirmed' as const,
+      recurrenceRule: null,
+      recurrenceExceptions: [],
+    },
+  ];
+
+  const result = await prepareDeterministicFindTime(
+    { userId: USER_ID, request: adHocRequest(), now: NOW },
+    // deno-lint-ignore no-explicit-any
+    dataSource({ loadEvents: () => Promise.resolve(busy as any) }),
+    candidateId,
+  );
+
+  for (const candidate of result.candidates) {
+    const start = Date.parse(candidate.startAt);
+    const end = Date.parse(candidate.endAt);
+    assertEquals(end - start, 15 * 60_000);
+    assert(
+      end <= Date.parse(busyStart) || start >= Date.parse(busyEnd),
+      `candidate ${candidate.startAt} overlaps the busy block`,
+    );
+  }
+});
+
+Deno.test('an ad-hoc request without a deadline uses the default horizon', async () => {
+  const result = await prepareDeterministicFindTime(
+    { userId: USER_ID, request: adHocRequest(), now: NOW },
+    dataSource(),
+    candidateId,
+  );
+
+  const end = Date.parse(result.constraints.windowEnd);
+  const days = (end - NOW.getTime()) / 86_400_000;
+  assert(days > 6.9 && days < 7.1, `expected a 7 day horizon, got ${days}`);
+});
+
+Deno.test('the schema rejects a request that is neither task-based nor ad-hoc', () => {
+  assertEquals(aiScheduleRequestSchema.safeParse({}).success, false);
+  // Both modes at once.
+  assertEquals(
+    aiScheduleRequestSchema.safeParse({ taskId: TASK_ID, ...adHocRequest() }).success,
+    false,
+  );
+  // Ad-hoc missing its duration.
+  assertEquals(aiScheduleRequestSchema.safeParse({ title: 'Coffee' }).success, false);
+  // Each valid mode on its own.
+  assertEquals(aiScheduleRequestSchema.safeParse({ taskId: TASK_ID }).success, true);
+  assertEquals(aiScheduleRequestSchema.safeParse(adHocRequest()).success, true);
+});

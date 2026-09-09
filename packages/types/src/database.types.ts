@@ -12,6 +12,8 @@ export type Database = {
       ai_schedule_requests: {
         Row: {
           accepted_event_id: string | null
+          ad_hoc_duration_minutes: number | null
+          ad_hoc_title: string | null
           candidate_count: number
           completed_at: string | null
           constraints: Json
@@ -29,13 +31,15 @@ export type Database = {
           status: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id: string | null
           target_calendar_version: string | null
-          task_id: string
+          task_id: string | null
           task_version: string | null
           total_tokens: number | null
           user_id: string
         }
         Insert: {
           accepted_event_id?: string | null
+          ad_hoc_duration_minutes?: number | null
+          ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
           constraints?: Json
@@ -53,13 +57,15 @@ export type Database = {
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
           target_calendar_version?: string | null
-          task_id: string
+          task_id?: string | null
           task_version?: string | null
           total_tokens?: number | null
           user_id: string
         }
         Update: {
           accepted_event_id?: string | null
+          ad_hoc_duration_minutes?: number | null
+          ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
           constraints?: Json
@@ -77,7 +83,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
           target_calendar_version?: string | null
-          task_id?: string
+          task_id?: string | null
           task_version?: string | null
           total_tokens?: number | null
           user_id?: string
@@ -936,7 +942,13 @@ export type Database = {
         Returns: boolean
       }
       claim_ai_schedule_request: {
-        Args: { p_limit?: number; p_task_id: string; p_user_id: string }
+        Args: {
+          p_ad_hoc_duration_minutes?: number
+          p_ad_hoc_title?: string
+          p_limit?: number
+          p_task_id: string
+          p_user_id: string
+        }
         Returns: string
       }
       claim_sync_jobs: {

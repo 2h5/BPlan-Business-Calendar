@@ -70,9 +70,26 @@ export const timeSlotSchema = z
     path: ['endAt'],
   });
 
+/**
+ * A Find Time request targets either an existing task or an ad-hoc block the
+ * user described in the free-text box ("15-minute meeting with Andrew").
+ *
+ * The ad-hoc duration is parsed deterministically by
+ * `parseSchedulingIntent` before it reaches the server; it arrives here as a
+ * number so the availability engine — not a model — decides what is free.
+ */
 export const aiScheduleRequestSchema = z
   .object({
-    taskId: uuidSchema,
+    taskId: uuidSchema.optional(),
+    /** Ad-hoc title. Untrusted: ranking context only, never an availability input. */
+    title: z.string().trim().min(1).max(200).optional(),
+    /** Required for an ad-hoc request; a task supplies its own estimate. */
+    durationMinutes: z
+      .number()
+      .int()
+      .min(5)
+      .max(12 * 60)
+      .optional(),
     /** Untrusted ranking context. It never changes deterministic availability. */
     note: z.string().trim().min(1).max(500).optional(),
     windowStart: isoDateTimeSchema.optional(),
@@ -83,6 +100,23 @@ export const aiScheduleRequestSchema = z
     preferredTimeOfDay: timeOfDayPreferenceSchema.optional(),
   })
   .strict()
+  .refine(
+    (request) =>
+      (request.taskId !== undefined) !==
+      (request.title !== undefined && request.durationMinutes !== undefined),
+    {
+      message: 'Provide either a taskId or an ad-hoc title with a durationMinutes, but not both',
+      path: ['taskId'],
+    },
+  )
+  .refine((request) => request.taskId === undefined || request.title === undefined, {
+    message: 'A task-based request takes its title from the task',
+    path: ['title'],
+  })
+  .refine((request) => request.taskId === undefined || request.durationMinutes === undefined, {
+    message: 'A task-based request takes its duration from the task estimate',
+    path: ['durationMinutes'],
+  })
   .refine(
     (request) =>
       request.windowStart === undefined ||
