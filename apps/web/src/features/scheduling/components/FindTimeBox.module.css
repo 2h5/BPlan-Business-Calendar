@@ -1,0 +1,203 @@
+.container {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  transition: border-color var(--transition-fast);
+}
+
+.container:focus-within {
+  border-color: rgba(138, 164, 255, 0.5);
+}
+
+.form {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.inputWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: var(--space-3);
+  display: flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.input {
+  width: 100%;
+  height: var(--control-height-md, 44px);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 18px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height-md, 44px);
+  padding: 0 var(--space-4);
+  border: 1px solid rgba(138, 164, 255, 0.4);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin-top: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Parsed-intent readback: the user must be able to see what we understood. */
+.readback {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-3);
+}
+
+.chip {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-base);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.chipTitle {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.results {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.resultsHeading {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.slot {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-base);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+}
+
+.slot:hover {
+  border-color: rgba(138, 164, 255, 0.5);
+}
+
+.rank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.slotBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.slotTime {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.slotReason {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.error {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-danger-border, rgba(248, 113, 113, 0.3));
+  border-radius: var(--radius-sm);
+  color: var(--color-danger, #f87171);
+  font-size: var(--font-size-xs);
+}
+
+@media (max-width: 640px) {
+  .form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .submit {
+    justify-content: center;
+  }
+}
+
+/* Same shape as .slot, but presentational while booking is not yet wired. */
+.slotStatic {
+  composes: slot;
+  cursor: default;
+}
+
+.slotStatic:hover {
+  border-color: var(--color-border-subtle);
+}

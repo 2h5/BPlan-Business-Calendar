@@ -7,13 +7,40 @@ engine is `packages/domain/src/scheduling/availability.ts`. Live model
 evaluation, production model selection, web/mobile Find Time UX, and the real
 RevenueCat purchase E2E remain pending.
 
-## Pause checkpoint — 2026-09-09
+## Checkpoint — 2026-09-09 (web Find Time box)
 
-The repository contains the server-side AI scheduling implementation, not a
-finished end-user AI feature. `supabase/functions/ai-find-time/` generates and
-persists proposals, and `supabase/functions/ai-confirm-time/` safely
-revalidates and creates the internal event. No web or mobile client currently
-invokes those endpoints or renders proposal selection/confirmation UI.
+`supabase/functions/ai-find-time/` generates and persists proposals, and
+`supabase/functions/ai-confirm-time/` safely revalidates and creates the
+internal event.
+
+The web Today page now has a free-text Find Time box
+(`apps/web/src/features/scheduling/`) that calls `ai-find-time` and renders the
+top three ranked slots. **Confirmation is not wired for ad-hoc blocks yet**, so
+the proposed slots are presentational: choosing one does not create an event.
+Mobile has no Find Time UI.
+
+No AI provider is configured. `ai-find-time` requires `OPENAI_API_KEY` and will
+fail without it, so the box cannot return suggestions until a model is chosen
+(`AI_MODEL`, default `gpt-5.6-luna`).
+
+### Ad-hoc requests
+
+A request now targets **either** an existing task **or** an ad-hoc block typed
+into the box. `aiScheduleRequestSchema` enforces exactly one mode, and
+`ai_schedule_requests` mirrors it with a check constraint: `task_id` is
+nullable, and an ad-hoc row instead carries `ad_hoc_title` and
+`ad_hoc_duration_minutes`.
+
+Free text is interpreted by `parseSchedulingIntent`
+(`packages/domain/src/scheduling/intent.ts`) — deterministic code, not a model.
+It extracts duration, time-of-day preference, and a today/tomorrow hint, and
+leaves the remainder as the title. Duration is parsed deterministically
+precisely because it changes which slots the engine generates. Text with no
+duration falls back to 30 minutes, and an ad-hoc block with no deadline
+searches a 7-day horizon.
+
+Attendees are not modelled: "with Andrew" stays in the title, and no invite is
+sent to anyone.
 
 The only currently scoped Pro capability is **Find Time with AI**. Other AI
 ideas in the product plan remain potential future features and are not part of

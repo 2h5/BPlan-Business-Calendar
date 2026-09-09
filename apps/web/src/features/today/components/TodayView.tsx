@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 import styles from './TodayView.module.css';
 import { Select } from '../../../components/forms/Select';
+import { FindTimeBox } from '../../scheduling';
 import type { TaskWithTags } from '../../tasks/api/tasks.api';
 import {
   useCreateTask,
@@ -259,6 +260,8 @@ export function TodayView() {
           </button>
         </div>
       </header>
+
+      <FindTimeBox timeZone={today.timeZone} />
 
       {/* Bento Metric Cards */}
       <section className={styles.bentoGrid} aria-label="Day Overview">
