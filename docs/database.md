@@ -14,22 +14,25 @@ Postgres via Supabase. Every table below is created by a migration in
 - Policies use `(select auth.uid())` so the planner evaluates it once per query
   rather than once per row.
 
-## Tables
+## Tables and client-facing views
 
-| Table                     | Purpose                             | Client access                                          |
-| ------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| `profiles`                | Planning preferences, working hours | Own row, full CRUD                                     |
-| `calendars`               | Internal and synced calendars       | Own rows, full CRUD                                    |
-| `events`                  | Events and time blocks              | Own rows, full CRUD; provider writes use server path   |
-| `task_lists`              | Lists / projects                    | Own rows, full CRUD                                    |
-| `tasks`                   | Tasks and reminders                 | Own rows, full CRUD                                    |
-| `tags`, `task_tags`       | Labelling                           | Own rows, via task ownership                           |
-| `provider_accounts`       | Connected Google/Microsoft accounts | Read only; disconnect via Edge Function                |
-| `calendar_sync_states`    | Sync cursors, webhook bookkeeping   | **None**                                               |
-| `sync_jobs`               | Durable retry queue                 | Read only                                              |
-| `ai_schedule_requests`    | Find Time requests                  | Read own requests; server-managed                      |
-| `ai_schedule_suggestions` | Ranked proposals                    | Read own proposed/accepted suggestions; server-managed |
-| `subscriptions`           | RevenueCat entitlement mirror       | Read only                                              |
+| Object                     | Purpose                             | Client access                                          |
+| -------------------------- | ----------------------------------- | ------------------------------------------------------ |
+| `profiles`                 | Planning preferences, working hours | Own row, full CRUD                                     |
+| `calendars`                | Internal and synced calendars       | Own rows, full CRUD                                    |
+| `events`                   | Events and time blocks              | Own rows, full CRUD; provider writes use server path   |
+| `task_lists`               | Lists / projects                    | Own rows, full CRUD                                    |
+| `tasks`                    | Tasks and reminders                 | Own rows, full CRUD                                    |
+| `tags`, `task_tags`        | Labelling                           | Own rows, via task ownership                           |
+| `provider_accounts`        | Connected Google/Microsoft accounts | Safe-column read only; disconnect via Edge Function    |
+| `provider_accounts_public` | Client-safe connection projection   | Read only                                              |
+| `calendar_sync_states`     | Sync cursors, webhook bookkeeping   | **None**                                               |
+| `sync_jobs`                | Durable retry queue                 | **None in current client grant set**                   |
+| `calendar_sync_health`     | Client-safe sync health view        | Read only                                              |
+| `ai_schedule_requests`     | Find Time requests                  | Read own requests; server-managed                      |
+| `ai_schedule_suggestions`  | Ranked proposals                    | Read own proposed/accepted suggestions; server-managed |
+| `subscriptions`            | RevenueCat entitlement mirror       | Read only                                              |
+| `subscription_events`      | RevenueCat webhook event ledger     | **None; service-role only**                            |
 
 `oauth_states` is a short-lived, server-only table for OAuth state and PKCE
 verifiers. Its `return_target` is constrained to `mobile` or `web` and defaults
@@ -48,6 +51,38 @@ table policies allow an owner to read and modify owned rows, but a provider-owne
 event is still a provider mirror: application create/update/delete must go
 through the provider-first `provider-event-write` path. Internal events remain
 database-authoritative.
+
+## Client access: RLS policies and SQL privileges
+
+RLS and SQL privileges answer different questions. RLS policies filter which
+rows a role may use; `GRANT`/`REVOKE` determines whether PostgREST may expose the
+operation at all. A client request needs both. Migration
+`20260908000021_client_api_table_grants.sql` adds the explicit authenticated
+role grants required by the hosted project; it does not replace the row-level
+policies.
+
+The current client-facing access is:
+
+| Object                     | RLS / view boundary                                                                                                     | Explicit client privilege                                             | Current app path                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `provider_accounts`        | Own-row `SELECT`; own-row `DELETE` policy, with sensitive watch/token columns revoked                                   | Safe-column `SELECT`; client `DELETE` is revoked by migration 11      | Apps read `provider_accounts_public` and use `integrations-disconnect` for teardown |
+| `provider_accounts_public` | `security_invoker = true` view over the safe projection                                                                 | `SELECT` to `authenticated`                                           | Web and mobile integrations settings                                                |
+| `sync_jobs`                | Legacy own-row `SELECT` policy remains in migration 4                                                                   | No explicit authenticated grant in the current client-grant migration | Not queried by either app; server queue functions only                              |
+| `calendar_sync_health`     | `security_invoker = false` view with an `auth.uid()` owner filter; provider error text is reduced to safe status fields | `SELECT` to `authenticated`                                           | Web and mobile integrations settings                                                |
+| `subscriptions`            | Own-row `SELECT` policy; writes are webhook/server-managed                                                              | `SELECT` to `authenticated`                                           | Web billing status query                                                            |
+| `ai_schedule_requests`     | Own-row `SELECT`; final proposal runtime removes the broad client update policy                                         | `SELECT` to `authenticated`                                           | Reserved for future client proposal UI                                              |
+| `ai_schedule_suggestions`  | `SELECT` only for the user's proposed/accepted requests                                                                 | `SELECT` to `authenticated`                                           | Reserved for future client proposal UI                                              |
+| `subscription_events`      | RLS enabled with no client policies                                                                                     | `INSERT, SELECT` to `service_role` only                               | RevenueCat webhook ledger                                                           |
+
+The server-only RevenueCat and AI RPCs are not browser write APIs. Current
+security-definer grants allow `service_role` only for
+`apply_revenuecat_event`, `has_active_entitlement`,
+`claim_ai_schedule_request`, and `confirm_ai_schedule_suggestion`; `public`,
+`anon`, and `authenticated` are explicitly revoked. The Edge Functions call
+these through their admin/service-role client. The `sync_jobs` read policy is
+therefore documented as a historical schema policy, not as supported client
+access: without a matching SQL privilege, it does not establish PostgREST
+access.
 
 ## Invariants enforced in the database
 

@@ -1043,8 +1043,9 @@ Record every manual external step explicitly so implementation status and live-v
 Backend checkpoint SHA:
 
 `5e1e01d` (RevenueCat webhook and entitlement mirror; now integrated into
-`main`). The current web billing changes and hosted ACL migrations remain local
-and uncommitted until this pause is lifted.
+`main`). The current web billing changes and hosted ACL migrations are
+committed on `main` at `673eb12`; Cloudflare deployment remains a separate
+manual step and has not been run after that checkpoint.
 
 ---
 
@@ -2362,6 +2363,10 @@ Current Sprint 6 verification evidence:
 - GitHub CI run [33839322098](https://github.com/Andrewy530/BCalAI/actions/runs/33839322098)
   passed both the static and hosted migrations/RLS/generated-types jobs.
 
-Repository HEAD may be later than this Sprint 6 checkpoint because the latest
-commits are web-only documentation/hardening changes; inspect Git before
-continuing Sprint 6 work.
+Current repository checkpoint:
+
+`main` at `673eb12` includes the committed web billing seam and hosted ACL
+migrations. Current HEAD GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
+passed both the static and hosted migrations/RLS/generated-types jobs. The
+local `pnpm verify` command remains environment-dependent; this CI result is
+the current repository-level verification evidence.

@@ -5,6 +5,8 @@ PURCHASE PAGE AND FIND TIME UX
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
+Current repository checkpoint: `main` at `673eb12`. GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054) passed both the static and hosted migrations/RLS/generated-types jobs.
+
 ---
 
 ## Architectural Principles & Invariants
@@ -280,8 +282,9 @@ This document is the single source of truth for web client implementation, archi
   Other AI ideas remain undecided future scope. The server proposal and
   confirmation endpoints exist, but no web or mobile client invokes them yet.
 - **Deployment:** Cloudflare automatic deployments remain disabled. Sandbox
-  variables are saved for the next manual deployment, but the latest local
-  billing changes are uncommitted and not deployed.
+  variables are saved for the next manual deployment. The latest billing code
+  and hosted ACL migrations are committed on `main` at `673eb12` but have not
+  been deployed after that checkpoint.
 - **Next Action:** Confirm Pro/AI scope and model-evaluation direction, then
   implement Web Phase 7 Find Time UX before resuming real billing acceptance
   tests.

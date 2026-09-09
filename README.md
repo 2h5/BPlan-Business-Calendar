@@ -1,8 +1,9 @@
-# Calendar + Reminders App
+# BPlan: Business Calendar
 
-A premium personal planning app: calendar, reminders, tasks, and AI-assisted
-time blocking. It has a React Native mobile client and a browser web client
-over shared backend, schema, and domain contracts.
+BPlan: Business Calendar is a premium personal planning app for calendars,
+reminders, tasks, and AI-assisted time blocking. It has a React Native mobile
+client and a browser web client over shared backend, schema, and domain
+contracts.
 
 The full product and technical plan is in
 [`calendar_app_product_technical_plan.md`](calendar_app_product_technical_plan.md).
@@ -11,15 +12,43 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ---
 
+## Project checkpoint — 2026-09-09
+
+```text
+CORE PRODUCT
+├─ Mobile core ..................... COMPLETE
+├─ Web Phases 0–6 .................. COMPLETE
+├─ Google Calendar integration ..... IMPLEMENTED / major flows verified
+└─ Microsoft integration ........... IMPLEMENTED / live lifecycle gaps remain
+
+AI / PRO
+├─ Find Time backend ................ COMPLETE + HARDENED
+├─ Find Time client UX .............. NOT STARTED
+├─ Production model selection ...... PENDING
+├─ RevenueCat backend ............... IMPLEMENTED
+├─ Web sandbox billing seam ........ CONFIGURED
+└─ Real purchase E2E ................ PENDING
+
+RELEASE
+├─ Hosted Supabase project .......... CREATED / schema wired
+├─ Production billing ............... INTENTIONALLY DISABLED
+├─ Seller / final legal docs ....... TBD
+└─ Production release hardening .... PENDING
+
+CURRENT STATE
+└─ Development paused at a stable checkpoint.
+```
+
+HEAD `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054).
+
 ## Current status
 
-**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat webhook, sandbox catalog, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
+**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat hosted sandbox checkout, webhook, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
 complete/implemented. Sprint 5's Microsoft
 implementation is complete in code with external lifecycle/device verification
-still tracked separately. The web client has completed Phases 0–5 plus its
-latest hardening follow-up; Web Phase 6 provider integrations is next. The
-Phase 0 audit used
-`4678adc381cd0e85326772a5e7d6864af9589a1c` on `main`.
+still tracked separately. The web client has completed Web Phases 0–6 plus
+hardening; Web Phase 7 Find Time is not started and the billing/AI track is
+paused at this checkpoint.
 
 Google live OAuth, calendar import, initial/incremental sync, and
 provider-first create/update/delete were verified in Sprint 4. Microsoft OAuth,
@@ -32,24 +61,24 @@ for mobile/AI work and [`docs/web-active.md`](docs/web-active.md) for the web
 client. The Sprint 3 and Sprint 4 trackers are closed historical records; the
 Sprint 5 tracker retains Microsoft external-verification evidence.
 
-| Area                                                                          | State                                                                                                     |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Monorepo, TypeScript strict, ESLint, Prettier, CI                             | Implemented; verification is environment-dependent                                                        |
-| Design tokens + UI primitives (`@cal/ui`)                                     | Done                                                                                                      |
-| Database schema, RLS, pgTAP tests                                             | Done                                                                                                      |
-| Auth (email, Apple), session, account deletion                                | Done                                                                                                      |
-| Deterministic availability engine (`@cal/domain`)                             | Done, unit-tested                                                                                         |
-| Task inbox, editor, completion, snooze, delete                                | Done — Sprint 1                                                                                           |
-| Quick Add (task lane)                                                         | Done — Sprint 1                                                                                           |
-| Local task reminders + notification actions                                   | Done — Sprint 1                                                                                           |
-| Calendar views, event CRUD, recurrence, alerts, calendar colors               | Done — Sprint 2                                                                                           |
-| Today dashboard, merged timeline, overdue/unscheduled work, free-time summary | Done — Sprint 3                                                                                           |
-| Search across event/task titles, notes, and locations                         | Done — Sprint 3                                                                                           |
-| Settings planning preferences                                                 | Done — Sprint 3                                                                                           |
-| Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain                                    |
-| Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                                                        |
-| AI Find Time, RevenueCat                                                      | AI Phases 1–4 done; RevenueCat webhook and sandbox catalog done; hosted checkout and app integration next |
-| Web client                                                                    | Phases 0–5 + hardening done; Phase 6 provider integrations next                                           |
+| Area                                                                          | State                                                                                                                                |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Monorepo, TypeScript strict, ESLint, Prettier, CI                             | Implemented; verification is environment-dependent                                                                                   |
+| Design tokens + UI primitives (`@cal/ui`)                                     | Done                                                                                                                                 |
+| Database schema, RLS, pgTAP tests                                             | Done                                                                                                                                 |
+| Auth (email, Apple), session, account deletion                                | Done                                                                                                                                 |
+| Deterministic availability engine (`@cal/domain`)                             | Done, unit-tested                                                                                                                    |
+| Task inbox, editor, completion, snooze, delete                                | Done — Sprint 1                                                                                                                      |
+| Quick Add (task lane)                                                         | Done — Sprint 1                                                                                                                      |
+| Local task reminders + notification actions                                   | Done — Sprint 1                                                                                                                      |
+| Calendar views, event CRUD, recurrence, alerts, calendar colors               | Done — Sprint 2                                                                                                                      |
+| Today dashboard, merged timeline, overdue/unscheduled work, free-time summary | Done — Sprint 3                                                                                                                      |
+| Search across event/task titles, notes, and locations                         | Done — Sprint 3                                                                                                                      |
+| Settings planning preferences                                                 | Done — Sprint 3                                                                                                                      |
+| Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain                                                               |
+| Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                                                                                   |
+| AI Find Time, RevenueCat                                                      | AI Phases 1–4 hardened; RevenueCat hosted sandbox/webhook/web billing foundation configured; client UX and real purchase E2E pending |
+| Web client                                                                    | Web Phases 0–6 + hardening done; Phase 7 Find Time not started/paused                                                                |
 
 ---
 

@@ -138,8 +138,10 @@ notification handling. So the system also needs:
 - A claimed queue row carries a fencing token. Lease recovery can make an
   abandoned row retryable, but the old worker cannot complete the replacement
   claim if it returns late.
-- A user-visible sync health state — `sync_jobs` is readable by its owner for
-  exactly this reason.
+- A user-visible sync health state through the client-safe
+  `calendar_sync_health` view. `sync_jobs` remains the server-owned retry queue;
+  its legacy owner-read policy does not establish current PostgREST client
+  access without an explicit SQL privilege.
 
 ## Authenticating the untrusted callers
 

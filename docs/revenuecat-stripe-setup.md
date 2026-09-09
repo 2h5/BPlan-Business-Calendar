@@ -16,9 +16,10 @@ returned 2xx without granting access. No monthly or annual sandbox purchase
 has yet been completed.
 
 Cloudflare Pages remains configured for manual deployment with sandbox billing;
-automatic deployments remain disabled. The latest local web billing changes
-and ACL migrations are not committed or deployed. Production checkout remains
-blocked by the unresolved seller identity and final legal-document flags.
+automatic deployments remain disabled. The latest web billing changes and ACL
+migrations are committed on `main` at `673eb12`, but have not been deployed
+after that checkpoint. Production checkout remains blocked by the unresolved
+seller identity and final legal-document flags.
 
 This runbook records the current billing decision and the steps needed to take
 BPlan: Business Calendar from the Stripe sandbox to a tested production web
@@ -122,9 +123,9 @@ The webhook expects:
 Anonymous RevenueCat IDs are intentionally ignored until RevenueCat associates
 the purchase with a signed-in Supabase user.
 
-## Remaining setup, in order
+## Setup status and remaining verification
 
-### 1. Publish a public Terms & Conditions page
+### 1. Public Terms & Conditions page — provisional and published
 
 A custom domain is not required. Cloudflare Pages can provide a public
 production URL such as:
@@ -167,7 +168,7 @@ This document is an implementation checklist, not legal advice. The terms
 should be reviewed for the business and jurisdictions where the service will
 be sold.
 
-### 2. Deploy the Terms page with Cloudflare Pages
+### 2. Cloudflare Pages deployment — provisional pages published
 
 For the current Vite monorepo, configure the Pages project as follows:
 
@@ -199,9 +200,10 @@ After deployment:
 2. Confirm it loads without authentication.
 3. Copy the public URL.
 
-### 3. Create the RevenueCat hosted purchase link
+### 3. RevenueCat hosted purchase link — sandbox configured
 
-Create a sandbox link for testing only after the public Terms URL is available.
+The sandbox link is configured for testing only. If it must be recreated, use
+the following values after the public Terms URL is available.
 Do not create or distribute a production purchase link while the seller
 identity or final legal documents remain unresolved.
 
@@ -231,7 +233,7 @@ RevenueCat's purchase-link documentation requires a Terms & Conditions URL and
 allows the default package-selection page to use the products in the selected
 offering.
 
-### 4. Copy and test the purchase URL
+### 4. Copy and test the purchase URL — pending real sandbox purchase
 
 After the purchase link is saved:
 
@@ -247,10 +249,11 @@ For a logged-in customer, the checkout URL must identify the customer with the
 URL-encoded Supabase user UUID. Use one stable Supabase UUID per customer. Do
 not substitute an email address, display name, or a newly generated ID.
 
-### 5. Deploy and connect the RevenueCat webhook
+### 5. Deploy and connect the RevenueCat webhook — hosted setup complete
 
-The Supabase function is already in the repository but still needs to be
-deployed to the hosted Supabase project.
+The Supabase function is in the repository and is deployed to the hosted
+Supabase project. The following records the configuration and the commands to
+repeat or re-verify it:
 
 1. Link the Supabase CLI to the correct hosted project.
 2. Set `REVENUECAT_WEBHOOK_SECRET` in the Supabase Edge Function secret store.
@@ -341,9 +344,11 @@ pnpm db:types
 The RevenueCat backend commit passed its focused Deno tests, database/RLS
 checks, generated-type checks, and git-diff checks. The current focused webhook
 run passes 18/18 Deno tests. The web billing guard passes 4/4 Vitest tests and
-the web TypeScript check passes. At the time of the last full verification,
-`pnpm verify` was blocked by a Corepack environment failure; rerun it before
-publishing or merging a broader billing change.
+the web TypeScript check passes. A local `pnpm verify` invocation at the
+current Windows checkout is blocked before project scripts by an environment
+permission error (`EPERM` while inspecting `C:\Users\lache`); this is not a
+reported code-test failure. Current HEAD CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
+passes both the static and hosted migrations/RLS/generated-types jobs.
 
 ## Production readiness checklist
 
@@ -364,7 +369,8 @@ publishing or merging a broader billing change.
 - [ ] Production Stripe account connected
 - [ ] Production products/prices and purchase link verified
 - [ ] Production URL kept separate from the sandbox URL
-- [ ] `pnpm verify` passes
+- [x] Current HEAD CI verification passes (run #67 covers format, lint, types,
+      unit tests, web build, migrations/RLS, and generated types)
 
 ## Official references
 

@@ -895,7 +895,7 @@ calendar-app/
 │       ├── webhook-microsoft/
 │       ├── ai-find-time/                # implemented — Sprint 6 Phases 1–3
 │       ├── ai-confirm-time/             # implemented — Sprint 6 Phase 4
-│       ├── revenuecat-webhook/          # planned — Sprint 6
+│       ├── revenuecat-webhook/          # implemented — Sprint 6 Phase 5 foundation
 │       └── delete-account/
 │
 ├── docs/
@@ -1395,12 +1395,11 @@ Allow users to turn on “Auto Schedule Flexible Tasks,” with clear safeguards
 - Search
 - Basic themes/preferences
 
-## Pro / AI subscription — potential future scope
+## Pro / AI subscription
 
-The only currently scoped Pro capability is **AI Find Time**. The items below
-are product ideas, not current launch commitments.
+The only currently scoped Pro capability is **AI Find Time**. The following
+items are potential future scope, not current launch commitments.
 
-- AI Find Time
 - AI reschedule missed tasks
 - Smart daily plan
 - Natural-language scheduling
