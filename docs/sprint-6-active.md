@@ -1,7 +1,8 @@
 # Sprint 6 — AI Pro / Find Time
 
-Status: PHASE 4 SAFE CONFIRMATION AND RECURRENCE HARDENING IMPLEMENTED,
-VERIFIED, AND PUSHED — LIVE MODEL EVALUATION AND PHASE 5 / REVENUECAT PENDING
+Status: PHASES 1–4 IMPLEMENTED, HARDENED, VERIFIED, AND PUSHED; PHASE 5
+SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED — SPRINT 6 PAUSED BEFORE
+LIVE MODEL EVALUATION, AI CLIENT UX, AND SANDBOX PURCHASE E2E (2026-09-09)
 
 This file is the source of truth for Sprint 6 implementation and handoff.
 
@@ -951,9 +952,10 @@ earlier recurrence checkpoint `682d1d5f8f91e001d93e11a746fec06ab2596957`)
 
 # Phase 5 — RevenueCat
 
-Status: **PARTIALLY IMPLEMENTED — server webhook/mirror foundation and guarded
-web billing seam are present; mobile SDK, purchase/restore, and live E2E remain
-pending (2026-09-08).**
+Status: **PARTIALLY IMPLEMENTED — server webhook/mirror foundation, guarded web
+billing seam, and sandbox dashboard setup are present; the standalone purchase
+page, real purchase E2E, customer billing-management URL, mobile SDK, and
+purchase/restore remain pending (2026-09-09).**
 
 The server implementation landed in `5e1e01d`; the web billing and provisional
 legal-page scaffolding are tracked in
@@ -1007,6 +1009,21 @@ including sandbox and production Stripe/RevenueCat steps, lives in
 products are not configured for this release. Mobile purchase/restore setup is
 future work.
 
+### Current pause boundary
+
+- The web app has a billing section inside Settings; it does not have a
+  standalone purchase page.
+- The web billing code is a sandbox/testing seam, not a finished customer
+  purchase experience. A RevenueCat TEST webhook has returned 2xx, but no real
+  monthly or annual sandbox purchase has been completed.
+- The only currently scoped Pro capability is Find Time with AI. The broader AI
+  feature ideas in the product plan are not launch commitments.
+- The AI backend exists, but no web or mobile client currently invokes the
+  proposal/confirmation endpoints. The live model comparison and production
+  model choice remain pending.
+- Seller identity and final legal documents remain a production billing gate,
+  but they do not block future sandbox or UI implementation.
+
 Record every manual external step explicitly so implementation status and live-verification status remain separate.
 
 ## Exit criteria
@@ -1023,9 +1040,11 @@ Record every manual external step explicitly so implementation status and live-v
 - `pnpm verify` passes
 - checkpoint pushed
 
-Checkpoint SHA:
+Backend checkpoint SHA:
 
-`TBD`
+`5e1e01d` (RevenueCat webhook and entitlement mirror; now integrated into
+`main`). The current web billing changes and hosted ACL migrations remain local
+and uncommitted until this pause is lifted.
 
 ---
 
@@ -2272,9 +2291,10 @@ The next implementer must:
 
 Current phase:
 
-`Phase 4 safe confirmation and recurrence hardening complete; live model
-evaluation and Phase 5 / RevenueCat remain pending. The independent web track
-has completed Web Phases 0–5 plus hardening; Web Phase 6 is next.`
+`Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
+foundation. Live model evaluation, production model selection, the AI client
+experience, and real sandbox purchase E2E remain pending. The independent web
+track has completed Web Phases 0–6; Web Phase 7 Find Time has not started.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2319,16 +2339,19 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current blocker:
 
-`Live Luna/Terra evaluation still needs an authorized server-side OpenAI key
-and explicit cost authorization. Phase 5 / RevenueCat remains intentionally
-unstarted.`
+`The product Pro scope and AI model choice are not final. Live Luna/Terra
+evaluation still needs an authorized server-side OpenAI key and explicit cost
+authorization. The web billing/purchase work is intentionally paused because
+the client purchase surface and the real AI feature experience are not yet
+defined.`
 
 Next exact action:
 
-Await authorized live model evaluation when the server-side key and cost
-authorization are available. Do not begin Phase 5. Preserve deterministic
-candidate membership as the sole availability authority. Web work can proceed
-independently to Web Phase 6 according to [`docs/web-active.md`](web-active.md).
+`Do not expand billing or AI scope while paused. When resumed, first confirm
+the Pro feature set and authorize the live model evaluation; then implement the
+web Find Time proposal/confirmation UX and return to the RevenueCat sandbox
+purchase acceptance test. Preserve deterministic candidate membership as the
+sole availability authority.`
 
 Current Sprint 6 verification evidence:
 

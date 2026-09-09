@@ -1,10 +1,24 @@
 # RevenueCat + Stripe Web Billing Setup
 
-Status: **Sandbox catalog and webhook implementation configured; provisional
-legal pages and guarded web billing UI are in the repository. Hosted checkout,
-webhook deployment, final legal documents, and app purchase integration remain.**
+Status: **Sandbox catalog, hosted checkout, webhook, and identified web billing
+integration are configured; provisional legal pages are published. Final legal
+documents and production billing remain intentionally blocked.**
 
-Last verified: **2026-09-08**
+Last verified: **2026-09-09**
+
+## Pause checkpoint — 2026-09-09
+
+Billing work is intentionally paused before the real sandbox purchase test.
+The web app currently has a billing section inside Settings, not a standalone
+purchase page. The RevenueCat sandbox catalog, hosted link, webhook, and
+identified web billing seam are configured, and the webhook TEST event has
+returned 2xx without granting access. No monthly or annual sandbox purchase
+has yet been completed.
+
+Cloudflare Pages remains configured for manual deployment with sandbox billing;
+automatic deployments remain disabled. The latest local web billing changes
+and ACL migrations are not committed or deployed. Production checkout remains
+blocked by the unresolved seller identity and final legal-document flags.
 
 This runbook records the current billing decision and the steps needed to take
 BPlan: Business Calendar from the Stripe sandbox to a tested production web
@@ -79,12 +93,13 @@ Both products use the customer-facing name `BPlan Pro` and the description
 
 ## What is already implemented in the repository
 
-The RevenueCat webhook and entitlement mirror are committed on:
+The RevenueCat webhook and entitlement mirror were introduced in:
 
 ```text
-Branch: sprint-6/phase-5-revenuecat-webhook
 Commit: 5e1e01d feat(subscriptions): add RevenueCat webhook and entitlement mirror
 ```
+
+That commit is now integrated into `main`.
 
 The backend includes:
 
@@ -262,17 +277,22 @@ variable, or a chat message.
 
 ### 6. Wire the application to RevenueCat
 
-The web app now has a billing section that reads the safe subscription projection
-through a TanStack Query API/hook and can open an identified hosted checkout link
-when explicitly configured. Checkout is disabled by default and production is
+The web app's Settings billing section now reads the safe subscription projection
+through a user-scoped TanStack Query API/hook, opens an identified hosted sandbox
+checkout link, and offers an explicit access-status refresh after checkout. The
+checkout URL uses the signed-in Supabase auth UUID as the RevenueCat App User ID.
+This is a billing seam for testing, not a standalone purchase page or completed
+customer purchase experience. Checkout is disabled by default and production is
 blocked unless seller-identity and final-document confirmations plus public Terms
-and Privacy URLs are present. The implementation must still:
+and Privacy URLs are present.
 
-- Identify the RevenueCat customer with the Supabase auth UUID after sign-in.
-- Use the `pro` entitlement for the Pro experience.
-- Keep entitlement reads in the owning app's TanStack Query API/hook.
-- Keep provider calls out of React route and page components.
-- Never trust a client-only `isPro` flag for server authorization.
+The implementation also:
+
+- Uses the `pro` entitlement for the Pro experience.
+- Keeps entitlement reads in the owning app's TanStack Query API/hook.
+- Keeps provider calls out of React route and page components.
+- Never trusts a client-only `isPro` flag for server authorization.
+- Separates subscription query cache entries by authenticated user ID.
 
 The mobile RevenueCat SDK, purchase/restore flow, and customer-facing paywall
 remain future work. The current release decision is web billing only; Apple and
@@ -327,17 +347,19 @@ publishing or merging a broader billing change.
 
 ## Production readiness checklist
 
-- [ ] Terms page published at a stable public URL
+- [x] Provisional Terms page published at a stable public URL
 - [x] Provisional Terms and Privacy page scaffolding exists in the repository
-- [ ] Terms URL added to the RevenueCat purchase link
-- [ ] Sandbox purchase link created and tested
-- [ ] Hosted Supabase webhook deployed
-- [ ] RevenueCat webhook secret stored server-side
-- [ ] RevenueCat webhook configured and returning 2xx
+- [x] Terms URL added to the RevenueCat sandbox purchase link
+- [x] Sandbox purchase link created
+- [x] Hosted Supabase webhook deployed
+- [x] RevenueCat webhook secret stored server-side
+- [x] RevenueCat webhook configured and TEST event returns 2xx
 - [ ] Monthly sandbox purchase verified at $4.99
 - [ ] Annual sandbox purchase verified at $49.99
 - [ ] Entitlement mirror verified for a real Supabase user UUID
-- [ ] Web/mobile Pro-gated flow wired to the `pro` entitlement
+- [x] Web subscription read/checkout guard wired to the `pro` entitlement
+- [ ] Web Find Time proposal/confirmation UI wired to the `pro` entitlement
+- [ ] Mobile RevenueCat purchase/restore flow wired to the `pro` entitlement
 - [ ] Cancellation and expiration behavior verified
 - [ ] Production Stripe account connected
 - [ ] Production products/prices and purchase link verified

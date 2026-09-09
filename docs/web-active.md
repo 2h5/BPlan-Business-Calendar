@@ -1,6 +1,7 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASES 0–6 COMPLETE + HARDENING; PHASE 7 FIND TIME NEXT
+Status: WEB PHASES 0–6 COMPLETE + HARDENING; BILLING/AI WORK PAUSED BEFORE
+PURCHASE PAGE AND FIND TIME UX
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -265,17 +266,40 @@ This document is the single source of truth for web client implementation, archi
 
 ---
 
+### Billing and AI pause checkpoint — 2026-09-09
+
+- **Status:** Paused by product-scope decision; no production billing enabled.
+- **Implemented:** Settings billing seam, user-scoped subscription read,
+  identified RevenueCat sandbox checkout link, explicit access-status refresh,
+  provisional legal-page scaffolding, and the server-side `pro` entitlement
+  boundary.
+- **Not implemented:** A standalone purchase page, a real monthly/annual
+  sandbox purchase acceptance test, a customer billing-management URL, or the
+  web Find Time proposal/confirmation experience.
+- **AI scope:** Find Time with AI is the only currently scoped Pro capability.
+  Other AI ideas remain undecided future scope. The server proposal and
+  confirmation endpoints exist, but no web or mobile client invokes them yet.
+- **Deployment:** Cloudflare automatic deployments remain disabled. Sandbox
+  variables are saved for the next manual deployment, but the latest local
+  billing changes are uncommitted and not deployed.
+- **Next Action:** Confirm Pro/AI scope and model-evaluation direction, then
+  implement Web Phase 7 Find Time UX before resuming real billing acceptance
+  tests.
+
+---
+
 ### Web Phase 7 — Find Time
 
 - **Goal:** Consume hardened Sprint 6 proposal endpoint, proposal selection UX, confirmation flow, Pro entitlement rendering (no client-side availability calculation).
-- **Status:** Planned
+- **Status:** Not started — billing/AI work paused
 - **Starting SHA:** TBD
 - **Implementation Completed:** TBD
 - **Tests / Verification:** TBD
 - **Pushed SHA:** TBD
 - **CI:** TBD
-- **Blockers:** Finalized subscription/entitlement architecture
-- **Next Action:** Pending Phase 6
+- **Blockers:** Product Pro scope, live AI model evaluation, and the missing
+  purchase/Find Time user experience
+- **Next Action:** Resume only after the pause checkpoint decisions are made
 
 ---
 

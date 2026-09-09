@@ -5,10 +5,13 @@ import { useAuth } from '../../auth';
 import { fetchSubscription } from '../api/billing.api';
 
 export function useSubscription() {
-  const { isAuthenticated } = useAuth();
+  const { userId } = useAuth();
   return useQuery({
-    queryKey: queryKeys.subscription(),
-    queryFn: fetchSubscription,
-    enabled: isAuthenticated,
+    queryKey: queryKeys.subscription(userId),
+    queryFn: () => {
+      if (!userId) throw new Error('Expected an authenticated user');
+      return fetchSubscription(userId);
+    },
+    enabled: userId !== null,
   });
 }

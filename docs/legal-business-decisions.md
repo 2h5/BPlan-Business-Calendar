@@ -1,7 +1,7 @@
 # BPlan Legal / Business Decision Sheet
 
 Status: **provisional implementation input — not legal sign-off**
-Last reviewed: **2026-09-08**
+Last reviewed: **2026-09-09**
 
 Production paid checkout must remain disabled until the seller identity is
 chosen and the final Terms and Privacy Policy are approved and published.
@@ -31,9 +31,12 @@ valid open slots, and the configured AI provider may rank and explain those
 slots. The server checks the persisted `pro` entitlement before allowing the
 feature.
 
-The complete client purchase/paywall experience and live RevenueCat sandbox
-flow are still being wired. This sheet does not describe additional Pro
-features that are not present in the repository.
+The repository currently contains a Settings billing seam and server-side AI
+Find Time endpoints, but not a standalone purchase page or user-facing Find
+Time proposal/confirmation experience. The live RevenueCat sandbox purchase
+flow is not yet complete. This sheet does not describe additional Pro features
+that are not present in the repository; the broader AI feature ideas remain
+undecided future scope.
 
 ## Billing, cancellation, and refunds
 

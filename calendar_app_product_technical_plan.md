@@ -20,12 +20,14 @@
   [`docs/sprint-5-active.md`](docs/sprint-5-active.md).
 - Sprint 6 AI Phases 1–4 are implemented and hardened: deterministic candidate
   preparation, provider abstraction, proposal persistence/ranking, and safe
-  confirmation/revalidation. Live model evaluation and Phase 5 RevenueCat
-  remain pending. See [`docs/sprint-6-active.md`](docs/sprint-6-active.md).
-- The web client has completed Web Phases 0–5 plus the latest hardening
-  follow-up. Web Phase 6 Provider Integrations is the next planned web phase;
-  it can proceed independently of the pending Sprint 6 AI work. See
-  [`docs/web-active.md`](docs/web-active.md).
+  confirmation/revalidation. Phase 5 has a partial RevenueCat server/web
+  billing foundation, but live model evaluation, client AI UX, and real
+  purchase E2E remain pending. Sprint 6 is paused. See
+  [`docs/sprint-6-active.md`](docs/sprint-6-active.md).
+- The web client has completed Web Phases 0–6 plus hardening. Billing is a
+  sandbox/testing seam inside Settings rather than a standalone purchase page;
+  Web Phase 7 Find Time UX has not started. See [`docs/web-active.md`](docs/web-active.md)
+  and [`docs/revenuecat-stripe-setup.md`](docs/revenuecat-stripe-setup.md).
 - `pnpm verify` covers workspace formatting, lint, typechecks, tests, and build.
   CI additionally runs the Supabase migrations/RLS/pgTAP and generated-types
   job; those database checks are tracked separately from the workspace gate.
@@ -1393,9 +1395,10 @@ Allow users to turn on “Auto Schedule Flexible Tasks,” with clear safeguards
 - Search
 - Basic themes/preferences
 
-## Pro / AI subscription
+## Pro / AI subscription — potential future scope
 
-Potential features:
+The only currently scoped Pro capability is **AI Find Time**. The items below
+are product ideas, not current launch commitments.
 
 - AI Find Time
 - AI reschedule missed tasks
@@ -1838,7 +1841,7 @@ verified.
 
 ## Sprint 6 — AI Pro prototype
 
-Status: **PHASES 1–4 IMPLEMENTED/HARDENED — LIVE MODEL EVALUATION AND PHASE 5 REVENUECAT PENDING**
+Status: **PHASES 1–4 IMPLEMENTED/HARDENED — PHASE 5 PARTIAL; SPRINT 6 PAUSED**
 
 - Deterministic candidate preparation and server Find Time endpoint — implemented
 - Provider abstraction and narrow model-ranking contract — implemented; live
@@ -1846,25 +1849,30 @@ Status: **PHASES 1–4 IMPLEMENTED/HARDENED — LIVE MODEL EVALUATION AND PHASE 
 - Proposal persistence, candidate validation, and token/model metadata — implemented
 - Safe confirmation/revalidation and recurrence-aware conflict checks — implemented
 - Mobile Find Time UI — not started
-- RevenueCat entitlement runtime — Phase 5, not started
+- Web Find Time UI — not started
+- RevenueCat server/web billing foundation — partial; real purchase E2E pending
+- Mobile RevenueCat purchase/restore — not started
 
 ### Deliverable
 
-A paid user can ask the server to find time for an unscheduled task and receive
-a persisted, confirmable proposal. Live model evaluation, mobile Find Time UI,
-and RevenueCat remain outside the completed Phase 1–4 implementation.
+A paid user can eventually ask the server to find time for an unscheduled task
+and receive a persisted, confirmable proposal. The backend path exists, but no
+web or mobile client currently exposes it. Live model evaluation, client Find
+Time UI, and real RevenueCat purchase E2E remain pending.
 
 ---
 
 ## Web client — current implementation track
 
-Status: **PHASES 0–5 AND HARDENING COMPLETE — PHASE 6 PROVIDER INTEGRATIONS PLANNED**
+Status: **PHASES 0–6 AND HARDENING COMPLETE — BILLING/AI WORK PAUSED BEFORE WEB
+PHASE 7 FIND TIME UX**
 
 The browser client has its own Vite/React presentation layer and shares the
 Supabase, schema, generated-type, and `@cal/domain` contracts with mobile. Web
 Phases 0–5 cover the authenticated shell, Tasks, Calendar, Today, Search,
-Settings, and hardening. Provider OAuth/discovery/import/sync-health work is the
-next web phase; see [`docs/web-active.md`](docs/web-active.md).
+Settings, and hardening. Provider OAuth/discovery/import/sync-health work is
+complete. The next planned web surface is Find Time, but implementation is
+paused pending product/AI scope decisions; see [`docs/web-active.md`](docs/web-active.md).
 
 ---
 
@@ -2191,7 +2199,9 @@ The following sources were reviewed while preparing this plan.
 
 The core repository documents below exist and are maintained alongside the
 implementation. Current work has two active handoffs: `docs/sprint-6-active.md`
-for mobile/AI and `docs/web-active.md` for the browser client.
+for mobile/AI and `docs/web-active.md` for the browser client. Billing and
+legal launch decisions are tracked separately in
+`docs/revenuecat-stripe-setup.md` and `docs/legal-business-decisions.md`.
 `docs/sprint-5-active.md` is retained as historical Microsoft implementation and
 external-verification evidence.
 
@@ -2205,7 +2215,11 @@ external-verification evidence.
 They are reference documents, not a replacement for the active handoffs or the
 code when the two disagree. The active handoffs are:
 
-- `docs/sprint-6-active.md` — Sprint 6 mobile/AI phases and pending live model
-  evaluation/RevenueCat work.
-- `docs/web-active.md` — web phases 0–5/hardening and the planned Web Phase 6
-  provider integrations.
+- `docs/sprint-6-active.md` — Sprint 6 mobile/AI phases, pause boundary, and
+  pending live model evaluation/client UX work.
+- `docs/web-active.md` — web phases 0–6/hardening and the paused Web Phase 7
+  Find Time work.
+- `docs/revenuecat-stripe-setup.md` — sandbox billing setup, acceptance tests,
+  production gate, and pause checkpoint.
+- `docs/legal-business-decisions.md` — provisional seller, legal, and Pro-scope
+  decisions.

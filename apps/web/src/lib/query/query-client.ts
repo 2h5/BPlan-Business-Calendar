@@ -59,7 +59,7 @@ export const queryKeys = {
     tags: () => ['tasks', 'tags'] as const,
   },
   search: (query: string) => ['search', query] as const,
-  subscription: () => ['subscription'] as const,
+  subscription: (userId: string | null) => ['subscription', userId] as const,
   integrations: {
     all: () => ['integrations'] as const,
     accounts: () => ['integrations', 'accounts'] as const,

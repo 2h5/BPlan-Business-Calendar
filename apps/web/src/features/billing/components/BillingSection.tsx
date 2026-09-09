@@ -58,7 +58,12 @@ export function BillingSection() {
           </p>
         ) : null}
 
-        <BillingActions availability={availability} checkoutUrl={checkoutUrl} />
+        <BillingActions
+          availability={availability}
+          checkoutUrl={checkoutUrl}
+          isRefreshing={subscription.isFetching}
+          onRefresh={() => void subscription.refetch()}
+        />
       </div>
     </section>
   );
@@ -67,9 +72,13 @@ export function BillingSection() {
 function BillingActions({
   availability,
   checkoutUrl,
+  isRefreshing,
+  onRefresh,
 }: {
   availability: CheckoutAvailability;
   checkoutUrl: string | null;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 }) {
   return (
     <div className={styles.billingActions}>
@@ -95,8 +104,19 @@ function BillingActions({
           Manage billing
         </a>
       ) : null}
+      <button
+        type="button"
+        className={styles.secondary}
+        onClick={onRefresh}
+        disabled={isRefreshing}
+      >
+        {isRefreshing ? 'Refreshing…' : 'Refresh access status'}
+      </button>
       <p className={availabilityMessageClass(availability)} role="status">
         {availabilityMessage(availability)}
+        {checkoutUrl
+          ? ' After checkout, refresh access status here while the webhook finishes processing.'
+          : null}
       </p>
     </div>
   );

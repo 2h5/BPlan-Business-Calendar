@@ -1,3 +1,4 @@
+import { uuidSchema } from '@cal/schemas';
 import { subscriptionSchema, type Subscription } from '@cal/schemas/subscription';
 import { z } from 'zod';
 
@@ -10,10 +11,12 @@ const subscriptionRowSchema = z.object({
   expires_at: z.string().nullable(),
 });
 
-export async function fetchSubscription(): Promise<Subscription | null> {
+export async function fetchSubscription(userId: string): Promise<Subscription | null> {
+  const parsedUserId = uuidSchema.parse(userId);
   const { data, error } = await supabase
     .from('subscriptions')
     .select('entitlement, status, expires_at')
+    .eq('user_id', parsedUserId)
     .eq('entitlement', 'pro')
     .maybeSingle();
 

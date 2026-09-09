@@ -686,7 +686,8 @@
   justify-content: flex-start;
 }
 
-.billingActions a {
+.billingActions a,
+.billingActions button {
   display: inline-flex;
   align-items: center;
   min-height: var(--control-height);

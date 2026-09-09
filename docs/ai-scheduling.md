@@ -4,8 +4,20 @@ Status: **engine, deterministic server Find Time path, provider foundation,
 Phase 3 proposal implementation, and Phase 4 confirmation path are built; full
 verification is tracked in** [`sprint-6-active.md`](sprint-6-active.md). The
 engine is `packages/domain/src/scheduling/availability.ts`. Live model
-evaluation, the mobile Find Time UI, and Sprint 6 Phase 5 RevenueCat remain
-pending.
+evaluation, production model selection, web/mobile Find Time UX, and the real
+RevenueCat purchase E2E remain pending.
+
+## Pause checkpoint — 2026-09-09
+
+The repository contains the server-side AI scheduling implementation, not a
+finished end-user AI feature. `supabase/functions/ai-find-time/` generates and
+persists proposals, and `supabase/functions/ai-confirm-time/` safely
+revalidates and creates the internal event. No web or mobile client currently
+invokes those endpoints or renders proposal selection/confirmation UI.
+
+The only currently scoped Pro capability is **Find Time with AI**. Other AI
+ideas in the product plan remain potential future features and are not part of
+the current launch promise.
 
 ## The division of labour
 
