@@ -13,7 +13,7 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ## Current status
 
-**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); live model evaluation and Phase 5 RevenueCat remain pending.** Sprints 0 through 4 are
+**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat webhook is implemented and the Stripe sandbox catalog is configured, with hosted checkout, live webhook deployment, and app integration remaining.** Sprints 0 through 4 are
 complete/implemented. Sprint 5's Microsoft
 implementation is complete in code with external lifecycle/device verification
 still tracked separately. The web client has completed Phases 0–5 plus its
@@ -48,7 +48,7 @@ Sprint 5 tracker retains Microsoft external-verification evidence.
 | Settings planning preferences                                                 | Done — Sprint 3                                                        |
 | Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain |
 | Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                     |
-| AI Find Time, RevenueCat                                                      | Phases 1–4 done; live model eval and Phase 5 RevenueCat pending        |
+| AI Find Time, RevenueCat                                                      | AI Phases 1–4 done; RevenueCat webhook and sandbox catalog done; hosted checkout and app integration next |
 | Web client                                                                    | Phases 0–5 + hardening done; Phase 6 provider integrations next        |
 
 ---
@@ -161,6 +161,7 @@ Active tracks:
 - Mobile Sprint 6 decisions and handoff: [`docs/sprint-6-active.md`](docs/sprint-6-active.md).
 - Web application architecture and roadmap: [`docs/web-active.md`](docs/web-active.md).
 - Historical Sprint 5 verification evidence: [`docs/sprint-5-active.md`](docs/sprint-5-active.md).
+- RevenueCat + Stripe web billing runbook: [`docs/revenuecat-stripe-setup.md`](docs/revenuecat-stripe-setup.md).
 
 ## Layout
 
