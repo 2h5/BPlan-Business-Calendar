@@ -39,7 +39,7 @@ CURRENT STATE
 └─ Development paused at a stable checkpoint.
 ```
 
-HEAD `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054).
+The implementation checkpoint `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054); this documentation checkpoint is maintained on `main`.
 
 ## Current status
 

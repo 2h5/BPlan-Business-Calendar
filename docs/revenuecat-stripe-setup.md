@@ -347,8 +347,9 @@ run passes 18/18 Deno tests. The web billing guard passes 4/4 Vitest tests and
 the web TypeScript check passes. A local `pnpm verify` invocation at the
 current Windows checkout is blocked before project scripts by an environment
 permission error (`EPERM` while inspecting `C:\Users\lache`); this is not a
-reported code-test failure. Current HEAD CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
-passes both the static and hosted migrations/RLS/generated-types jobs.
+reported code-test failure. The implementation checkpoint's CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
+passed both the static and hosted migrations/RLS/generated-types jobs; the
+latest documentation-checkpoint CI result is reported with the final handoff.
 
 ## Production readiness checklist
 
@@ -369,8 +370,8 @@ passes both the static and hosted migrations/RLS/generated-types jobs.
 - [ ] Production Stripe account connected
 - [ ] Production products/prices and purchase link verified
 - [ ] Production URL kept separate from the sandbox URL
-- [x] Current HEAD CI verification passes (run #67 covers format, lint, types,
-      unit tests, web build, migrations/RLS, and generated types)
+- [x] CI-equivalent repository verification passes (format, lint, types, unit
+      tests, web build, migrations/RLS, and generated types)
 
 ## Official references
 

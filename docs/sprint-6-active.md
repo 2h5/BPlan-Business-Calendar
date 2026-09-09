@@ -2363,10 +2363,10 @@ Current Sprint 6 verification evidence:
 - GitHub CI run [33839322098](https://github.com/Andrewy530/BCalAI/actions/runs/33839322098)
   passed both the static and hosted migrations/RLS/generated-types jobs.
 
-Current repository checkpoint:
+Current implementation checkpoint:
 
-`main` at `673eb12` includes the committed web billing seam and hosted ACL
-migrations. Current HEAD GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
+`673eb12` includes the committed web billing seam and hosted ACL migrations.
+GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
 passed both the static and hosted migrations/RLS/generated-types jobs. The
-local `pnpm verify` command remains environment-dependent; this CI result is
-the current repository-level verification evidence.
+local `pnpm verify` command remains environment-dependent; the latest CI result
+for the documentation checkpoint is reported with the final handoff.

@@ -5,7 +5,7 @@ PURCHASE PAGE AND FIND TIME UX
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
-Current repository checkpoint: `main` at `673eb12`. GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054) passed both the static and hosted migrations/RLS/generated-types jobs.
+Implementation checkpoint used for this tracker: `673eb12`. GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054) passed both the static and hosted migrations/RLS/generated-types jobs; this documentation checkpoint is maintained on `main`.
 
 ---
 
