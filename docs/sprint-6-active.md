@@ -2,8 +2,8 @@
 
 Status: PHASES 1–4 IMPLEMENTED, HARDENED, VERIFIED, AND PUSHED; PHASE 5
 SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
-(PROPOSE PATH) IMPLEMENTED — STILL PAUSED BEFORE LIVE MODEL EVALUATION AND
-SANDBOX PURCHASE E2E (2026-09-09)
+IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
+EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
 
 ### Web Find Time box — 2026-09-09
 
@@ -18,23 +18,23 @@ Implemented:
   `task_id` nullable, adds `ad_hoc_title` / `ad_hoc_duration_minutes` with a
   check constraint enforcing exactly one mode, and replaces
   `claim_ai_schedule_request` with a five-argument signature.
-- `apps/web/src/features/scheduling/` — API, `useFindTime`, `FindTimeBox`.
+- `apps/web/src/features/scheduling/` — API, `useFindTime`, `useConfirmSlot`,
+  `FindTimeBox`.
+- Ad-hoc confirmation: migration `20260909200000_ai_ad_hoc_confirmation.sql`
+  makes the task steps of `confirm_ai_schedule_suggestion` conditional on
+  `task_id` while leaving every other guard shared and unchanged. Covered by
+  `supabase/tests/confirmation_ad_hoc.test.sql` (14 assertions) and four new
+  Deno tests.
 
 Deliberately NOT done, in priority order for whoever picks this up:
 
-1. **Ad-hoc confirmation.** `ai-confirm-time` and the hardened
-   `confirm_ai_schedule_suggestion` plpgsql still assume a task: they link the
-   created event to `task_id` and compare `task_version`, which is null for an
-   ad-hoc row. The box therefore renders its three slots as presentational
-   rows and offers no click. Wiring this means branching the confirm RPC to
-   create an event from `ad_hoc_title` with no task linkage, while keeping the
-   per-user event-write lock and recurrence expansion intact.
-2. **Pro gating in the UI.** `ai-find-time` returns 403
+1. **Pro gating in the UI.** `ai-find-time` returns 403
    `SUBSCRIPTION_REQUIRED`; the box currently surfaces that only as an error
    message after submitting. Decide hide-vs-upsell for free users.
-3. **No AI provider is configured**, so the propose path cannot be exercised
-   end to end. Nothing here has been run against a live model.
-4. Mobile Find Time UX is untouched.
+2. **No AI provider is configured**, so the propose path cannot be exercised
+   end to end. Nothing here has been run against a live model, and the box has
+   not been seen rendered in a browser.
+3. Mobile Find Time UX is untouched.
 
 This file is the source of truth for Sprint 6 implementation and handoff.
 

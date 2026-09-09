@@ -21,7 +21,8 @@ const suggestionRowSchema = z.object({
 const requestRowSchema = z.object({
   id: uuidSchema,
   user_id: uuidSchema,
-  task_id: uuidSchema,
+  task_id: uuidSchema.nullable(),
+  ad_hoc_title: z.string().nullable(),
   status: requestStatusSchema,
   constraints: z.unknown(),
   target_calendar_id: uuidSchema.nullable(),
@@ -79,7 +80,9 @@ const EVENT_COLUMNS =
 export interface PersistedAiConfirmation {
   suggestionId: string;
   requestId: string;
-  taskId: string;
+  /** Null for an ad-hoc block described in the Find Time box. */
+  taskId: string | null;
+  adHocTitle: string | null;
   requestStatus: z.infer<typeof requestStatusSchema>;
   constraints: unknown;
   targetCalendarId: string | null;
@@ -133,7 +136,8 @@ export interface ConfirmedTask {
 
 export interface ConfirmedSchedule {
   event: ConfirmedEvent;
-  task: ConfirmedTask;
+  /** Null when the confirmed block was ad-hoc and linked to no task. */
+  task: ConfirmedTask | null;
 }
 
 export interface AiConfirmationRepository {
@@ -142,7 +146,7 @@ export interface AiConfirmationRepository {
   loadCanonicalSchedule(
     userId: string,
     eventId: string,
-    taskId: string,
+    taskId: string | null,
   ): Promise<ConfirmedSchedule | null>;
 }
 
@@ -161,7 +165,7 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
       const { data: requestData, error: requestError } = await admin
         .from('ai_schedule_requests')
         .select(
-          'id, task_id, status, constraints, target_calendar_id, task_version, ' +
+          'id, task_id, ad_hoc_title, status, constraints, target_calendar_id, task_version, ' +
             'profile_version, target_calendar_version, accepted_event_id, user_id',
         )
         .eq('id', suggestion.request_id)
@@ -176,6 +180,7 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
         suggestionId: suggestion.id,
         requestId: request.id,
         taskId: request.task_id,
+        adHocTitle: request.ad_hoc_title,
         requestStatus: request.status,
         constraints: request.constraints,
         targetCalendarId: request.target_calendar_id,
@@ -218,17 +223,22 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
       if (eventError) throw persistenceError('load_event', eventError.code);
       if (!eventData) return null;
 
-      const { data: taskData, error: taskError } = await admin
-        .from('tasks')
-        .select('id, user_id, title, status, scheduled_event_id, updated_at')
-        .eq('id', taskId)
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (taskError) throw persistenceError('load_task', taskError.code);
-      if (!taskData) return null;
+      // An ad-hoc block links to no task, so there is nothing to load.
+      let taskData: unknown = null;
+      if (taskId !== null) {
+        const { data, error: taskError } = await admin
+          .from('tasks')
+          .select('id, user_id, title, status, scheduled_event_id, updated_at')
+          .eq('id', taskId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (taskError) throw persistenceError('load_task', taskError.code);
+        if (!data) return null;
+        taskData = data;
+      }
 
       const event = eventRowSchema.parse(eventData);
-      const task = taskRowSchema.parse(taskData);
+      const task = taskData === null ? null : taskRowSchema.parse(taskData);
       return {
         event: {
           id: event.id,
@@ -254,14 +264,17 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
           createdAt: event.created_at,
           updatedAt: event.updated_at,
         },
-        task: {
-          id: task.id,
-          userId: task.user_id,
-          title: task.title,
-          status: task.status,
-          scheduledEventId: task.scheduled_event_id,
-          updatedAt: task.updated_at,
-        },
+        task:
+          task === null
+            ? null
+            : {
+                id: task.id,
+                userId: task.user_id,
+                title: task.title,
+                status: task.status,
+                scheduledEventId: task.scheduled_event_id,
+                updatedAt: task.updated_at,
+              },
       };
     },
   };

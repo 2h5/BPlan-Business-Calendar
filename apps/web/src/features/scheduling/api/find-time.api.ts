@@ -36,6 +36,19 @@ const proposalSchema = z.object({
 export type FindTimeSuggestion = z.infer<typeof suggestionSchema>;
 export type FindTimeProposal = z.infer<typeof proposalSchema>;
 
+const confirmationSchema = z.object({
+  status: z.literal('accepted'),
+  suggestionId: z.string().min(1),
+  event: z.object({
+    id: z.string().min(1),
+    title: z.string(),
+    startAt: z.string().min(1),
+    endAt: z.string().min(1),
+  }),
+});
+
+export type FindTimeConfirmation = z.infer<typeof confirmationSchema>;
+
 const errorEnvelopeSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
@@ -66,6 +79,17 @@ export async function findTimeForIntent(
       .sort((left, right) => left.rank - right.rank)
       .slice(0, MAX_SUGGESTIONS_SHOWN),
   };
+}
+
+/**
+ * Books one persisted suggestion. The server revalidates the exact slot
+ * against current state before it creates anything, so a slot that filled up
+ * while the user was deciding is rejected rather than double-booked.
+ */
+export async function confirmFindTimeSuggestion(
+  suggestionId: string,
+): Promise<FindTimeConfirmation> {
+  return confirmationSchema.parse(await invoke('ai-confirm-time', { suggestionId }));
 }
 
 /**

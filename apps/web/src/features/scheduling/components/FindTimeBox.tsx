@@ -3,6 +3,7 @@ import React, { useId, useState } from 'react';
 
 import styles from './FindTimeBox.module.css';
 import { DEFAULT_MEETING_MINUTES, type FindTimeSuggestion } from '../api/find-time.api';
+import { useConfirmSlot } from '../hooks/useConfirmSlot';
 import { useFindTime } from '../hooks/useFindTime';
 
 const PLACEHOLDER = 'Try “15-minute meeting with Andrew”';
@@ -15,25 +16,33 @@ const TIME_OF_DAY_LABELS: Record<string, string> = {
 
 export interface FindTimeBoxProps {
   timeZone: string;
-  /** Called with the chosen slot so the page can open it for confirmation. */
-  onSelectSlot?: (suggestion: FindTimeSuggestion) => void;
+  /** Notified after a slot is booked, e.g. so the page can navigate to it. */
+  onScheduled?: (suggestion: FindTimeSuggestion) => void;
 }
 
 /**
  * The free-text scheduling box on Today. The text is parsed deterministically
  * in `@cal/domain`; the server finds genuinely open slots and ranks them.
  */
-export function FindTimeBox({ timeZone, onSelectSlot }: FindTimeBoxProps) {
+export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const [text, setText] = useState('');
   const findTime = useFindTime();
+  const confirmSlot = useConfirmSlot();
   const inputId = useId();
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    confirmSlot.reset();
     findTime.submit(text, timeZone);
   };
 
+  const handleSelect = (suggestion: FindTimeSuggestion) => {
+    confirmSlot.confirm(suggestion.id);
+    onScheduled?.(suggestion);
+  };
+
   const canSubmit = text.trim().length > 0 && !findTime.isPending;
+  const { confirmation } = confirmSlot;
 
   return (
     <section className={styles.container} aria-label="Find a time">
@@ -52,6 +61,7 @@ export function FindTimeBox({ timeZone, onSelectSlot }: FindTimeBoxProps) {
             onChange={(event) => {
               setText(event.target.value);
               if (findTime.proposal || findTime.errorMessage) findTime.reset();
+              if (confirmSlot.confirmation || confirmSlot.errorMessage) confirmSlot.reset();
             }}
           />
         </div>
@@ -60,13 +70,13 @@ export function FindTimeBox({ timeZone, onSelectSlot }: FindTimeBoxProps) {
         </button>
       </form>
 
-      {!findTime.proposal && !findTime.errorMessage && (
+      {!findTime.proposal && !findTime.errorMessage && !confirmation && (
         <p className={styles.hint}>
           Describe a meeting and BCal will suggest the three best open slots in your schedule.
         </p>
       )}
 
-      {findTime.intent && findTime.proposal && (
+      {findTime.intent && findTime.proposal && !confirmation && (
         <div className={styles.readback}>
           <span className={`${styles.chip} ${styles.chipTitle}`}>{findTime.intent.title}</span>
           <span className={styles.chip}>
@@ -86,7 +96,14 @@ export function FindTimeBox({ timeZone, onSelectSlot }: FindTimeBoxProps) {
         </div>
       )}
 
-      {findTime.proposal && (
+      {confirmation && (
+        <p className={styles.confirmed} role="status">
+          Scheduled <strong>{confirmation.event.title}</strong> for{' '}
+          {formatSlot(confirmation.event.startAt, confirmation.event.endAt, timeZone)}.
+        </p>
+      )}
+
+      {findTime.proposal && !confirmation && (
         <div className={styles.results}>
           <p className={styles.resultsHeading}>Best times</p>
           {findTime.proposal.suggestions.map((suggestion) => {
@@ -104,28 +121,27 @@ export function FindTimeBox({ timeZone, onSelectSlot }: FindTimeBoxProps) {
               </>
             );
 
-            // Without a handler the slot is presentational: never offer a dead click.
-            return onSelectSlot ? (
+            const isBooking = confirmSlot.confirmingSuggestionId === suggestion.id;
+
+            return (
               <button
                 key={suggestion.id}
                 type="button"
                 className={styles.slot}
-                onClick={() => onSelectSlot(suggestion)}
+                disabled={confirmSlot.confirmingSuggestionId !== null}
+                onClick={() => handleSelect(suggestion)}
               >
                 {body}
+                <span className={styles.slotAction}>{isBooking ? 'Booking…' : 'Schedule'}</span>
               </button>
-            ) : (
-              <div key={suggestion.id} className={styles.slotStatic}>
-                {body}
-              </div>
             );
           })}
         </div>
       )}
 
-      {findTime.errorMessage && (
+      {(findTime.errorMessage ?? confirmSlot.errorMessage) && (
         <p className={styles.error} role="alert">
-          {findTime.errorMessage}
+          {findTime.errorMessage ?? confirmSlot.errorMessage}
         </p>
       )}
     </section>

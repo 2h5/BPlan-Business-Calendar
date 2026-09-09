@@ -58,7 +58,7 @@ export async function confirmAiScheduleSuggestion(
 
   const constraints = parsePersistedConstraints(persisted);
   const current = await revalidateCurrentSlot(input.userId, persisted, constraints, deps);
-  if (!sameInstant(current.task.version, persisted.taskVersion)) throw staleProposal();
+  if (!sameTaskVersion(persisted, current.task.version)) throw staleProposal();
   if (!sameInstant(current.profileVersion, persisted.profileVersion)) throw staleProposal();
   if (
     current.targetCalendar.id !== persisted.targetCalendarId ||
@@ -97,7 +97,7 @@ async function revalidateCurrentSlot(
     return await prepareDeterministicFindTime(
       {
         userId,
-        request: requestFromPersistedConstraints(persisted.taskId, constraints),
+        request: requestFromPersistedConstraints(persisted, constraints),
         now: (deps.now ?? (() => new Date()))(),
       },
       deps.dataSource,
@@ -111,11 +111,18 @@ async function revalidateCurrentSlot(
 }
 
 function requestFromPersistedConstraints(
-  taskId: string,
+  persisted: PersistedAiConfirmation,
   constraints: ReturnType<typeof scheduleConstraintsSchema.parse>,
 ): AiScheduleRequest {
+  // An ad-hoc block is revalidated from its own persisted title and duration;
+  // there is no task row to re-read them from.
+  const target =
+    persisted.taskId === null
+      ? { title: requireAdHocTitle(persisted), durationMinutes: constraints.durationMinutes }
+      : { taskId: persisted.taskId };
+
   return {
-    taskId,
+    ...target,
     windowStart: constraints.windowStart,
     windowEnd: constraints.windowEnd,
     bufferMinutes: constraints.bufferMinutes,
@@ -159,6 +166,21 @@ async function finishAccepted(
     suggestionId: input.suggestionId,
     ...canonical,
   };
+}
+
+function requireAdHocTitle(persisted: PersistedAiConfirmation): string {
+  const title = persisted.adHocTitle?.trim();
+  if (!title) throw staleProposal();
+  return title;
+}
+
+/**
+ * A task-backed proposal must still match the task row it was built from. An
+ * ad-hoc proposal versions no task, so both sides must be absent instead.
+ */
+function sameTaskVersion(persisted: PersistedAiConfirmation, current: string | null): boolean {
+  if (persisted.taskId === null) return persisted.taskVersion === null && current === null;
+  return sameInstant(current, persisted.taskVersion);
 }
 
 function sameInstant(left: string | null, right: string | null): boolean {

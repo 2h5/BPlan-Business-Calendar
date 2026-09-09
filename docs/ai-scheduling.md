@@ -14,9 +14,8 @@ RevenueCat purchase E2E remain pending.
 internal event.
 
 The web Today page now has a free-text Find Time box
-(`apps/web/src/features/scheduling/`) that calls `ai-find-time` and renders the
-top three ranked slots. **Confirmation is not wired for ad-hoc blocks yet**, so
-the proposed slots are presentational: choosing one does not create an event.
+(`apps/web/src/features/scheduling/`) that calls `ai-find-time`, renders the
+top three ranked slots, and books the chosen one through `ai-confirm-time`.
 Mobile has no Find Time UI.
 
 No AI provider is configured. `ai-find-time` requires `OPENAI_API_KEY` and will
@@ -41,6 +40,16 @@ searches a 7-day horizon.
 
 Attendees are not modelled: "with Andrew" stays in the title, and no invite is
 sent to anyone.
+
+### Ad-hoc confirmation
+
+`confirm_ai_schedule_suggestion` makes its task steps conditional on
+`task_id`: an ad-hoc confirmation takes the event title from `ad_hoc_title`,
+links no task, and requires `task_version` to be absent. Everything else is
+shared with the task path and unchanged — the per-user advisory lock, the
+start-time guard, the profile and default-calendar version checks, the
+recurrence-aware conflict predicate, and the single-transaction commit. A
+repeated confirmation still returns the same event and creates no duplicate.
 
 The only currently scoped Pro capability is **Find Time with AI**. Other AI
 ideas in the product plan remain potential future features and are not part of

@@ -96,6 +96,7 @@ function persisted(overrides: Partial<PersistedAiConfirmation> = {}): PersistedA
     suggestionId: SUGGESTION_ID,
     requestId: '66666666-6666-6666-6666-666666666666',
     taskId: TASK_ID,
+    adHocTitle: null,
     requestStatus: 'proposed',
     constraints: CONSTRAINTS,
     targetCalendarId: CALENDAR_ID,
@@ -207,7 +208,7 @@ Deno.test('confirms a valid persisted suggestion and returns canonical state', a
   assertEquals(result.requestId, '66666666-6666-6666-6666-666666666666');
   assertEquals(result.suggestionId, SUGGESTION_ID);
   assertEquals(result.event.id, EVENT_ID);
-  assertEquals(result.task.scheduledEventId, EVENT_ID);
+  assertEquals(result.task?.scheduledEventId, EVENT_ID);
   assertEquals(confirmCalls, 1);
 });
 
@@ -534,3 +535,93 @@ Deno.test(
     assertEquals(result.event.id, EVENT_ID);
   },
 );
+
+// --- Ad-hoc confirmation (no backing task) ----------------------------------
+
+const adHocPersisted = () =>
+  persisted({ taskId: null, adHocTitle: 'Meeting with Andrew', taskVersion: null });
+
+const adHocCanonical = (): ConfirmedSchedule => ({ ...canonical(), task: null });
+
+const adHocRepository = (overrides: Partial<AiConfirmationRepository> = {}) =>
+  repository({
+    loadSuggestion: () => Promise.resolve(adHocPersisted()),
+    loadCanonicalSchedule: () => Promise.resolve(adHocCanonical()),
+    ...overrides,
+  });
+
+Deno.test('confirms an ad-hoc suggestion and revalidates it without a task', async () => {
+  let loadTaskCalls = 0;
+  let canonicalTaskId: string | null | undefined;
+
+  const result = await confirmAiScheduleSuggestion(
+    { userId: USER_ID, suggestionId: SUGGESTION_ID },
+    deps({
+      dataSource: source({
+        loadTask: () => {
+          loadTaskCalls += 1;
+          return Promise.resolve(task());
+        },
+      }),
+      repository: adHocRepository({
+        loadCanonicalSchedule: (_userId, _eventId, taskId) => {
+          canonicalTaskId = taskId;
+          return Promise.resolve(adHocCanonical());
+        },
+      }),
+    }),
+  );
+
+  assertEquals(result.status, 'accepted');
+  assertEquals(result.task, null);
+  assertEquals(result.event.id, EVENT_ID);
+  // Revalidation must not read a task row for a task-less proposal.
+  assertEquals(loadTaskCalls, 0);
+  assertEquals(canonicalTaskId, null);
+});
+
+Deno.test('rejects an ad-hoc proposal whose persisted row carries a task version', async () => {
+  await expectCode(
+    confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        repository: adHocRepository({
+          loadSuggestion: () =>
+            Promise.resolve(
+              persisted({ taskId: null, adHocTitle: 'X', taskVersion: TASK_VERSION }),
+            ),
+        }),
+      }),
+    ),
+    'AI_PROPOSAL_STALE',
+  );
+});
+
+Deno.test('rejects an ad-hoc proposal that lost its title', async () => {
+  await expectCode(
+    confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        repository: adHocRepository({
+          loadSuggestion: () =>
+            Promise.resolve(persisted({ taskId: null, adHocTitle: '  ', taskVersion: null })),
+        }),
+      }),
+    ),
+    'AI_PROPOSAL_STALE',
+  );
+});
+
+Deno.test('a task-backed proposal missing its task version is still stale', async () => {
+  await expectCode(
+    confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        repository: repository({
+          loadSuggestion: () => Promise.resolve(persisted({ taskVersion: null })),
+        }),
+      }),
+    ),
+    'AI_PROPOSAL_STALE',
+  );
+});

@@ -192,12 +192,30 @@
   }
 }
 
-/* Same shape as .slot, but presentational while booking is not yet wired. */
-.slotStatic {
-  composes: slot;
-  cursor: default;
+/* The booking affordance sits at the far end of the slot row. */
+.slotAction {
+  margin-left: auto;
+  padding-left: var(--space-3);
+  flex-shrink: 0;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
-.slotStatic:hover {
-  border-color: var(--color-border-subtle);
+.slot:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.confirmed {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-success-border, rgba(74, 222, 128, 0.3));
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.confirmed strong {
+  color: var(--color-text-primary);
 }
