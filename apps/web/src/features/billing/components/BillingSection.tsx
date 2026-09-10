@@ -1,4 +1,5 @@
 import type { Subscription } from '@cal/schemas/subscription';
+import { Link } from 'react-router-dom';
 
 import { env } from '../../../lib/env';
 import { useAuth } from '../../auth';
@@ -82,6 +83,9 @@ function BillingActions({
 }) {
   return (
     <div className={styles.billingActions}>
+      <Link to="/subscription" className={styles.secondary}>
+        View plan comparison
+      </Link>
       {checkoutUrl ? (
         <a
           className={styles.primary}

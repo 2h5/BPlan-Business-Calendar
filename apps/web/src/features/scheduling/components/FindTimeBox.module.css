@@ -2,13 +2,16 @@
   margin-bottom: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-bg-surface);
-  transition: border-color var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .container:focus-within {
-  border-color: rgba(138, 164, 255, 0.5);
+  border-color: var(--color-border);
 }
 
 .form {
@@ -22,48 +25,93 @@
   flex: 1;
   display: flex;
   align-items: center;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
 }
 
 .inputIcon {
   position: absolute;
   left: var(--space-3);
   display: flex;
-  color: var(--color-text-muted);
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+  opacity: 0.85;
   pointer-events: none;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.inputWrap:focus-within .inputIcon {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.inputIconScanning {
+  animation: pulseGlow 1.4s ease-in-out infinite;
 }
 
 .input {
   width: 100%;
-  height: var(--control-height-md, 44px);
-  padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 18px);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-base);
+  height: var(--control-height, 40px);
+  padding: 0 var(--space-3) 0 calc(var(--space-3) * 2 + 16px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .input::placeholder {
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
+  opacity: 0.65;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Input scanning effect while finding */
+.inputWrapScanning .input {
+  border-color: rgba(138, 164, 255, 0.4);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-input) 0%,
+    rgba(138, 164, 255, 0.04) 50%,
+    var(--color-bg-input) 100%
+  );
+  background-size: 200% 100%;
+  animation: scanGradient 2s ease-in-out infinite;
+}
+
+@keyframes scanGradient {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .submit {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--control-height-md, 44px);
+  height: var(--control-height, 40px);
   padding: 0 var(--space-4);
-  border: 1px solid rgba(138, 164, 255, 0.4);
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(138, 164, 255, 0.35);
+  border-radius: var(--radius-md);
   background: var(--color-accent);
   color: var(--color-on-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
   transition: all var(--transition-fast);
@@ -71,114 +119,864 @@
 
 .submit:hover:not(:disabled) {
   background: var(--color-accent-hover);
+  border-color: rgba(138, 164, 255, 0.55);
 }
 
 .submit:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+.submitFinding {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-accent);
+  border-color: rgba(138, 164, 255, 0.6);
+}
+
+.submitFinding::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  animation: buttonShimmer 1.5s infinite;
+}
+
+@keyframes buttonShimmer {
+  100% {
+    left: 100%;
+  }
 }
 
 .hint {
   margin-top: var(--space-2);
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+/* ==========================================================================
+   1. Animated Loading State While Finding Time
+   ========================================================================== */
+.loadingArea {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid rgba(138, 164, 255, 0.2);
+  border-radius: var(--radius-md);
+  background: rgba(138, 164, 255, 0.03);
+  animation: fadeInDown 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.loadingHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.loadingBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(138, 164, 255, 0.15);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.loadingText {
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
 }
 
-/* Parsed-intent readback: the user must be able to see what we understood. */
+.skeletonContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeletonCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeletonCard::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 150%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  animation: shimmerPulse 1.6s infinite ease-in-out;
+}
+
+.skeletonDelay1::after {
+  animation-delay: 200ms;
+}
+
+.skeletonDelay2::after {
+  animation-delay: 400ms;
+}
+
+@keyframes shimmerPulse {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.skeletonRank {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface);
+  flex-shrink: 0;
+}
+
+.skeletonBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeletonTime {
+  width: 180px;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--color-bg-surface);
+}
+
+.skeletonReason {
+  width: 260px;
+  height: 10px;
+  border-radius: 4px;
+  background: var(--color-bg-surface);
+  opacity: 0.7;
+}
+
+.skeletonAction {
+  width: 72px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+/* ==========================================================================
+   2. Parsed Intent Readback Chips
+   ========================================================================== */
 .readback {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
   margin-top: var(--space-3);
+  animation: fadeInDown 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .chip {
-  padding: 2px var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-base);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface-raised);
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .chipTitle {
-  color: var(--color-text-primary);
+  color: var(--color-accent);
+  background: rgba(138, 164, 255, 0.08);
+  border-color: rgba(138, 164, 255, 0.25);
   font-weight: var(--font-weight-semibold);
 }
 
+/* ==========================================================================
+   3. Available Times Slot Results
+   ========================================================================== */
 .results {
   margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  animation: fadeInDown 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.resultsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.resultsTitleGroup {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
 .resultsHeading {
-  color: var(--color-text-muted);
+  color: var(--color-text-primary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.slot {
-  display: flex;
-  gap: var(--space-3);
+.resultsBadge {
+  display: inline-flex;
   align-items: center;
-  width: 100%;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-base);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--transition-fast);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(97, 214, 162, 0.12);
+  color: var(--color-success);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
 }
 
-.slot:hover {
-  border-color: rgba(138, 164, 255, 0.5);
+.resultsSub {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
 }
 
-.rank {
+.slotList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.slotCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface-raised);
+  padding: var(--space-3) var(--space-4);
+  transition: all var(--transition-fast);
+  animation: slotAppear 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.slotCard:hover {
+  border-color: rgba(138, 164, 255, 0.45);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+/* Rank 1 Top Pick / Best match */
+.slotCardTopPick {
+  border-color: rgba(138, 164, 255, 0.35);
+  background: linear-gradient(
+    135deg,
+    rgba(138, 164, 255, 0.06) 0%,
+    var(--color-bg-surface-raised) 100%
+  );
+  box-shadow: 0 2px 8px rgba(138, 164, 255, 0.06);
+}
+
+.slotCardTopPick:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 18px rgba(138, 164, 255, 0.18);
+}
+
+.slotCardBooking {
+  border-color: var(--color-accent) !important;
+  background: rgba(138, 164, 255, 0.08) !important;
+}
+
+.slotCardDimmed {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.slotCardMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.slotLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rankBadge {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
   background: var(--color-bg-surface);
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
 }
 
-.slotBody {
+.rankBadgeTop {
+  border-color: rgba(138, 164, 255, 0.4);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: 0 2px 6px rgba(138, 164, 255, 0.3);
+}
+
+.slotDetails {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
+.slotTimeRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .slotTime {
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+.topPickTag {
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(138, 164, 255, 0.15);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
 }
 
 .slotReason {
-  color: var(--color-text-muted);
+  color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
 }
 
+/* Schedule Action Button */
+.scheduleButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.scheduleButton:hover:not(:disabled) {
+  border-color: rgba(138, 164, 255, 0.5);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  transform: translateX(1px);
+}
+
+.scheduleButtonPrimary {
+  border-color: rgba(138, 164, 255, 0.3);
+  background: rgba(138, 164, 255, 0.12);
+  color: var(--color-accent);
+}
+
+.scheduleButtonPrimary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.scheduleButtonLoading {
+  border-color: rgba(138, 164, 255, 0.4);
+  background: rgba(138, 164, 255, 0.1);
+  color: var(--color-accent);
+  cursor: progress;
+}
+
+.scheduleButton:disabled {
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   4. Scheduled Confirmation Card
+   ========================================================================== */
+.confirmationCard {
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid rgba(97, 214, 162, 0.35);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(97, 214, 162, 0.09) 0%, rgba(97, 214, 162, 0.02) 100%);
+  box-shadow: 0 4px 20px rgba(97, 214, 162, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  animation: confirmEntrance 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.confirmationHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.checkIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: rgba(97, 214, 162, 0.15);
+  border: 1px solid rgba(97, 214, 162, 0.3);
+  color: var(--color-success);
+  flex-shrink: 0;
+  animation: checkPop 450ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.confirmationMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.confirmationBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.confirmationBadge {
+  color: var(--color-success);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.confirmationLiveIndicator {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(97, 214, 162, 0.12);
+  color: var(--color-success);
+  font-size: 0.6875rem;
+}
+
+.confirmationTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+.confirmationTimeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  margin-top: 2px;
+}
+
+.confirmationActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(97, 214, 162, 0.15);
+}
+
+.actionResetButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.actionResetButton:hover {
+  background: var(--color-bg-surface-raised);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.actionCalendarButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid rgba(97, 214, 162, 0.3);
+  border-radius: var(--radius-md);
+  background: rgba(97, 214, 162, 0.12);
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.actionCalendarButton:hover {
+  background: var(--color-success);
+  color: #071021;
+  border-color: var(--color-success);
+  transform: translateX(1px);
+}
+
+/* ==========================================================================
+   5. Docked Recent Scheduled Banner (Persistent for 30s)
+   ========================================================================== */
+.recentBanner {
+  position: relative;
+  overflow: hidden;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(97, 214, 162, 0.3);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(97, 214, 162, 0.08) 0%, rgba(97, 214, 162, 0.02) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  animation: bannerSlideDown 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: all 300ms ease;
+}
+
+.recentBannerExiting {
+  animation: bannerExitAnim 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+
+.recentBannerMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.recentCheckIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: rgba(97, 214, 162, 0.15);
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.recentText {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.recentTag {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(97, 214, 162, 0.15);
+  color: var(--color-success);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.recentTitle {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.recentSeparator {
+  color: var(--color-text-tertiary);
+}
+
+.recentTime {
+  color: var(--color-text-secondary);
+}
+
+.recentActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.recentCalendarLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.recentCalendarLink:hover {
+  color: #7ef5bf;
+  transform: translateX(1px);
+}
+
+.recentDismissButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all var(--transition-fast);
+}
+
+.recentDismissButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+}
+
+/* 30-second depletion bar */
+.bannerTimerBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(97, 214, 162, 0.45);
+  width: var(--start-width, 100%);
+  animation: timerDeplete var(--deplete-duration, 30s) linear forwards;
+}
+
+@keyframes timerDeplete {
+  from {
+    width: var(--start-width, 100%);
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes bannerSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bannerExitAnim {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 80px;
+    margin-top: var(--space-3);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* Proposal Smooth Exit Animations on Cleared Input */
+.proposalExiting {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.readback.proposalExiting {
+  animation: readbackExitAnim 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+.results.proposalExiting {
+  animation: resultsExitAnim 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes readbackExitAnim {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 60px;
+    margin-top: var(--space-3);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@keyframes resultsExitAnim {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 420px;
+    margin-top: var(--space-4);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* ==========================================================================
+   6. General Utility & Animations
+   ========================================================================== */
 .error {
   margin-top: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--color-danger-border, rgba(248, 113, 113, 0.3));
   border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.05);
   color: var(--color-danger, #f87171);
   font-size: var(--font-size-xs);
+}
+
+.spinningSparkle {
+  animation: spinSlow 3s linear infinite;
+}
+
+.buttonSpinner {
+  animation: spin 1s linear infinite;
+  display: inline-flex;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slotAppear {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes confirmEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -190,32 +988,36 @@
   .submit {
     justify-content: center;
   }
+
+  .slotCardMain {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .scheduleButton {
+    justify-content: center;
+  }
 }
 
-/* The booking affordance sits at the far end of the slot row. */
-.slotAction {
-  margin-left: auto;
-  padding-left: var(--space-3);
-  flex-shrink: 0;
-  color: var(--color-accent);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-.slot:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-
-.confirmed {
-  margin-top: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--color-success-border, rgba(74, 222, 128, 0.3));
-  border-radius: var(--radius-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-}
-
-.confirmed strong {
-  color: var(--color-text-primary);
+@media (prefers-reduced-motion: reduce) {
+  .inputWrapScanning .input,
+  .submitFinding::after,
+  .skeletonCard::after,
+  .loadingArea,
+  .readback,
+  .readback.proposalExiting,
+  .results,
+  .results.proposalExiting,
+  .proposalExiting,
+  .slotCard,
+  .confirmationCard,
+  .recentBanner,
+  .recentBannerExiting,
+  .bannerTimerBar,
+  .checkIconWrap,
+  .spinningSparkle,
+  .buttonSpinner {
+    animation: none !important;
+    transition: none !important;
+  }
 }

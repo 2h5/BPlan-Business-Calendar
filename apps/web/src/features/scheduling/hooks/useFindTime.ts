@@ -60,13 +60,13 @@ export function useFindTime(): FindTimeState {
 function messageForError(error: unknown): string {
   switch (codeOf(error)) {
     case 'SUBSCRIPTION_REQUIRED':
-      return 'Find Time is a Pro feature. Upgrade to let BCal find open slots for you.';
+      return 'Find Time is a Pro feature. Upgrade to let BPlan find open slots for you.';
     case 'AI_NO_VALID_SLOT':
       return 'No open time fits that in the next week. Try a shorter block or a wider window.';
     case 'AI_RATE_LIMITED':
       return "You've used all 10 Find Time attempts this hour. Try again shortly.";
     case 'AI_DEFAULT_CALENDAR_MISSING':
-      return 'Restore a writable default BCal calendar before finding time.';
+      return 'Restore a writable default BPlan calendar before finding time.';
     case 'AI_SCHEDULING_WINDOW_INVALID':
       return 'Check the timezone and working hours in your planning preferences.';
     case 'VALIDATION_FAILED':

@@ -49,4 +49,25 @@ describe('billing checkout guard', () => {
   it('uses only a valid authenticated UUID as the RevenueCat app user id', () => {
     expect(revenueCatCheckoutUrl({ ...baseConfig, mode: 'sandbox' }, 'not-an-email')).toBeNull();
   });
+
+  it('marks disabled mode as disabled regardless of other flags', () => {
+    expect(
+      checkoutAvailability({
+        ...baseConfig,
+        mode: 'disabled',
+        sellerIdentityConfirmed: true,
+        legalDocsFinal: true,
+      }),
+    ).toBe('disabled');
+  });
+
+  it('marks unconfigured when purchaseUrl is missing', () => {
+    expect(
+      checkoutAvailability({
+        ...baseConfig,
+        mode: 'sandbox',
+        purchaseUrl: undefined,
+      }),
+    ).toBe('unconfigured');
+  });
 });

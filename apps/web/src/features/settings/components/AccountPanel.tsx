@@ -25,7 +25,7 @@ export function AccountPanel({ fullName }: { fullName: string | null }) {
       </button>
       <hr />
       <h3>Account data</h3>
-      <p>Deleting your account removes BCal data and revokes connected calendars.</p>
+      <p>Deleting your account removes BPlan data and revokes connected calendars.</p>
       <button
         type="button"
         className={styles.delete}
@@ -33,7 +33,7 @@ export function AccountPanel({ fullName }: { fullName: string | null }) {
         onClick={async () => {
           if (
             !confirm(
-              'Permanently delete your BCal account and all of its data? This cannot be undone.',
+              'Permanently delete your BPlan account and all of its data? This cannot be undone.',
             )
           )
             return;

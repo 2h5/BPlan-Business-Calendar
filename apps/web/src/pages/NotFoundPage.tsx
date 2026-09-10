@@ -5,7 +5,7 @@ import styles from './pages.module.css';
 
 export function NotFoundPage() {
   useEffect(() => {
-    document.title = 'BCal | Page Not Found';
+    document.title = 'BPlan | Page Not Found';
   }, []);
 
   return (
@@ -15,7 +15,7 @@ export function NotFoundPage() {
         <h2 className={styles.cardTitle}>Page Not Found</h2>
       </div>
       <p className={styles.cardDescription}>
-        The requested page does not exist in the BCal web client.
+        The requested page does not exist in the BPlan web client.
       </p>
       <div className={styles.cardDetails}>
         <Link

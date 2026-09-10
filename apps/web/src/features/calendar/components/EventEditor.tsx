@@ -206,7 +206,7 @@ export function EventEditor({
                 ? 'View only'
                 : providerOwned
                   ? `Changes are saved to ${event.sourceType} first`
-                  : 'BCal calendar event'}
+                  : 'BPlan calendar event'}
             </span>
           </div>
           <button

@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './AppShell.module.css';
@@ -107,6 +108,25 @@ function SettingsIcon() {
   );
 }
 
+function SubscriptionIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      fillOpacity="0.2"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5L12 2z" />
+    </svg>
+  );
+}
+
 function SignOutIcon() {
   return (
     <svg
@@ -134,10 +154,79 @@ const PRIMARY_NAV: NavItemConfig[] = [
   { to: '/search', label: 'Search', icon: SearchIcon },
 ];
 
+const WORKSPACE_PATHS = ['/today', '/calendar', '/tasks', '/search'];
+
+function isWorkspacePath(pathname: string): boolean {
+  return WORKSPACE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 export function AppShell() {
   const { email } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const prevPathRef = useRef<string>(location.pathname);
+  const isInitialMount = useRef(true);
+  const [metrics, setMetrics] = useState<{ top: number; height: number } | null>(null);
+  const [mode, setMode] = useState<'sliding' | 'entering' | 'exiting' | 'hidden'>('hidden');
+
+  useLayoutEffect(() => {
+    const prevPath = prevPathRef.current;
+    const currentPath = location.pathname;
+    prevPathRef.current = currentPath;
+
+    const wasWorkspace = isWorkspacePath(prevPath);
+    const isWorkspace = isWorkspacePath(currentPath);
+
+    if (isWorkspace) {
+      const activeIndex = PRIMARY_NAV.findIndex(
+        (item) => item.to === currentPath || currentPath.startsWith(`${item.to}/`),
+      );
+      const el = itemRefs.current[activeIndex];
+      if (el) {
+        setMetrics({
+          top: el.offsetTop,
+          height: el.offsetHeight,
+        });
+      }
+
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        setMode('sliding');
+      } else if (wasWorkspace) {
+        setMode('sliding');
+      } else {
+        setMode('entering');
+      }
+    } else {
+      isInitialMount.current = false;
+      if (wasWorkspace) {
+        setMode('exiting');
+      } else {
+        setMode('hidden');
+      }
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    function handleResize() {
+      if (!isWorkspacePath(location.pathname)) return;
+      const activeIndex = PRIMARY_NAV.findIndex(
+        (item) => item.to === location.pathname || location.pathname.startsWith(`${item.to}/`),
+      );
+      const el = itemRefs.current[activeIndex];
+      if (el) {
+        setMetrics({
+          top: el.offsetTop,
+          height: el.offsetHeight,
+        });
+      }
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [location.pathname]);
 
   async function handleSignOut() {
     try {
@@ -158,7 +247,7 @@ export function AppShell() {
             B
           </div>
           <div className={styles.brandCopy}>
-            <span className={styles.brandName}>BCal</span>
+            <span className={styles.brandName}>BPlan</span>
             <span className={styles.brandTag}>Plan with clarity</span>
           </div>
         </div>
@@ -166,25 +255,77 @@ export function AppShell() {
         <nav className={styles.nav} aria-label="Main navigation">
           <div className={styles.navGroup}>
             <span className={styles.navGroupLabel}>Workspace</span>
-            {PRIMARY_NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-                }
-              >
-                <span className={styles.navIcon}>
-                  <item.icon />
-                </span>
-                <span className={styles.navLabel}>{item.label}</span>
-              </NavLink>
-            ))}
+            <div className={styles.workspaceList}>
+              {metrics && mode !== 'hidden' && (
+                <div
+                  className={`${styles.workspaceHighlight} ${
+                    mode === 'sliding'
+                      ? styles.modeSliding
+                      : mode === 'entering'
+                        ? styles.modeEntering
+                        : mode === 'exiting'
+                          ? styles.modeExiting
+                          : ''
+                  }`}
+                  style={
+                    {
+                      '--target-top': `${metrics.top}px`,
+                      transform: `translateY(${metrics.top}px)`,
+                      height: `${metrics.height}px`,
+                    } as React.CSSProperties
+                  }
+                  onAnimationEnd={() => {
+                    if (mode === 'entering') {
+                      setMode('sliding');
+                    }
+                  }}
+                  onTransitionEnd={() => {
+                    if (mode === 'exiting') {
+                      setMode('hidden');
+                    }
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {PRIMARY_NAV.map((item, index) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  ref={(el) => {
+                    itemRefs.current[index] = el;
+                  }}
+                  className={({ isActive }) =>
+                    `${styles.navItem} ${styles.workspaceNavItem} ${
+                      isActive ? styles.workspaceNavItemActive : ''
+                    }`
+                  }
+                >
+                  <span className={styles.navIcon}>
+                    <item.icon />
+                  </span>
+                  <span className={styles.navLabel}>{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
           </div>
 
           <div className={styles.navSpacer} />
 
           <div className={styles.navGroup}>
+            <NavLink
+              to="/subscription"
+              className={({ isActive }) =>
+                `${styles.navItem} ${styles.navItemHighlight} ${
+                  isActive ? styles.navItemActive : ''
+                }`
+              }
+            >
+              <span className={`${styles.navIcon} ${styles.navIconHighlight}`}>
+                <SubscriptionIcon />
+              </span>
+              <span className={styles.navLabel}>Plan &amp; Pro</span>
+              <span className={styles.navBadge}>PRO</span>
+            </NavLink>
             <NavLink
               to="/settings"
               className={({ isActive }) =>
@@ -215,7 +356,7 @@ export function AppShell() {
             type="button"
             className={styles.signOutButton}
             onClick={handleSignOut}
-            aria-label="Sign out of BCal"
+            aria-label="Sign out of BPlan"
           >
             <SignOutIcon />
             <span className={styles.signOutText}>Sign out</span>

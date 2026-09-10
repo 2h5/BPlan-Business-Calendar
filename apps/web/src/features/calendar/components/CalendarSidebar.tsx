@@ -68,7 +68,7 @@ export function CalendarSidebar({
                     <span className={styles.calendarName}>{calendar.name}</span>
                     <span className={styles.calendarMeta}>
                       {calendar.isDefault ? 'Default · ' : ''}
-                      {calendar.sourceType === 'internal' ? 'BCal' : calendar.sourceType}
+                      {calendar.sourceType === 'internal' ? 'BPlan' : calendar.sourceType}
                       {calendar.isReadOnly ? ' · Read only' : ''}
                     </span>
                   </span>

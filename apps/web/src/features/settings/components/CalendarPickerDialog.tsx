@@ -100,7 +100,7 @@ export function CalendarPickerDialog({
       <header className={styles.header}>
         <div>
           <h2 id="calendar-picker-title">Calendars to sync</h2>
-          <p>Choose which calendars from {providerName} BCal should import.</p>
+          <p>Choose which calendars from {providerName} BPlan should import.</p>
         </div>
         <button ref={closeRef} type="button" className={styles.close} onClick={onClose}>
           Close
@@ -144,7 +144,7 @@ export function CalendarPickerDialog({
               );
             })}
             {calendars.data.length === 0 ? (
-              <div className={styles.state}>This account has no calendars BCal can read.</div>
+              <div className={styles.state}>This account has no calendars BPlan can read.</div>
             ) : null}
           </div>
         ) : null}
@@ -152,7 +152,7 @@ export function CalendarPickerDialog({
 
       <footer className={styles.footer}>
         <p>
-          Turning a calendar off removes its events from BCal. Nothing is deleted from{' '}
+          Turning a calendar off removes its events from BPlan. Nothing is deleted from{' '}
           {providerName}.
         </p>
       </footer>

@@ -126,6 +126,129 @@
   color: var(--color-accent-hover);
 }
 
+/* Workspace Sliding Highlight */
+.workspaceList {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspaceHighlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-subtle);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.workspaceHighlight::before {
+  position: absolute;
+  left: -12px;
+  top: calc(50% - 10px);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
+  background: var(--color-accent);
+  content: '';
+}
+
+.modeSliding {
+  opacity: 1;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    height 260ms cubic-bezier(0.2, 0.9, 0.3, 1),
+    opacity 180ms ease-out;
+}
+
+.modeEntering {
+  animation: workspaceEnterAnim 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.modeExiting {
+  opacity: 0;
+  transform: translateY(var(--target-top)) scale(0.92) !important;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+  pointer-events: none;
+}
+
+@keyframes workspaceEnterAnim {
+  from {
+    opacity: 0;
+    transform: translateY(var(--target-top)) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(var(--target-top)) scale(1);
+  }
+}
+
+.workspaceNavItem {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.workspaceNavItem::before {
+  display: none !important;
+}
+
+.workspaceNavItemActive {
+  color: var(--color-accent);
+  background: transparent !important;
+}
+
+.workspaceNavItemActive:hover {
+  background: transparent !important;
+  color: var(--color-accent-hover);
+}
+
+.workspaceNavItem:not(.workspaceNavItemActive):hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.navItemHighlight:not(.navItemActive) {
+  background: rgba(138, 164, 255, 0.06);
+  border: 1px solid rgba(138, 164, 255, 0.16);
+  color: var(--color-text-primary);
+}
+
+.navItemHighlight:not(.navItemActive):hover {
+  background: rgba(138, 164, 255, 0.12);
+  border-color: rgba(138, 164, 255, 0.3);
+  color: var(--color-text-primary);
+}
+
+.navIconHighlight {
+  color: var(--color-accent);
+}
+
+.navBadge {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(138, 164, 255, 0.14);
+  color: var(--color-accent);
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.navItemActive .navBadge {
+  background: rgba(138, 164, 255, 0.22);
+}
+
 .navIcon {
   width: 20px;
   height: 20px;
@@ -228,6 +351,7 @@
   .brandCopy,
   .navGroupLabel,
   .navLabel,
+  .navBadge,
   .userMeta,
   .signOutText {
     display: none;
@@ -251,7 +375,8 @@
     padding: 0;
   }
 
-  .navItemActive::before {
+  .navItemActive::before,
+  .workspaceHighlight::before {
     left: -8px;
   }
 
@@ -273,5 +398,14 @@
   .brandLogo {
     width: 28px;
     height: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeSliding,
+  .modeEntering,
+  .modeExiting {
+    animation: none !important;
+    transition: none !important;
   }
 }
