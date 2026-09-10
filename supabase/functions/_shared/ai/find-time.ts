@@ -1,13 +1,17 @@
 import {
   generateCandidateSlots,
+  resolveEffectiveWorkingHours,
   schedulingEventsToBusyIntervals,
   type SchedulingCalendarEvent,
 } from '@cal/domain/scheduling';
 import { addZonedDays, startOfZonedDay } from '@cal/domain/time';
 import {
   scheduleConstraintsSchema,
+  workingHoursSchema,
   type AiScheduleRequest,
+  type DateIntent,
   type ScheduleConstraints,
+  type WorkingHours,
 } from '@cal/schemas/scheduling';
 
 import { EdgeError } from '../errors/index.ts';
@@ -98,6 +102,12 @@ export async function prepareDeterministicFindTime(
     allowNoValidSlot?: boolean;
     allowedDurationsMinutes?: number[];
     placementPreference?: 'early' | 'middle' | 'late' | 'any';
+    /**
+     * Present when the window came from interpreted text. It says whether the
+     * user actually named a day or hour outside their work week, which is what
+     * distinguishes a personal-time request from an unqualified one.
+     */
+    dateIntent?: DateIntent;
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -141,7 +151,17 @@ export async function prepareDeterministicFindTime(
     allowedDurationsMinutes: input.allowedDurationsMinutes,
     windowStart: window.start.toISOString(),
     windowEnd: window.end.toISOString(),
-    workingHours: profile.workingHours,
+    workingHours: input.dateIntent
+      ? resolveEffectiveWorkingHours({
+          workingHours: parseWorkingHours(profile.workingHours),
+          dateIntent: input.dateIntent,
+          windowStart: window.start,
+          windowEnd: window.end,
+          timeZone: profile.timezone,
+          earliestMinute: input.request.earliestMinute,
+          latestMinute: input.request.latestMinute,
+        })
+      : profile.workingHours,
     timezone: profile.timezone,
     bufferMinutes: input.request.bufferMinutes ?? 0,
     earliestMinute: input.request.earliestMinute,
@@ -315,6 +335,23 @@ function taskDeadlineFor(task: FindTimeTask, timezone: string): Date {
 
   const dueDayStart = startOfZonedDay(dueAt, timezone);
   return addZonedDays(dueDayStart, 1, timezone);
+}
+
+/**
+ * The profile's working hours arrive untyped and are normally validated as
+ * part of the whole constraints object. Resolving personal time needs them one
+ * step earlier, so they are validated here with the same failure.
+ */
+function parseWorkingHours(value: unknown): WorkingHours {
+  const parsed = workingHoursSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new EdgeError(
+      'AI_SCHEDULING_WINDOW_INVALID',
+      'Your planning preferences do not form a valid scheduling window.',
+      422,
+    );
+  }
+  return parsed.data;
 }
 
 function parseConstraints(input: unknown): ScheduleConstraints {

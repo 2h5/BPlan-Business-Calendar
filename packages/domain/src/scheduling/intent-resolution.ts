@@ -5,6 +5,7 @@ import {
   type SchedulingIntent,
   type TimeIntent,
   type TimeOfDayPreference,
+  type WorkingHours,
 } from '@cal/schemas/scheduling';
 
 import {
@@ -419,4 +420,107 @@ export function generateIntentReadback(intent: SchedulingIntent): {
     timeLabel: formatIntentTimeLabel(intent.time),
     location: intent.location,
   };
+}
+
+/**
+ * Personal time runs 08:00–22:00 local. Outside the work week the calendar is
+ * the user's own, but "any hour at all" would propose 3am; this band is the
+ * waking day, and an explicit time intent can still pin a slot inside it.
+ */
+export const PERSONAL_DAY_START_MINUTE = 8 * 60;
+export const PERSONAL_DAY_END_MINUTE = 22 * 60;
+
+export interface EffectiveWorkingHoursInput {
+  /** The user's configured work week. */
+  workingHours: WorkingHours;
+  dateIntent: DateIntent;
+  /** Resolved from `dateIntent`; determines which weekdays are in scope. */
+  windowStart: Date;
+  windowEnd: Date;
+  timeZone: string;
+  /** Explicit local-minute bounds the user named, if any. */
+  earliestMinute?: number;
+  latestMinute?: number;
+}
+
+/**
+ * Working hours bound the search by default, which is what makes an
+ * unqualified "find me 30 minutes" land inside the work week.
+ *
+ * But the work week is a default, not a fence: a user who explicitly asks for
+ * the weekend, or for a named day that they do not work, or for an hour
+ * outside their working band, is asking for personal time and means it. For
+ * those requests only, the affected days open up to the personal band.
+ *
+ * Requests that name no day ("unconstrained") or name the week as a whole
+ * ("next week") are deliberately left alone: neither one asks for the weekend,
+ * so neither one should quietly start proposing Saturdays.
+ */
+export function resolveEffectiveWorkingHours(input: EffectiveWorkingHoursInput): WorkingHours {
+  const { workingHours, dateIntent, windowStart, windowEnd, timeZone } = input;
+
+  if (dateIntent.type === 'unconstrained' || dateIntent.type === 'relative_week') {
+    return workingHours;
+  }
+
+  const weekdays = weekdaysInWindow(windowStart, windowEnd, timeZone);
+  const extra: WorkingHours = [];
+
+  for (const weekday of weekdays) {
+    const configured = workingHours.filter((w) => w.weekday === weekday);
+
+    // A day the user does not work at all, named explicitly: personal time.
+    if (configured.length === 0) {
+      extra.push({
+        weekday,
+        startMinute: PERSONAL_DAY_START_MINUTE,
+        endMinute: PERSONAL_DAY_END_MINUTE,
+      });
+      continue;
+    }
+
+    // A working day, but the hour they named falls outside the working band —
+    // "Friday at 8pm" is personal time on a day they happen to work.
+    if (namesHourOutside(configured, input.earliestMinute, input.latestMinute)) {
+      extra.push({
+        weekday,
+        startMinute: PERSONAL_DAY_START_MINUTE,
+        endMinute: PERSONAL_DAY_END_MINUTE,
+      });
+    }
+  }
+
+  // Overlapping bands are merged downstream by `expandWorkingHours`.
+  return extra.length === 0 ? workingHours : [...workingHours, ...extra];
+}
+
+/** Local weekdays the window touches, capped at a week's worth of days. */
+function weekdaysInWindow(windowStart: Date, windowEnd: Date, timeZone: string): number[] {
+  const weekdays = new Set<number>();
+  let cursor = startOfZonedDay(windowStart, timeZone);
+
+  for (let guard = 0; cursor.getTime() < windowEnd.getTime() && guard < 8; guard += 1) {
+    weekdays.add(getZonedParts(cursor, timeZone).weekday);
+    cursor = addZonedDays(cursor, 1, timeZone);
+  }
+
+  return [...weekdays];
+}
+
+/**
+ * True when the user named an hour that the working band cannot satisfy. A
+ * bound that still overlaps the working band is just a narrowing of it and
+ * must not open the day up.
+ */
+function namesHourOutside(
+  configured: WorkingHours,
+  earliestMinute: number | undefined,
+  latestMinute: number | undefined,
+): boolean {
+  if (earliestMinute === undefined && latestMinute === undefined) return false;
+
+  const from = earliestMinute ?? 0;
+  const to = latestMinute ?? 24 * 60;
+
+  return !configured.some((w) => w.startMinute < to && w.endMinute > from);
 }
