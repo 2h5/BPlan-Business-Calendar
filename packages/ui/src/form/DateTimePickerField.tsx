@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, View, type ViewStyle } from 'react-native';
 
 import { Text } from '../text/Text';
 import { useTheme } from '../theme/ThemeProvider';
@@ -78,12 +78,12 @@ function PickerField({
           flexDirection: 'row',
           alignItems: 'center',
           gap: theme.spacing.sm,
-          minHeight: 48,
+          minHeight: theme.hitSlopSize,
           paddingHorizontal: theme.spacing.md,
           borderRadius: theme.radius.md,
-          borderWidth: error ? 1 : StyleSheet.hairlineWidth,
+          borderWidth: theme.borderWidth.hairline,
           borderColor: error ? theme.colors.danger : theme.colors.border,
-          backgroundColor: pressed ? theme.colors.surfacePressed : theme.colors.surface,
+          backgroundColor: pressed ? theme.colors.surfacePressed : theme.colors.inputBackground,
           opacity: disabled ? 0.5 : 1,
         })}
       >

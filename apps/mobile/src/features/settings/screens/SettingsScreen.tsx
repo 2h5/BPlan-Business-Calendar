@@ -17,6 +17,7 @@ import { Alert, View } from 'react-native';
 import { useAuth, useAuthActions } from '../../auth';
 import { useConnections } from '../../integrations/hooks/useIntegrations';
 import { NotificationSettingsCard } from '../../notifications';
+import { AppearanceCard } from '../components/AppearanceCard';
 import {
   PlanningPreferencesSheet,
   type PlanningPreference,
@@ -46,7 +47,7 @@ export function SettingsScreen() {
 
   return (
     <View style={{ gap: theme.spacing.xl }}>
-      <Text variant="display">Settings</Text>
+      <Text variant="title1">Settings</Text>
 
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.lg }}>
@@ -97,6 +98,8 @@ export function SettingsScreen() {
           onPress={() => setPreference('defaultTaskMinutes')}
         />
       </Card>
+
+      <AppearanceCard />
 
       <NotificationSettingsCard />
 

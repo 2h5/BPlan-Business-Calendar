@@ -47,7 +47,7 @@ export function Screen({
     paddingHorizontal: padded ? theme.screenPadding : 0,
     paddingTop: insets.top + theme.spacing.sm,
     paddingBottom: footer ? theme.spacing.lg : insets.bottom + theme.spacing.xxl,
-    gap: theme.spacing.lg,
+    gap: theme.spacing.xl,
   };
 
   return (
@@ -81,8 +81,8 @@ export function Screen({
             paddingHorizontal: theme.screenPadding,
             paddingTop: theme.spacing.md,
             paddingBottom: insets.bottom + theme.spacing.md,
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderTopColor: theme.colors.border,
+            borderTopWidth: theme.borderWidth.hairline,
+            borderTopColor: theme.colors.borderSubtle,
             backgroundColor: theme.colors.backgroundElevated,
           }}
         >

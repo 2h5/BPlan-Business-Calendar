@@ -103,7 +103,7 @@ export function IntegrationsScreen() {
   return (
     <View style={{ gap: theme.spacing.xl }}>
       <View style={{ gap: theme.spacing.sm }}>
-        <Text variant="display">Connections</Text>
+        <Text variant="title1">Connections</Text>
         <Text variant="footnote" color="secondary">
           Connected calendars sync both ways. Events you create on them are written to the provider
           first.

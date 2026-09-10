@@ -1,4 +1,4 @@
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 
@@ -14,9 +14,9 @@ export function Divider({ inset = false, style }: DividerProps) {
     <View
       style={[
         {
-          height: StyleSheet.hairlineWidth,
-          backgroundColor: theme.colors.border,
-          marginLeft: inset ? theme.spacing.lg : 0,
+          height: theme.borderWidth.hairline,
+          backgroundColor: theme.colors.borderSubtle,
+          marginLeft: inset ? theme.spacing.xl : 0,
         },
         style,
       ]}

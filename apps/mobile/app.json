@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.example.calendarapp",
-      "adaptiveIcon": { "backgroundColor": "#0B0B0F" },
+      "adaptiveIcon": { "backgroundColor": "#0B0D12" },
       "edgeToEdgeEnabled": true
     },
     "plugins": [
@@ -30,14 +30,14 @@
       [
         "expo-notifications",
         {
-          "color": "#6E8BFF"
+          "color": "#8AA4FF"
         }
       ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0B0B0F",
-          "dark": { "backgroundColor": "#0B0B0F" },
+          "backgroundColor": "#F4F6F8",
+          "dark": { "backgroundColor": "#0B0D12" },
           "resizeMode": "contain"
         }
       ]

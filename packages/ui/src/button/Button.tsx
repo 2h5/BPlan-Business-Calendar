@@ -28,7 +28,11 @@ export interface ButtonProps extends Omit<PressableProps, 'style' | 'children'> 
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const HEIGHT: Record<ButtonSize, number> = { sm: 36, md: 46, lg: 54 };
+/**
+ * `md` is the web's `--control-height` (40) raised to the 44pt minimum a touch
+ * target has to clear; `sm` is `--control-height-sm`.
+ */
+const HEIGHT: Record<ButtonSize, number> = { sm: 34, md: 44, lg: 52 };
 
 export function Button({
   label,
@@ -54,12 +58,16 @@ export function Button({
   const surface: Record<ButtonVariant, ViewStyle> = {
     primary: { backgroundColor: theme.colors.accent },
     secondary: {
-      backgroundColor: theme.colors.surfaceElevated,
-      borderWidth: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.surfaceRaised,
+      borderWidth: theme.borderWidth.hairline,
       borderColor: theme.colors.border,
     },
     ghost: { backgroundColor: 'transparent' },
-    destructive: { backgroundColor: theme.colors.dangerSubtle },
+    destructive: {
+      backgroundColor: theme.colors.dangerSubtle,
+      borderWidth: theme.borderWidth.hairline,
+      borderColor: theme.colors.dangerSubtle,
+    },
   };
 
   const labelColor = {
@@ -88,7 +96,7 @@ export function Button({
         {
           height: HEIGHT[size],
           borderRadius: theme.radius.md,
-          paddingHorizontal: size === 'sm' ? theme.spacing.md : theme.spacing.xl,
+          paddingHorizontal: size === 'sm' ? theme.spacing.md : theme.spacing.lg,
           gap: theme.spacing.sm,
           opacity: isInactive ? 0.55 : 1,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
@@ -106,7 +114,7 @@ export function Button({
       ) : (
         <>
           {leadingIcon ? <View>{leadingIcon}</View> : null}
-          <Text variant={size === 'sm' ? 'subhead' : 'bodyStrong'} color={labelColor[variant]}>
+          <Text variant={size === 'sm' ? 'subhead' : 'headline'} color={labelColor[variant]}>
             {label}
           </Text>
           {trailingIcon ? <View>{trailingIcon}</View> : null}

@@ -1,5 +1,5 @@
 import { forwardRef, useState, type ReactNode } from 'react';
-import { StyleSheet, TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
+import { TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
 
 import { Text } from '../text/Text';
 import { useTheme } from '../theme/ThemeProvider';
@@ -14,6 +14,9 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   trailing?: ReactNode;
   containerStyle?: ViewStyle;
 }
+
+/** Width of the web's `box-shadow: 0 0 0 3px var(--color-focus-ring)` on focus. */
+const FOCUS_RING_WIDTH = 3;
 
 export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
   { label, error, hint, leading, trailing, containerStyle, onFocus, onBlur, ...rest },
@@ -36,40 +39,56 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         </Text>
       ) : null}
 
+      {/* The ring is drawn as an outer inset rather than a shadow so it renders
+          identically on both platforms — RN has no `outline`. */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: theme.spacing.sm,
-          minHeight: 48,
-          paddingHorizontal: theme.spacing.md,
-          borderRadius: theme.radius.md,
-          borderWidth: focused || error ? 1 : StyleSheet.hairlineWidth,
-          borderColor,
-          backgroundColor: theme.colors.surface,
+          padding: FOCUS_RING_WIDTH,
+          margin: -FOCUS_RING_WIDTH,
+          borderRadius: theme.radius.md + FOCUS_RING_WIDTH,
+          backgroundColor: focused
+            ? error
+              ? theme.colors.dangerSubtle
+              : theme.colors.focusRing
+            : 'transparent',
         }}
       >
-        {leading}
-        <TextInput
-          ref={ref}
-          accessibilityLabel={label}
-          placeholderTextColor={theme.colors.textTertiary}
-          selectionColor={theme.colors.accent}
-          onFocus={(event) => {
-            setFocused(true);
-            onFocus?.(event);
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.sm,
+            // The web control is 40pt; a touch target is not allowed below 44.
+            minHeight: theme.hitSlopSize,
+            paddingHorizontal: theme.spacing.md,
+            borderRadius: theme.radius.md,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor,
+            backgroundColor: theme.colors.inputBackground,
           }}
-          onBlur={(event) => {
-            setFocused(false);
-            onBlur?.(event);
-          }}
-          style={[
-            theme.typography.body,
-            { flex: 1, color: theme.colors.textPrimary, paddingVertical: theme.spacing.md },
-          ]}
-          {...rest}
-        />
-        {trailing}
+        >
+          {leading}
+          <TextInput
+            ref={ref}
+            accessibilityLabel={label}
+            placeholderTextColor={theme.colors.textTertiary}
+            selectionColor={theme.colors.accent}
+            onFocus={(event) => {
+              setFocused(true);
+              onFocus?.(event);
+            }}
+            onBlur={(event) => {
+              setFocused(false);
+              onBlur?.(event);
+            }}
+            style={[
+              theme.typography.callout,
+              { flex: 1, color: theme.colors.textPrimary, paddingVertical: theme.spacing.sm },
+            ]}
+            {...rest}
+          />
+          {trailing}
+        </View>
       </View>
 
       {error ? (

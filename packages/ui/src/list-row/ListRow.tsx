@@ -73,7 +73,7 @@ export function ListRow({
   const layout: ViewStyle = {
     minHeight: theme.hitSlopSize + theme.spacing.sm,
     paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
     gap: theme.spacing.md,
     opacity: disabled ? 0.5 : 1,
   };
@@ -97,7 +97,7 @@ export function ListRow({
       style={({ pressed }) => [
         styles.row,
         layout,
-        pressed && { backgroundColor: theme.colors.surfacePressed },
+        pressed && { backgroundColor: theme.colors.hover },
         style,
       ]}
     >

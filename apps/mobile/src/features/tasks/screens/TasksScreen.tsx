@@ -56,7 +56,7 @@ export function TasksScreen() {
   return (
     <View style={{ gap: theme.spacing.xl }}>
       <View style={{ gap: theme.spacing.xxs }}>
-        <Text variant="display">Tasks</Text>
+        <Text variant="title1">Tasks</Text>
         <Text variant="callout" color="secondary">
           {openCount === 0
             ? 'Nothing outstanding'

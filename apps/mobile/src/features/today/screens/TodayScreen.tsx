@@ -78,7 +78,7 @@ export function TodayScreen() {
           <Text variant="caption" color="tertiary" uppercase>
             {heading}
           </Text>
-          <Text variant="display">{firstName ? `Hello, ${firstName}` : 'Today'}</Text>
+          <Text variant="title1">{firstName ? `Hello, ${firstName}` : 'Today'}</Text>
         </View>
         <IconButton
           name="search-outline"
