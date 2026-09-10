@@ -114,6 +114,11 @@ export async function prepareDeterministicFindTime(
      * distinguishes a personal-time request from an unqualified one.
      */
     dateIntent?: DateIntent;
+    /**
+     * Explicit working hours to use directly instead of resolving from the
+     * profile (e.g. during revalidation of an already-resolved request).
+     */
+    workingHours?: WorkingHours;
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -157,17 +162,19 @@ export async function prepareDeterministicFindTime(
     allowedDurationsMinutes: input.allowedDurationsMinutes,
     windowStart: window.start.toISOString(),
     windowEnd: window.end.toISOString(),
-    workingHours: input.dateIntent
-      ? resolveEffectiveWorkingHours({
-          workingHours: parseWorkingHours(profile.workingHours),
-          dateIntent: input.dateIntent,
-          windowStart: window.start,
-          windowEnd: window.end,
-          timeZone: profile.timezone,
-          earliestMinute: input.request.earliestMinute,
-          latestMinute: input.request.latestMinute,
-        })
-      : profile.workingHours,
+    workingHours:
+      input.workingHours ??
+      (input.dateIntent
+        ? resolveEffectiveWorkingHours({
+            workingHours: parseWorkingHours(profile.workingHours),
+            dateIntent: input.dateIntent,
+            windowStart: window.start,
+            windowEnd: window.end,
+            timeZone: profile.timezone,
+            earliestMinute: input.request.earliestMinute,
+            latestMinute: input.request.latestMinute,
+          })
+        : profile.workingHours),
     timezone: profile.timezone,
     bufferMinutes: input.request.bufferMinutes ?? 0,
     earliestMinute: input.request.earliestMinute,

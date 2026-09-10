@@ -100,6 +100,7 @@ async function revalidateCurrentSlot(
         request: requestFromPersistedConstraints(persisted, constraints),
         now: (deps.now ?? (() => new Date()))(),
         allowedDurationsMinutes: constraints.allowedDurationsMinutes,
+        workingHours: constraints.workingHours,
       },
       deps.dataSource,
     );
