@@ -194,19 +194,19 @@ export function EventEditor({
     <aside
       ref={panelRef}
       className={editorClassName}
-      aria-label={isDraft ? 'Create event' : 'Event inspector'}
+      aria-label={isDraft ? 'Create event' : 'Calendar event'}
       onAnimationEnd={handleAnimationEnd}
     >
       <div className={styles.editorInner}>
         <div className={styles.editorHeader}>
           <div>
-            <span className={styles.eyebrow}>{isDraft ? 'New event' : 'Event inspector'}</span>
+            <span className={styles.eyebrow}>{isDraft ? 'New event' : 'Calendar event'}</span>
             <span className={styles.editorSubtitle}>
               {readOnly
                 ? 'View only'
                 : providerOwned
                   ? `Changes are saved to ${event.sourceType} first`
-                  : 'BCal calendar event'}
+                  : 'BPlan calendar event'}
             </span>
           </div>
           <button
@@ -216,7 +216,20 @@ export function EventEditor({
             aria-label="Close event editor"
             title="Close (Esc)"
           >
-            ×
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 

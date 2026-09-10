@@ -1,11 +1,11 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASES 0–6 COMPLETE + HARDENING; BILLING/AI WORK PAUSED BEFORE
-PURCHASE PAGE AND FIND TIME UX
+Status: WEB PHASES 0–6 COMPLETE + HARDENING; FIND TIME WEB UX AND
+SUBSCRIPTION/UPGRADE PAGE IMPLEMENTED; LIVE AI AND BILLING E2E PENDING
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
-Implementation checkpoint used for this tracker: `673eb12`. GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054) passed both the static and hosted migrations/RLS/generated-types jobs; this documentation checkpoint is maintained on `main`.
+Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054) passed both the static and hosted migrations/RLS/generated-types jobs; this documentation checkpoint is maintained on `main`.
 
 ---
 
@@ -268,41 +268,46 @@ Implementation checkpoint used for this tracker: `673eb12`. GitHub CI run [#67](
 
 ---
 
-### Billing and AI pause checkpoint — 2026-09-09
+### Billing and AI status checkpoint — 2026-09-09
 
-- **Status:** Paused by product-scope decision; no production billing enabled.
+- **Status:** Web Find Time proposal/confirmation UX and the dedicated
+  subscription/upgrade page are implemented; no production billing is enabled.
 - **Implemented:** Settings billing seam, user-scoped subscription read,
   identified RevenueCat sandbox checkout link, explicit access-status refresh,
-  provisional legal-page scaffolding, and the server-side `pro` entitlement
-  boundary.
-- **Not implemented:** A standalone purchase page, a real monthly/annual
-  sandbox purchase acceptance test, a customer billing-management URL, or the
-  web Find Time proposal/confirmation experience.
+  provisional legal-page scaffolding, the server-side `pro` entitlement
+  boundary, the Today Find Time box with propose/confirm flow, and server-side
+  development rate-limit overrides.
+- **Still pending:** Live AI model evaluation and production model selection, a
+  real monthly/annual sandbox purchase acceptance test, a customer
+  billing-management URL, mobile Find Time UX, and production hardening.
 - **AI scope:** Find Time with AI is the only currently scoped Pro capability.
-  Other AI ideas remain undecided future scope. The server proposal and
-  confirmation endpoints exist, but no web or mobile client invokes them yet.
+  Other AI ideas remain undecided future scope. The web client invokes the
+  proposal and confirmation endpoints; no mobile Find Time client exists yet.
 - **Deployment:** Cloudflare automatic deployments remain disabled. Sandbox
-  variables are saved for the next manual deployment. The latest billing code
-  and hosted ACL migrations are committed on `main` at `673eb12` but have not
-  been deployed after that checkpoint.
-- **Next Action:** Confirm Pro/AI scope and model-evaluation direction, then
-  implement Web Phase 7 Find Time UX before resuming real billing acceptance
-  tests.
+  variables are saved for the next manual deployment. The current web/AI
+  implementation is committed on `main` through `85c96ed`; deployment and
+  production billing remain intentionally gated.
+- **Next Action:** Authorize live model evaluation and production model
+  selection, then run the real RevenueCat sandbox purchase acceptance test.
 
 ---
 
 ### Web Phase 7 — Find Time
 
 - **Goal:** Consume hardened Sprint 6 proposal endpoint, proposal selection UX, confirmation flow, Pro entitlement rendering (no client-side availability calculation).
-- **Status:** Not started — billing/AI work paused
-- **Starting SHA:** TBD
-- **Implementation Completed:** TBD
+- **Status:** Implemented in code — web proposal + confirmation UX
+- **Starting SHA:** `159a409`
+- **Implementation Completed:** `85c96ed` — free-text Find Time proposal and
+  confirmation flow, subscription/upgrade page, BPlan UI polish, and
+  development rate-limit override support
 - **Tests / Verification:** TBD
-- **Pushed SHA:** TBD
-- **CI:** TBD
-- **Blockers:** Product Pro scope, live AI model evaluation, and the missing
-  purchase/Find Time user experience
-- **Next Action:** Resume only after the pause checkpoint decisions are made
+- **Pushed SHA:** `85c96ed`
+- **CI:** Not rechecked for this documentation update
+- **Blockers:** Live AI model evaluation, production model selection, real
+  purchase E2E, production billing/legal completion, and production hardening
+- **Next Action:** Complete the live model-selection and real purchase-E2E gates;
+  keep production checkout disabled until seller identity and final legal
+  documents are confirmed
 
 ---
 
@@ -316,4 +321,5 @@ Implementation checkpoint used for this tracker: `673eb12`. GitHub CI run [#67](
 - **Pushed SHA:** TBD
 - **CI:** TBD
 - **Blockers:** None
-- **Next Action:** Pending Phase 7
+- **Next Action:** Begin production hardening after the live model, purchase-E2E,
+  legal, and deployment gates are resolved

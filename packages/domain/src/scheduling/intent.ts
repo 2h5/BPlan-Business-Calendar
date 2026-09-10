@@ -57,7 +57,7 @@ const DAY_HINTS: ReadonlyArray<readonly [RegExp, 'today' | 'tomorrow']> = [
  * "a 30 minute call" or a trailing preposition in "meeting with Andrew for".
  */
 const DANGLING_ARTICLE = /^(?:a|an|the|some)\s+/i;
-const DANGLING_PREPOSITION = /\s+(?:for|of|at|on|in|about|around)$/i;
+const DANGLING_PREPOSITION = /\s+(?:for|of|at|on|in|about|around|lasting|taking)$/i;
 /** Left behind when the duration sat between the verb and the attendee. */
 const LEADING_PREPOSITION = /^(?:with|for|of|about)\s+/i;
 

@@ -6,7 +6,7 @@
 begin;
 create extension if not exists pgtap;
 
-select plan(9);
+select plan(11);
 
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
 values ('00000000-0000-0000-0000-000000000000',
@@ -90,6 +90,35 @@ select ok(
     10
   ) is null,
   'a failed attempt still consumes its rolling quota slot'
+);
+
+-- --- test server-side dev rate-limit override ------------------------------
+insert into public.ai_rate_limit_overrides (user_id, rate_limit_per_hour, note)
+values ('cccccccc-cccc-cccc-cccc-cccccccccccc', 15, 'dev test override');
+
+-- Carol previously had 10 requests. With an override of 15, she can claim 5 more!
+insert into ai_claim_ids (id)
+select public.claim_ai_schedule_request(
+  'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  (select id from public.tasks where title = 'AI rate-limit fixture'),
+  10
+)
+from generate_series(11, 15);
+
+select is(
+  (select count(*)::int from ai_claim_ids where id is not null),
+  15,
+  'the override allows claims up to the custom higher limit'
+);
+
+select is(
+  public.claim_ai_schedule_request(
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    (select id from public.tasks where title = 'AI rate-limit fixture'),
+    10
+  ),
+  null::uuid,
+  'the attempt beyond the override limit is rate limited'
 );
 
 -- Back to the owning role so finish() is unaffected by RLS.

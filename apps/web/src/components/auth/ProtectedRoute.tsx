@@ -20,7 +20,7 @@ export function ProtectedRoute() {
         }}
         aria-live="polite"
       >
-        <span>Loading BCal…</span>
+        <span>Loading BPlan…</span>
       </div>
     );
   }

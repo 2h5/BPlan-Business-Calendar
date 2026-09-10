@@ -20,6 +20,26 @@ const suggestionSchema = z.object({
   reason: z.string().min(1),
 });
 
+export const readbackSchema = z.object({
+  title: z.string(),
+  durationMinutes: z.number().int().nullable(),
+  durationLabel: z.string(),
+  dateLabel: z.string().nullable(),
+  timeLabel: z.string().nullable(),
+  location: z.string().nullable(),
+});
+
+export type FindTimeReadback = z.infer<typeof readbackSchema>;
+
+export const clarificationSchema = z.object({
+  status: z.literal('clarification_required'),
+  requestId: z.string().min(1),
+  clarificationQuestion: z.string().min(1),
+  intent: z.unknown().optional(),
+});
+
+export type FindTimeClarification = z.infer<typeof clarificationSchema>;
+
 const proposalSchema = z.object({
   status: z.literal('proposed'),
   requestId: z.string().min(1),
@@ -31,10 +51,13 @@ const proposalSchema = z.object({
   }),
   targetCalendar: z.object({ id: z.string(), name: z.string() }),
   suggestions: z.array(suggestionSchema).min(1),
+  readback: readbackSchema.optional(),
+  intent: z.unknown().optional(),
 });
 
 export type FindTimeSuggestion = z.infer<typeof suggestionSchema>;
 export type FindTimeProposal = z.infer<typeof proposalSchema>;
+export type FindTimeResult = FindTimeProposal | FindTimeClarification;
 
 const confirmationSchema = z.object({
   status: z.literal('accepted'),
@@ -44,6 +67,8 @@ const confirmationSchema = z.object({
     title: z.string(),
     startAt: z.string().min(1),
     endAt: z.string().min(1),
+    location: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
   }),
 });
 
@@ -52,6 +77,28 @@ export type FindTimeConfirmation = z.infer<typeof confirmationSchema>;
 const errorEnvelopeSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
+
+/**
+ * Submits raw natural-language text to the server.
+ * The server interprets user intent with Luna, verifies conflict-free availability
+ * with the deterministic engine, and ranks the candidates.
+ */
+export async function findTimeForText(text: string, _timeZone?: string): Promise<FindTimeResult> {
+  const response = await invoke('ai-find-time', { text });
+
+  const clarification = clarificationSchema.safeParse(response);
+  if (clarification.success) {
+    return clarification.data;
+  }
+
+  const parsed = proposalSchema.parse(response);
+  return {
+    ...parsed,
+    suggestions: [...parsed.suggestions]
+      .sort((left, right) => left.rank - right.rank)
+      .slice(0, MAX_SUGGESTIONS_SHOWN),
+  };
+}
 
 /**
  * Asks the server for ranked open slots for an ad-hoc block. The client sends

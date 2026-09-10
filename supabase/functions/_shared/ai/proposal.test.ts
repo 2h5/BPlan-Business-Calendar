@@ -1,8 +1,10 @@
 import { assertEquals, assertRejects } from 'jsr:@std/assert@^1.0.0';
+import type { AiIntentProvider } from './intent.ts';
 import type { AiRankingProvider } from './ranking.ts';
 import { generateAiFindTimeProposal, type GenerateAiFindTimeProposalDeps } from './proposal.ts';
 import {
   supabaseAiScheduleRepository,
+  type AiRequestUpdate,
   type AiScheduleRepository,
   type AiSuggestionToPersist,
 } from './proposal-repository.ts';
@@ -141,6 +143,7 @@ Deno.test('persists only generated timestamps and returns a proposed request', a
   );
 
   assertEquals(result.status, 'proposed');
+  if (result.status !== 'proposed') throw new Error('Expected proposed status');
   assertEquals(result.requestId, REQUEST_ID);
   assertEquals(result.suggestions[0]?.slotId, 'candidate_1');
   assertEquals(result.suggestions[0]?.startAt, '2026-08-31T13:00:00.000Z');
@@ -346,3 +349,212 @@ Deno.test(
     ]);
   },
 );
+
+Deno.test(
+  'interprets natural language text, generates readback, claims quota with raw text, and proposes ranked slots',
+  async () => {
+    let claimedTarget: unknown = null;
+    const updates: Array<{ userId: string; requestId: string; patch: Record<string, unknown> }> =
+      [];
+    let intentCalls = 0;
+    let rankingCalls = 0;
+
+    const mockIntentProvider = {
+      provider: 'openai',
+      model: 'gpt-5.6-luna',
+      parseSchedulingIntent: () => {
+        intentCalls += 1;
+        return Promise.resolve({
+          intent: {
+            title: 'meeting with Andrew',
+            duration: { type: 'exact' as const, minutes: 15 },
+            date: { type: 'unconstrained' as const },
+            time: { type: 'unconstrained' as const },
+            location: 'Paramus office',
+            description: 'Discuss Q3 launch',
+            requiresClarification: false,
+            clarificationQuestion: null,
+          },
+          metadata: {
+            provider: 'openai',
+            model: 'gpt-5.6-luna',
+            responseId: 'resp_123',
+            promptVersion: 'find-time-intent-v1',
+            latencyMs: 50,
+            usage: { inputTokens: 80, outputTokens: 25, reasoningTokens: 5, totalTokens: 105 },
+          },
+        });
+      },
+    };
+
+    const result = await generateAiFindTimeProposal(
+      {
+        userId: USER_ID,
+        request: { text: 'meeting with Andrew lasting 15m' },
+        now: NOW,
+      },
+      deps({
+        repository: repository({
+          claimRatedRequest: (_userId, target) => {
+            claimedTarget = target;
+            return Promise.resolve(REQUEST_ID);
+          },
+          updateRequest: (userId, requestId, patch) => {
+            updates.push({ userId, requestId, patch: { ...patch } });
+            return Promise.resolve();
+          },
+        }),
+        createIntentProvider: () => mockIntentProvider,
+        createProvider: () => {
+          rankingCalls += 1;
+          return providerFor((input) => {
+            const candidate = input.candidates[0];
+            if (!candidate) throw new Error('Fixture needs a candidate.');
+            return Promise.resolve({
+              proposal: {
+                suggestions: [{ slotId: candidate.id, rank: 1, score: 0.95, reason: 'Great slot' }],
+              },
+              metadata: {
+                provider: 'fixture',
+                model: 'fixture-model',
+                responseId: null,
+                promptVersion: 'find-time-ranker-v1',
+                latencyMs: 10,
+                usage: {
+                  inputTokens: null,
+                  outputTokens: null,
+                  reasoningTokens: null,
+                  totalTokens: null,
+                },
+              },
+            });
+          });
+        },
+      }),
+    );
+
+    assertEquals(intentCalls, 1);
+    assertEquals(rankingCalls, 1);
+    assertEquals(claimedTarget, { taskId: null, rawText: 'meeting with Andrew lasting 15m' });
+    assertEquals(result.status, 'proposed');
+    if (result.status !== 'proposed') throw new Error('Expected proposed');
+
+    assertEquals(result.task.title, 'meeting with Andrew');
+    assertEquals(result.task.durationMinutes, 15);
+    assertEquals(result.readback?.title, 'meeting with Andrew');
+    assertEquals(result.readback?.durationLabel, '15 min');
+    assertEquals(result.readback?.location, 'Paramus office');
+    assertEquals(result.intent?.title, 'meeting with Andrew');
+
+    const pendingUpdate = updates.find((u) => u.patch.adHocTitle === 'meeting with Andrew');
+    if (!pendingUpdate) throw new Error('Expected ad-hoc pending update.');
+    assertEquals(pendingUpdate.patch.rawText, null);
+    assertEquals(pendingUpdate.patch.adHocLocation, 'Paramus office');
+    assertEquals(pendingUpdate.patch.adHocDescription, 'Discuss Q3 launch');
+    assertEquals(pendingUpdate.patch.adHocDurationMinutes, 15);
+    assertEquals(pendingUpdate.patch.intentModel, 'gpt-5.6-luna');
+    assertEquals(pendingUpdate.patch.intentTotalTokens, 105);
+  },
+);
+
+Deno.test(
+  'returns clarification_required when model indicates clarification needed, consuming 1 quota unit',
+  async () => {
+    let rankingCalls = 0;
+    let claimedTarget: unknown = null;
+    const updates: Array<{ userId: string; requestId: string; patch: AiRequestUpdate }> = [];
+    const REQUEST_ID = 'b0000000-0000-0000-0000-000000000099';
+
+    const mockIntentProvider: AiIntentProvider = {
+      provider: 'openai',
+      model: 'gpt-5.6-luna',
+      parseSchedulingIntent: () =>
+        Promise.resolve({
+          intent: {
+            title: 'schedule something',
+            duration: null,
+            date: { type: 'unconstrained' },
+            time: { type: 'unconstrained' },
+            location: null,
+            description: null,
+            requiresClarification: true,
+            clarificationQuestion: 'What would you like to schedule and for how long?',
+          },
+          metadata: {
+            provider: 'openai',
+            model: 'gpt-5.6-luna',
+            responseId: 'resp_clarification_test',
+            promptVersion: 'find-time-intent-v1',
+            latencyMs: 35,
+            usage: { inputTokens: 50, outputTokens: 20, reasoningTokens: 5, totalTokens: 70 },
+          },
+        }),
+    };
+
+    const result = await generateAiFindTimeProposal(
+      {
+        userId: USER_ID,
+        request: { text: 'schedule something' },
+        now: NOW,
+      },
+      deps({
+        repository: repository({
+          claimRatedRequest: (_userId, target) => {
+            claimedTarget = target;
+            return Promise.resolve(REQUEST_ID);
+          },
+          updateRequest: (userId, requestId, patch) => {
+            updates.push({ userId, requestId, patch: patch as any });
+            return Promise.resolve();
+          },
+        }),
+        createIntentProvider: () => mockIntentProvider,
+        createProvider: () => {
+          rankingCalls += 1;
+          return providerFor(() => Promise.reject(new Error('must not call ranking')));
+        },
+      }),
+    );
+
+    assertEquals(rankingCalls, 0);
+    assertEquals(claimedTarget, { taskId: null, rawText: 'schedule something' });
+    assertEquals(result.status, 'clarification_required');
+    if (result.status !== 'clarification_required')
+      throw new Error('Expected clarification_required');
+
+    assertEquals(result.clarificationQuestion, 'What would you like to schedule and for how long?');
+    assertEquals(result.requestId, REQUEST_ID);
+
+    const failedUpdate = updates.find((u) => u.patch.errorCode === 'AI_CLARIFICATION_REQUIRED');
+    if (!failedUpdate) throw new Error('Expected clarification failed update.');
+    assertEquals(failedUpdate.patch.status, 'failed');
+    assertEquals(failedUpdate.patch.rawText, null);
+    assertEquals(failedUpdate.patch.intentModel, 'gpt-5.6-luna');
+    assertEquals(failedUpdate.patch.intentTotalTokens, 70);
+  },
+);
+
+Deno.test('does not invoke intent provider when raw text request is rate limited', async () => {
+  let intentCalls = 0;
+  const error = await assertRejects(
+    () =>
+      generateAiFindTimeProposal(
+        { userId: USER_ID, request: { text: 'quick chat' }, now: NOW },
+        deps({
+          repository: repository({ claimRatedRequest: () => Promise.resolve(null) }),
+          createIntentProvider: () => ({
+            provider: 'openai',
+            model: 'gpt-5.6-luna',
+            parseSchedulingIntent: () => {
+              intentCalls += 1;
+              return Promise.reject(new Error('must not call'));
+            },
+          }),
+        }),
+      ),
+    EdgeError,
+  );
+
+  assertEquals(error.code, 'AI_RATE_LIMITED');
+  assertEquals(intentCalls, 0);
+});

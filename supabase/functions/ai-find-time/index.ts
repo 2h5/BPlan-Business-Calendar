@@ -2,6 +2,10 @@ import { aiScheduleRequestSchema } from '@cal/schemas/scheduling';
 
 import { adminClient, requireUser } from '../_shared/auth/index.ts';
 import { createOpenAiRankingProvider, openAiRankingConfigFromEnv } from '../_shared/ai/openai.ts';
+import {
+  createOpenAiIntentProvider,
+  openAiIntentConfigFromEnv,
+} from '../_shared/ai/openai-intent.ts';
 import { supabaseFindTimeDataSource } from '../_shared/ai/find-time-repository.ts';
 import { generateAiFindTimeProposal } from '../_shared/ai/proposal.ts';
 import { supabaseAiScheduleRepository } from '../_shared/ai/proposal-repository.ts';
@@ -38,9 +42,10 @@ const handler = withErrorHandling(async (request) => {
       {
         dataSource: supabaseFindTimeDataSource(admin),
         repository: supabaseAiScheduleRepository(admin),
-        // The factory is intentionally lazy: a no-slot response must not read
-        // provider configuration or make a model request.
+        // The factories are intentionally lazy: an early validation failure or
+        // no-slot response must not read provider configuration or make a model request.
         createProvider: () => createOpenAiRankingProvider(openAiRankingConfigFromEnv()),
+        createIntentProvider: () => createOpenAiIntentProvider(openAiIntentConfigFromEnv()),
       },
     ),
   );

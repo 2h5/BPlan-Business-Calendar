@@ -13,7 +13,7 @@ export function SignInPage() {
     (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/today';
 
   useEffect(() => {
-    document.title = 'BCal | Sign In';
+    document.title = 'BPlan | Sign In';
   }, []);
 
   useEffect(() => {
@@ -24,11 +24,11 @@ export function SignInPage() {
 
   return (
     <div className={styles.loginPage}>
-      <Link className={styles.loginBrand} to="/" aria-label="BCal home">
+      <Link className={styles.loginBrand} to="/" aria-label="BPlan home">
         <span className={styles.loginBrandMark} aria-hidden="true">
           B
         </span>
-        <span className={styles.loginBrandName}>BCal</span>
+        <span className={styles.loginBrandName}>BPlan</span>
       </Link>
 
       <main className={styles.loginContent}>

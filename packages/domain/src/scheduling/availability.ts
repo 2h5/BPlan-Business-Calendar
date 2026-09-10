@@ -168,29 +168,76 @@ export function findFreeIntervals(input: AvailabilityInput): Interval[] {
  */
 export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[] {
   const { constraints } = input;
-  const duration = constraints.durationMinutes * MINUTE_MS;
+  const durations =
+    constraints.allowedDurationsMinutes && constraints.allowedDurationsMinutes.length > 0
+      ? [...new Set(constraints.allowedDurationsMinutes)]
+      : [constraints.durationMinutes];
   const step = constraints.granularityMinutes * MINUTE_MS;
   const free = findFreeIntervals(input);
 
   const slots: CandidateSlot[] = [];
   for (const interval of free) {
-    if (interval.end - interval.start < duration) continue;
+    const exactStart =
+      constraints.exactStartMinute === undefined
+        ? undefined
+        : exactStartForLocalDate(interval, constraints.exactStartMinute, constraints.timezone);
 
-    for (
-      let start = alignToGrid(interval.start, constraints.granularityMinutes, constraints.timezone);
-      start + duration <= interval.end;
-      start += step
-    ) {
-      if (start < interval.start) continue;
-      slots.push({
-        id: `slot_${slots.length + 1}`,
-        start,
-        end: start + duration,
-      });
+    for (const durationMinutes of durations) {
+      const duration = durationMinutes * MINUTE_MS;
+      if (interval.end - interval.start < duration) continue;
+
+      if (exactStart !== undefined) {
+        if (exactStart < interval.start || exactStart + duration > interval.end) continue;
+        slots.push({
+          id: `slot_${slots.length + 1}`,
+          start: exactStart,
+          end: exactStart + duration,
+        });
+        continue;
+      }
+
+      for (
+        let start = alignToGrid(
+          interval.start,
+          constraints.granularityMinutes,
+          constraints.timezone,
+        );
+        start + duration <= interval.end;
+        start += step
+      ) {
+        if (start < interval.start) continue;
+        slots.push({
+          id: `slot_${slots.length + 1}`,
+          start,
+          end: start + duration,
+        });
+      }
     }
   }
 
-  return slots;
+  slots.sort((a, b) => a.start - b.start || a.end - a.start - (b.end - b.start));
+  return slots.map((slot, index) => ({
+    ...slot,
+    id: `slot_${index + 1}`,
+  }));
+}
+
+function exactStartForLocalDate(
+  interval: Interval,
+  exactStartMinute: number,
+  timeZone: string,
+): number {
+  const parts = getZonedParts(new Date(interval.start), timeZone);
+  return zonedWallClockToUtc(
+    {
+      year: parts.year,
+      month: parts.month,
+      day: parts.day,
+      hour: Math.floor(exactStartMinute / 60),
+      minute: exactStartMinute % 60,
+    },
+    timeZone,
+  ).getTime();
 }
 
 /** Round an instant up to the next local `granularity`-minute boundary. */

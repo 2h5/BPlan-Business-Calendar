@@ -54,7 +54,7 @@ export function ConnectionsSection({ notice }: { notice?: string | null }) {
   const disconnectAccount = (account: ProviderAccount) => {
     if (
       !confirm(
-        `Disconnect ${account.email ?? 'this account'}? Its imported calendars will be removed from BCal.`,
+        `Disconnect ${account.email ?? 'this account'}? Its imported calendars will be removed from BPlan.`,
       )
     ) {
       return;
@@ -130,7 +130,7 @@ export function ConnectionsSection({ notice }: { notice?: string | null }) {
                 <strong>
                   {accounts.length > 0 ? 'Connect another provider' : 'Add a provider'}
                 </strong>
-                <span>Choose which calendar service BCal can sync.</span>
+                <span>Choose which calendar service BPlan can sync.</span>
               </div>
               <div className={styles.connectButtons}>
                 {connectableProviders.map((provider) => (

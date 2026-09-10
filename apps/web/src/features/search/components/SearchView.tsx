@@ -80,7 +80,7 @@ export function SearchView() {
           label: calendar.name,
           meta:
             calendar.sourceType === 'internal'
-              ? 'BCal calendar'
+              ? 'BPlan calendar'
               : `${calendar.sourceType} calendar`,
           kind: 'calendar' as const,
           open: () => navigate('/calendar'),
@@ -148,7 +148,7 @@ export function SearchView() {
     <div className={styles.page}>
       <div className={styles.intro}>
         <h2>Find anything</h2>
-        <p>Fast, bounded search across your BCal workspace.</p>
+        <p>Fast, bounded search across your BPlan workspace.</p>
       </div>
       <div className={styles.searchBox}>
         <svg viewBox="0 0 24 24" aria-hidden="true">

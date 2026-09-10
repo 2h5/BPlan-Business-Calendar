@@ -78,7 +78,7 @@
       <h2>1. Scope</h2>
       <p>
         This draft describes the data flows currently represented in the BPlan repository as of
-        September 8, 2026. It is not final and must be reconciled with the deployed services,
+        September 10, 2026. It is not final and must be reconciled with the deployed services,
         provider contracts, and the launch jurisdictions.
       </p>
 
@@ -113,22 +113,29 @@
 
       <h2>3. AI scheduling</h2>
       <p>
-        When Find Time with AI is enabled for an entitled user, the server sends the configured AI
-        provider the task title, priority, duration, deadline, optional scheduling note, time
-        zone/preferences, and derived candidate-slot features. The current implementation does not
-        send raw event descriptions, locations, attendees, OAuth tokens, or provider credentials to
-        the model. OpenAI requests are configured with storage disabled; the application stores
-        scheduling metadata and suggestions needed for the feature, not full model prompts or
-        provider responses.
+        When a user submits a natural-language Find Time request, the server sends the raw
+        scheduling request to the configured AI provider (OpenAI in the current implementation) for
+        intent interpretation. BPlan then uses the validated structured intent and deterministic
+        availability engine to prepare candidates; the ranker receives the task context,
+        preferences, and derived candidate-slot features rather than calendar rows. BPlan clears
+        <code>raw_text</code> from <code>ai_schedule_requests</code> after processing. Validated
+        structured scheduling metadata and operational/model telemetry may remain so the request can
+        be confirmed, supported, and monitored.
+      </p>
+      <p>
+        Raw calendar event descriptions, attendees, OAuth credentials, and provider secrets are not
+        sent to the AI providers. OpenAI requests are configured with storage disabled, and the
+        application stores scheduling metadata and suggestions needed for the feature, not full
+        model prompts or provider responses.
       </p>
 
       <h2>4. Services and sharing</h2>
       <p>
         Current service flows use Supabase for authentication, database, and server functions;
         Google and Microsoft when the user connects those calendars; RevenueCat and Stripe for
-        subscription checkout and billing; OpenAI for the configured AI ranker; and Cloudflare Pages
-        for the web application and public pages. Final processor terms and international-transfer
-        details are still a launch-review item.
+        subscription checkout and billing; OpenAI for the configured AI intent interpreter and
+        ranker; and Cloudflare Pages for the web application and public pages. Final processor terms
+        and international-transfer details are still a launch-review item.
       </p>
 
       <h2>5. Use of information</h2>

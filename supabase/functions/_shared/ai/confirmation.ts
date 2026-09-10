@@ -99,6 +99,7 @@ async function revalidateCurrentSlot(
         userId,
         request: requestFromPersistedConstraints(persisted, constraints),
         now: (deps.now ?? (() => new Date()))(),
+        allowedDurationsMinutes: constraints.allowedDurationsMinutes,
       },
       deps.dataSource,
     );
@@ -128,6 +129,7 @@ function requestFromPersistedConstraints(
     bufferMinutes: constraints.bufferMinutes,
     earliestMinute: constraints.earliestMinute,
     latestMinute: constraints.latestMinute,
+    exactStartMinute: constraints.exactStartMinute,
     preferredTimeOfDay: constraints.preferredTimeOfDay,
   };
 }

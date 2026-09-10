@@ -3,9 +3,17 @@ import { z } from 'zod';
 import { isoDateTimeSchema, minuteOfDaySchema, timeZoneSchema, uuidSchema } from './primitives.ts';
 import { workingHoursSchema } from './profile.schema.ts';
 
+export * from './intent.schema.ts';
+
 export type { WorkingHours } from './profile.schema.ts';
 
 export const timeOfDayPreferenceSchema = z.enum(['morning', 'afternoon', 'evening', 'any']);
+
+const exactStartMinuteSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(24 * 60 - 1);
 
 /**
  * Everything the deterministic availability engine needs. Note what is absent:
@@ -19,6 +27,17 @@ const scheduleConstraintsObject = z
       .int()
       .min(5)
       .max(12 * 60),
+    allowedDurationsMinutes: z
+      .array(
+        z
+          .number()
+          .int()
+          .min(5)
+          .max(12 * 60),
+      )
+      .min(1)
+      .max(10)
+      .optional(),
     windowStart: isoDateTimeSchema,
     windowEnd: isoDateTimeSchema,
     workingHours: workingHoursSchema,
@@ -29,6 +48,8 @@ const scheduleConstraintsObject = z
     earliestMinute: minuteOfDaySchema.optional(),
     /** Do not end a block after this local minute of day. */
     latestMinute: minuteOfDaySchema.optional(),
+    /** Require every candidate to start at this exact local minute of day. */
+    exactStartMinute: exactStartMinuteSchema.optional(),
     /** Slots are generated on this cadence, e.g. every 15 minutes. */
     granularityMinutes: z.number().int().min(5).max(60).default(15),
     /** Allow splitting the work across multiple shorter blocks. */
@@ -40,6 +61,7 @@ const scheduleConstraintsObject = z
       .max(8 * 60)
       .default(30),
     preferredTimeOfDay: timeOfDayPreferenceSchema.default('any'),
+    placementPreference: z.enum(['early', 'middle', 'late', 'any']).optional(),
   })
   .strict();
 
@@ -71,19 +93,17 @@ export const timeSlotSchema = z
   });
 
 /**
- * A Find Time request targets either an existing task or an ad-hoc block the
- * user described in the free-text box ("15-minute meeting with Andrew").
- *
- * The ad-hoc duration is parsed deterministically by
- * `parseSchedulingIntent` before it reaches the server; it arrives here as a
- * number so the availability engine — not a model — decides what is free.
+ * A Find Time request targets an existing task, raw natural-language text
+ * interpreted server-side, or an ad-hoc block with title and duration.
  */
 export const aiScheduleRequestSchema = z
   .object({
     taskId: uuidSchema.optional(),
+    /** Raw natural language typed into Find Time ("30-ish minutes Friday after 4"). */
+    text: z.string().trim().min(1).max(500).optional(),
     /** Ad-hoc title. Untrusted: ranking context only, never an availability input. */
     title: z.string().trim().min(1).max(200).optional(),
-    /** Required for an ad-hoc request; a task supplies its own estimate. */
+    /** Required for direct ad-hoc requests; a task or raw text supplies its own duration. */
     durationMinutes: z
       .number()
       .int()
@@ -97,16 +117,31 @@ export const aiScheduleRequestSchema = z
     bufferMinutes: z.number().int().min(0).max(120).optional(),
     earliestMinute: minuteOfDaySchema.optional(),
     latestMinute: minuteOfDaySchema.optional(),
+    exactStartMinute: exactStartMinuteSchema.optional(),
     preferredTimeOfDay: timeOfDayPreferenceSchema.optional(),
   })
   .strict()
   .refine(
-    (request) =>
-      (request.taskId !== undefined) !==
-      (request.title !== undefined && request.durationMinutes !== undefined),
+    (request) => {
+      const hasTask = request.taskId !== undefined;
+      const hasText = request.text !== undefined;
+      const hasAdHoc = request.title !== undefined && request.durationMinutes !== undefined;
+      const modes = (hasTask ? 1 : 0) + (hasText ? 1 : 0) + (hasAdHoc ? 1 : 0);
+      return modes === 1;
+    },
     {
-      message: 'Provide either a taskId or an ad-hoc title with a durationMinutes, but not both',
+      message:
+        'Provide exactly one scheduling mode: a taskId, a raw natural language text query, or an ad-hoc title with durationMinutes',
       path: ['taskId'],
+    },
+  )
+  .refine(
+    (request) =>
+      request.text === undefined ||
+      (request.title === undefined && request.durationMinutes === undefined),
+    {
+      message: 'A raw text request takes its title and duration from natural language parsing',
+      path: ['text'],
     },
   )
   .refine((request) => request.taskId === undefined || request.title === undefined, {
@@ -197,6 +232,12 @@ export const aiRankingCandidateSchema = z
     id: z.string().min(1),
     startAt: isoDateTimeSchema,
     endAt: isoDateTimeSchema,
+    durationMinutes: z
+      .number()
+      .int()
+      .min(5)
+      .max(12 * 60)
+      .optional(),
     localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     localStartMinute: minuteOfDaySchema,
     localEndMinute: z
@@ -231,6 +272,16 @@ export const aiRankCandidateSlotsInputSchema = z
         deadlineAt: isoDateTimeSchema.nullable(),
       })
       .strict(),
+    allowedDurationsMinutes: z
+      .array(
+        z
+          .number()
+          .int()
+          .min(5)
+          .max(12 * 60),
+      )
+      .optional(),
+    placementPreference: z.enum(['early', 'middle', 'late', 'any']).optional(),
     note: z.string().max(500).nullable(),
     timezone: timeZoneSchema,
     preferredTimeOfDay: timeOfDayPreferenceSchema,

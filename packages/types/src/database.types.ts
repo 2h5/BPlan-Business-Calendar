@@ -9,10 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_rate_limit_overrides: {
+        Row: {
+          created_at: string
+          note: string | null
+          rate_limit_per_hour: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          rate_limit_per_hour: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          rate_limit_per_hour?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_schedule_requests: {
         Row: {
           accepted_event_id: string | null
+          ad_hoc_description: string | null
           ad_hoc_duration_minutes: number | null
+          ad_hoc_location: string | null
           ad_hoc_title: string | null
           candidate_count: number
           completed_at: string | null
@@ -21,12 +47,22 @@ export type Database = {
           error_code: string | null
           id: string
           input_tokens: number | null
+          intent_input_tokens: number | null
+          intent_latency_ms: number | null
+          intent_model: string | null
+          intent_output_tokens: number | null
+          intent_prompt_version: string | null
+          intent_provider: string | null
+          intent_reasoning_tokens: number | null
+          intent_total_tokens: number | null
           latency_ms: number | null
           model: string | null
           output_tokens: number | null
+          parsed_intent: Json | null
           profile_version: string | null
           prompt_version: string | null
           provider: string | null
+          raw_text: string | null
           reasoning_tokens: number | null
           status: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id: string | null
@@ -38,7 +74,9 @@ export type Database = {
         }
         Insert: {
           accepted_event_id?: string | null
+          ad_hoc_description?: string | null
           ad_hoc_duration_minutes?: number | null
+          ad_hoc_location?: string | null
           ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
@@ -47,12 +85,22 @@ export type Database = {
           error_code?: string | null
           id?: string
           input_tokens?: number | null
+          intent_input_tokens?: number | null
+          intent_latency_ms?: number | null
+          intent_model?: string | null
+          intent_output_tokens?: number | null
+          intent_prompt_version?: string | null
+          intent_provider?: string | null
+          intent_reasoning_tokens?: number | null
+          intent_total_tokens?: number | null
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null
+          parsed_intent?: Json | null
           profile_version?: string | null
           prompt_version?: string | null
           provider?: string | null
+          raw_text?: string | null
           reasoning_tokens?: number | null
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
@@ -64,7 +112,9 @@ export type Database = {
         }
         Update: {
           accepted_event_id?: string | null
+          ad_hoc_description?: string | null
           ad_hoc_duration_minutes?: number | null
+          ad_hoc_location?: string | null
           ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
@@ -73,12 +123,22 @@ export type Database = {
           error_code?: string | null
           id?: string
           input_tokens?: number | null
+          intent_input_tokens?: number | null
+          intent_latency_ms?: number | null
+          intent_model?: string | null
+          intent_output_tokens?: number | null
+          intent_prompt_version?: string | null
+          intent_provider?: string | null
+          intent_reasoning_tokens?: number | null
+          intent_total_tokens?: number | null
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null
+          parsed_intent?: Json | null
           profile_version?: string | null
           prompt_version?: string | null
           provider?: string | null
+          raw_text?: string | null
           reasoning_tokens?: number | null
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
@@ -946,7 +1006,8 @@ export type Database = {
           p_ad_hoc_duration_minutes?: number
           p_ad_hoc_title?: string
           p_limit?: number
-          p_task_id: string
+          p_raw_text?: string
+          p_task_id?: string
           p_user_id: string
         }
         Returns: string

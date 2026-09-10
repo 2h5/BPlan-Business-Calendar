@@ -33,7 +33,7 @@ describe('event ownership routing', () => {
       id: 'b0000000-0000-0000-0000-000000000001',
       sourceType: 'google',
     };
-    expect(() => assertSupportedCalendarMove(base, google)).toThrow('between BCal and provider');
+    expect(() => assertSupportedCalendarMove(base, google)).toThrow('between BPlan and provider');
     expect(() => assertSupportedCalendarMove(google, { ...google, id: base.id })).toThrow(
       'another calendar',
     );

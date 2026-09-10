@@ -4,7 +4,7 @@ import { TodayView } from '../features/today/components/TodayView';
 
 export function TodayPage() {
   useEffect(() => {
-    document.title = 'BCal | Today';
+    document.title = 'BPlan | Today';
   }, []);
 
   return <TodayView />;

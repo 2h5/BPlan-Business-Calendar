@@ -13,7 +13,7 @@ export function assertSupportedCalendarMove(current: Calendar, target: Calendar)
     throw new Error('Read-only calendars cannot be changed.');
   }
   if (current.sourceType !== target.sourceType) {
-    throw new Error('Moving events between BCal and provider calendars is not supported.');
+    throw new Error('Moving events between BPlan and provider calendars is not supported.');
   }
   if (current.sourceType !== 'internal' && current.id !== target.id) {
     throw new Error('Synced events cannot be moved to another calendar here.');

@@ -27,6 +27,6 @@ describe('Theme resolution and validation', () => {
   });
 
   it('uses the standard storage key for theme persistence', () => {
-    expect(THEME_STORAGE_KEY).toBe('bcal_theme');
+    expect(THEME_STORAGE_KEY).toBe('bplan_theme');
   });
 });

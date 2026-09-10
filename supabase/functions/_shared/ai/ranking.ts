@@ -9,7 +9,7 @@ import {
 import { EdgeError } from '../errors/index.ts';
 import type { DeterministicFindTimeResult } from './find-time.ts';
 
-export const AI_PROMPT_VERSION = 'find-time-ranker-v1';
+export const AI_PROMPT_VERSION = 'find-time-ranker-v2';
 export const MAX_MODEL_CANDIDATES = 40;
 
 export interface AiRankingUsage {
@@ -51,12 +51,15 @@ export function buildAiRankingInput(
       durationMinutes: result.task.durationMinutes,
       deadlineAt: result.task.deadlineAt,
     },
+    allowedDurationsMinutes: result.constraints.allowedDurationsMinutes,
+    placementPreference: result.constraints.placementPreference,
     note: result.note,
     timezone: result.constraints.timezone,
     preferredTimeOfDay: result.constraints.preferredTimeOfDay,
     candidates: shortlisted.map((candidate) => {
       const start = new Date(candidate.startAt);
       const end = new Date(candidate.endAt);
+      const durationMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
       const startParts = getZonedParts(start, result.constraints.timezone);
       const endDate = toZonedDateKey(end, result.constraints.timezone);
       const localDate = toZonedDateKey(start, result.constraints.timezone);
@@ -65,6 +68,7 @@ export function buildAiRankingInput(
         id: candidate.id,
         startAt: candidate.startAt,
         endAt: candidate.endAt,
+        durationMinutes,
         localDate,
         localStartMinute: startParts.hour * 60 + startParts.minute,
         localEndMinute:

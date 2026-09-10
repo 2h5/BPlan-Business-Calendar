@@ -5,6 +5,37 @@ SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
 IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
 EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
 
+### Natural-Language Scheduling Intent Layer (Luna) Hardening — 2026-09-10
+
+Implemented and hardened the AI-first natural-language intent layer for Web Find Time using Luna (`gpt-5.6-luna`), strictly preserving the deterministic scheduling engine as the sole availability authority:
+
+- **Schemas (`packages/schemas`)**:
+  - `intent.schema.ts`: Strict fail-closed Zod contracts for `durationIntentSchema` (exact, approximate, range with `minMinutes <= maxMinutes`), `dateIntentSchema` (calendar round-trip validation via `isValidCalendarDate`, relative week/weekend with `preference: 'early' | 'late' | 'any'`), `timeIntentSchema` (hour/minute/period validation), `schedulingIntentSchema`, `aiFindTimeClarificationSchema`, and `aiFindTimeReadbackSchema`.
+  - `scheduling.schema.ts`: Accepts `text?: string` (enforcing exactly one mode: `taskId` XOR `text` XOR (`title` AND `durationMinutes`)), `allowedDurationsMinutes`, `placementPreference`, and candidate `durationMinutes`.
+- **Domain (`packages/domain`)**:
+  - `intent.ts`: Fixed title preposition cleanup bug (`lasting 15m` leaving `lasting`).
+  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, placement preferences (`early`/`late` weekend/week), and time bounds. Exact time uses `exactStartMinute` so every allowed duration starts at the requested minute without allowing later starts.
+  - `availability.ts`: `generateCandidateSlots` produces candidates across all allowed durations on the local grid.
+- **Database & Migrations**:
+  - `20260910000002_ai_natural_language_intent.sql`: Adds `raw_text`, `ad_hoc_location`, `ad_hoc_description`, `parsed_intent` columns to `ai_schedule_requests`. Updates `claim_ai_schedule_request` to accept `p_raw_text`, claiming quota under advisory lock before any billable model request. Updates `confirm_ai_schedule_suggestion` to populate `location` and `description` from the persisted request row.
+  - `20260910000003_ai_intent_telemetry.sql`: Adds independent intent telemetry columns (`intent_provider`, `intent_model`, `intent_prompt_version`, `intent_latency_ms`, `intent_input_tokens`, `intent_output_tokens`, `intent_reasoning_tokens`, `intent_total_tokens`) with non-negative check constraints. Updates check constraint to permit `raw_text is null` for data minimization.
+- **Data Minimization & Observability (`supabase/functions`)**:
+  - `_shared/ai/proposal.ts`: Implements data minimization (`raw_text = null`) immediately upon parsing or terminal error/clarification. Persists separate intent telemetry and ranking telemetry.
+  - `_shared/ai/intent.ts`: Strict Responses API schema and fail-closed validation rejecting malformed variants as `AI_INVALID_OUTPUT`.
+  - `_shared/ai/ranking.ts`: Forwards placement preferences and allowed durations to slot ranking.
+  - `_shared/ai/openai-intent.ts`: OpenAI Responses API provider with retries, timeout, and usage tracking.
+  - `_shared/ai/confirmation-repository.ts`: Loads `ad_hoc_location` and `ad_hoc_description` and populates them on confirmation.
+- **Web App (`apps/web`)**:
+  - `api/find-time.api.ts`: `findTimeForText` invokes `ai-find-time` with `{ text }`, parses proposals with readbacks or clarification requests.
+  - `hooks/useFindTime.ts`: Manages proposal and clarification states, mapping error codes.
+  - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips and clarification notices for Pro users. For Free/expired users, renders a locked teaser state with disabled input and a direct link to `/subscription` (no enabled input or failing requests), while preserving confirmation cards and banners.
+  - `components/FindTimeBox.test.tsx`: Unit tests verifying Free locked teaser and Pro interactive flow.
+- **Evaluation Suite (`supabase/functions/_shared/ai/evaluation`)**:
+  - `intent-fixtures.ts`: 18 comprehensive fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, descriptions, adversarial prompt injections, and impossible/past date clarifications.
+  - `intent-harness.ts`: Evaluates schema validity, extraction accuracy, clarification pass rate, latency, and tokens/cost.
+  - `intent-harness.test.ts`: Automated tests for intent evaluation harness.
+  - `run-live-intent.ts`: Live CLI runner for comparing Luna Low vs Luna Medium.
+
 ### Web Find Time box — 2026-09-09
 
 Added the free-text Find Time box to the web Today page, above the bento grid.
@@ -2325,9 +2356,11 @@ The next implementer must:
 Current phase:
 
 `Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
-foundation. Live model evaluation, production model selection, the AI client
-experience, and real sandbox purchase E2E remain pending. The independent web
-track has completed Web Phases 0–6; Web Phase 7 Find Time has not started.`
+foundation. The web Find Time proposal/confirmation UX and dedicated
+subscription page are implemented. Live model evaluation, production model
+selection, and real sandbox purchase E2E remain pending. The independent web
+track has completed Web Phases 0–6 plus hardening; production web hardening
+remains pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2374,17 +2407,16 @@ Current blocker:
 
 `The product Pro scope and AI model choice are not final. Live Luna/Terra
 evaluation still needs an authorized server-side OpenAI key and explicit cost
-authorization. The web billing/purchase work is intentionally paused because
-the client purchase surface and the real AI feature experience are not yet
-defined.`
+authorization. The web Find Time experience and subscription page now exist,
+but real RevenueCat purchase E2E remains pending and production billing stays
+disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Do not expand billing or AI scope while paused. When resumed, first confirm
-the Pro feature set and authorize the live model evaluation; then implement the
-web Find Time proposal/confirmation UX and return to the RevenueCat sandbox
-purchase acceptance test. Preserve deterministic candidate membership as the
-sole availability authority.`
+`Do not expand billing or AI scope while paused. When resumed, authorize the
+live model evaluation and select the production model; then run the RevenueCat
+sandbox purchase acceptance test. Preserve deterministic candidate membership
+as the sole availability authority.`
 
 Current Sprint 6 verification evidence:
 
@@ -2397,8 +2429,10 @@ Current Sprint 6 verification evidence:
 
 Current implementation checkpoint:
 
-`673eb12` includes the committed web billing seam and hosted ACL migrations.
+`85c96ed` includes the web Find Time proposal/confirmation UX, subscription
+page, BPlan UI polish, server-side development rate-limit overrides, and the
+committed web billing seam and hosted ACL migrations.
 GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
-passed both the static and hosted migrations/RLS/generated-types jobs. The
-local `pnpm verify` command remains environment-dependent; the latest CI result
-for the documentation checkpoint is reported with the final handoff.
+passed both the static and hosted migrations/RLS/generated-types jobs for the
+earlier billing checkpoint. No newer CI result is claimed in this handoff; the
+local `pnpm verify` command remains environment-dependent.

@@ -45,7 +45,7 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <span className={styles.eyebrow}>BCal workspace</span>
+        <span className={styles.eyebrow}>BPlan workspace</span>
         <h1 className={styles.title}>Welcome back</h1>
         <p className={styles.subtitle}>Sign in to continue to your calendar and tasks.</p>
       </div>

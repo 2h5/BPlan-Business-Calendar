@@ -16,7 +16,7 @@ export interface ThemeContextValue {
   setTheme: (theme: ThemeMode) => void;
 }
 
-export const THEME_STORAGE_KEY = 'bcal_theme';
+export const THEME_STORAGE_KEY = 'bplan_theme';
 
 export function isValidThemeMode(value: unknown): value is ThemeMode {
   return value === 'auto' || value === 'light' || value === 'dark';

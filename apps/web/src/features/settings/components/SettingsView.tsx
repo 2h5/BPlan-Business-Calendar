@@ -113,7 +113,7 @@ export function SettingsView() {
             <header>
               <div>
                 <h3>Profile</h3>
-                <p>The identity shown across your BCal workspace.</p>
+                <p>The identity shown across your BPlan workspace.</p>
               </div>
             </header>
             <div className={styles.formGrid}>
@@ -134,7 +134,7 @@ export function SettingsView() {
             <header>
               <div>
                 <h3>Appearance</h3>
-                <p>Customize how BCal looks on your device.</p>
+                <p>Customize how BPlan looks on your device.</p>
               </div>
             </header>
             <div className={styles.themeGrid}>
