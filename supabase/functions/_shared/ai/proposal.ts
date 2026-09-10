@@ -337,11 +337,7 @@ async function generateAiFindTimeProposalFromText(
       };
     }
 
-    const resolvedTimeBounds = resolveIntentTimeBounds(
-      parsedIntent.time,
-      resolvedDuration.durationMinutes,
-      resolvedDuration.maxDurationMinutes,
-    );
+    const resolvedTimeBounds = resolveIntentTimeBounds(parsedIntent.time);
     const readback = generateIntentReadback(parsedIntent);
 
     const normalizedRequest: AiScheduleRequest = {
@@ -358,6 +354,7 @@ async function generateAiFindTimeProposalFromText(
       bufferMinutes: input.request.bufferMinutes,
       earliestMinute: resolvedTimeBounds.earliestMinute ?? input.request.earliestMinute,
       latestMinute: resolvedTimeBounds.latestMinute ?? input.request.latestMinute,
+      exactStartMinute: resolvedTimeBounds.exactStartMinute ?? input.request.exactStartMinute,
       preferredTimeOfDay:
         resolvedTimeBounds.preferredTimeOfDay !== 'any'
           ? resolvedTimeBounds.preferredTimeOfDay

@@ -143,21 +143,22 @@ describe('resolveIntentDateWindow', () => {
 
 describe('resolveIntentTimeBounds', () => {
   it('handles unconstrained', () => {
-    const result = resolveIntentTimeBounds({ type: 'unconstrained' }, 30);
+    const result = resolveIntentTimeBounds({ type: 'unconstrained' });
     expect(result.preferredTimeOfDay).toBe('any');
     expect(result.earliestMinute).toBeUndefined();
     expect(result.latestMinute).toBeUndefined();
   });
 
-  it('handles exact time as a hard minute band', () => {
-    const result = resolveIntentTimeBounds({ type: 'exact_time', hour: 15, minute: 0 }, 60);
-    expect(result.earliestMinute).toBe(15 * 60);
-    expect(result.latestMinute).toBe(16 * 60);
+  it('handles exact time as an exact candidate start minute', () => {
+    const result = resolveIntentTimeBounds({ type: 'exact_time', hour: 15, minute: 0 });
+    expect(result.exactStartMinute).toBe(15 * 60);
+    expect(result.earliestMinute).toBeUndefined();
+    expect(result.latestMinute).toBeUndefined();
     expect(result.preferredTimeOfDay).toBe('afternoon');
   });
 
   it('handles around time as a soft preference without excluding valid slots', () => {
-    const result = resolveIntentTimeBounds({ type: 'around_time', hour: 14, minute: 0 }, 30);
+    const result = resolveIntentTimeBounds({ type: 'around_time', hour: 14, minute: 0 });
     expect(result.earliestMinute).toBeUndefined();
     expect(result.latestMinute).toBeUndefined();
     expect(result.preferredTimeOfDay).toBe('afternoon');
@@ -165,30 +166,27 @@ describe('resolveIntentTimeBounds', () => {
   });
 
   it('handles after time as a hard lower minute bound', () => {
-    const result = resolveIntentTimeBounds({ type: 'after_time', hour: 16, minute: 0 }, 30);
+    const result = resolveIntentTimeBounds({ type: 'after_time', hour: 16, minute: 0 });
     expect(result.earliestMinute).toBe(16 * 60);
     expect(result.latestMinute).toBeUndefined();
     expect(result.preferredTimeOfDay).toBe('afternoon');
   });
 
   it('handles before time as a hard upper minute bound', () => {
-    const result = resolveIntentTimeBounds({ type: 'before_time', hour: 12, minute: 0 }, 30);
+    const result = resolveIntentTimeBounds({ type: 'before_time', hour: 12, minute: 0 });
     expect(result.earliestMinute).toBeUndefined();
     expect(result.latestMinute).toBe(12 * 60);
     expect(result.preferredTimeOfDay).toBe('morning');
   });
 
   it('handles between times as hard lower and upper bounds', () => {
-    const result = resolveIntentTimeBounds(
-      {
-        type: 'between_times',
-        startHour: 14,
-        startMinute: 0,
-        endHour: 17,
-        endMinute: 30,
-      },
-      30,
-    );
+    const result = resolveIntentTimeBounds({
+      type: 'between_times',
+      startHour: 14,
+      startMinute: 0,
+      endHour: 17,
+      endMinute: 30,
+    });
     expect(result.earliestMinute).toBe(14 * 60);
     expect(result.latestMinute).toBe(17 * 60 + 30);
     expect(result.preferredTimeOfDay).toBe('afternoon');
@@ -340,20 +338,16 @@ describe('explicit date and calendar validation', () => {
 });
 
 describe('exact time with duration range', () => {
-  it('expands latestMinute to accommodate maxDurationMinutes so all candidate durations fit at exact start', () => {
+  it('generates every allowed duration at exactly the requested start and rejects later starts', () => {
     // User requested "an hour or two at exactly 3pm" (15:00)
     // Duration: range [60, 120] -> allowedDurations: [60, 90, 120]
     // Time: exact_time at 15:00
-    const resolved = resolveIntentTimeBounds(
-      { type: 'exact_time', hour: 15, minute: 0 },
-      60,
-      120, // maxDurationMinutes
-    );
+    const resolved = resolveIntentTimeBounds({ type: 'exact_time', hour: 15, minute: 0 });
 
     // 15:00 = 900 minutes
-    expect(resolved.earliestMinute).toBe(900);
-    // latestMinute is 15:00 + 120m = 1020 minutes (17:00), NOT clipped at 15:00 + 60m (960)
-    expect(resolved.latestMinute).toBe(1020);
+    expect(resolved.exactStartMinute).toBe(900);
+    expect(resolved.earliestMinute).toBeUndefined();
+    expect(resolved.latestMinute).toBeUndefined();
 
     // When candidates are generated with granularity 15 and allowedDurations [60, 90, 120],
     // slots starting at 15:00 for 60m, 90m, and 120m are all generated
@@ -366,8 +360,7 @@ describe('exact time with duration range', () => {
         workingHours: [{ weekday: 3, startMinute: 9 * 60, endMinute: 18 * 60 }],
         timezone: 'America/New_York',
         bufferMinutes: 0,
-        earliestMinute: resolved.earliestMinute,
-        latestMinute: resolved.latestMinute,
+        exactStartMinute: resolved.exactStartMinute,
         granularityMinutes: 15,
         splittable: false,
         minSplitMinutes: 30,
@@ -376,16 +369,13 @@ describe('exact time with duration range', () => {
       busy: [],
     });
 
-    const slotsStartingAt3pm = slots.filter((s) => {
-      const d = new Date(s.start);
-      // In America/New_York (EDT UTC-4), 15:00 is 19:00 UTC
-      return d.getUTCHours() === 19 && d.getUTCMinutes() === 0;
-    });
-
-    const candidateDurationsAt3pm = slotsStartingAt3pm.map((s) => (s.end - s.start) / 60_000);
-    expect(candidateDurationsAt3pm).toContain(60);
-    expect(candidateDurationsAt3pm).toContain(90);
-    expect(candidateDurationsAt3pm).toContain(120);
+    // In America/New_York (EDT UTC-4), 15:00 is 19:00 UTC. There is exactly
+    // one start, with one candidate for each allowed duration.
+    const exactStart = Date.parse('2026-09-09T19:00:00.000Z');
+    expect(slots).toHaveLength(3);
+    expect(slots.map((s) => s.start)).toEqual([exactStart, exactStart, exactStart]);
+    expect(slots.map((s) => (s.end - s.start) / 60_000)).toEqual([60, 90, 120]);
+    expect(slots.every((s) => s.start === exactStart)).toBe(true);
   });
 });
 

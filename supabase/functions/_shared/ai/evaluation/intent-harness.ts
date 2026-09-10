@@ -156,8 +156,12 @@ function gradeIntentFixture(
       accuracyPassed = false;
     }
 
-    if (expected.duration) {
-      if (!actual.duration) {
+    if (expected.duration !== undefined) {
+      if (expected.duration === null) {
+        if (actual.duration !== null) {
+          accuracyPassed = false;
+        }
+      } else if (!actual.duration) {
         accuracyPassed = false;
       } else if (expected.duration.type === 'range') {
         if (
@@ -179,75 +183,96 @@ function gradeIntentFixture(
       accuracyPassed = false;
     }
 
-    if (
-      expected.dateWeekday &&
-      actual.date.type === 'weekday' &&
-      actual.date.weekday !== expected.dateWeekday
-    ) {
-      accuracyPassed = false;
+    if (expected.dateWeekday !== undefined) {
+      if (actual.date.type !== 'weekday' || actual.date.weekday !== expected.dateWeekday) {
+        accuracyPassed = false;
+      }
     }
 
-    if (
-      expected.dateModifier &&
-      (actual.date.type === 'weekday' ||
+    if (expected.dateModifier !== undefined) {
+      const dateWithModifier =
+        actual.date.type === 'weekday' ||
         actual.date.type === 'weekend' ||
-        actual.date.type === 'relative_week') &&
-      actual.date.modifier !== expected.dateModifier
-    ) {
-      accuracyPassed = false;
+        actual.date.type === 'relative_week'
+          ? actual.date
+          : null;
+      if (!dateWithModifier || dateWithModifier.modifier !== expected.dateModifier) {
+        accuracyPassed = false;
+      }
     }
 
-    if (
-      expected.datePreference &&
-      (actual.date.type === 'weekend' || actual.date.type === 'relative_week') &&
-      actual.date.preference !== expected.datePreference
-    ) {
-      accuracyPassed = false;
+    if (expected.datePreference !== undefined) {
+      const dateWithPreference =
+        actual.date.type === 'weekend' || actual.date.type === 'relative_week' ? actual.date : null;
+      if (!dateWithPreference || dateWithPreference.preference !== expected.datePreference) {
+        accuracyPassed = false;
+      }
     }
 
     if (expected.timeType && actual.time.type !== expected.timeType) {
       accuracyPassed = false;
     }
 
-    if (
-      expected.timeHour !== undefined &&
-      (actual.time.type === 'exact_time' ||
+    if (expected.timeHour !== undefined || expected.timeMinute !== undefined) {
+      const timeWithClock =
+        actual.time.type === 'exact_time' ||
         actual.time.type === 'around_time' ||
         actual.time.type === 'after_time' ||
-        actual.time.type === 'before_time') &&
-      actual.time.hour !== expected.timeHour
-    ) {
-      accuracyPassed = false;
+        actual.time.type === 'before_time'
+          ? actual.time
+          : null;
+      if (
+        !timeWithClock ||
+        (expected.timeHour !== undefined && timeWithClock.hour !== expected.timeHour) ||
+        (expected.timeMinute !== undefined && timeWithClock.minute !== expected.timeMinute)
+      ) {
+        accuracyPassed = false;
+      }
     }
 
-    if (
-      expected.timeStartHour !== undefined &&
-      actual.time.type === 'between_times' &&
-      actual.time.startHour !== expected.timeStartHour
-    ) {
-      accuracyPassed = false;
+    if (expected.timeStartHour !== undefined || expected.timeStartMinute !== undefined) {
+      if (
+        actual.time.type !== 'between_times' ||
+        (expected.timeStartHour !== undefined &&
+          actual.time.startHour !== expected.timeStartHour) ||
+        (expected.timeStartMinute !== undefined &&
+          actual.time.startMinute !== expected.timeStartMinute)
+      ) {
+        accuracyPassed = false;
+      }
     }
 
-    if (
-      expected.timeEndHour !== undefined &&
-      actual.time.type === 'between_times' &&
-      actual.time.endHour !== expected.timeEndHour
-    ) {
-      accuracyPassed = false;
+    if (expected.timeEndHour !== undefined || expected.timeEndMinute !== undefined) {
+      if (
+        actual.time.type !== 'between_times' ||
+        (expected.timeEndHour !== undefined && actual.time.endHour !== expected.timeEndHour) ||
+        (expected.timeEndMinute !== undefined && actual.time.endMinute !== expected.timeEndMinute)
+      ) {
+        accuracyPassed = false;
+      }
     }
 
-    if (
-      expected.timePreference &&
-      actual.time.type === 'time_of_day' &&
-      actual.time.preference !== expected.timePreference
-    ) {
-      accuracyPassed = false;
+    if (expected.timePreference !== undefined) {
+      if (
+        actual.time.type !== 'time_of_day' ||
+        actual.time.preference !== expected.timePreference
+      ) {
+        accuracyPassed = false;
+      }
     }
 
     if (
       expected.locationContains &&
       (!actual.location ||
         !actual.location.toLowerCase().includes(expected.locationContains.toLowerCase()))
+    ) {
+      accuracyPassed = false;
+    }
+
+    if (
+      expected.descriptionContains !== undefined &&
+      (!actual.description ||
+        !actual.description.toLowerCase().includes(expected.descriptionContains.toLowerCase()))
     ) {
       accuracyPassed = false;
     }

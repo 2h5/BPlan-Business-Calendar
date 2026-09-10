@@ -146,6 +146,7 @@ export async function prepareDeterministicFindTime(
     bufferMinutes: input.request.bufferMinutes ?? 0,
     earliestMinute: input.request.earliestMinute,
     latestMinute: input.request.latestMinute,
+    exactStartMinute: input.request.exactStartMinute,
     granularityMinutes: GRANULARITY_MINUTES,
     splittable: false,
     minSplitMinutes: 30,

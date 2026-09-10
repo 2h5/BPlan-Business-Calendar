@@ -25,8 +25,11 @@ export interface ExpectedIntent {
     | 'time_of_day';
   timePreference?: 'morning' | 'afternoon' | 'evening';
   timeHour?: number;
+  timeMinute?: number;
   timeStartHour?: number;
+  timeStartMinute?: number;
   timeEndHour?: number;
+  timeEndMinute?: number;
   locationContains?: string;
   descriptionContains?: string;
   requiresClarification: boolean;
@@ -138,6 +141,7 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
       duration: { type: 'range', minMinutes: 60, maxMinutes: 120 },
       timeType: 'exact_time',
       timeHour: 15,
+      timeMinute: 0,
       requiresClarification: false,
     },
   },
@@ -197,6 +201,8 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
     },
     expected: {
       titleContains: 'lunch',
+      dateType: 'relative_week',
+      dateModifier: 'next',
       timePreference: 'afternoon',
       requiresClarification: false,
     },
@@ -246,6 +252,21 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
       titleContains: 'catchup with David',
       duration: { type: 'exact', minutes: 60 },
       dateType: 'unconstrained',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'description-purpose',
+    description: 'Preserve a natural-language scheduling purpose as the description.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'find me an hour to work on my resume',
+    },
+    expected: {
+      titleContains: 'work on resume',
+      duration: { type: 'exact', minutes: 60 },
+      dateType: 'unconstrained',
+      descriptionContains: 'work on my resume',
       requiresClarification: false,
     },
   },

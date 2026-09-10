@@ -245,6 +245,7 @@ export function resolveIntentDateWindow(
 export interface ResolvedIntentTimeBounds {
   earliestMinute?: number;
   latestMinute?: number;
+  exactStartMinute?: number;
   preferredTimeOfDay: TimeOfDayPreference;
   noteHint?: string;
 }
@@ -254,11 +255,7 @@ export interface ResolvedIntentTimeBounds {
  * Hard constraints: exact_time, after_time, before_time, between_times.
  * Soft preferences: around_time, time_of_day.
  */
-export function resolveIntentTimeBounds(
-  timeIntent: TimeIntent,
-  durationMinutes: number,
-  maxDurationMinutes?: number,
-): ResolvedIntentTimeBounds {
+export function resolveIntentTimeBounds(timeIntent: TimeIntent): ResolvedIntentTimeBounds {
   switch (timeIntent.type) {
     case 'unconstrained':
       return { preferredTimeOfDay: 'any' };
@@ -267,14 +264,9 @@ export function resolveIntentTimeBounds(
       return { preferredTimeOfDay: timeIntent.preference };
 
     case 'exact_time': {
-      const span =
-        maxDurationMinutes !== undefined && maxDurationMinutes > durationMinutes
-          ? maxDurationMinutes
-          : durationMinutes;
       const minute = timeIntent.hour * 60 + timeIntent.minute;
       return {
-        earliestMinute: minute,
-        latestMinute: Math.min(24 * 60, minute + span),
+        exactStartMinute: minute,
         preferredTimeOfDay: timeOfDayFromHour(timeIntent.hour),
         noteHint: `Scheduled for exact time ${formatClockTime(timeIntent.hour, timeIntent.minute)}`,
       };

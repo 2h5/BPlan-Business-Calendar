@@ -536,6 +536,33 @@ Deno.test(
   },
 );
 
+Deno.test(
+  'revalidates an exact-start duration-range candidate at its requested start',
+  async () => {
+    const exactRangePersisted = persisted({
+      constraints: {
+        ...CONSTRAINTS,
+        windowStart: '2026-08-31T12:00:00.000Z',
+        windowEnd: '2026-08-31T23:00:00.000Z',
+        allowedDurationsMinutes: [60, 90, 120],
+        exactStartMinute: 15 * 60,
+      },
+      startAt: '2026-08-31T19:00:00.000Z',
+      endAt: '2026-08-31T20:30:00.000Z',
+    });
+
+    const result = await confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        repository: repository({ loadSuggestion: () => Promise.resolve(exactRangePersisted) }),
+      }),
+    );
+
+    assertEquals(result.status, 'accepted');
+    assertEquals(result.event.startAt, '2026-08-31T13:00:00.000Z');
+  },
+);
+
 // --- Ad-hoc confirmation (no backing task) ----------------------------------
 
 const adHocPersisted = () =>

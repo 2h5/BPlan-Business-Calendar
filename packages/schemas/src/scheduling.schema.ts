@@ -9,6 +9,12 @@ export type { WorkingHours } from './profile.schema.ts';
 
 export const timeOfDayPreferenceSchema = z.enum(['morning', 'afternoon', 'evening', 'any']);
 
+const exactStartMinuteSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(24 * 60 - 1);
+
 /**
  * Everything the deterministic availability engine needs. Note what is absent:
  * free text. Intent is turned into these fields *before* slot generation, and
@@ -42,6 +48,8 @@ const scheduleConstraintsObject = z
     earliestMinute: minuteOfDaySchema.optional(),
     /** Do not end a block after this local minute of day. */
     latestMinute: minuteOfDaySchema.optional(),
+    /** Require every candidate to start at this exact local minute of day. */
+    exactStartMinute: exactStartMinuteSchema.optional(),
     /** Slots are generated on this cadence, e.g. every 15 minutes. */
     granularityMinutes: z.number().int().min(5).max(60).default(15),
     /** Allow splitting the work across multiple shorter blocks. */
@@ -109,6 +117,7 @@ export const aiScheduleRequestSchema = z
     bufferMinutes: z.number().int().min(0).max(120).optional(),
     earliestMinute: minuteOfDaySchema.optional(),
     latestMinute: minuteOfDaySchema.optional(),
+    exactStartMinute: exactStartMinuteSchema.optional(),
     preferredTimeOfDay: timeOfDayPreferenceSchema.optional(),
   })
   .strict()

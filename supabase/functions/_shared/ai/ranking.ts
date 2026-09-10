@@ -9,7 +9,7 @@ import {
 import { EdgeError } from '../errors/index.ts';
 import type { DeterministicFindTimeResult } from './find-time.ts';
 
-export const AI_PROMPT_VERSION = 'find-time-ranker-v1';
+export const AI_PROMPT_VERSION = 'find-time-ranker-v2';
 export const MAX_MODEL_CANDIDATES = 40;
 
 export interface AiRankingUsage {

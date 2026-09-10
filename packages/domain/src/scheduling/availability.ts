@@ -177,9 +177,24 @@ export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[
 
   const slots: CandidateSlot[] = [];
   for (const interval of free) {
+    const exactStart =
+      constraints.exactStartMinute === undefined
+        ? undefined
+        : exactStartForLocalDate(interval, constraints.exactStartMinute, constraints.timezone);
+
     for (const durationMinutes of durations) {
       const duration = durationMinutes * MINUTE_MS;
       if (interval.end - interval.start < duration) continue;
+
+      if (exactStart !== undefined) {
+        if (exactStart < interval.start || exactStart + duration > interval.end) continue;
+        slots.push({
+          id: `slot_${slots.length + 1}`,
+          start: exactStart,
+          end: exactStart + duration,
+        });
+        continue;
+      }
 
       for (
         let start = alignToGrid(
@@ -205,6 +220,24 @@ export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[
     ...slot,
     id: `slot_${index + 1}`,
   }));
+}
+
+function exactStartForLocalDate(
+  interval: Interval,
+  exactStartMinute: number,
+  timeZone: string,
+): number {
+  const parts = getZonedParts(new Date(interval.start), timeZone);
+  return zonedWallClockToUtc(
+    {
+      year: parts.year,
+      month: parts.month,
+      day: parts.day,
+      hour: Math.floor(exactStartMinute / 60),
+      minute: exactStartMinute % 60,
+    },
+    timeZone,
+  ).getTime();
 }
 
 /** Round an instant up to the next local `granularity`-minute boundary. */

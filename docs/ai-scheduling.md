@@ -34,7 +34,7 @@ The Find Time box accepts human language (e.g. `"meeting with Andrew lasting 15m
 6. **Deterministic Normalization (`@cal/domain/scheduling`)**:
    - `resolveIntentDuration`: Bounded duration ranges (e.g. 1–2 hours) are resolved deterministically into candidate durations `allowedDurationsMinutes: [60, 90, 120]`.
    - `resolveIntentDateWindow`: Deterministic date arithmetic converts relative dates ("Friday", "next Tuesday", "this weekend" with `early`/`late` preferences) into UTC window bounds using the user's timezone.
-   - `resolveIntentTimeBounds`: Maps time intent into deterministic minute-of-day constraints (`earliestMinute`, `latestMinute`, `preferredTimeOfDay`). For exact start times with duration ranges (e.g. "at 3 for 1-2 hours"), bounds span `[minute, minute + maxDuration]`, keeping all requested duration candidates available.
+   - `resolveIntentTimeBounds`: Maps time intent into deterministic minute-of-day constraints (`earliestMinute`, `latestMinute`, `exactStartMinute`, `preferredTimeOfDay`). Exact start times use `exactStartMinute`, so duration ranges (e.g. "at 3 for 1-2 hours") keep every valid duration at the requested start without allowing later starts.
    - `generateIntentReadback`: Produces clean UI readback metadata (`title`, `durationLabel`, `dateLabel`, `timeLabel`, `location`).
 7. **Deterministic Availability Engine**: `generateCandidateSlots` produces candidate slots across all allowed durations on the local grid. Only conflict-free slots within working hours are generated.
 8. **Candidate Ranking**: Luna ranks the verified candidates and explains its choices, respecting placement preferences (`early`, `late`).

@@ -27,6 +27,7 @@ function deterministicResult(candidateCount = 2): DeterministicFindTimeResult {
     profileVersion: '2026-09-01T10:00:00.000Z',
     constraints: {
       durationMinutes: 60,
+      allowedDurationsMinutes: [60, 90, 120],
       windowStart: '2026-09-01T12:00:00.000Z',
       windowEnd: '2026-09-04T00:00:00.000Z',
       workingHours: [{ weekday: 2, startMinute: 540, endMinute: 1020 }],
@@ -36,6 +37,7 @@ function deterministicResult(candidateCount = 2): DeterministicFindTimeResult {
       splittable: false,
       minSplitMinutes: 30,
       preferredTimeOfDay: 'morning',
+      placementPreference: 'late',
     },
     candidates: Array.from({ length: candidateCount }, (_, index) => ({
       id: `opaque_${((index * 7919 + 104729) % 999983).toString(16).padStart(6, 'a')}`,
@@ -56,6 +58,9 @@ Deno.test('builds a strict sanitized model input and caps candidates at forty', 
   assertEquals(input.candidates.at(-1)?.id, source.candidates.at(-1)?.id);
   assertEquals(input.candidates[0]?.localDate, '2026-09-01');
   assertEquals(input.candidates[0]?.localStartMinute, 9 * 60);
+  assertEquals(input.candidates[0]?.durationMinutes, 60);
+  assertEquals(input.allowedDurationsMinutes, [60, 90, 120]);
+  assertEquals(input.placementPreference, 'late');
   assertEquals(input.task.title, 'Write launch brief');
 
   const serialized = JSON.stringify(input);

@@ -1,4 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert@^1.0.0';
+import type { SchedulingIntent } from '@cal/schemas/scheduling';
 
 import { runAiIntentEvaluation } from './intent-harness.ts';
 import type { AiIntentEvaluationFixture } from './intent-fixtures.ts';
@@ -101,3 +102,95 @@ Deno.test('evaluates intent fixtures and computes summaries across models', asyn
   assertEquals(summary.totalInputTokens, 400);
   assertEquals(summary.totalOutputTokens, 120);
 });
+
+Deno.test(
+  'grades supplied detail expectations instead of allowing omitted fields to pass',
+  async () => {
+    const expected = {
+      titleContains: 'planning session',
+      duration: null,
+      dateType: 'relative_week' as const,
+      dateModifier: 'next' as const,
+      datePreference: 'late' as const,
+      timeType: 'exact_time' as const,
+      timeHour: 15,
+      timeMinute: 0,
+      descriptionContains: 'roadmap',
+      requiresClarification: false,
+    };
+    const matchingIntent: SchedulingIntent = {
+      title: 'Planning session',
+      duration: null,
+      date: { type: 'relative_week', modifier: 'next', preference: 'late' },
+      time: { type: 'exact_time', hour: 15, minute: 0 },
+      location: null,
+      description: 'Discuss the roadmap',
+      requiresClarification: false,
+      clarificationQuestion: null,
+    };
+    const omittedIntent: SchedulingIntent = {
+      title: 'Planning session',
+      duration: null,
+      date: { type: 'unconstrained' },
+      time: { type: 'unconstrained' },
+      location: null,
+      description: null,
+      requiresClarification: false,
+      clarificationQuestion: null,
+    };
+    const fixtures: readonly AiIntentEvaluationFixture[] = [
+      {
+        id: 'strict-match',
+        description: 'All supplied detail expectations match.',
+        input: {
+          rawText: 'matching intent',
+          timezone: 'America/New_York',
+          currentLocalDate: '2026-09-08',
+          currentLocalTime: '10:00',
+        },
+        expected,
+      },
+      {
+        id: 'strict-omitted',
+        description: 'Omitted detail expectations must fail grading.',
+        input: {
+          rawText: 'omitted intent',
+          timezone: 'America/New_York',
+          currentLocalDate: '2026-09-08',
+          currentLocalTime: '10:00',
+        },
+        expected,
+      },
+    ];
+
+    const { records } = await runAiIntentEvaluation({
+      models: ['fixture-model'],
+      repetitions: 1,
+      fixtures,
+      createProvider: (model) => ({
+        provider: 'fixture',
+        model,
+        parseSchedulingIntent: (input) =>
+          Promise.resolve({
+            intent: input.rawText === 'matching intent' ? matchingIntent : omittedIntent,
+            metadata: {
+              provider: 'fixture',
+              model,
+              responseId: 'resp_strict_test',
+              promptVersion: 'find-time-intent-v1',
+              latencyMs: 1,
+              usage: { inputTokens: 1, outputTokens: 1, reasoningTokens: 0, totalTokens: 2 },
+            },
+          }),
+      }),
+    });
+
+    const matching = records.find((record) => record.fixtureId === 'strict-match');
+    const omitted = records.find((record) => record.fixtureId === 'strict-omitted');
+    if (!matching || !omitted) throw new Error('Expected strict grading records.');
+
+    assertEquals(matching.grade.passed, true);
+    assertEquals(omitted.grade.accuracyPassed, false);
+    assertEquals(omitted.grade.passed, false);
+  },
+);

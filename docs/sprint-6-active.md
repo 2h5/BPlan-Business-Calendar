@@ -14,7 +14,7 @@ Implemented and hardened the AI-first natural-language intent layer for Web Find
   - `scheduling.schema.ts`: Accepts `text?: string` (enforcing exactly one mode: `taskId` XOR `text` XOR (`title` AND `durationMinutes`)), `allowedDurationsMinutes`, `placementPreference`, and candidate `durationMinutes`.
 - **Domain (`packages/domain`)**:
   - `intent.ts`: Fixed title preposition cleanup bug (`lasting 15m` leaving `lasting`).
-  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, placement preferences (`early`/`late` weekend/week), and time bounds. For exact time with duration range, extends upper bound to `minute + maxDuration` to preserve all duration variants.
+  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, placement preferences (`early`/`late` weekend/week), and time bounds. Exact time uses `exactStartMinute` so every allowed duration starts at the requested minute without allowing later starts.
   - `availability.ts`: `generateCandidateSlots` produces candidates across all allowed durations on the local grid.
 - **Database & Migrations**:
   - `20260910000002_ai_natural_language_intent.sql`: Adds `raw_text`, `ad_hoc_location`, `ad_hoc_description`, `parsed_intent` columns to `ai_schedule_requests`. Updates `claim_ai_schedule_request` to accept `p_raw_text`, claiming quota under advisory lock before any billable model request. Updates `confirm_ai_schedule_suggestion` to populate `location` and `description` from the persisted request row.
@@ -31,7 +31,7 @@ Implemented and hardened the AI-first natural-language intent layer for Web Find
   - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips and clarification notices for Pro users. For Free/expired users, renders a locked teaser state with disabled input and a direct link to `/subscription` (no enabled input or failing requests), while preserving confirmation cards and banners.
   - `components/FindTimeBox.test.tsx`: Unit tests verifying Free locked teaser and Pro interactive flow.
 - **Evaluation Suite (`supabase/functions/_shared/ai/evaluation`)**:
-  - `intent-fixtures.ts`: 17 comprehensive fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, adversarial prompt injections, and impossible/past date clarifications.
+  - `intent-fixtures.ts`: 18 comprehensive fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, descriptions, adversarial prompt injections, and impossible/past date clarifications.
   - `intent-harness.ts`: Evaluates schema validity, extraction accuracy, clarification pass rate, latency, and tokens/cost.
   - `intent-harness.test.ts`: Automated tests for intent evaluation harness.
   - `run-live-intent.ts`: Live CLI runner for comparing Luna Low vs Luna Medium.

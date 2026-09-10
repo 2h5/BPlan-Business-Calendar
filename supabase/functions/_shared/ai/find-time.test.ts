@@ -334,6 +334,43 @@ Deno.test(
 );
 
 Deno.test(
+  'enforces an exact local start while generating every allowed duration variant',
+  async () => {
+    const result = await prepareDeterministicFindTime(
+      {
+        userId: USER_ID,
+        request: {
+          title: 'Catchup',
+          durationMinutes: 60,
+          windowStart: NOW.toISOString(),
+          windowEnd: '2026-08-31T23:00:00.000Z',
+          exactStartMinute: 15 * 60,
+        },
+        now: NOW,
+        allowedDurationsMinutes: [60, 90, 120],
+      },
+      dataSource(),
+      candidateId,
+    );
+
+    const exactStart = '2026-08-31T19:00:00.000Z'; // 15:00 New York.
+    assertEquals(result.constraints.exactStartMinute, 15 * 60);
+    assertEquals(result.candidates.length, 3);
+    assertEquals(
+      result.candidates.map((candidate) => candidate.startAt),
+      [exactStart, exactStart, exactStart],
+    );
+    assertEquals(
+      result.candidates.map(
+        (candidate) => (Date.parse(candidate.endAt) - Date.parse(candidate.startAt)) / 60_000,
+      ),
+      [60, 90, 120],
+    );
+    assert(result.candidates.every((candidate) => candidate.startAt === exactStart));
+  },
+);
+
+Deno.test(
   'rejects a missing default internal calendar and malformed profile constraints',
   async () => {
     await expectCode(
