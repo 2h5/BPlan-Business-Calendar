@@ -29,6 +29,7 @@ yarn-error.*
 supabase/.branches
 supabase/.temp
 supabase/.env
+supabase/snippets
 
 .vscode/*
 !.vscode/extensions.json

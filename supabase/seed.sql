@@ -67,3 +67,11 @@ select
   'America/New_York'
 from public.calendars c
 where c.user_id = '11111111-1111-1111-1111-111111111111' and c.is_default;
+
+insert into public.subscriptions (user_id, entitlement, status)
+values ('11111111-1111-1111-1111-111111111111', 'pro', 'active')
+on conflict (user_id, entitlement) do nothing;
+
+insert into public.ai_rate_limit_overrides (user_id, rate_limit_per_hour, note)
+values ('11111111-1111-1111-1111-111111111111', 1000, 'dev seed high limit')
+on conflict (user_id) do nothing;

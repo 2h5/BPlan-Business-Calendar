@@ -9,6 +9,30 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      ai_rate_limit_overrides: {
+        Row: {
+          created_at: string
+          note: string | null
+          rate_limit_per_hour: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          rate_limit_per_hour: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          rate_limit_per_hour?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_schedule_requests: {
         Row: {
           accepted_event_id: string | null

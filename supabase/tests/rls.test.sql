@@ -8,7 +8,7 @@
 begin;
 create extension if not exists pgtap;
 
-select plan(24);
+select plan(25);
 
 -- --- fixtures --------------------------------------------------------------
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
@@ -187,6 +187,12 @@ select throws_ok(
   )$$,
   '42501', null,
   'the rate-limit claim is server-only'
+);
+
+select throws_ok(
+  $$select * from public.ai_rate_limit_overrides$$,
+  '42501', null,
+  'ai_rate_limit_overrides is inaccessible to authenticated role'
 );
 
 select is(

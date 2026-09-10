@@ -59,6 +59,10 @@ export function useFindTime(): FindTimeState {
  */
 function messageForError(error: unknown): string {
   switch (codeOf(error)) {
+    case 'NOT_AUTHENTICATED':
+      return 'Your session has expired. Please sign out and sign in again.';
+    case 'AI_PROVIDER_UNAVAILABLE':
+      return 'AI scheduling service is temporarily unavailable. Please try again shortly.';
     case 'SUBSCRIPTION_REQUIRED':
       return 'Find Time is a Pro feature. Upgrade to let BPlan find open slots for you.';
     case 'AI_NO_VALID_SLOT':
