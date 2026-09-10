@@ -115,6 +115,21 @@ export const dateIntentExplicitSchema = z
   })
   .strict();
 
+/**
+ * A named week identified by a date inside it, e.g. "the week of the 21st".
+ * The whole week is the window; the date only says which week is meant.
+ */
+export const dateIntentWeekOfSchema = z
+  .object({
+    type: z.literal('week_of'),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format')
+      .refine(isValidCalendarDate, { message: 'Date must be a valid calendar date' }),
+    preference: datePreferenceSchema.default('any'),
+  })
+  .strict();
+
 export const dateIntentSchema = z.discriminatedUnion('type', [
   dateIntentUnconstrainedSchema,
   dateIntentTodaySchema,
@@ -123,6 +138,7 @@ export const dateIntentSchema = z.discriminatedUnion('type', [
   dateIntentWeekendSchema,
   dateIntentRelativeWeekSchema,
   dateIntentExplicitSchema,
+  dateIntentWeekOfSchema,
 ]);
 export type DateIntent = z.infer<typeof dateIntentSchema>;
 

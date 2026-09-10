@@ -218,6 +218,41 @@ export function resolveIntentDateWindow(
       };
     }
 
+    case 'week_of': {
+      if (!isValidCalendarDate(dateIntent.date)) {
+        return { windowStart: now, windowEnd: now, isImpossibleDate: true };
+      }
+
+      // The named date only identifies the week; the window is the whole week,
+      // Monday through Sunday, in the user's own timezone.
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIntent.date)!;
+      const namedUtc = zonedWallClockToUtc(
+        {
+          year: Number(match[1]),
+          month: Number(match[2]),
+          day: Number(match[3]),
+          hour: 0,
+          minute: 0,
+        },
+        timeZone,
+      );
+      const namedDayStart = startOfZonedDay(namedUtc, timeZone);
+      const namedWeekday = getZonedParts(namedDayStart, timeZone).weekday;
+      // Sunday (0) belongs to the week that began the preceding Monday.
+      const daysSinceMonday = (namedWeekday + 6) % 7;
+      const weekStart = addZonedDays(namedDayStart, -daysSinceMonday, timeZone);
+      const weekEnd = addZonedDays(weekStart, 7, timeZone);
+      const placementPreference = dateIntent.preference ?? 'any';
+
+      // A week already under way starts from now, not from its Monday.
+      return {
+        windowStart: weekStart.getTime() < now.getTime() ? now : weekStart,
+        windowEnd: weekEnd,
+        placementPreference,
+        isPast: weekEnd.getTime() <= now.getTime(),
+      };
+    }
+
     case 'explicit_date': {
       if (!isValidCalendarDate(dateIntent.date)) {
         return {
@@ -379,7 +414,36 @@ export function formatIntentDateLabel(dateIntent: DateIntent): string | null {
     }
     case 'explicit_date':
       return dateIntent.date;
+    case 'week_of': {
+      const week = `week of ${formatMonthDay(dateIntent.date)}`;
+      if (dateIntent.preference === 'late') return `Later in the ${week}`;
+      if (dateIntent.preference === 'early') return `Early in the ${week}`;
+      if (dateIntent.preference === 'middle') return `Mid ${week}`;
+      return `Week of ${formatMonthDay(dateIntent.date)}`;
+    }
   }
+}
+
+/** "2026-09-21" -> "Sep 21". Falls back to the raw date if it cannot be read. */
+function formatMonthDay(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) return date;
+  const monthNames = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const monthName = monthNames[Number(match[2]) - 1];
+  return monthName ? `${monthName} ${Number(match[3])}` : date;
 }
 
 /** Formats time intent into concise human-facing readback text. */
@@ -459,7 +523,11 @@ export interface EffectiveWorkingHoursInput {
 export function resolveEffectiveWorkingHours(input: EffectiveWorkingHoursInput): WorkingHours {
   const { workingHours, dateIntent, windowStart, windowEnd, timeZone } = input;
 
-  if (dateIntent.type === 'unconstrained' || dateIntent.type === 'relative_week') {
+  if (
+    dateIntent.type === 'unconstrained' ||
+    dateIntent.type === 'relative_week' ||
+    dateIntent.type === 'week_of'
+  ) {
     return workingHours;
   }
 

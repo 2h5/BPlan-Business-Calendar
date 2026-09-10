@@ -92,6 +92,7 @@ export const AI_INTENT_JSON_SCHEMA = {
             'weekend',
             'relative_week',
             'explicit_date',
+            'week_of',
           ],
         },
         weekday: {
@@ -218,8 +219,17 @@ RULES:
      - "later next week" -> modifier: "next", preference: "late".
      - "early next week" -> modifier: "next", preference: "early".
      - "toward the end of the week" / "later this week" -> modifier: "this", preference: "late".
-   - "explicit_date": specific calendar date in YYYY-MM-DD.
+   - "week_of": a week named by a date inside it, NOT a single day.
+     - "the week of the 21st" -> date: the 21st, resolved as a bare day below.
+     - "the week of October 5" -> date: "2026-10-05".
+     - "later in the week of the 21st" -> preference: "late".
+     - Use this whenever the text says "the week of"; the whole week is meant, not that one day.
+   - "explicit_date": specific calendar date in YYYY-MM-DD, for a single day.
    - "unconstrained": no date constraint named.
+   - Bare day numbers ("the 21st", "on the 3rd") name a day in the CURRENT month.
+     - If that day has already passed this month, use the same day next month.
+     - Never drop a named day: a bare day number is always a date, never "unconstrained".
+     - Today is given as currentLocalDate; resolve every relative date against it.
 
 4. Time Intent:
    - "exact_time": "at exactly 3pm", "at 10:15" -> hour (0..23), minute (0..59).
@@ -382,6 +392,15 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
       );
     }
     date = { type: 'explicit_date', date: d.date };
+  } else if (d.type === 'week_of') {
+    if (typeof d.date !== 'string' || !isValidCalendarDate(d.date)) {
+      throw new EdgeError(
+        'AI_INVALID_OUTPUT',
+        'Week-of date intent requires a valid calendar date in YYYY-MM-DD format.',
+        502,
+      );
+    }
+    date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
   } else {
     throw new EdgeError(
       'AI_INVALID_OUTPUT',
