@@ -6,13 +6,31 @@ import {
   toZonedDateKey,
 } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import styles from './CalendarView.module.css';
+import type { AnchorRect } from './QuickCreatePopover';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+export interface SlotSelection {
+  dateKey: string;
+  startMinute?: number;
+  endMinute?: number;
+  allDay?: boolean;
+  anchorRect: AnchorRect;
+}
+
+export interface DraftEventState {
+  dateKey: string;
+  startMinute?: number;
+  endMinute?: number;
+  allDay?: boolean;
+  title?: string;
+  calendarColor?: string;
+}
 
 interface TimelineViewProps {
   dateKeys: readonly string[];
@@ -22,7 +40,10 @@ interface TimelineViewProps {
   hourCycle: HourCycle;
   now: Date;
   onSelectDate: (dateKey: string) => void;
-  onSelectEvent: (occurrence: EventOccurrence) => void;
+  onSelectEvent: (occurrence: EventOccurrence, anchorRect?: AnchorRect) => void;
+  onSelectSlot?: (selection: SlotSelection) => void;
+  draftEvent?: DraftEventState | null;
+  defaultDurationMinutes?: number;
 }
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
@@ -47,7 +68,7 @@ interface EventButtonProps {
   hourCycle: HourCycle;
   compact: boolean;
   style?: React.CSSProperties;
-  onSelect: () => void;
+  onSelect: (anchorRect?: AnchorRect) => void;
 }
 
 function EventButton({
@@ -64,7 +85,18 @@ function EventButton({
       type="button"
       className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''}`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
-      onClick={onSelect}
+      onClick={(e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        onSelect({
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        });
+      }}
       title={`${occurrence.event.title}, ${formatEventTime(occurrence.start, timeZone, hourCycle)}`}
     >
       <span className={styles.timelineEventTitle}>{occurrence.event.title}</span>
@@ -77,6 +109,17 @@ function EventButton({
   );
 }
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
+function formatMinute(minute: number, hourCycle: HourCycle): string {
+  const h = Math.floor(minute / 60);
+  const m = minute % 60;
+  if (hourCycle === 'h23') return `${pad(h)}:${pad(m)}`;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 === 0 ? 12 : h % 12;
+  return `${displayH}:${pad(m)} ${period}`;
+}
+
 export function TimelineView({
   dateKeys,
   byDateKey,
@@ -86,11 +129,134 @@ export function TimelineView({
   now,
   onSelectDate,
   onSelectEvent,
+  onSelectSlot,
+  draftEvent,
+  defaultDurationMinutes = 60,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isWeek = dateKeys.length > 1;
   const hourHeight = isWeek ? 54 : 64;
   const todayKey = toZonedDateKey(now, timeZone);
+
+  const [dragSelection, setDragSelection] = useState<{
+    dateKey: string;
+    startMinute: number;
+    endMinute: number;
+  } | null>(null);
+
+  const dragRef = useRef<{
+    dateKey: string;
+    startY: number;
+    startX: number;
+    startMinute: number;
+    colRect: DOMRect;
+  } | null>(null);
+
+  const handleColumnPointerDown = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
+    if ((e.target as HTMLElement).closest(`.${styles.timelineEvent}`)) return;
+    if (e.button !== 0) return;
+
+    const colRect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - colRect.top;
+    const rawMinute = (y / hourHeight) * 60;
+    const startMinute = Math.max(0, Math.min(23 * 60 + 45, Math.floor(rawMinute / 15) * 15));
+
+    dragRef.current = {
+      dateKey,
+      startY: e.clientY,
+      startX: e.clientX,
+      startMinute,
+      colRect,
+    };
+
+    setDragSelection({
+      dateKey,
+      startMinute,
+      endMinute: Math.min(24 * 60, startMinute + 15),
+    });
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleColumnPointerMove = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
+    if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
+
+    const colRect = dragRef.current.colRect;
+    const y = Math.max(0, Math.min(colRect.height, e.clientY - colRect.top));
+    const rawMinute = (y / hourHeight) * 60;
+    const currentSnapped = Math.max(0, Math.min(24 * 60, Math.floor(rawMinute / 15) * 15));
+
+    const startMin = Math.min(dragRef.current.startMinute, currentSnapped);
+    const endMin = Math.max(dragRef.current.startMinute, currentSnapped) + 15;
+
+    setDragSelection({
+      dateKey,
+      startMinute: startMin,
+      endMinute: Math.min(24 * 60, endMin),
+    });
+  };
+
+  const handleColumnPointerUp = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
+    if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    const dragInfo = dragRef.current;
+    dragRef.current = null;
+
+    const distY = Math.abs(e.clientY - dragInfo.startY);
+    const isClick = distY < 6;
+
+    let finalStart = dragInfo.startMinute;
+    let finalEnd = Math.min(24 * 60, dragInfo.startMinute + defaultDurationMinutes);
+
+    if (!isClick && dragSelection) {
+      finalStart = dragSelection.startMinute;
+      finalEnd = dragSelection.endMinute;
+    }
+
+    setDragSelection(null);
+
+    if (onSelectSlot) {
+      const slotTop = dragInfo.colRect.top + (finalStart / 60) * hourHeight;
+      const slotHeight = Math.max(20, ((finalEnd - finalStart) / 60) * hourHeight);
+      const anchorRect: AnchorRect = {
+        top: slotTop,
+        bottom: slotTop + slotHeight,
+        left: dragInfo.colRect.left,
+        right: dragInfo.colRect.right,
+        width: dragInfo.colRect.width,
+        height: slotHeight,
+      };
+
+      onSelectSlot({
+        dateKey,
+        startMinute: finalStart,
+        endMinute: finalEnd,
+        anchorRect,
+      });
+    }
+  };
+
+  const handleColumnPointerCancel = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
+    if (dragRef.current?.dateKey === dateKey) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      dragRef.current = null;
+      setDragSelection(null);
+    }
+  };
 
   useEffect(() => {
     const initialHour =
@@ -155,7 +321,28 @@ export function TimelineView({
             <div className={styles.allDayLabel}>all-day</div>
             <div className={styles.allDayGrid}>
               {dateKeys.map((dateKey) => (
-                <div key={dateKey} className={styles.allDayColumn}>
+                <div
+                  key={dateKey}
+                  className={styles.allDayColumn}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest(`.${styles.timelineEvent}`)) return;
+                    if (onSelectSlot) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      onSelectSlot({
+                        dateKey,
+                        allDay: true,
+                        anchorRect: {
+                          top: rect.top,
+                          bottom: rect.bottom,
+                          left: rect.left,
+                          right: rect.right,
+                          width: rect.width,
+                          height: rect.height,
+                        },
+                      });
+                    }
+                  }}
+                >
                   {(allDayByDate.get(dateKey) ?? []).map((occurrence) => (
                     <EventButton
                       key={occurrence.key}
@@ -163,9 +350,23 @@ export function TimelineView({
                       timeZone={timeZone}
                       hourCycle={hourCycle}
                       compact
-                      onSelect={() => onSelectEvent(occurrence)}
+                      onSelect={(anchorRect) => onSelectEvent(occurrence, anchorRect)}
                     />
                   ))}
+                  {draftEvent && draftEvent.dateKey === dateKey && draftEvent.allDay && (
+                    <div
+                      className={`${styles.timelineEvent} ${styles.timelineEventCompact} ${styles.monthEventDraft}`}
+                      style={
+                        {
+                          '--event-color': draftEvent.calendarColor || 'var(--color-accent)',
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className={styles.timelineEventTitle}>
+                        {draftEvent.title || '(New event)'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,11 +399,62 @@ export function TimelineView({
             return (
               <div
                 key={dateKey}
+                data-date-key={dateKey}
                 className={`${styles.dayColumn} ${dateKey === todayKey ? styles.todayColumn : ''}`}
+                onPointerDown={(e) => handleColumnPointerDown(e, dateKey)}
+                onPointerMove={(e) => handleColumnPointerMove(e, dateKey)}
+                onPointerUp={(e) => handleColumnPointerUp(e, dateKey)}
+                onPointerCancel={(e) => handleColumnPointerCancel(e, dateKey)}
               >
                 {HOURS.map((hour) => (
                   <span key={hour} className={styles.hourLine} style={{ top: hour * hourHeight }} />
                 ))}
+                {dragSelection && dragSelection.dateKey === dateKey && (
+                  <div
+                    className={styles.dragSelectionIndicator}
+                    style={{
+                      top: (dragSelection.startMinute / 60) * hourHeight,
+                      height: Math.max(
+                        20,
+                        ((dragSelection.endMinute - dragSelection.startMinute) / 60) * hourHeight -
+                          2,
+                      ),
+                    }}
+                  >
+                    <span>
+                      {formatMinute(dragSelection.startMinute, hourCycle)} –{' '}
+                      {formatMinute(dragSelection.endMinute, hourCycle)}
+                    </span>
+                  </div>
+                )}
+                {draftEvent &&
+                  draftEvent.dateKey === dateKey &&
+                  !draftEvent.allDay &&
+                  draftEvent.startMinute !== undefined &&
+                  draftEvent.endMinute !== undefined &&
+                  !dragSelection && (
+                    <div
+                      className={styles.draftTimelineEvent}
+                      style={
+                        {
+                          top: (draftEvent.startMinute / 60) * hourHeight,
+                          height: Math.max(
+                            22,
+                            ((draftEvent.endMinute - draftEvent.startMinute) / 60) * hourHeight - 2,
+                          ),
+                          '--event-color': draftEvent.calendarColor || 'var(--color-accent)',
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className={styles.draftTimelineEventTitle}>
+                        {draftEvent.title || '(New event)'}
+                      </span>
+                      <span className={styles.draftTimelineEventTime}>
+                        {formatMinute(draftEvent.startMinute, hourCycle)} –{' '}
+                        {formatMinute(draftEvent.endMinute, hourCycle)}
+                      </span>
+                    </div>
+                  )}
                 {laidOut.map((placed) => {
                   const startMinute =
                     placed.interval.start <= dayStart.getTime()
@@ -230,7 +482,7 @@ export function TimelineView({
                         left: `calc(${placed.left * 100}% + 2px)`,
                         width: `calc(${placed.width * 100}% - 4px)`,
                       }}
-                      onSelect={() => onSelectEvent(placed.item)}
+                      onSelect={(anchorRect) => onSelectEvent(placed.item, anchorRect)}
                     />
                   );
                 })}

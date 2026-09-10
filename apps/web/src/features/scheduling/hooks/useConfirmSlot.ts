@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { queryKeys } from '../../../lib/query/query-client';
 import { confirmFindTimeSuggestion, type FindTimeConfirmation } from '../api/find-time.api';
@@ -28,13 +29,23 @@ export function useConfirmSlot(): ConfirmSlotState {
     },
   });
 
-  return {
-    confirmation: mutation.data ?? null,
-    confirmingSuggestionId: mutation.isPending ? (mutation.variables ?? null) : null,
-    errorMessage: mutation.error ? messageForError(mutation.error) : null,
-    confirm: mutation.mutate,
-    reset: mutation.reset,
-  };
+  return useMemo(
+    () => ({
+      confirmation: mutation.data ?? null,
+      confirmingSuggestionId: mutation.isPending ? (mutation.variables ?? null) : null,
+      errorMessage: mutation.error ? messageForError(mutation.error) : null,
+      confirm: mutation.mutate,
+      reset: mutation.reset,
+    }),
+    [
+      mutation.data,
+      mutation.isPending,
+      mutation.variables,
+      mutation.error,
+      mutation.mutate,
+      mutation.reset,
+    ],
+  );
 }
 
 function messageForError(error: unknown): string {

@@ -128,7 +128,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const [text, setText] = useState(() => findTime.promptText || getStoredFindTimeDraft());
 
   // Restore any active scheduled banner from sessionStorage (survives route navigation)
-  const [storedRecord] = useState<StoredScheduledBanner | null>(() => {
+  const [storedRecord, setStoredRecord] = useState<StoredScheduledBanner | null>(() => {
     const stored = getStoredBanner();
     if (!stored) return null;
     const remaining = stored.expiresAt - Date.now();
@@ -167,7 +167,12 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastHandledConfirmationRef = useRef<string | null>(null);
+  const bannerExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDismissingRef = useRef(false);
+  const hasRestoredRef = useRef(false);
+  const lastHandledConfirmationRef = useRef<string | null>(
+    storedRecord?.confirmation.suggestionId ?? confirmSlot.confirmation?.suggestionId ?? null,
+  );
 
   // Smooth exit state for proposal when user clears/deletes input
   const [displayedProposal, setDisplayedProposal] = useState<FindTimeProposal | null>(
@@ -176,25 +181,30 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const [isProposalExiting, setIsProposalExiting] = useState(false);
   const proposalExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (findTime.promptText && !text) {
-      setText(findTime.promptText);
-    }
-  }, [findTime.promptText, text]);
-
   const triggerBannerDismiss = useCallback(() => {
+    if (isDismissingRef.current) return;
+    isDismissingRef.current = true;
+
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
       dismissTimerRef.current = null;
     }
-    lastHandledConfirmationRef.current = null;
-    setIsBannerExiting(true);
+    if (bannerExitTimerRef.current) {
+      clearTimeout(bannerExitTimerRef.current);
+      bannerExitTimerRef.current = null;
+    }
+
     clearBannerRecord();
+    setStoredRecord(null);
+    setIsBannerExiting(true);
     confirmSlot.reset();
-    setTimeout(() => {
+
+    bannerExitTimerRef.current = setTimeout(() => {
       setRecentScheduled(null);
       setNoticePhase(null);
       setIsBannerExiting(false);
+      isDismissingRef.current = false;
+      bannerExitTimerRef.current = null;
     }, 350);
   }, [confirmSlot]);
 
@@ -203,8 +213,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
       const remaining = bannerExpiresAt - Date.now();
       if (remaining <= 0) {
         clearBannerRecord();
+        setStoredRecord(null);
         confirmSlot.reset();
-        lastHandledConfirmationRef.current = null;
         setRecentScheduled(null);
         setNoticePhase(null);
         return;
@@ -214,6 +224,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         clearTimeout(dismissTimerRef.current);
       }
       confirmSlot.reset();
+      setStoredRecord(null);
       setRecentScheduled(target);
       setNoticePhase('banner');
       setIsBannerExiting(false);
@@ -236,7 +247,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   // Restore the appropriate scheduled notice phase from storage and keep its
   // absolute transition/expiry times running across route navigation.
   useEffect(() => {
-    if (!storedRecord) return;
+    if (!storedRecord || hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
 
     if (storedRecord.phase === 'confirmation') {
       const bannerExpiresAt =
@@ -317,6 +329,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
       dismissTimerRef.current = setTimeout(() => {
         transitionToBanner(confirmation, bannerExpiresAt);
       }, CONFIRMATION_DISPLAY_DURATION_MS);
+    } else if (!confirmation) {
+      lastHandledConfirmationRef.current = null;
     }
   }, [confirmSlot.confirmation, transitionToBanner]);
 
@@ -324,6 +338,9 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
+      }
+      if (bannerExitTimerRef.current) {
+        clearTimeout(bannerExitTimerRef.current);
       }
       if (proposalExitTimerRef.current) {
         clearTimeout(proposalExitTimerRef.current);
@@ -472,6 +489,10 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                   if (findTime.errorMessage) findTime.reset();
 
                   if (newText.trim().length === 0) {
+                    clearStoredFindTimeDraft();
+                    if (findTime.clarification) {
+                      findTime.reset();
+                    }
                     if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
                       triggerProposalExit();
                     }
@@ -487,6 +508,9 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                   if (event.key === 'Escape') {
                     setText('');
                     clearStoredFindTimeDraft();
+                    if (findTime.clarification) {
+                      findTime.reset();
+                    }
                     if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
                       triggerProposalExit();
                     }

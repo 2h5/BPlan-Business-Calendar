@@ -26,6 +26,7 @@ interface EventEditorProps {
   onCreate: (input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onUpdate: (event: CalendarEvent, input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onDelete: (event: CalendarEvent) => Promise<void>;
+  initialFormValues?: Partial<EventFormValues> | null;
 }
 
 function writableCalendars(
@@ -53,6 +54,7 @@ export function EventEditor({
   onCreate,
   onUpdate,
   onDelete,
+  initialFormValues,
 }: EventEditorProps) {
   const event = occurrence?.event ?? null;
   const defaultCalendar =
@@ -118,13 +120,25 @@ export function EventEditor({
     if (event) {
       setForm(eventToFormValues(event));
     } else if (isDraft && defaultCalendar) {
-      setForm(
-        newEventFormValues(selectedDateKey, defaultCalendar.id, timeZone, defaultDurationMinutes),
+      const baseValues = newEventFormValues(
+        selectedDateKey,
+        defaultCalendar.id,
+        timeZone,
+        defaultDurationMinutes,
       );
+      setForm(initialFormValues ? { ...baseValues, ...initialFormValues } : baseValues);
     } else {
       setForm(null);
     }
-  }, [defaultCalendar, defaultDurationMinutes, event, isDraft, selectedDateKey, timeZone]);
+  }, [
+    defaultCalendar,
+    defaultDurationMinutes,
+    event,
+    initialFormValues,
+    isDraft,
+    selectedDateKey,
+    timeZone,
+  ]);
 
   useEffect(() => {
     const handleKeyDown = (keyboardEvent: KeyboardEvent) => {

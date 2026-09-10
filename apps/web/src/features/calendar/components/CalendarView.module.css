@@ -1929,7 +1929,75 @@
   .eventEditor,
   .eventEditorClosing,
   .detailsBackdrop,
-  .detailsBackdropClosing {
+  .detailsBackdropClosing,
+  .draftTimelineEvent,
+  .monthEventDraft {
     animation-duration: 1ms;
+  }
+}
+
+.dragSelectionIndicator {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  border: 2px dashed var(--color-accent);
+  z-index: 10;
+  pointer-events: none;
+  padding: 2px 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.draftTimelineEvent {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  border: 1.5px dashed var(--event-color, var(--color-accent));
+  z-index: 10;
+  pointer-events: none;
+  padding: 2px 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-sm);
+  animation: draft-pulse 2s ease-in-out infinite;
+  overflow: hidden;
+}
+
+.draftTimelineEventTitle {
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draftTimelineEventTime {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+}
+
+.monthEventDraft {
+  border: 1px dashed var(--event-color, var(--color-accent)) !important;
+  opacity: 0.85;
+  animation: draft-pulse 2s ease-in-out infinite;
+}
+
+@keyframes draft-pulse {
+  0%,
+  100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.65;
   }
 }

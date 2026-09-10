@@ -1,6 +1,8 @@
 import { toZonedDateKey } from '@cal/domain';
 
 import styles from './CalendarView.module.css';
+import type { AnchorRect } from './QuickCreatePopover';
+import type { DraftEventState, SlotSelection } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 
@@ -11,7 +13,9 @@ interface MonthViewProps {
   timeZone: string;
   now: Date;
   onSelectDate: (dateKey: string) => void;
-  onSelectEvent: (occurrence: EventOccurrence) => void;
+  onSelectEvent: (occurrence: EventOccurrence, anchorRect?: AnchorRect) => void;
+  onSelectSlot?: (selection: SlotSelection) => void;
+  draftEvent?: DraftEventState | null;
 }
 
 export function MonthView({
@@ -22,6 +26,8 @@ export function MonthView({
   now,
   onSelectDate,
   onSelectEvent,
+  onSelectSlot,
+  draftEvent,
 }: MonthViewProps) {
   const focusedMonth = Number(selectedDateKey.slice(5, 7));
   const todayKey = toZonedDateKey(now, timeZone);
@@ -47,12 +53,33 @@ export function MonthView({
             return (
               <div
                 key={dateKey}
+                data-date-key={dateKey}
                 className={`${styles.monthDay} ${isOutside ? styles.monthDayOutside : ''} ${dateKey === selectedDateKey ? styles.monthDaySelected : ''}`}
+                onDoubleClick={() => onSelectDate(dateKey)}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest(`.${styles.monthEvent}`)) {
+                    return;
+                  }
+                  if (onSelectSlot) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    onSelectSlot({
+                      dateKey,
+                      allDay: true,
+                      anchorRect: {
+                        top: rect.top,
+                        bottom: rect.bottom,
+                        left: rect.left,
+                        right: rect.right,
+                        width: rect.width,
+                        height: rect.height,
+                      },
+                    });
+                  }
+                }}
               >
                 <button
                   type="button"
                   className={`${styles.monthDateButton} ${isToday ? styles.monthDateToday : ''}`}
-                  onClick={() => onSelectDate(dateKey)}
                   aria-label={`${dateKey}, ${events.length} events`}
                 >
                   {Number(dateKey.slice(-2))}
@@ -68,13 +95,38 @@ export function MonthView({
                           '--event-color': occurrence.calendar?.color ?? 'var(--color-accent)',
                         } as React.CSSProperties
                       }
-                      onClick={() => onSelectEvent(occurrence)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        onSelectEvent(occurrence, {
+                          top: rect.top,
+                          bottom: rect.bottom,
+                          left: rect.left,
+                          right: rect.right,
+                          width: rect.width,
+                          height: rect.height,
+                        });
+                      }}
                       title={occurrence.event.title}
                     >
                       <span />
                       {occurrence.event.title}
                     </button>
                   ))}
+                  {draftEvent && draftEvent.dateKey === dateKey && (
+                    <div
+                      className={`${styles.monthEvent} ${styles.monthEventDraft}`}
+                      style={
+                        {
+                          '--event-color': draftEvent.calendarColor ?? 'var(--color-accent)',
+                        } as React.CSSProperties
+                      }
+                      title={draftEvent.title || '(New event)'}
+                    >
+                      <span />
+                      {draftEvent.title || '(New event)'}
+                    </div>
+                  )}
                   {events.length > 3 ? (
                     <span className={styles.moreEvents}>+{events.length - 3} more</span>
                   ) : null}

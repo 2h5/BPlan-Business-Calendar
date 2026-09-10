@@ -8,7 +8,9 @@ import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
-import { TimelineView } from './TimelineView';
+import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
+import { TimelineView, type SlotSelection } from './TimelineView';
+import { useCreateTask } from '../../tasks/hooks/useTasks';
 import {
   useCreateCalendar,
   useCreateEvent,
@@ -21,6 +23,7 @@ import {
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
+import type { EventFormValues } from '../utils/event-form';
 
 function CalendarState({
   kind,
@@ -87,6 +90,31 @@ export function CalendarView() {
   const [toast, setToast] = useState<string | null>(null);
   const openingControlRef = useRef<HTMLElement | null>(null);
 
+  const [quickCreateState, setQuickCreateState] = useState<{
+    isOpen: boolean;
+    dateKey: string;
+    startMinute?: number;
+    endMinute?: number;
+    startTime?: string;
+    endTime?: string;
+    allDay?: boolean;
+    anchorRect: AnchorRect | null;
+    editingOccurrence?: EventOccurrence | null;
+  }>({
+    isOpen: false,
+    dateKey: selectedDateKey,
+    anchorRect: null,
+    editingOccurrence: null,
+  });
+  const [draftState, setDraftState] = useState<{
+    title: string;
+    calendarColor: string;
+  } | null>(null);
+  const [editorInitialValues, setEditorInitialValues] = useState<Partial<EventFormValues> | null>(
+    null,
+  );
+  const createTaskMutation = useCreateTask();
+
   const result = useCalendarWindow(mode, selectedDateKey);
   const toggleVisibility = useToggleCalendarVisibility();
   const createCalendar = useCreateCalendar();
@@ -114,25 +142,136 @@ export function CalendarView() {
     if (result.calendars.some((calendar) => !calendar.isReadOnly)) {
       setIsEventEditorClosing(false);
       setSelectedOccurrence(null);
-      setIsDraft(true);
+      setIsDraft(false);
+
+      const todayKey = toZonedDateKey(new Date(), timeZone);
+      const todayElement = document.querySelector(`[data-date-key="${todayKey}"]`);
+      let anchorRect: AnchorRect | null = null;
+      if (todayElement instanceof HTMLElement) {
+        const rect = todayElement.getBoundingClientRect();
+        anchorRect = {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+      }
+
+      setQuickCreateState({
+        isOpen: true,
+        dateKey: todayKey,
+        allDay: false,
+        anchorRect,
+      });
     } else {
       setToast('Create or connect a writable calendar first.');
     }
-  }, [hasRequestedNewEvent, result.isLoading, result.calendars]);
+  }, [hasRequestedNewEvent, result.isLoading, result.calendars, timeZone]);
+
+  const rememberOpeningControl = useCallback(() => {
+    openingControlRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, []);
+
+  const handleEventSelect = useCallback(
+    (occurrence: EventOccurrence, anchorRect?: AnchorRect) => {
+      rememberOpeningControl();
+      setIsDraft(false);
+      setSelectedOccurrence(null);
+
+      let finalAnchorRect = anchorRect ?? null;
+      if (!finalAnchorRect) {
+        const dateKey = toZonedDateKey(new Date(occurrence.start), timeZone);
+        const cell = document.querySelector(`[data-date-key="${dateKey}"]`);
+        if (cell instanceof HTMLElement) {
+          const r = cell.getBoundingClientRect();
+          finalAnchorRect = {
+            top: r.top,
+            bottom: r.bottom,
+            left: r.left,
+            right: r.right,
+            width: r.width,
+            height: r.height,
+          };
+        }
+      }
+
+      const dateKey = toZonedDateKey(new Date(occurrence.start), timeZone);
+      setSelectedDateKey(dateKey);
+
+      setQuickCreateState({
+        isOpen: true,
+        dateKey,
+        anchorRect: finalAnchorRect,
+        editingOccurrence: occurrence,
+      });
+    },
+    [timeZone, rememberOpeningControl],
+  );
 
   useEffect(() => {
     if (!requestedEventId) return;
     const occurrence = result.occurrences.find((item) => item.event.id === requestedEventId);
     if (occurrence) {
-      setIsEventEditorClosing(false);
-      setSelectedOccurrence(occurrence);
+      handleEventSelect(occurrence);
       setRequestedEventId(null);
     }
-  }, [requestedEventId, result.occurrences]);
+  }, [requestedEventId, result.occurrences, handleEventSelect]);
+
   const heading = useMemo(
     () => formatRangeHeading(mode, selectedDateKey, window, timeZone),
     [mode, selectedDateKey, timeZone, window],
   );
+
+  const handleSlotSelect = useCallback(
+    ({ dateKey, startMinute, endMinute, allDay, anchorRect }: SlotSelection) => {
+      if (!result.calendars.some((c) => !c.isReadOnly)) {
+        setToast('Create or connect a writable calendar first.');
+        return;
+      }
+      rememberOpeningControl();
+      setSelectedDateKey(dateKey);
+      setIsDraft(false);
+      setSelectedOccurrence(null);
+
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const startTime =
+        startMinute !== undefined
+          ? `${pad(Math.floor(startMinute / 60))}:${pad(startMinute % 60)}`
+          : undefined;
+      const endTime =
+        endMinute !== undefined
+          ? `${pad(Math.floor(endMinute / 60))}:${pad(endMinute % 60)}`
+          : undefined;
+
+      setQuickCreateState({
+        isOpen: true,
+        dateKey,
+        startMinute,
+        endMinute,
+        startTime,
+        endTime,
+        allDay: allDay ?? false,
+        anchorRect,
+        editingOccurrence: null,
+      });
+    },
+    [result.calendars, rememberOpeningControl],
+  );
+
+  const activeDraftEvent = useMemo(() => {
+    if (!quickCreateState.isOpen || quickCreateState.editingOccurrence) return null;
+    return {
+      dateKey: quickCreateState.dateKey,
+      startMinute: quickCreateState.startMinute,
+      endMinute: quickCreateState.endMinute,
+      allDay: quickCreateState.allDay,
+      title: draftState?.title,
+      calendarColor: draftState?.calendarColor,
+    };
+  }, [quickCreateState, draftState]);
 
   const handleToggleVisibility = useCallback(
     (calendar: Calendar) => {
@@ -158,6 +297,7 @@ export function CalendarView() {
       setSelectedOccurrence(null);
       setIsDraft(false);
       setIsEventEditorClosing(false);
+      setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
     [mode],
   );
@@ -182,6 +322,7 @@ export function CalendarView() {
     setSelectedOccurrence(null);
     setIsDraft(false);
     setIsEventEditorClosing(false);
+    setEditorInitialValues(null);
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
 
     if (searchParams.has('newEvent') || searchParams.has('new') || searchParams.has('event')) {
@@ -197,11 +338,6 @@ export function CalendarView() {
       );
     }
   }, [searchParams, setSearchParams]);
-
-  const rememberOpeningControl = useCallback(() => {
-    openingControlRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  }, []);
 
   const closeCalendarEditor = useCallback(() => {
     setCalendarEditorOpen(false);
@@ -243,9 +379,46 @@ export function CalendarView() {
               return;
             }
             rememberOpeningControl();
-            setIsEventEditorClosing(false);
+            setIsDraft(false);
             setSelectedOccurrence(null);
-            setIsDraft(true);
+
+            const todayKey = toZonedDateKey(new Date(), timeZone);
+            setSelectedDateKey(todayKey);
+
+            // Locate today's square/column in the active calendar view to anchor popover to its left
+            const todayElement = document.querySelector(`[data-date-key="${todayKey}"]`);
+            let anchorRect: AnchorRect | null = null;
+
+            if (todayElement instanceof HTMLElement) {
+              const rect = todayElement.getBoundingClientRect();
+              anchorRect = {
+                top: rect.top,
+                bottom: rect.bottom,
+                left: rect.left,
+                right: rect.right,
+                width: rect.width,
+                height: rect.height,
+              };
+            } else {
+              const buttonRect = openingControlRef.current?.getBoundingClientRect() ?? null;
+              if (buttonRect) {
+                anchorRect = {
+                  top: buttonRect.top,
+                  bottom: buttonRect.bottom,
+                  left: buttonRect.left,
+                  right: buttonRect.right,
+                  width: buttonRect.width,
+                  height: buttonRect.height,
+                };
+              }
+            }
+
+            setQuickCreateState({
+              isOpen: true,
+              dateKey: todayKey,
+              allDay: false,
+              anchorRect,
+            });
           }}
         />
 
@@ -273,12 +446,9 @@ export function CalendarView() {
                   timeZone={timeZone}
                   now={new Date()}
                   onSelectDate={selectMonthDate}
-                  onSelectEvent={(occurrence) => {
-                    rememberOpeningControl();
-                    setIsEventEditorClosing(false);
-                    setIsDraft(false);
-                    setSelectedOccurrence(occurrence);
-                  }}
+                  onSelectEvent={handleEventSelect}
+                  onSelectSlot={handleSlotSelect}
+                  draftEvent={activeDraftEvent}
                 />
               ) : (
                 <TimelineView
@@ -289,12 +459,10 @@ export function CalendarView() {
                   hourCycle={result.hourCycle}
                   now={new Date()}
                   onSelectDate={setSelectedDateKey}
-                  onSelectEvent={(occurrence) => {
-                    rememberOpeningControl();
-                    setIsEventEditorClosing(false);
-                    setIsDraft(false);
-                    setSelectedOccurrence(occurrence);
-                  }}
+                  onSelectEvent={handleEventSelect}
+                  onSelectSlot={handleSlotSelect}
+                  draftEvent={activeDraftEvent}
+                  defaultDurationMinutes={result.defaultEventMinutes}
                 />
               )}
             </div>
@@ -307,6 +475,59 @@ export function CalendarView() {
           ) : null}
         </div>
       </section>
+
+      <QuickCreatePopover
+        isOpen={quickCreateState.isOpen}
+        anchorRect={quickCreateState.anchorRect}
+        selectedDateKey={quickCreateState.dateKey}
+        initialStartTime={quickCreateState.startTime}
+        initialEndTime={quickCreateState.endTime}
+        initialAllDay={quickCreateState.allDay}
+        editingOccurrence={quickCreateState.editingOccurrence}
+        calendars={result.calendars}
+        timeZone={timeZone}
+        defaultDurationMinutes={result.defaultEventMinutes}
+        isSaving={
+          createEvent.isPending ||
+          updateEvent.isPending ||
+          removeEvent.isPending ||
+          createTaskMutation.isPending
+        }
+        onClose={() =>
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }))
+        }
+        onCreateEvent={async (input) => {
+          await createEvent.mutateAsync(input);
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+          showSuccess('Event created.');
+        }}
+        onUpdateEvent={async (event, input) => {
+          await updateEvent.mutateAsync({ event, input });
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+          showSuccess('Event updated.');
+        }}
+        onDeleteEvent={async (event) => {
+          await removeEvent.mutateAsync(event);
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+          showSuccess('Event deleted.');
+        }}
+        onCreateTask={async (input) => {
+          await createTaskMutation.mutateAsync(input);
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+          showSuccess('Task created.');
+        }}
+        onMoreOptions={(draftValues) => {
+          setEditorInitialValues(draftValues);
+          if (quickCreateState.editingOccurrence) {
+            setSelectedOccurrence(quickCreateState.editingOccurrence);
+          } else {
+            setIsDraft(true);
+          }
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+          setIsEventEditorClosing(false);
+        }}
+        onDraftChange={(draft) => setDraftState(draft)}
+      />
 
       {selectedOccurrence || isDraft || isEventEditorClosing ? (
         <>
@@ -343,6 +564,7 @@ export function CalendarView() {
               await removeEvent.mutateAsync(event);
               showSuccess('Event deleted.');
             }}
+            initialFormValues={editorInitialValues}
           />
         </>
       ) : null}
