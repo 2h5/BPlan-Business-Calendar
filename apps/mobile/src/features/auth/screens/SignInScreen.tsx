@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { toAppError } from '../../../lib/errors/app-error';
 import { AppleSignInButton } from '../components/AppleSignInButton';
 import { AuthDivider } from '../components/AuthDivider';
+import { AuthHeader } from '../components/AuthHeader';
 import { useAuthActions } from '../hooks/useAuthActions';
 
 export function SignInScreen() {
@@ -27,12 +28,11 @@ export function SignInScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ gap: theme.spacing.xxl }}
       >
-        <View style={{ gap: theme.spacing.xs, paddingTop: theme.spacing.xxxl }}>
-          <Text variant="display">Welcome back</Text>
-          <Text variant="callout" color="secondary">
-            Know what you need to do, and when you can do it.
-          </Text>
-        </View>
+        <AuthHeader
+          eyebrow="BCal workspace"
+          title="Welcome back"
+          subtitle="Sign in to continue to your calendar and tasks."
+        />
 
         <View style={{ gap: theme.spacing.lg }}>
           <Controller

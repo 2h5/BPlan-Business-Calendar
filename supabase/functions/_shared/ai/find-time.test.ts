@@ -178,6 +178,71 @@ Deno.test('caps an explicit scheduling horizon at fourteen local days', async ()
   assertEquals(result.constraints.windowEnd, '2026-09-14T12:00:00.000Z');
 });
 
+Deno.test('honours a window the caller started, far beyond the default horizon', async () => {
+  // NOW is 2026-08-31; a request for late October is ~7 weeks out, well past
+  // the fourteen-day cap that bounds unbounded searches.
+  const result = await prepareDeterministicFindTime(
+    {
+      userId: USER_ID,
+      request: {
+        title: 'Meeting with Pat',
+        durationMinutes: 15,
+        windowStart: '2026-10-21T04:00:00.000Z',
+        windowEnd: '2026-10-22T04:00:00.000Z',
+      },
+      now: NOW,
+      allowNoValidSlot: true,
+    },
+    dataSource(),
+    candidateId,
+  );
+
+  assertEquals(result.constraints.windowStart, '2026-10-21T04:00:00.000Z');
+  assertEquals(result.constraints.windowEnd, '2026-10-22T04:00:00.000Z');
+});
+
+Deno.test('does not truncate a named week at the default horizon', async () => {
+  const result = await prepareDeterministicFindTime(
+    {
+      userId: USER_ID,
+      request: {
+        title: 'Meeting with Pat',
+        durationMinutes: 15,
+        windowStart: '2026-09-21T04:00:00.000Z',
+        windowEnd: '2026-09-28T04:00:00.000Z',
+      },
+      now: NOW,
+      allowNoValidSlot: true,
+    },
+    dataSource(),
+    candidateId,
+  );
+
+  // The whole week survives rather than being clipped to NOW + 14 days.
+  assertEquals(result.constraints.windowEnd, '2026-09-28T04:00:00.000Z');
+});
+
+Deno.test('rejects a start beyond the explicit horizon with a distinct code', async () => {
+  await expectCode(
+    prepareDeterministicFindTime(
+      {
+        userId: USER_ID,
+        request: {
+          title: 'Meeting with Pat',
+          durationMinutes: 15,
+          windowStart: '2028-01-10T05:00:00.000Z',
+          windowEnd: '2028-01-11T05:00:00.000Z',
+        },
+        now: NOW,
+        allowNoValidSlot: true,
+      },
+      dataSource(),
+      candidateId,
+    ),
+    'AI_WINDOW_TOO_FAR',
+  );
+});
+
 Deno.test('treats a date-only deadline as the end of its local day', async () => {
   const now = new Date('2026-03-09T12:00:00.000Z');
   const result = await prepareDeterministicFindTime(

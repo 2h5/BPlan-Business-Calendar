@@ -25,10 +25,10 @@ export interface TaskRowProps {
 /**
  * One line in the inbox or on Today.
  *
- * The row carries four pieces of information at a glance — done state,
- * urgency, when it is due, and how long it takes — without becoming noisy. The
- * priority tint is applied to the checkbox ring rather than added as a
- * separate badge, which keeps the row to a single visual column.
+ * The badge row mirrors the web client's task row — list, priority, due, and
+ * estimate as small rectangular tags — so a task reads the same on both
+ * surfaces. Where the web reveals snooze and delete on hover, which a touch
+ * screen has no equivalent for, the row exposes them on swipe instead.
  */
 export function TaskRow({
   task,
@@ -48,23 +48,19 @@ export function TaskRow({
   const completed = task.status === 'completed';
   const due = describeTaskDue(task, { now, timeZone, hourCycle });
 
-  const priorityColor: Record<TaskPriority, string | undefined> = {
-    urgent: theme.colors.danger,
-    high: theme.colors.warning,
-    normal: undefined,
-    low: undefined,
+  const priorityTone: Record<TaskPriority, { fg: string; bg: string }> = {
+    urgent: { fg: theme.colors.danger, bg: theme.colors.dangerSubtle },
+    high: { fg: theme.colors.warning, bg: theme.colors.warningSubtle },
+    normal: { fg: theme.colors.textTertiary, bg: theme.colors.surfaceElevated },
+    low: { fg: theme.colors.textTertiary, bg: theme.colors.surfaceElevated },
   };
 
-  const dueColor =
+  const dueTone =
     due.tone === 'overdue'
-      ? theme.colors.danger
+      ? { fg: theme.colors.danger, bg: theme.colors.dangerSubtle }
       : due.tone === 'today'
-        ? theme.colors.accent
-        : theme.colors.textTertiary;
-
-  const metaParts: string[] = [];
-  if (listName) metaParts.push(listName);
-  if (task.estimatedMinutes) metaParts.push(formatDuration(task.estimatedMinutes));
+        ? { fg: theme.colors.accent, bg: theme.colors.accentSubtle }
+        : { fg: theme.colors.textSecondary, bg: theme.colors.surfaceElevated };
 
   const renderRightActions = () => (
     <View style={{ flexDirection: 'row' }}>
@@ -95,6 +91,11 @@ export function TaskRow({
     </View>
   );
 
+  const showPriority = isNotablePriority(task.priority) && !completed;
+  const showDue = due.tone !== 'none' && !completed;
+  const showDuration = task.estimatedMinutes !== null && task.estimatedMinutes > 0;
+  const hasBadges = Boolean(listName) || showPriority || showDue || showDuration;
+
   return (
     <ReanimatedSwipeable
       ref={swipeableRef}
@@ -115,21 +116,22 @@ export function TaskRow({
             paddingVertical: theme.spacing.md,
             paddingHorizontal: theme.spacing.lg,
             minHeight: theme.hitSlopSize + theme.spacing.sm,
-            backgroundColor: pressed ? theme.colors.surfacePressed : theme.colors.surface,
+            opacity: completed ? 0.6 : 1,
+            backgroundColor: pressed ? theme.colors.hover : theme.colors.surface,
           },
         ]}
       >
         <Checkbox
           checked={completed}
           onChange={onToggleComplete}
-          color={priorityColor[task.priority]}
+          size={18}
           accessibilityLabel={completed ? `Mark ${task.title} not done` : `Complete ${task.title}`}
           testID={`task-checkbox-${task.id}`}
         />
 
         <View style={styles.body}>
           <Text
-            variant="body"
+            variant="subhead"
             numberOfLines={2}
             color={completed ? 'tertiary' : 'primary'}
             style={completed ? strikeThroughStyle : undefined}
@@ -137,50 +139,64 @@ export function TaskRow({
             {task.title}
           </Text>
 
-          {metaParts.length > 0 || due.tone !== 'none' ? (
-            <View style={[styles.meta, { gap: theme.spacing.sm }]}>
-              {due.tone !== 'none' ? (
-                <View style={[styles.meta, { gap: theme.spacing.xs }]}>
-                  {due.tone === 'overdue' ? (
-                    <Ionicons name="alert-circle" size={12} color={dueColor} />
+          {hasBadges ? (
+            <View style={[styles.badges, { gap: theme.spacing.sm }]}>
+              {listName ? (
+                <View style={[styles.listPill, { gap: 4 }]}>
+                  {listColor ? (
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 2,
+                        backgroundColor: listColor,
+                      }}
+                    />
                   ) : null}
-                  <Text variant="footnote" style={{ color: dueColor }}>
-                    {due.text}
+                  <Text variant="footnote" color="tertiary" style={styles.badgeText}>
+                    {listName}
                   </Text>
                 </View>
               ) : null}
 
-              {metaParts.length > 0 ? (
-                <Text variant="footnote" color="tertiary" numberOfLines={1}>
-                  {due.tone !== 'none' ? '· ' : ''}
-                  {metaParts.join(' · ')}
-                </Text>
+              {showPriority ? (
+                <Badge
+                  label={PRIORITY_LABELS[task.priority]}
+                  fg={priorityTone[task.priority].fg}
+                  bg={priorityTone[task.priority].bg}
+                />
+              ) : null}
+
+              {showDue ? <Badge label={due.text} fg={dueTone.fg} bg={dueTone.bg} /> : null}
+
+              {showDuration ? (
+                <View style={[styles.listPill, { gap: 3 }]}>
+                  <Ionicons name="time-outline" size={11} color={theme.colors.textTertiary} />
+                  <Text variant="footnote" color="tertiary" style={styles.badgeText}>
+                    {formatDuration(task.estimatedMinutes ?? 0)}
+                  </Text>
+                </View>
               ) : null}
             </View>
           ) : null}
         </View>
-
-        {isNotablePriority(task.priority) && !completed ? (
-          <View
-            accessibilityLabel={`${PRIORITY_LABELS[task.priority]} priority`}
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: priorityColor[task.priority] ?? theme.colors.accent,
-            }}
-          />
-        ) : null}
-
-        {listColor && !listName ? (
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: listColor }} />
-        ) : null}
 
         {task.scheduledEventId ? (
           <Ionicons name="calendar" size={14} color={theme.colors.textTertiary} />
         ) : null}
       </Pressable>
     </ReanimatedSwipeable>
+  );
+}
+
+/** The web's crisp rectangular tag — a 3px radius, not a pill. */
+function Badge({ label, fg, bg }: { label: string; fg: string; bg: string }) {
+  return (
+    <View style={[styles.badge, { backgroundColor: bg }]}>
+      <Text variant="footnote" style={[styles.badgeText, { color: fg }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
   );
 }
 
@@ -222,6 +238,9 @@ function SwipeAction({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
-  body: { flex: 1, gap: 2 },
-  meta: { flexDirection: 'row', alignItems: 'center' },
+  body: { flex: 1, gap: 3 },
+  badges: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  listPill: { flexDirection: 'row', alignItems: 'center' },
+  badge: { paddingVertical: 1, paddingHorizontal: 5, borderRadius: 3 },
+  badgeText: { fontSize: 11, lineHeight: 16 },
 });

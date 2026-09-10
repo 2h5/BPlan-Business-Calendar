@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { toAppError } from '../../../lib/errors/app-error';
 import { AppleSignInButton } from '../components/AppleSignInButton';
 import { AuthDivider } from '../components/AuthDivider';
+import { AuthHeader } from '../components/AuthHeader';
 import { useAuthActions } from '../hooks/useAuthActions';
 
 export function SignUpScreen() {
@@ -27,12 +28,11 @@ export function SignUpScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ gap: theme.spacing.xxl }}
       >
-        <View style={{ gap: theme.spacing.xs, paddingTop: theme.spacing.xxl }}>
-          <Text variant="display">Create your account</Text>
-          <Text variant="callout" color="secondary">
-            Your calendar and your to-do list, finally in the same place.
-          </Text>
-        </View>
+        <AuthHeader
+          eyebrow="BCal workspace"
+          title="Create your account"
+          subtitle="Your calendar and your to-do list, finally in the same place."
+        />
 
         <View style={{ gap: theme.spacing.lg }}>
           <Controller

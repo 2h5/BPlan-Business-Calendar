@@ -14,12 +14,33 @@ export interface BadgeProps {
 export function Badge({ label, tone = 'neutral', style }: BadgeProps) {
   const theme = useTheme();
 
-  const palette: Record<BadgeTone, { bg: string; fg: string }> = {
-    neutral: { bg: theme.colors.surfaceElevated, fg: theme.colors.textSecondary },
-    accent: { bg: theme.colors.accentSubtle, fg: theme.colors.accent },
-    success: { bg: theme.colors.successSubtle, fg: theme.colors.success },
-    warning: { bg: theme.colors.warningSubtle, fg: theme.colors.warning },
-    danger: { bg: theme.colors.dangerSubtle, fg: theme.colors.danger },
+  // Web `.badge`: a subtle tinted pill outlined in its own tone.
+  const palette: Record<BadgeTone, { bg: string; fg: string; border: string }> = {
+    neutral: {
+      bg: theme.colors.surfaceElevated,
+      fg: theme.colors.textSecondary,
+      border: theme.colors.border,
+    },
+    accent: {
+      bg: theme.colors.accentSubtle,
+      fg: theme.colors.accent,
+      border: theme.colors.accentSubtle,
+    },
+    success: {
+      bg: theme.colors.successSubtle,
+      fg: theme.colors.success,
+      border: theme.colors.successSubtle,
+    },
+    warning: {
+      bg: theme.colors.warningSubtle,
+      fg: theme.colors.warning,
+      border: theme.colors.warningSubtle,
+    },
+    danger: {
+      bg: theme.colors.dangerSubtle,
+      fg: theme.colors.danger,
+      border: theme.colors.dangerSubtle,
+    },
   };
 
   return (
@@ -28,15 +49,17 @@ export function Badge({ label, tone = 'neutral', style }: BadgeProps) {
         {
           minWidth: 22,
           paddingHorizontal: theme.spacing.sm,
-          paddingVertical: 2,
+          paddingVertical: 3,
           borderRadius: theme.radius.pill,
+          borderWidth: theme.borderWidth.hairline,
+          borderColor: palette[tone].border,
           backgroundColor: palette[tone].bg,
           alignItems: 'center',
         },
         style,
       ]}
     >
-      <Text variant="caption" style={{ color: palette[tone].fg }}>
+      <Text variant="caption" uppercase style={{ color: palette[tone].fg }}>
         {String(label)}
       </Text>
     </View>

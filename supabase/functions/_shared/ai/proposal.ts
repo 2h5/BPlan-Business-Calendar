@@ -388,6 +388,7 @@ async function generateAiFindTimeProposalFromText(
         allowNoValidSlot: true,
         allowedDurationsMinutes: resolvedDuration.allowedDurationsMinutes,
         placementPreference: resolvedWindow.placementPreference,
+        dateIntent: parsedIntent.date,
       },
       deps.dataSource,
       deps.candidateIdFactory,

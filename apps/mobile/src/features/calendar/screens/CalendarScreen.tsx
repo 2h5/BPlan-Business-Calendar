@@ -91,7 +91,9 @@ export function CalendarScreen() {
     <View style={{ flex: 1, gap: theme.spacing.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="title1">{heading}</Text>
+          <Text variant="title3" numberOfLines={1}>
+            {heading}
+          </Text>
         </View>
 
         <IconButton name="chevron-back" accessibilityLabel="Previous" onPress={() => shift(-1)} />

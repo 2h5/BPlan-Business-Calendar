@@ -692,3 +692,177 @@ Deno.test(
     assertEquals(result.task, null);
   },
 );
+
+Deno.test(
+  'confirms a weekend proposal whose working hours were opened as personal time',
+  async () => {
+    // Friday 2026-09-04 -> Saturday 2026-09-05 14:00-15:00 UTC (10:00-11:00 EDT)
+    const friNow = new Date('2026-09-04T12:00:00.000Z');
+    const satStart = '2026-09-05T14:00:00.000Z';
+    const satEnd = '2026-09-05T15:00:00.000Z';
+
+    const weekendWorkingHours = [
+      ...WORKING_HOURS,
+      { weekday: 6, startMinute: 8 * 60, endMinute: 22 * 60 },
+      { weekday: 0, startMinute: 8 * 60, endMinute: 22 * 60 },
+    ];
+
+    const result = await confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        now: () => friNow,
+        repository: repository({
+          loadSuggestion: () =>
+            Promise.resolve(
+              persisted({
+                taskId: null,
+                adHocTitle: 'Weekend hike',
+                taskVersion: null,
+                startAt: satStart,
+                endAt: satEnd,
+                constraints: {
+                  ...CONSTRAINTS,
+                  windowStart: '2026-09-05T04:00:00.000Z',
+                  windowEnd: '2026-09-07T04:00:00.000Z',
+                  workingHours: weekendWorkingHours,
+                },
+              }),
+            ),
+          loadCanonicalSchedule: () =>
+            Promise.resolve({
+              ...canonical(),
+              event: {
+                ...canonical().event,
+                title: 'Weekend hike',
+                startAt: satStart,
+                endAt: satEnd,
+              },
+              task: null,
+            }),
+        }),
+      }),
+    );
+
+    assertEquals(result.status, 'accepted');
+    assertEquals(result.event.title, 'Weekend hike');
+    assertEquals(result.event.startAt, satStart);
+  },
+);
+
+Deno.test(
+  'confirms an out-of-hours proposal whose working hours were opened as personal time',
+  async () => {
+    // Friday evening 2026-09-04 23:00-24:00 UTC (19:00-20:00 EDT) — outside 9-5 work hours
+    const friNow = new Date('2026-09-04T12:00:00.000Z');
+    const eveningStart = '2026-09-04T23:00:00.000Z';
+    const eveningEnd = '2026-09-05T00:00:00.000Z';
+
+    const eveningWorkingHours = [
+      ...WORKING_HOURS.filter((w) => w.weekday !== 5),
+      { weekday: 5, startMinute: 8 * 60, endMinute: 22 * 60 },
+    ];
+
+    const result = await confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        now: () => friNow,
+        repository: repository({
+          loadSuggestion: () =>
+            Promise.resolve(
+              persisted({
+                taskId: null,
+                adHocTitle: 'Friday dinner',
+                taskVersion: null,
+                startAt: eveningStart,
+                endAt: eveningEnd,
+                constraints: {
+                  ...CONSTRAINTS,
+                  windowStart: '2026-09-04T04:00:00.000Z',
+                  windowEnd: '2026-09-05T04:00:00.000Z',
+                  earliestMinute: 19 * 60,
+                  workingHours: eveningWorkingHours,
+                },
+              }),
+            ),
+          loadCanonicalSchedule: () =>
+            Promise.resolve({
+              ...canonical(),
+              event: {
+                ...canonical().event,
+                title: 'Friday dinner',
+                startAt: eveningStart,
+                endAt: eveningEnd,
+              },
+              task: null,
+            }),
+        }),
+      }),
+    );
+
+    assertEquals(result.status, 'accepted');
+    assertEquals(result.event.title, 'Friday dinner');
+  },
+);
+
+Deno.test(
+  'rejects a weekend proposal as stale when an event now conflicts with the slot',
+  async () => {
+    const friNow = new Date('2026-09-04T12:00:00.000Z');
+    const satStart = '2026-09-05T14:00:00.000Z';
+    const satEnd = '2026-09-05T15:00:00.000Z';
+
+    const weekendWorkingHours = [
+      ...WORKING_HOURS,
+      { weekday: 6, startMinute: 8 * 60, endMinute: 22 * 60 },
+      { weekday: 0, startMinute: 8 * 60, endMinute: 22 * 60 },
+    ];
+
+    await assertRejects(
+      () =>
+        confirmAiScheduleSuggestion(
+          { userId: USER_ID, suggestionId: SUGGESTION_ID },
+          deps({
+            now: () => friNow,
+            dataSource: source({
+              // A conflicting event now occupies that slot
+              loadEvents: () =>
+                Promise.resolve([
+                  {
+                    calendarId: CALENDAR_ID,
+                    startAt: '2026-09-05T14:00:00.000Z',
+                    endAt: '2026-09-05T15:00:00.000Z',
+                    timezone: 'America/New_York',
+                    status: 'confirmed',
+                    recurrenceRule: null,
+                    sourceType: 'internal',
+                    providerEventId: null,
+                    recurringEventId: null,
+                    recurrenceOriginalStartAt: null,
+                  },
+                ]),
+            }),
+            repository: repository({
+              loadSuggestion: () =>
+                Promise.resolve(
+                  persisted({
+                    taskId: null,
+                    adHocTitle: 'Weekend hike',
+                    taskVersion: null,
+                    startAt: satStart,
+                    endAt: satEnd,
+                    constraints: {
+                      ...CONSTRAINTS,
+                      windowStart: '2026-09-05T04:00:00.000Z',
+                      windowEnd: '2026-09-07T04:00:00.000Z',
+                      workingHours: weekendWorkingHours,
+                    },
+                  }),
+                ),
+            }),
+          }),
+        ),
+      EdgeError,
+      'That scheduling suggestion is no longer current.',
+    );
+  },
+);

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 
 import type { IconName } from '../icons';
 import { Text } from '../text/Text';
@@ -35,9 +35,9 @@ export function Chip({
     height: 32,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.pill,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: theme.borderWidth.hairline,
     borderColor: selected ? tint : theme.colors.border,
-    backgroundColor: selected ? theme.colors.accentSubtle : theme.colors.surface,
+    backgroundColor: selected ? theme.colors.accentSubtle : theme.colors.surfaceRaised,
   };
 
   const content = (

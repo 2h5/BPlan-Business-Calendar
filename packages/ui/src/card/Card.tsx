@@ -8,6 +8,8 @@ export interface CardProps extends ViewProps {
   /** Small uppercase eyebrow above the card title. */
   eyebrow?: string;
   title?: string;
+  /** Sits under the title, for a line of explanation. */
+  description?: string;
   /** Rendered at the trailing edge of the header row. */
   headerAccessory?: ReactNode;
   padded?: boolean;
@@ -16,9 +18,15 @@ export interface CardProps extends ViewProps {
   style?: ViewStyle;
 }
 
+/**
+ * The web's `.section`: a flat surface with a 1px edge, its header divided from
+ * the body by a hairline rather than by whitespace. Depth comes from the border
+ * and the surface colour, never from a shadow.
+ */
 export function Card({
   eyebrow,
   title,
+  description,
   headerAccessory,
   padded = true,
   elevated = false,
@@ -30,30 +38,49 @@ export function Card({
   const theme = useTheme();
 
   const surface: ViewStyle = {
-    backgroundColor: elevated ? theme.colors.surfaceElevated : theme.colors.surface,
+    backgroundColor: elevated ? theme.colors.surfaceRaised : theme.colors.surface,
     borderRadius: theme.radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    padding: padded ? theme.spacing.lg : 0,
-    ...theme.elevation.card,
+    borderWidth: theme.borderWidth.hairline,
+    borderColor: theme.colors.borderSubtle,
+    // Keeps a `padded={false}` list's row press states inside the rounded edge.
+    overflow: 'hidden',
   };
+
+  const hasHeader = Boolean(eyebrow || title || description || headerAccessory);
+
+  const header = hasHeader ? (
+    <View
+      style={[
+        styles.header,
+        {
+          paddingHorizontal: theme.spacing.xl,
+          paddingVertical: theme.spacing.lg,
+          borderBottomWidth: theme.borderWidth.hairline,
+          borderBottomColor: theme.colors.borderSubtle,
+        },
+      ]}
+    >
+      <View style={styles.headerText}>
+        {eyebrow ? (
+          <Text variant="caption" color="tertiary" uppercase>
+            {eyebrow}
+          </Text>
+        ) : null}
+        {title ? <Text variant="headline">{title}</Text> : null}
+        {description ? (
+          <Text variant="footnote" color="secondary">
+            {description}
+          </Text>
+        ) : null}
+      </View>
+      {headerAccessory}
+    </View>
+  ) : null;
 
   const content = (
     <>
-      {(eyebrow || title || headerAccessory) && (
-        <View style={[styles.header, { marginBottom: theme.spacing.md }]}>
-          <View style={styles.headerText}>
-            {eyebrow ? (
-              <Text variant="caption" color="tertiary" uppercase>
-                {eyebrow}
-              </Text>
-            ) : null}
-            {title ? <Text variant="title3">{title}</Text> : null}
-          </View>
-          {headerAccessory}
-        </View>
-      )}
-      {children}
+      {header}
+      <View style={padded ? { padding: theme.spacing.xl } : undefined}>{children}</View>
     </>
   );
 
@@ -82,6 +109,6 @@ export function Card({
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   headerText: { flexShrink: 1, gap: 2 },
 });

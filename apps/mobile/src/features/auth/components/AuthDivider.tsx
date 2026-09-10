@@ -3,7 +3,11 @@ import { StyleSheet, View } from 'react-native';
 
 export function AuthDivider({ label = 'or' }: { label?: string }) {
   const theme = useTheme();
-  const rule = { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: theme.colors.border };
+  const rule = {
+    flex: 1,
+    height: theme.borderWidth.hairline,
+    backgroundColor: theme.colors.borderSubtle,
+  };
 
   return (
     <View style={[styles.row, { gap: theme.spacing.md }]}>

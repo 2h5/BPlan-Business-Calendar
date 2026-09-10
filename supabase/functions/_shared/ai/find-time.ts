@@ -1,18 +1,28 @@
 import {
   generateCandidateSlots,
+  resolveEffectiveWorkingHours,
   schedulingEventsToBusyIntervals,
   type SchedulingCalendarEvent,
 } from '@cal/domain/scheduling';
 import { addZonedDays, startOfZonedDay } from '@cal/domain/time';
 import {
   scheduleConstraintsSchema,
+  workingHoursSchema,
   type AiScheduleRequest,
+  type DateIntent,
   type ScheduleConstraints,
+  type WorkingHours,
 } from '@cal/schemas/scheduling';
 
 import { EdgeError } from '../errors/index.ts';
 
 const MAX_HORIZON_DAYS = 14;
+/**
+ * A request that names its own dates is honoured far further out: the 14-day
+ * cap exists to bound a search nobody bounded, not to overrule a user who
+ * asked for a specific week or date.
+ */
+const EXPLICIT_HORIZON_DAYS = 365;
 const MAX_DURATION_MINUTES = 12 * 60;
 const GRANULARITY_MINUTES = 15;
 /**
@@ -98,6 +108,17 @@ export async function prepareDeterministicFindTime(
     allowNoValidSlot?: boolean;
     allowedDurationsMinutes?: number[];
     placementPreference?: 'early' | 'middle' | 'late' | 'any';
+    /**
+     * Present when the window came from interpreted text. It says whether the
+     * user actually named a day or hour outside their work week, which is what
+     * distinguishes a personal-time request from an unqualified one.
+     */
+    dateIntent?: DateIntent;
+    /**
+     * Explicit working hours to use directly instead of resolving from the
+     * profile (e.g. during revalidation of an already-resolved request).
+     */
+    workingHours?: WorkingHours;
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -141,7 +162,19 @@ export async function prepareDeterministicFindTime(
     allowedDurationsMinutes: input.allowedDurationsMinutes,
     windowStart: window.start.toISOString(),
     windowEnd: window.end.toISOString(),
-    workingHours: profile.workingHours,
+    workingHours:
+      input.workingHours ??
+      (input.dateIntent
+        ? resolveEffectiveWorkingHours({
+            workingHours: parseWorkingHours(profile.workingHours),
+            dateIntent: input.dateIntent,
+            windowStart: window.start,
+            windowEnd: window.end,
+            timeZone: profile.timezone,
+            earliestMinute: input.request.earliestMinute,
+            latestMinute: input.request.latestMinute,
+          })
+        : profile.workingHours),
     timezone: profile.timezone,
     bufferMinutes: input.request.bufferMinutes ?? 0,
     earliestMinute: input.request.earliestMinute,
@@ -281,7 +314,25 @@ function resolveWindow(
     defaultEnd = addZonedDays(now, DEFAULT_ADHOC_HORIZON_DAYS, timezone);
   }
 
-  const cap = addZonedDays(now, MAX_HORIZON_DAYS, timezone);
+  // A caller that named where the window *starts* has chosen the window and is
+  // honoured far out. Naming only an end is asking us to bound a search that
+  // still begins now, so that keeps the short default horizon.
+  const cap = addZonedDays(
+    now,
+    request.windowStart === undefined ? MAX_HORIZON_DAYS : EXPLICIT_HORIZON_DAYS,
+    timezone,
+  );
+
+  // Clamping only the end would invert the window and surface as a confusing
+  // "your preferences are invalid"; say plainly that the date is too far out.
+  if (start.getTime() >= cap.getTime()) {
+    throw new EdgeError(
+      'AI_WINDOW_TOO_FAR',
+      'That date is further ahead than scheduling looks.',
+      422,
+    );
+  }
+
   const end = new Date(
     Math.min(
       cap.getTime(),
@@ -315,6 +366,23 @@ function taskDeadlineFor(task: FindTimeTask, timezone: string): Date {
 
   const dueDayStart = startOfZonedDay(dueAt, timezone);
   return addZonedDays(dueDayStart, 1, timezone);
+}
+
+/**
+ * The profile's working hours arrive untyped and are normally validated as
+ * part of the whole constraints object. Resolving personal time needs them one
+ * step earlier, so they are validated here with the same failure.
+ */
+function parseWorkingHours(value: unknown): WorkingHours {
+  const parsed = workingHoursSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new EdgeError(
+      'AI_SCHEDULING_WINDOW_INVALID',
+      'Your planning preferences do not form a valid scheduling window.',
+      422,
+    );
+  }
+  return parsed.data;
 }
 
 function parseConstraints(input: unknown): ScheduleConstraints {

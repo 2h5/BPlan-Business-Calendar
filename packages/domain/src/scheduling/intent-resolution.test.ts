@@ -7,6 +7,7 @@ import {
   formatIntentTimeLabel,
   generateIntentReadback,
   resolveIntentDateWindow,
+  resolveEffectiveWorkingHours,
   resolveIntentDuration,
   resolveIntentTimeBounds,
   timeOfDayFromHour,
@@ -432,5 +433,218 @@ describe('richer relative-date preferences', () => {
     expect(laterNextWeek.windowStart.toISOString()).toBe('2026-09-14T04:00:00.000Z');
     expect(laterNextWeek.windowEnd.toISOString()).toBe('2026-09-21T04:00:00.000Z');
     expect(laterNextWeek.placementPreference).toBe('late');
+  });
+});
+
+describe('resolveEffectiveWorkingHours', () => {
+  const ZONE = 'America/New_York';
+  // Monday to Friday, 09:00-17:00.
+  const WORK_WEEK = [1, 2, 3, 4, 5].map((weekday) => ({
+    weekday,
+    startMinute: 9 * 60,
+    endMinute: 17 * 60,
+  }));
+
+  /** Saturday 2026-09-12 through Monday, the window "this weekend" resolves to. */
+  const WEEKEND_START = new Date('2026-09-12T04:00:00.000Z');
+  const WEEKEND_END = new Date('2026-09-14T04:00:00.000Z');
+
+  it('opens the weekend to personal time when the weekend was asked for', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekend', modifier: 'this', preference: 'any' },
+      windowStart: WEEKEND_START,
+      windowEnd: WEEKEND_END,
+      timeZone: ZONE,
+    });
+
+    const saturday = result.find((w) => w.weekday === 6);
+    const sunday = result.find((w) => w.weekday === 0);
+    expect(saturday).toEqual({ weekday: 6, startMinute: 8 * 60, endMinute: 22 * 60 });
+    expect(sunday).toEqual({ weekday: 0, startMinute: 8 * 60, endMinute: 22 * 60 });
+  });
+
+  it('leaves the work week untouched while doing so', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekend', modifier: 'this', preference: 'any' },
+      windowStart: WEEKEND_START,
+      windowEnd: WEEKEND_END,
+      timeZone: ZONE,
+    });
+
+    for (const weekday of [1, 2, 3, 4, 5]) {
+      expect(result.filter((w) => w.weekday === weekday)).toEqual([
+        { weekday, startMinute: 9 * 60, endMinute: 17 * 60 },
+      ]);
+    }
+  });
+
+  it('does not open the weekend for "next week", which names no weekend', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'relative_week', modifier: 'next', preference: 'any' },
+      windowStart: new Date('2026-09-14T04:00:00.000Z'),
+      windowEnd: new Date('2026-09-21T04:00:00.000Z'),
+      timeZone: ZONE,
+    });
+
+    expect(result).toEqual(WORK_WEEK);
+  });
+
+  it('does not open the weekend for an unconstrained request', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'unconstrained' },
+      windowStart: new Date('2026-09-10T13:00:00.000Z'),
+      windowEnd: new Date('2026-09-17T13:00:00.000Z'),
+      timeZone: ZONE,
+    });
+
+    expect(result).toEqual(WORK_WEEK);
+  });
+
+  it('opens a named non-working day, e.g. "Saturday"', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekday', weekday: 'saturday', modifier: 'none' },
+      windowStart: WEEKEND_START,
+      windowEnd: new Date('2026-09-13T04:00:00.000Z'),
+      timeZone: ZONE,
+    });
+
+    expect(result.find((w) => w.weekday === 6)).toEqual({
+      weekday: 6,
+      startMinute: 8 * 60,
+      endMinute: 22 * 60,
+    });
+    expect(result.some((w) => w.weekday === 0)).toBe(false);
+  });
+
+  it('opens a working day when the named hour falls outside working hours', () => {
+    // Friday 2026-09-11, asked for 20:00 — a workday, but personal time.
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekday', weekday: 'friday', modifier: 'none' },
+      windowStart: new Date('2026-09-11T04:00:00.000Z'),
+      windowEnd: new Date('2026-09-12T04:00:00.000Z'),
+      timeZone: ZONE,
+      earliestMinute: 20 * 60,
+    });
+
+    expect(result).toContainEqual({ weekday: 5, startMinute: 8 * 60, endMinute: 22 * 60 });
+  });
+
+  it('leaves a working day alone when the named hour still overlaps working hours', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekday', weekday: 'friday', modifier: 'none' },
+      windowStart: new Date('2026-09-11T04:00:00.000Z'),
+      windowEnd: new Date('2026-09-12T04:00:00.000Z'),
+      timeZone: ZONE,
+      earliestMinute: 14 * 60,
+    });
+
+    expect(result).toEqual(WORK_WEEK);
+  });
+});
+
+describe('resolveIntentDateWindow: week_of', () => {
+  const ZONE = 'America/New_York';
+  // Thursday 2026-09-10, 07:00 local.
+  const NOW = new Date('2026-09-10T11:00:00.000Z');
+
+  it('spans the whole week containing the named day, Monday to Monday', () => {
+    // The 21st is a Monday; the week runs to Monday the 28th.
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-09-21', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.windowStart.toISOString()).toBe('2026-09-21T04:00:00.000Z');
+    expect(result.windowEnd.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+    expect(result.isPast).toBe(false);
+  });
+
+  it('anchors to the Monday of the week when a mid-week day is named', () => {
+    // Wednesday the 23rd still means the week beginning Monday the 21st.
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-09-23', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.windowStart.toISOString()).toBe('2026-09-21T04:00:00.000Z');
+    expect(result.windowEnd.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+  });
+
+  it('treats Sunday as the end of the week that began the preceding Monday', () => {
+    // Sunday the 27th belongs to the week of the 21st, not the 28th.
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-09-27', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.windowStart.toISOString()).toBe('2026-09-21T04:00:00.000Z');
+    expect(result.windowEnd.toISOString()).toBe('2026-09-28T04:00:00.000Z');
+  });
+
+  it('starts from now when the named week is already under way', () => {
+    // The week of the 7th contains today, so it cannot start on its Monday.
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-09-07', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.windowStart.toISOString()).toBe(NOW.toISOString());
+    expect(result.windowEnd.toISOString()).toBe('2026-09-14T04:00:00.000Z');
+    expect(result.isPast).toBe(false);
+  });
+
+  it('reports a fully past week as past rather than searching it', () => {
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-08-31', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.isPast).toBe(true);
+  });
+
+  it('carries the placement preference through', () => {
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-09-21', preference: 'late' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.placementPreference).toBe('late');
+  });
+
+  it('rejects an impossible calendar date', () => {
+    const result = resolveIntentDateWindow(
+      { type: 'week_of', date: '2026-02-30', preference: 'any' },
+      ZONE,
+      NOW,
+    );
+
+    expect(result.isImpossibleDate).toBe(true);
+  });
+});
+
+describe('formatIntentDateLabel: week_of', () => {
+  it('names the week rather than the day', () => {
+    expect(formatIntentDateLabel({ type: 'week_of', date: '2026-09-21', preference: 'any' })).toBe(
+      'Week of Sep 21, 2026',
+    );
+  });
+
+  it('keeps a placement preference in the label', () => {
+    expect(formatIntentDateLabel({ type: 'week_of', date: '2026-09-21', preference: 'late' })).toBe(
+      'Later in the week of Sep 21, 2026',
+    );
   });
 });

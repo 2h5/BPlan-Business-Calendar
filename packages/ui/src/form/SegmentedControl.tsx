@@ -46,7 +46,9 @@ export function SegmentedControl<T extends string>({
           padding: 3,
           gap: 3,
           borderRadius: theme.radius.md,
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.surfaceRaised,
+          borderWidth: theme.borderWidth.hairline,
+          borderColor: theme.colors.borderSubtle,
         }}
       >
         {options.map((option) => {
@@ -67,7 +69,7 @@ export function SegmentedControl<T extends string>({
                 minHeight: 36,
                 paddingHorizontal: theme.spacing.sm,
                 borderRadius: theme.radius.sm,
-                backgroundColor: selected ? theme.colors.surfaceElevated : 'transparent',
+                backgroundColor: selected ? theme.colors.surface : 'transparent',
                 borderWidth: selected ? 1 : 0,
                 borderColor: selected ? tint : 'transparent',
               }}

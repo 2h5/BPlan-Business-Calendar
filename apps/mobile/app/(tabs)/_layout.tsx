@@ -1,15 +1,9 @@
 import { useTheme } from '@cal/ui';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { QuickAddButton } from '../../src/components/app-shell/QuickAddButton';
-
-const NATIVE_TAB_BAR_CLEARANCE = 72;
 
 export default function TabsLayout() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
@@ -40,20 +34,6 @@ export default function TabsLayout() {
         <NativeTabs.Trigger name="quick-add" hidden />
         <NativeTabs.Trigger name="search" hidden />
       </NativeTabs>
-
-      {/* Quick Add is an action, so it sits above the native navigation bar. */}
-      <View
-        pointerEvents="box-none"
-        style={[
-          styles.quickAddOverlay,
-          {
-            bottom: insets.bottom + NATIVE_TAB_BAR_CLEARANCE,
-            right: theme.screenPadding,
-          },
-        ]}
-      >
-        <QuickAddButton />
-      </View>
     </View>
   );
 }
@@ -61,12 +41,5 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  quickAddOverlay: {
-    position: 'absolute',
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    zIndex: 10,
   },
 });

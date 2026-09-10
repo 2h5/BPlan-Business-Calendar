@@ -5,6 +5,7 @@ import { workingHoursSchema } from './profile.schema.ts';
 
 export * from './intent.schema.ts';
 
+export { workingHoursSchema } from './profile.schema.ts';
 export type { WorkingHours } from './profile.schema.ts';
 
 export const timeOfDayPreferenceSchema = z.enum(['morning', 'afternoon', 'evening', 'any']);
