@@ -17,6 +17,12 @@ import {
 import { EdgeError } from '../errors/index.ts';
 
 const MAX_HORIZON_DAYS = 14;
+/**
+ * A request that names its own dates is honoured far further out: the 14-day
+ * cap exists to bound a search nobody bounded, not to overrule a user who
+ * asked for a specific week or date.
+ */
+const EXPLICIT_HORIZON_DAYS = 365;
 const MAX_DURATION_MINUTES = 12 * 60;
 const GRANULARITY_MINUTES = 15;
 /**
@@ -301,7 +307,25 @@ function resolveWindow(
     defaultEnd = addZonedDays(now, DEFAULT_ADHOC_HORIZON_DAYS, timezone);
   }
 
-  const cap = addZonedDays(now, MAX_HORIZON_DAYS, timezone);
+  // A caller that named where the window *starts* has chosen the window and is
+  // honoured far out. Naming only an end is asking us to bound a search that
+  // still begins now, so that keeps the short default horizon.
+  const cap = addZonedDays(
+    now,
+    request.windowStart === undefined ? MAX_HORIZON_DAYS : EXPLICIT_HORIZON_DAYS,
+    timezone,
+  );
+
+  // Clamping only the end would invert the window and surface as a confusing
+  // "your preferences are invalid"; say plainly that the date is too far out.
+  if (start.getTime() >= cap.getTime()) {
+    throw new EdgeError(
+      'AI_WINDOW_TOO_FAR',
+      'That date is further ahead than scheduling looks.',
+      422,
+    );
+  }
+
   const end = new Date(
     Math.min(
       cap.getTime(),

@@ -638,13 +638,13 @@ describe('resolveIntentDateWindow: week_of', () => {
 describe('formatIntentDateLabel: week_of', () => {
   it('names the week rather than the day', () => {
     expect(formatIntentDateLabel({ type: 'week_of', date: '2026-09-21', preference: 'any' })).toBe(
-      'Week of Sep 21',
+      'Week of Sep 21, 2026',
     );
   });
 
   it('keeps a placement preference in the label', () => {
     expect(formatIntentDateLabel({ type: 'week_of', date: '2026-09-21', preference: 'late' })).toBe(
-      'Later in the week of Sep 21',
+      'Later in the week of Sep 21, 2026',
     );
   });
 });

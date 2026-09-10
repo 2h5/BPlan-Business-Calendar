@@ -301,6 +301,8 @@ function messageForError(error: unknown): string {
       return "You've used all 10 Find Time attempts this hour. Try again shortly.";
     case 'AI_DEFAULT_CALENDAR_MISSING':
       return 'Restore a writable default BPlan calendar before finding time.';
+    case 'AI_WINDOW_TOO_FAR':
+      return 'That date is too far ahead to schedule yet. Try a date within the next year.';
     case 'AI_SCHEDULING_WINDOW_INVALID':
       return 'Check the timezone and working hours in your planning preferences.';
     case 'AI_CLARIFICATION_REQUIRED':

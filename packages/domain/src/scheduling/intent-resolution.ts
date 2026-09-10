@@ -413,7 +413,7 @@ export function formatIntentDateLabel(dateIntent: DateIntent): string | null {
       return isNext ? 'Next week' : 'This week';
     }
     case 'explicit_date':
-      return dateIntent.date;
+      return formatMonthDay(dateIntent.date);
     case 'week_of': {
       const week = `week of ${formatMonthDay(dateIntent.date)}`;
       if (dateIntent.preference === 'late') return `Later in the ${week}`;
@@ -424,7 +424,11 @@ export function formatIntentDateLabel(dateIntent: DateIntent): string | null {
   }
 }
 
-/** "2026-09-21" -> "Sep 21". Falls back to the raw date if it cannot be read. */
+/**
+ * "2026-09-21" -> "Sep 21, 2026". The year is always shown: scheduling now
+ * reaches a year ahead, so a bare "Sep 21" would be genuinely ambiguous.
+ * Falls back to the raw date if it cannot be read.
+ */
 function formatMonthDay(date: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   if (!match) return date;
@@ -443,7 +447,7 @@ function formatMonthDay(date: string): string {
     'Dec',
   ];
   const monthName = monthNames[Number(match[2]) - 1];
-  return monthName ? `${monthName} ${Number(match[3])}` : date;
+  return monthName ? `${monthName} ${Number(match[3])}, ${match[1]}` : date;
 }
 
 /** Formats time intent into concise human-facing readback text. */
