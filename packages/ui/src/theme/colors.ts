@@ -49,6 +49,9 @@ export interface ColorTokens {
   hover: string;
   /** Focus ring around a focused input. */
   focusRing: string;
+  /** A second, violet accent used where a surface needs to differ from `accent`. */
+  focusAccent: string;
+  focusAccentSubtle: string;
 
   success: string;
   successSubtle: string;
@@ -92,6 +95,8 @@ export const darkColors: ColorTokens = {
   selected: 'rgba(125, 153, 255, 0.11)',
   hover: 'rgba(255, 255, 255, 0.045)',
   focusRing: 'rgba(138, 164, 255, 0.28)',
+  focusAccent: '#A78BFA',
+  focusAccentSubtle: 'rgba(167, 139, 250, 0.15)',
 
   success: '#61D6A2',
   successSubtle: 'rgba(60, 200, 139, 0.12)',
@@ -134,6 +139,8 @@ export const lightColors: ColorTokens = {
   selected: 'rgba(71, 102, 219, 0.085)',
   hover: 'rgba(24, 31, 43, 0.035)',
   focusRing: 'rgba(71, 102, 219, 0.22)',
+  focusAccent: '#7C3AED',
+  focusAccentSubtle: 'rgba(124, 58, 237, 0.12)',
 
   success: '#16865A',
   successSubtle: 'rgba(22, 134, 90, 0.10)',

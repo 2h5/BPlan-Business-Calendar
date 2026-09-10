@@ -56,6 +56,8 @@ export interface TodaySummary {
   buckets: TaskBuckets;
   /** Flexible tasks with an estimate that do not have a scheduled block. */
   unscheduled: Task[];
+  /** Tasks finished today, which the panel folds away rather than hides. */
+  completedToday: Task[];
   eventOccurrences: TodayEventOccurrence[];
   timeline: TodayTimelineItem[];
   next: TodayTimelineItem | null;
@@ -206,6 +208,8 @@ export function useTodaySummary(): TodaySummary {
     taskLists,
     buckets,
     unscheduled,
+    // `bucketTasks` already resolves "today" in the profile's timezone.
+    completedToday: buckets.completedToday,
     eventOccurrences,
     timeline,
     next,

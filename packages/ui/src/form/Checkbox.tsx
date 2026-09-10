@@ -12,7 +12,7 @@ import { useTheme } from '../theme/ThemeProvider';
 export interface CheckboxProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
-  /** Tints the unchecked ring — used for task priority. */
+  /** Overrides the fill. Defaults to the success tone the web uses. */
   color?: string;
   size?: number;
   disabled?: boolean;
@@ -27,19 +27,22 @@ const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
  * Completing a task is the most-repeated interaction in the app, so it gets a
  * deliberate two-part animation: the ring fills, and the tick scales in just
  * behind it. It reads as a single confident motion rather than a state swap.
+ *
+ * The box is a rounded square filled in the success tone, matching the web
+ * client's `.taskCheckbox` rather than the circle iOS would default to.
  */
 export function Checkbox({
   checked,
   onChange,
   color,
-  size = 24,
+  size = 20,
   disabled = false,
   accessibilityLabel,
   style,
   testID,
 }: CheckboxProps) {
   const theme = useTheme();
-  const tint = color ?? theme.colors.accent;
+  const tint = color ?? theme.colors.success;
 
   const progress = useDerivedValue(
     () => withTiming(checked ? 1 : 0, { duration: theme.motion.duration.fast }),
@@ -73,7 +76,7 @@ export function Checkbox({
           {
             width: size,
             height: size,
-            borderRadius: size / 2,
+            borderRadius: Math.max(4, Math.round(size * 0.24)),
             borderWidth: 1.5,
             alignItems: 'center',
             justifyContent: 'center',
@@ -85,7 +88,7 @@ export function Checkbox({
         <AnimatedIonicons
           name="checkmark"
           size={size * 0.62}
-          color={theme.colors.onAccent}
+          color={theme.colors.textInverse}
           style={tickStyle}
         />
       </Animated.View>
