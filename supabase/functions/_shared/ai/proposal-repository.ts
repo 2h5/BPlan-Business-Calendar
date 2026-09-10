@@ -62,6 +62,14 @@ export interface AiRequestUpdate {
   outputTokens?: number | null;
   reasoningTokens?: number | null;
   totalTokens?: number | null;
+  intentProvider?: string | null;
+  intentModel?: string | null;
+  intentPromptVersion?: string | null;
+  intentLatencyMs?: number | null;
+  intentInputTokens?: number | null;
+  intentOutputTokens?: number | null;
+  intentReasoningTokens?: number | null;
+  intentTotalTokens?: number | null;
   errorCode?: EdgeErrorCode | null;
   completedAt?: string | null;
 }
@@ -129,6 +137,22 @@ export function supabaseAiScheduleRepository(admin: SupabaseClient): AiScheduleR
       if (patch.outputTokens !== undefined) payload.output_tokens = patch.outputTokens;
       if (patch.reasoningTokens !== undefined) payload.reasoning_tokens = patch.reasoningTokens;
       if (patch.totalTokens !== undefined) payload.total_tokens = patch.totalTokens;
+      if (patch.intentProvider !== undefined) payload.intent_provider = patch.intentProvider;
+      if (patch.intentModel !== undefined) payload.intent_model = patch.intentModel;
+      if (patch.intentPromptVersion !== undefined) {
+        payload.intent_prompt_version = patch.intentPromptVersion;
+      }
+      if (patch.intentLatencyMs !== undefined) payload.intent_latency_ms = patch.intentLatencyMs;
+      if (patch.intentInputTokens !== undefined)
+        payload.intent_input_tokens = patch.intentInputTokens;
+      if (patch.intentOutputTokens !== undefined) {
+        payload.intent_output_tokens = patch.intentOutputTokens;
+      }
+      if (patch.intentReasoningTokens !== undefined) {
+        payload.intent_reasoning_tokens = patch.intentReasoningTokens;
+      }
+      if (patch.intentTotalTokens !== undefined)
+        payload.intent_total_tokens = patch.intentTotalTokens;
       if (patch.errorCode !== undefined) payload.error_code = patch.errorCode;
       if (patch.completedAt !== undefined) payload.completed_at = patch.completedAt;
       if (Object.keys(payload).length === 0) return;

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -47,6 +47,14 @@ export type Database = {
           error_code: string | null
           id: string
           input_tokens: number | null
+          intent_input_tokens: number | null
+          intent_latency_ms: number | null
+          intent_model: string | null
+          intent_output_tokens: number | null
+          intent_prompt_version: string | null
+          intent_provider: string | null
+          intent_reasoning_tokens: number | null
+          intent_total_tokens: number | null
           latency_ms: number | null
           model: string | null
           output_tokens: number | null
@@ -77,6 +85,14 @@ export type Database = {
           error_code?: string | null
           id?: string
           input_tokens?: number | null
+          intent_input_tokens?: number | null
+          intent_latency_ms?: number | null
+          intent_model?: string | null
+          intent_output_tokens?: number | null
+          intent_prompt_version?: string | null
+          intent_provider?: string | null
+          intent_reasoning_tokens?: number | null
+          intent_total_tokens?: number | null
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null
@@ -107,6 +123,14 @@ export type Database = {
           error_code?: string | null
           id?: string
           input_tokens?: number | null
+          intent_input_tokens?: number | null
+          intent_latency_ms?: number | null
+          intent_model?: string | null
+          intent_output_tokens?: number | null
+          intent_prompt_version?: string | null
+          intent_provider?: string | null
+          intent_reasoning_tokens?: number | null
+          intent_total_tokens?: number | null
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null

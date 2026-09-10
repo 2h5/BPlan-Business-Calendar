@@ -53,6 +53,7 @@ const scheduleConstraintsObject = z
       .max(8 * 60)
       .default(30),
     preferredTimeOfDay: timeOfDayPreferenceSchema.default('any'),
+    placementPreference: z.enum(['early', 'middle', 'late', 'any']).optional(),
   })
   .strict();
 
@@ -222,6 +223,12 @@ export const aiRankingCandidateSchema = z
     id: z.string().min(1),
     startAt: isoDateTimeSchema,
     endAt: isoDateTimeSchema,
+    durationMinutes: z
+      .number()
+      .int()
+      .min(5)
+      .max(12 * 60)
+      .optional(),
     localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     localStartMinute: minuteOfDaySchema,
     localEndMinute: z
@@ -256,6 +263,16 @@ export const aiRankCandidateSlotsInputSchema = z
         deadlineAt: isoDateTimeSchema.nullable(),
       })
       .strict(),
+    allowedDurationsMinutes: z
+      .array(
+        z
+          .number()
+          .int()
+          .min(5)
+          .max(12 * 60),
+      )
+      .optional(),
+    placementPreference: z.enum(['early', 'middle', 'late', 'any']).optional(),
     note: z.string().max(500).nullable(),
     timezone: timeZoneSchema,
     preferredTimeOfDay: timeOfDayPreferenceSchema,

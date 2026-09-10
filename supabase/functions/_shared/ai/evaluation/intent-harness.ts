@@ -189,8 +189,18 @@ function gradeIntentFixture(
 
     if (
       expected.dateModifier &&
-      (actual.date.type === 'weekday' || actual.date.type === 'weekend') &&
+      (actual.date.type === 'weekday' ||
+        actual.date.type === 'weekend' ||
+        actual.date.type === 'relative_week') &&
       actual.date.modifier !== expected.dateModifier
+    ) {
+      accuracyPassed = false;
+    }
+
+    if (
+      expected.datePreference &&
+      (actual.date.type === 'weekend' || actual.date.type === 'relative_week') &&
+      actual.date.preference !== expected.datePreference
     ) {
       accuracyPassed = false;
     }

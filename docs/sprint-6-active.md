@@ -5,30 +5,33 @@ SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
 IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
 EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
 
-### Natural-Language Scheduling Intent Layer (Luna) — 2026-09-10
+### Natural-Language Scheduling Intent Layer (Luna) Hardening — 2026-09-10
 
-Implemented the AI-first natural-language intent layer for Web Find Time using Luna (`gpt-5.6-luna`), strictly preserving the deterministic scheduling engine as the sole availability authority:
+Implemented and hardened the AI-first natural-language intent layer for Web Find Time using Luna (`gpt-5.6-luna`), strictly preserving the deterministic scheduling engine as the sole availability authority:
 
-- **Schemas (`packages/schemas`)**: `intent.schema.ts` defines strict Zod contracts for `durationIntentSchema` (exact, approximate, range), `dateIntentSchema`, `timeIntentSchema`, `schedulingIntentSchema`, `aiFindTimeClarificationSchema`, and `aiFindTimeReadbackSchema`. `scheduling.schema.ts` accepts `text?: string` (enforcing exactly one mode: `taskId` XOR `text` XOR (`title` AND `durationMinutes`)) and `allowedDurationsMinutes`.
+- **Schemas (`packages/schemas`)**:
+  - `intent.schema.ts`: Strict fail-closed Zod contracts for `durationIntentSchema` (exact, approximate, range with `minMinutes <= maxMinutes`), `dateIntentSchema` (calendar round-trip validation via `isValidCalendarDate`, relative week/weekend with `preference: 'early' | 'late' | 'any'`), `timeIntentSchema` (hour/minute/period validation), `schedulingIntentSchema`, `aiFindTimeClarificationSchema`, and `aiFindTimeReadbackSchema`.
+  - `scheduling.schema.ts`: Accepts `text?: string` (enforcing exactly one mode: `taskId` XOR `text` XOR (`title` AND `durationMinutes`)), `allowedDurationsMinutes`, `placementPreference`, and candidate `durationMinutes`.
 - **Domain (`packages/domain`)**:
   - `intent.ts`: Fixed title preposition cleanup bug (`lasting 15m` leaving `lasting`).
-  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, and time bounds.
-  - `availability.ts`: `generateCandidateSlots` produces candidates across all allowed durations.
-- **Database & Migration (`supabase/migrations/20260910000002_ai_natural_language_intent.sql`)**:
-  - Adds `raw_text`, `ad_hoc_location`, `ad_hoc_description`, `parsed_intent` columns to `ai_schedule_requests`.
-  - Updates `claim_ai_schedule_request` to accept `p_raw_text`, claiming quota under advisory lock before any billable model request.
-  - Updates `confirm_ai_schedule_suggestion` to populate `location` and `description` from the persisted request row.
-- **Edge Functions (`supabase/functions`)**:
-  - `_shared/ai/intent.ts`: Strict Responses API schema and instructions for Luna.
+  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, placement preferences (`early`/`late` weekend/week), and time bounds. For exact time with duration range, extends upper bound to `minute + maxDuration` to preserve all duration variants.
+  - `availability.ts`: `generateCandidateSlots` produces candidates across all allowed durations on the local grid.
+- **Database & Migrations**:
+  - `20260910000002_ai_natural_language_intent.sql`: Adds `raw_text`, `ad_hoc_location`, `ad_hoc_description`, `parsed_intent` columns to `ai_schedule_requests`. Updates `claim_ai_schedule_request` to accept `p_raw_text`, claiming quota under advisory lock before any billable model request. Updates `confirm_ai_schedule_suggestion` to populate `location` and `description` from the persisted request row.
+  - `20260910000003_ai_intent_telemetry.sql`: Adds independent intent telemetry columns (`intent_provider`, `intent_model`, `intent_prompt_version`, `intent_latency_ms`, `intent_input_tokens`, `intent_output_tokens`, `intent_reasoning_tokens`, `intent_total_tokens`) with non-negative check constraints. Updates check constraint to permit `raw_text is null` for data minimization.
+- **Data Minimization & Observability (`supabase/functions`)**:
+  - `_shared/ai/proposal.ts`: Implements data minimization (`raw_text = null`) immediately upon parsing or terminal error/clarification. Persists separate intent telemetry and ranking telemetry.
+  - `_shared/ai/intent.ts`: Strict Responses API schema and fail-closed validation rejecting malformed variants as `AI_INVALID_OUTPUT`.
+  - `_shared/ai/ranking.ts`: Forwards placement preferences and allowed durations to slot ranking.
   - `_shared/ai/openai-intent.ts`: OpenAI Responses API provider with retries, timeout, and usage tracking.
-  - `_shared/ai/proposal.ts`: Natural language branch claiming quota atomically before billable model call, handling clarification (returning 200 clarification without slots and updating request row with `AI_CLARIFICATION_REQUIRED`), deterministically resolving constraints, and ranking candidate slots.
   - `_shared/ai/confirmation-repository.ts`: Loads `ad_hoc_location` and `ad_hoc_description` and populates them on confirmation.
 - **Web App (`apps/web`)**:
   - `api/find-time.api.ts`: `findTimeForText` invokes `ai-find-time` with `{ text }`, parses proposals with readbacks or clarification requests.
   - `hooks/useFindTime.ts`: Manages proposal and clarification states, mapping error codes.
-  - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips (title, duration, date, time, location) and displays a clean clarification notice when clarification is needed.
+  - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips and clarification notices for Pro users. For Free/expired users, renders a locked teaser state with disabled input and a direct link to `/subscription` (no enabled input or failing requests), while preserving confirmation cards and banners.
+  - `components/FindTimeBox.test.tsx`: Unit tests verifying Free locked teaser and Pro interactive flow.
 - **Evaluation Suite (`supabase/functions/_shared/ai/evaluation`)**:
-  - `intent-fixtures.ts`: 14 comprehensive fixtures covering 10 core phrases, adversarial prompt injections, duration ranges, and clarification cases.
+  - `intent-fixtures.ts`: 17 comprehensive fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, adversarial prompt injections, and impossible/past date clarifications.
   - `intent-harness.ts`: Evaluates schema validity, extraction accuracy, clarification pass rate, latency, and tokens/cost.
   - `intent-harness.test.ts`: Automated tests for intent evaluation harness.
   - `run-live-intent.ts`: Live CLI runner for comparing Luna Low vs Luna Medium.

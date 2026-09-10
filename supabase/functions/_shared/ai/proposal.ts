@@ -262,15 +262,16 @@ async function generateAiFindTimeProposalFromText(
     if (parsedIntent.requiresClarification) {
       await deps.repository.updateRequest(input.userId, requestId, {
         status: 'failed',
+        rawText: null,
         errorCode: 'AI_CLARIFICATION_REQUIRED',
-        provider: intentResult.metadata.provider,
-        model: intentResult.metadata.model,
-        promptVersion: intentResult.metadata.promptVersion,
-        latencyMs: intentResult.metadata.latencyMs,
-        inputTokens: intentResult.metadata.usage.inputTokens,
-        outputTokens: intentResult.metadata.usage.outputTokens,
-        reasoningTokens: intentResult.metadata.usage.reasoningTokens,
-        totalTokens: intentResult.metadata.usage.totalTokens,
+        intentProvider: intentResult.metadata.provider,
+        intentModel: intentResult.metadata.model,
+        intentPromptVersion: intentResult.metadata.promptVersion,
+        intentLatencyMs: intentResult.metadata.latencyMs,
+        intentInputTokens: intentResult.metadata.usage.inputTokens,
+        intentOutputTokens: intentResult.metadata.usage.outputTokens,
+        intentReasoningTokens: intentResult.metadata.usage.reasoningTokens,
+        intentTotalTokens: intentResult.metadata.usage.totalTokens,
         parsedIntent,
         completedAt: (deps.clock ?? (() => new Date()))().toISOString(),
       });
@@ -288,9 +289,58 @@ async function generateAiFindTimeProposalFromText(
 
     const resolvedDuration = resolveIntentDuration(parsedIntent.duration);
     const resolvedWindow = resolveIntentDateWindow(parsedIntent.date, profile.timezone, input.now);
+
+    if (resolvedWindow.isImpossibleDate) {
+      await deps.repository.updateRequest(input.userId, requestId, {
+        status: 'failed',
+        rawText: null,
+        errorCode: 'AI_INVALID_OUTPUT',
+        intentProvider: intentResult.metadata.provider,
+        intentModel: intentResult.metadata.model,
+        intentPromptVersion: intentResult.metadata.promptVersion,
+        intentLatencyMs: intentResult.metadata.latencyMs,
+        intentInputTokens: intentResult.metadata.usage.inputTokens,
+        intentOutputTokens: intentResult.metadata.usage.outputTokens,
+        intentReasoningTokens: intentResult.metadata.usage.reasoningTokens,
+        intentTotalTokens: intentResult.metadata.usage.totalTokens,
+        parsedIntent,
+        completedAt: (deps.clock ?? (() => new Date()))().toISOString(),
+      });
+      requestMarkedFailed = true;
+      throw new EdgeError('AI_INVALID_OUTPUT', 'The requested calendar date does not exist.', 502);
+    }
+
+    if (resolvedWindow.isPast || resolvedWindow.windowEnd.getTime() <= input.now.getTime()) {
+      await deps.repository.updateRequest(input.userId, requestId, {
+        status: 'failed',
+        rawText: null,
+        errorCode: 'AI_CLARIFICATION_REQUIRED',
+        intentProvider: intentResult.metadata.provider,
+        intentModel: intentResult.metadata.model,
+        intentPromptVersion: intentResult.metadata.promptVersion,
+        intentLatencyMs: intentResult.metadata.latencyMs,
+        intentInputTokens: intentResult.metadata.usage.inputTokens,
+        intentOutputTokens: intentResult.metadata.usage.outputTokens,
+        intentReasoningTokens: intentResult.metadata.usage.reasoningTokens,
+        intentTotalTokens: intentResult.metadata.usage.totalTokens,
+        parsedIntent,
+        completedAt: (deps.clock ?? (() => new Date()))().toISOString(),
+      });
+      requestMarkedFailed = true;
+
+      return {
+        status: 'clarification_required',
+        requestId,
+        clarificationQuestion:
+          'That date or time has already passed. What upcoming date would you like to schedule for?',
+        intent: parsedIntent,
+      };
+    }
+
     const resolvedTimeBounds = resolveIntentTimeBounds(
       parsedIntent.time,
       resolvedDuration.durationMinutes,
+      resolvedDuration.maxDurationMinutes,
     );
     const readback = generateIntentReadback(parsedIntent);
 
@@ -317,11 +367,20 @@ async function generateAiFindTimeProposalFromText(
 
     await deps.repository.updateRequest(input.userId, requestId, {
       status: 'pending',
+      rawText: null,
       adHocTitle: parsedIntent.title,
       adHocDurationMinutes: resolvedDuration.durationMinutes,
       adHocLocation: parsedIntent.location,
       adHocDescription: parsedIntent.description,
       parsedIntent,
+      intentProvider: intentResult.metadata.provider,
+      intentModel: intentResult.metadata.model,
+      intentPromptVersion: intentResult.metadata.promptVersion,
+      intentLatencyMs: intentResult.metadata.latencyMs,
+      intentInputTokens: intentResult.metadata.usage.inputTokens,
+      intentOutputTokens: intentResult.metadata.usage.outputTokens,
+      intentReasoningTokens: intentResult.metadata.usage.reasoningTokens,
+      intentTotalTokens: intentResult.metadata.usage.totalTokens,
     });
 
     const result = await prepareDeterministicFindTime(
@@ -331,6 +390,7 @@ async function generateAiFindTimeProposalFromText(
         now: input.now,
         allowNoValidSlot: true,
         allowedDurationsMinutes: resolvedDuration.allowedDurationsMinutes,
+        placementPreference: resolvedWindow.placementPreference,
       },
       deps.dataSource,
       deps.candidateIdFactory,
@@ -421,6 +481,9 @@ async function generateAiFindTimeProposalFromText(
     };
   } catch (error) {
     if (!requestMarkedFailed) {
+      await deps.repository
+        .updateRequest(input.userId, requestId, { rawText: null })
+        .catch(() => {});
       await markRequestFailed(deps.repository, input.userId, requestId, error, deps.clock);
     }
     throw error;

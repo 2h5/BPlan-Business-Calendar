@@ -1,8 +1,10 @@
 import { assertEquals, assertRejects } from 'jsr:@std/assert@^1.0.0';
+import type { AiIntentProvider } from './intent.ts';
 import type { AiRankingProvider } from './ranking.ts';
 import { generateAiFindTimeProposal, type GenerateAiFindTimeProposalDeps } from './proposal.ts';
 import {
   supabaseAiScheduleRepository,
+  type AiRequestUpdate,
   type AiScheduleRepository,
   type AiSuggestionToPersist,
 } from './proposal-repository.ts';
@@ -446,30 +448,33 @@ Deno.test(
 
     const pendingUpdate = updates.find((u) => u.patch.adHocTitle === 'meeting with Andrew');
     if (!pendingUpdate) throw new Error('Expected ad-hoc pending update.');
+    assertEquals(pendingUpdate.patch.rawText, null);
     assertEquals(pendingUpdate.patch.adHocLocation, 'Paramus office');
     assertEquals(pendingUpdate.patch.adHocDescription, 'Discuss Q3 launch');
     assertEquals(pendingUpdate.patch.adHocDurationMinutes, 15);
+    assertEquals(pendingUpdate.patch.intentModel, 'gpt-5.6-luna');
+    assertEquals(pendingUpdate.patch.intentTotalTokens, 105);
   },
 );
 
 Deno.test(
   'returns clarification_required when model indicates clarification needed, consuming 1 quota unit',
   async () => {
-    let claimedTarget: unknown = null;
-    const updates: Array<{ userId: string; requestId: string; patch: Record<string, unknown> }> =
-      [];
     let rankingCalls = 0;
+    let claimedTarget: unknown = null;
+    const updates: Array<{ userId: string; requestId: string; patch: AiRequestUpdate }> = [];
+    const REQUEST_ID = 'b0000000-0000-0000-0000-000000000099';
 
-    const mockIntentProvider = {
+    const mockIntentProvider: AiIntentProvider = {
       provider: 'openai',
       model: 'gpt-5.6-luna',
       parseSchedulingIntent: () =>
         Promise.resolve({
           intent: {
-            title: 'something',
+            title: 'schedule something',
             duration: null,
-            date: { type: 'unconstrained' as const },
-            time: { type: 'unconstrained' as const },
+            date: { type: 'unconstrained' },
+            time: { type: 'unconstrained' },
             location: null,
             description: null,
             requiresClarification: true,
@@ -478,10 +483,10 @@ Deno.test(
           metadata: {
             provider: 'openai',
             model: 'gpt-5.6-luna',
-            responseId: 'resp_clarification',
+            responseId: 'resp_clarification_test',
             promptVersion: 'find-time-intent-v1',
-            latencyMs: 30,
-            usage: { inputTokens: 50, outputTokens: 20, reasoningTokens: 4, totalTokens: 70 },
+            latencyMs: 35,
+            usage: { inputTokens: 50, outputTokens: 20, reasoningTokens: 5, totalTokens: 70 },
           },
         }),
     };
@@ -499,7 +504,7 @@ Deno.test(
             return Promise.resolve(REQUEST_ID);
           },
           updateRequest: (userId, requestId, patch) => {
-            updates.push({ userId, requestId, patch: { ...patch } });
+            updates.push({ userId, requestId, patch: patch as any });
             return Promise.resolve();
           },
         }),
@@ -523,8 +528,9 @@ Deno.test(
     const failedUpdate = updates.find((u) => u.patch.errorCode === 'AI_CLARIFICATION_REQUIRED');
     if (!failedUpdate) throw new Error('Expected clarification failed update.');
     assertEquals(failedUpdate.patch.status, 'failed');
-    assertEquals(failedUpdate.patch.model, 'gpt-5.6-luna');
-    assertEquals(failedUpdate.patch.totalTokens, 70);
+    assertEquals(failedUpdate.patch.rawText, null);
+    assertEquals(failedUpdate.patch.intentModel, 'gpt-5.6-luna');
+    assertEquals(failedUpdate.patch.intentTotalTokens, 70);
   },
 );
 

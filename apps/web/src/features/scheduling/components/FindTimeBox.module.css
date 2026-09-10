@@ -1049,6 +1049,135 @@
   .scheduleButton {
     justify-content: center;
   }
+
+  .lockedInputBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .upgradeButton {
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   Locked Teaser State (Free / Non-Pro Users)
+   ========================================================================== */
+.lockedTeaser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+}
+
+.lockedHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lockedBadgeGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.proBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.18));
+  color: var(--color-accent);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.proSparkleIcon {
+  width: 11px;
+  height: 11px;
+}
+
+.lockedHeading {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.lockedSubheading {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.lockedInputBar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.lockedInputWrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.lockIcon {
+  position: absolute;
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+}
+
+.inputLocked {
+  cursor: not-allowed;
+  opacity: 0.75;
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-secondary);
+}
+
+.upgradeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-height, 40px);
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: #ffffff;
+  background: var(--color-accent);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.upgradeButton:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.upgradeButton:active {
+  transform: translateY(0);
+}
+
+.lockedDescription {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-secondary);
 }
 
 @media (prefers-reduced-motion: reduce) {

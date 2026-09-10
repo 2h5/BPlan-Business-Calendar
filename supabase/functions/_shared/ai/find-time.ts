@@ -97,6 +97,7 @@ export async function prepareDeterministicFindTime(
     /** Phase 3 persists a controlled no-slot request instead of losing context. */
     allowNoValidSlot?: boolean;
     allowedDurationsMinutes?: number[];
+    placementPreference?: 'early' | 'middle' | 'late' | 'any';
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -149,6 +150,7 @@ export async function prepareDeterministicFindTime(
     splittable: false,
     minSplitMinutes: 30,
     preferredTimeOfDay: input.request.preferredTimeOfDay ?? 'any',
+    placementPreference: input.placementPreference,
   });
 
   const bufferMs = constraints.bufferMinutes * 60_000;

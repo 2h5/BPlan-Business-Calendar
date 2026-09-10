@@ -3,6 +3,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
+import { useSubscription } from '../../billing/hooks/useBilling';
+import { getSubscriptionStatusInfo } from '../../billing/utils/subscription-display';
 import {
   type FindTimeConfirmation,
   type FindTimeProposal,
@@ -101,6 +103,10 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
 
   const findTime = useFindTime();
   const confirmSlot = useConfirmSlot();
+  const subscription = useSubscription();
+  const statusInfo = getSubscriptionStatusInfo(subscription.data);
+  const isCheckingSubscription = subscription.isLoading;
+  const isPro = !isCheckingSubscription && statusInfo.state === 'active';
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -235,6 +241,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isPro) return;
     if (proposalExitTimerRef.current) {
       clearTimeout(proposalExitTimerRef.current);
       proposalExitTimerRef.current = null;
@@ -258,7 +265,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     onScheduled?.(suggestion);
   };
 
-  const canSubmit = text.trim().length > 0 && !findTime.isPending;
+  const canSubmit = isPro && text.trim().length > 0 && !findTime.isPending;
   const { confirmation } = confirmSlot;
 
   const calendarLink = confirmation
@@ -267,71 +274,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
 
   return (
     <section className={styles.container} aria-label="Find a time">
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <div
-          className={`${styles.inputWrap} ${findTime.isPending ? styles.inputWrapScanning : ''}`}
-        >
-          <span
-            className={`${styles.inputIcon} ${findTime.isPending ? styles.inputIconScanning : ''}`}
-            aria-hidden="true"
-          >
-            <StarIcon />
-          </span>
-          <input
-            id={inputId}
-            ref={inputRef}
-            className={styles.input}
-            type="text"
-            value={text}
-            placeholder={PLACEHOLDER}
-            aria-label="Describe what you want to schedule"
-            onChange={(event) => {
-              const newText = event.target.value;
-              setText(newText);
-              if (confirmSlot.errorMessage) confirmSlot.reset();
-              if (findTime.errorMessage) findTime.reset();
-
-              if (newText.trim().length === 0) {
-                if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
-                  triggerProposalExit();
-                }
-              } else if (isProposalExiting) {
-                if (proposalExitTimerRef.current) {
-                  clearTimeout(proposalExitTimerRef.current);
-                  proposalExitTimerRef.current = null;
-                }
-                setIsProposalExiting(false);
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                setText('');
-                if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
-                  triggerProposalExit();
-                }
-              }
-            }}
-          />
-        </div>
-        <button
-          type="submit"
-          className={`${styles.submit} ${findTime.isPending ? styles.submitFinding : ''}`}
-          disabled={!canSubmit}
-        >
-          {findTime.isPending ? (
-            <>
-              <SparkleIcon className={styles.spinningSparkle} />
-              <span>Finding slots…</span>
-            </>
-          ) : (
-            <>
-              <StarIcon />
-              <span>Find time</span>
-            </>
-          )}
-        </button>
-      </form>
-
       {/* Docked Recent Scheduled Notification */}
       {isSchedulingAnother && recentScheduled && (
         <div
@@ -380,117 +322,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </div>
       )}
 
-      {!confirmation && (
-        <p className={styles.hint}>
-          Describe a meeting and BPlan will suggest the three best open slots in your schedule.
-        </p>
-      )}
-
-      {/* Loading Radar / Shimmering Skeletons while finding */}
-      {findTime.isPending && (
-        <div className={styles.loadingArea} role="status" aria-live="polite">
-          <div className={styles.loadingHeader}>
-            <div className={styles.loadingBadge}>
-              <SparkleIcon className={styles.spinningSparkle} />
-              <span>AI Engine</span>
-            </div>
-            <span className={styles.loadingText}>
-              Verifying deterministic calendar availability &amp; ranking optimal slots…
-            </span>
-          </div>
-          <div className={styles.skeletonContainer}>
-            <div className={styles.skeletonCard}>
-              <div className={styles.skeletonRank} />
-              <div className={styles.skeletonBody}>
-                <div className={styles.skeletonTime} />
-                <div className={styles.skeletonReason} />
-              </div>
-              <div className={styles.skeletonAction} />
-            </div>
-            <div className={`${styles.skeletonCard} ${styles.skeletonDelay1}`}>
-              <div className={styles.skeletonRank} />
-              <div className={styles.skeletonBody}>
-                <div className={styles.skeletonTime} />
-                <div className={styles.skeletonReason} />
-              </div>
-              <div className={styles.skeletonAction} />
-            </div>
-            <div className={`${styles.skeletonCard} ${styles.skeletonDelay2}`}>
-              <div className={styles.skeletonRank} />
-              <div className={styles.skeletonBody}>
-                <div className={styles.skeletonTime} />
-                <div className={styles.skeletonReason} />
-              </div>
-              <div className={styles.skeletonAction} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Luna Clarification Notice */}
-      {findTime.clarification && !confirmation && !findTime.isPending && (
-        <div className={styles.clarificationCard} role="status">
-          <div className={styles.clarificationHeader}>
-            <div className={styles.clarificationIconWrap}>
-              <HelpCircleIcon />
-            </div>
-            <div className={styles.clarificationMain}>
-              <div className={styles.clarificationTag}>Luna needs clarification</div>
-              <p className={styles.clarificationQuestion}>
-                {findTime.clarification.clarificationQuestion}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Parsed Intent Readback */}
-      {displayedProposal && !confirmation && !findTime.isPending && (
-        <div className={`${styles.readback} ${isProposalExiting ? styles.proposalExiting : ''}`}>
-          {displayedProposal.readback ? (
-            <>
-              <span className={`${styles.chip} ${styles.chipTitle}`}>
-                <StarIcon />
-                <span>{displayedProposal.readback.title}</span>
-              </span>
-              <span className={styles.chip}>
-                <ClockIcon />
-                <span>{displayedProposal.readback.durationLabel}</span>
-              </span>
-              {displayedProposal.readback.dateLabel && (
-                <span className={styles.chip}>
-                  <CalendarIcon />
-                  <span>{displayedProposal.readback.dateLabel}</span>
-                </span>
-              )}
-              {displayedProposal.readback.timeLabel && (
-                <span className={styles.chip}>
-                  <span>{displayedProposal.readback.timeLabel}</span>
-                </span>
-              )}
-              {displayedProposal.readback.location && (
-                <span className={styles.chip}>
-                  <MapPinIcon />
-                  <span>{displayedProposal.readback.location}</span>
-                </span>
-              )}
-            </>
-          ) : (
-            <>
-              <span className={`${styles.chip} ${styles.chipTitle}`}>
-                <StarIcon />
-                <span>{displayedProposal.task.title}</span>
-              </span>
-              <span className={styles.chip}>
-                <ClockIcon />
-                <span>{formatDuration(displayedProposal.task.durationMinutes)}</span>
-              </span>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Beautiful Scheduled Confirmation */}
+      {/* Beautiful Scheduled Confirmation (preserved in both Pro and Free) */}
       {confirmation && !isSchedulingAnother && (
         <div className={styles.confirmationCard} role="status">
           <div className={styles.confirmationHeader}>
@@ -529,76 +361,299 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </div>
       )}
 
-      {/* Available Slots Display */}
-      {displayedProposal && !confirmation && !findTime.isPending && (
-        <div className={`${styles.results} ${isProposalExiting ? styles.proposalExiting : ''}`}>
-          <div className={styles.resultsHeader}>
-            <div className={styles.resultsTitleGroup}>
-              <span className={styles.resultsHeading}>Verified Open Slots</span>
-              <span className={styles.resultsBadge}>✦ Guaranteed Conflict-Free</span>
+      {!isPro ? (
+        <div className={styles.lockedTeaser}>
+          <div className={styles.lockedHeader}>
+            <div className={styles.lockedBadgeGroup}>
+              <span className={styles.proBadge}>
+                <SparkleIcon className={styles.proSparkleIcon} />
+                <span>PRO</span>
+              </span>
+              <span className={styles.lockedHeading}>Find Time with Luna</span>
             </div>
-            <span className={styles.resultsSub}>Ranked by optimal availability</span>
+            <span className={styles.lockedSubheading}>AI-assisted natural language scheduling</span>
           </div>
 
-          <div className={styles.slotList}>
-            {displayedProposal.suggestions.map((suggestion, index) => {
-              const isTopPick = suggestion.rank === 1;
-              const isBooking = confirmSlot.confirmingSuggestionId === suggestion.id;
-              const isOtherBooking = confirmSlot.confirmingSuggestionId !== null && !isBooking;
+          <div className={styles.lockedInputBar}>
+            <div className={styles.lockedInputWrap}>
+              <span className={styles.lockIcon} aria-hidden="true">
+                <LockIcon />
+              </span>
+              <input
+                id={inputId}
+                className={`${styles.input} ${styles.inputLocked}`}
+                type="text"
+                disabled
+                readOnly
+                value=""
+                placeholder="Try “15-minute meeting with Andrew tomorrow afternoon”"
+                aria-label="Find Time with AI is available on the Pro plan"
+              />
+            </div>
+            <Link to="/subscription" className={styles.upgradeButton}>
+              <span>Upgrade to Pro</span>
+              <ArrowRightIcon />
+            </Link>
+          </div>
 
-              return (
-                <div
-                  key={suggestion.id}
-                  className={`${styles.slotCard} ${isTopPick ? styles.slotCardTopPick : ''} ${
-                    isBooking ? styles.slotCardBooking : ''
-                  } ${isOtherBooking ? styles.slotCardDimmed : ''}`}
-                  style={{ animationDelay: `${index * 70}ms` }}
-                >
-                  <div className={styles.slotCardMain}>
-                    <div className={styles.slotLeft}>
-                      <div
-                        className={`${styles.rankBadge} ${isTopPick ? styles.rankBadgeTop : ''}`}
-                        aria-hidden="true"
-                      >
-                        {suggestion.rank}
-                      </div>
-                      <div className={styles.slotDetails}>
-                        <div className={styles.slotTimeRow}>
-                          <span className={styles.slotTime}>
-                            {formatSlot(suggestion.startAt, suggestion.endAt, timeZone)}
-                          </span>
-                          {isTopPick && <span className={styles.topPickTag}>✦ Recommended</span>}
+          <p className={styles.lockedDescription}>
+            Luna interprets your natural-language requests and finds optimal, conflict-free openings
+            on your calendar. Upgrade to Pro to unlock AI scheduling.
+          </p>
+        </div>
+      ) : (
+        <>
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <div
+              className={`${styles.inputWrap} ${findTime.isPending ? styles.inputWrapScanning : ''}`}
+            >
+              <span
+                className={`${styles.inputIcon} ${findTime.isPending ? styles.inputIconScanning : ''}`}
+                aria-hidden="true"
+              >
+                <StarIcon />
+              </span>
+              <input
+                id={inputId}
+                ref={inputRef}
+                className={styles.input}
+                type="text"
+                value={text}
+                placeholder={PLACEHOLDER}
+                aria-label="Describe what you want to schedule"
+                onChange={(event) => {
+                  const newText = event.target.value;
+                  setText(newText);
+                  if (confirmSlot.errorMessage) confirmSlot.reset();
+                  if (findTime.errorMessage) findTime.reset();
+
+                  if (newText.trim().length === 0) {
+                    if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
+                      triggerProposalExit();
+                    }
+                  } else if (isProposalExiting) {
+                    if (proposalExitTimerRef.current) {
+                      clearTimeout(proposalExitTimerRef.current);
+                      proposalExitTimerRef.current = null;
+                    }
+                    setIsProposalExiting(false);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setText('');
+                    if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
+                      triggerProposalExit();
+                    }
+                  }
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              className={`${styles.submit} ${findTime.isPending ? styles.submitFinding : ''}`}
+              disabled={!canSubmit}
+            >
+              {findTime.isPending ? (
+                <>
+                  <SparkleIcon className={styles.spinningSparkle} />
+                  <span>Finding slots…</span>
+                </>
+              ) : (
+                <>
+                  <StarIcon />
+                  <span>Find time</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {!confirmation && (
+            <p className={styles.hint}>
+              Describe a meeting and BPlan will suggest the three best open slots in your schedule.
+            </p>
+          )}
+
+          {/* Loading Radar / Shimmering Skeletons while finding */}
+          {findTime.isPending && (
+            <div className={styles.loadingArea} role="status" aria-live="polite">
+              <div className={styles.loadingHeader}>
+                <div className={styles.loadingBadge}>
+                  <SparkleIcon className={styles.spinningSparkle} />
+                  <span>AI Engine</span>
+                </div>
+                <span className={styles.loadingText}>
+                  Verifying deterministic calendar availability &amp; ranking optimal slots…
+                </span>
+              </div>
+              <div className={styles.skeletonContainer}>
+                <div className={styles.skeletonCard}>
+                  <div className={styles.skeletonRank} />
+                  <div className={styles.skeletonBody}>
+                    <div className={styles.skeletonTime} />
+                    <div className={styles.skeletonReason} />
+                  </div>
+                  <div className={styles.skeletonAction} />
+                </div>
+                <div className={`${styles.skeletonCard} ${styles.skeletonDelay1}`}>
+                  <div className={styles.skeletonRank} />
+                  <div className={styles.skeletonBody}>
+                    <div className={styles.skeletonTime} />
+                    <div className={styles.skeletonReason} />
+                  </div>
+                  <div className={styles.skeletonAction} />
+                </div>
+                <div className={`${styles.skeletonCard} ${styles.skeletonDelay2}`}>
+                  <div className={styles.skeletonRank} />
+                  <div className={styles.skeletonBody}>
+                    <div className={styles.skeletonTime} />
+                    <div className={styles.skeletonReason} />
+                  </div>
+                  <div className={styles.skeletonAction} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Luna Clarification Notice */}
+          {findTime.clarification && !confirmation && !findTime.isPending && (
+            <div className={styles.clarificationCard} role="status">
+              <div className={styles.clarificationHeader}>
+                <div className={styles.clarificationIconWrap}>
+                  <HelpCircleIcon />
+                </div>
+                <div className={styles.clarificationMain}>
+                  <div className={styles.clarificationTag}>Luna needs clarification</div>
+                  <p className={styles.clarificationQuestion}>
+                    {findTime.clarification.clarificationQuestion}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Parsed Intent Readback */}
+          {displayedProposal && !confirmation && !findTime.isPending && (
+            <div
+              className={`${styles.readback} ${isProposalExiting ? styles.proposalExiting : ''}`}
+            >
+              {displayedProposal.readback ? (
+                <>
+                  <span className={`${styles.chip} ${styles.chipTitle}`}>
+                    <StarIcon />
+                    <span>{displayedProposal.readback.title}</span>
+                  </span>
+                  <span className={styles.chip}>
+                    <ClockIcon />
+                    <span>{displayedProposal.readback.durationLabel}</span>
+                  </span>
+                  {displayedProposal.readback.dateLabel && (
+                    <span className={styles.chip}>
+                      <CalendarIcon />
+                      <span>{displayedProposal.readback.dateLabel}</span>
+                    </span>
+                  )}
+                  {displayedProposal.readback.timeLabel && (
+                    <span className={styles.chip}>
+                      <span>{displayedProposal.readback.timeLabel}</span>
+                    </span>
+                  )}
+                  {displayedProposal.readback.location && (
+                    <span className={styles.chip}>
+                      <MapPinIcon />
+                      <span>{displayedProposal.readback.location}</span>
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className={`${styles.chip} ${styles.chipTitle}`}>
+                    <StarIcon />
+                    <span>{displayedProposal.task.title}</span>
+                  </span>
+                  <span className={styles.chip}>
+                    <ClockIcon />
+                    <span>{formatDuration(displayedProposal.task.durationMinutes)}</span>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Available Slots Display */}
+          {displayedProposal && !confirmation && !findTime.isPending && (
+            <div className={`${styles.results} ${isProposalExiting ? styles.proposalExiting : ''}`}>
+              <div className={styles.resultsHeader}>
+                <div className={styles.resultsTitleGroup}>
+                  <span className={styles.resultsHeading}>Verified Open Slots</span>
+                  <span className={styles.resultsBadge}>✦ Guaranteed Conflict-Free</span>
+                </div>
+                <span className={styles.resultsSub}>Ranked by optimal availability</span>
+              </div>
+
+              <div className={styles.slotList}>
+                {displayedProposal.suggestions.map((suggestion, index) => {
+                  const isTopPick = suggestion.rank === 1;
+                  const isBooking = confirmSlot.confirmingSuggestionId === suggestion.id;
+                  const isOtherBooking = confirmSlot.confirmingSuggestionId !== null && !isBooking;
+
+                  return (
+                    <div
+                      key={suggestion.id}
+                      className={`${styles.slotCard} ${isTopPick ? styles.slotCardTopPick : ''} ${
+                        isBooking ? styles.slotCardBooking : ''
+                      } ${isOtherBooking ? styles.slotCardDimmed : ''}`}
+                      style={{ animationDelay: `${index * 70}ms` }}
+                    >
+                      <div className={styles.slotCardMain}>
+                        <div className={styles.slotLeft}>
+                          <div
+                            className={`${styles.rankBadge} ${isTopPick ? styles.rankBadgeTop : ''}`}
+                            aria-hidden="true"
+                          >
+                            {suggestion.rank}
+                          </div>
+                          <div className={styles.slotDetails}>
+                            <div className={styles.slotTimeRow}>
+                              <span className={styles.slotTime}>
+                                {formatSlot(suggestion.startAt, suggestion.endAt, timeZone)}
+                              </span>
+                              {isTopPick && (
+                                <span className={styles.topPickTag}>✦ Recommended</span>
+                              )}
+                            </div>
+                            <p className={styles.slotReason}>{suggestion.reason}</p>
+                          </div>
                         </div>
-                        <p className={styles.slotReason}>{suggestion.reason}</p>
+
+                        <button
+                          type="button"
+                          className={`${styles.scheduleButton} ${
+                            isTopPick ? styles.scheduleButtonPrimary : ''
+                          } ${isBooking ? styles.scheduleButtonLoading : ''}`}
+                          disabled={confirmSlot.confirmingSuggestionId !== null}
+                          onClick={() => handleSelect(suggestion)}
+                        >
+                          {isBooking ? (
+                            <>
+                              <SpinnerIcon className={styles.buttonSpinner} />
+                              <span>Booking…</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>Schedule</span>
+                              <ArrowRightIcon />
+                            </>
+                          )}
+                        </button>
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      className={`${styles.scheduleButton} ${
-                        isTopPick ? styles.scheduleButtonPrimary : ''
-                      } ${isBooking ? styles.scheduleButtonLoading : ''}`}
-                      disabled={confirmSlot.confirmingSuggestionId !== null}
-                      onClick={() => handleSelect(suggestion)}
-                    >
-                      {isBooking ? (
-                        <>
-                          <SpinnerIcon className={styles.buttonSpinner} />
-                          <span>Booking…</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Schedule</span>
-                          <ArrowRightIcon />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {(findTime.errorMessage ?? confirmSlot.errorMessage) && (
@@ -839,6 +894,25 @@ function HelpCircleIcon() {
       <circle cx="12" cy="12" r="10" />
       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
       <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }

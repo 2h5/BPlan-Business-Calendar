@@ -1,9 +1,10 @@
-import type {
-  DateIntent,
-  DurationIntent,
-  SchedulingIntent,
-  TimeIntent,
-  TimeOfDayPreference,
+import {
+  isValidCalendarDate,
+  type DateIntent,
+  type DurationIntent,
+  type SchedulingIntent,
+  type TimeIntent,
+  type TimeOfDayPreference,
 } from '@cal/schemas/scheduling';
 
 import {
@@ -37,6 +38,7 @@ export const DEFAULT_INTENT_DURATION_MINUTES = 30;
 
 export interface ResolvedIntentDuration {
   durationMinutes: number;
+  maxDurationMinutes?: number;
   allowedDurationsMinutes?: number[];
 }
 
@@ -62,6 +64,7 @@ export function resolveIntentDuration(duration: DurationIntent | null): Resolved
   if (gap < 30) {
     return {
       durationMinutes: minMinutes,
+      maxDurationMinutes: maxMinutes,
       allowedDurationsMinutes: [minMinutes, maxMinutes],
     };
   }
@@ -72,12 +75,14 @@ export function resolveIntentDuration(duration: DurationIntent | null): Resolved
   if (mid > minMinutes && mid < maxMinutes) {
     return {
       durationMinutes: minMinutes,
+      maxDurationMinutes: maxMinutes,
       allowedDurationsMinutes: [minMinutes, mid, maxMinutes],
     };
   }
 
   return {
     durationMinutes: minMinutes,
+    maxDurationMinutes: maxMinutes,
     allowedDurationsMinutes: [minMinutes, maxMinutes],
   };
 }
@@ -85,6 +90,9 @@ export function resolveIntentDuration(duration: DurationIntent | null): Resolved
 export interface ResolvedIntentDateWindow {
   windowStart: Date;
   windowEnd: Date;
+  placementPreference?: 'early' | 'middle' | 'late' | 'any';
+  isPast?: boolean;
+  isImpossibleDate?: boolean;
 }
 
 /**
@@ -155,6 +163,7 @@ export function resolveIntentDateWindow(
     case 'weekend': {
       // Saturday is 6, Sunday is 0
       const currentDayNumber = currentParts.weekday;
+      const placementPreference = dateIntent.preference ?? 'any';
 
       if (dateIntent.modifier === 'next') {
         let daysUntilNextSaturday = (6 - currentDayNumber + 7) % 7;
@@ -162,42 +171,72 @@ export function resolveIntentDateWindow(
         else daysUntilNextSaturday += 7;
         const saturdayStart = addZonedDays(todayStart, daysUntilNextSaturday, timeZone);
         const mondayStart = addZonedDays(saturdayStart, 2, timeZone);
-        return { windowStart: saturdayStart, windowEnd: mondayStart };
+        return { windowStart: saturdayStart, windowEnd: mondayStart, placementPreference };
       }
 
       // "this weekend" / "weekend"
       if (currentDayNumber === 6) {
         // Today is Saturday: start now, end at Monday start
         const mondayStart = addZonedDays(todayStart, 2, timeZone);
-        return { windowStart: now, windowEnd: mondayStart };
+        return { windowStart: now, windowEnd: mondayStart, placementPreference };
       }
 
       if (currentDayNumber === 0) {
         // Today is Sunday: start now, end at Monday start
         const mondayStart = addZonedDays(todayStart, 1, timeZone);
-        return { windowStart: now, windowEnd: mondayStart };
+        return { windowStart: now, windowEnd: mondayStart, placementPreference };
       }
 
       // Sunday to Friday: find this upcoming Saturday
       const daysUntilSaturday = (6 - currentDayNumber + 7) % 7;
       const saturdayStart = addZonedDays(todayStart, daysUntilSaturday, timeZone);
       const mondayStart = addZonedDays(saturdayStart, 2, timeZone);
-      return { windowStart: saturdayStart, windowEnd: mondayStart };
+      return { windowStart: saturdayStart, windowEnd: mondayStart, placementPreference };
+    }
+
+    case 'relative_week': {
+      const currentDayNumber = currentParts.weekday;
+      const daysUntilNextMonday = (1 - currentDayNumber + 7) % 7 || 7;
+      const nextMondayStart = addZonedDays(todayStart, daysUntilNextMonday, timeZone);
+      const placementPreference = dateIntent.preference ?? 'any';
+
+      if (dateIntent.modifier === 'next') {
+        const followingMondayStart = addZonedDays(nextMondayStart, 7, timeZone);
+        return {
+          windowStart: nextMondayStart,
+          windowEnd: followingMondayStart,
+          placementPreference,
+        };
+      }
+
+      // "this week"
+      return {
+        windowStart: now,
+        windowEnd: nextMondayStart,
+        placementPreference,
+      };
     }
 
     case 'explicit_date': {
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIntent.date);
-      if (!match) {
-        return { windowStart: now, windowEnd: addZonedDays(now, 7, timeZone) };
+      if (!isValidCalendarDate(dateIntent.date)) {
+        return {
+          windowStart: now,
+          windowEnd: now,
+          isImpossibleDate: true,
+        };
       }
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIntent.date)!;
       const year = Number(match[1]);
       const month = Number(match[2]);
       const day = Number(match[3]);
       const dateUtc = zonedWallClockToUtc({ year, month, day, hour: 0, minute: 0 }, timeZone);
       const dayStart = startOfZonedDay(dateUtc, timeZone);
+      const dayEnd = addZonedDays(dayStart, 1, timeZone);
+      const isPast = dayEnd.getTime() <= now.getTime();
       return {
         windowStart: dayStart.getTime() < now.getTime() ? now : dayStart,
-        windowEnd: addZonedDays(dayStart, 1, timeZone),
+        windowEnd: dayEnd,
+        isPast,
       };
     }
   }
@@ -218,6 +257,7 @@ export interface ResolvedIntentTimeBounds {
 export function resolveIntentTimeBounds(
   timeIntent: TimeIntent,
   durationMinutes: number,
+  maxDurationMinutes?: number,
 ): ResolvedIntentTimeBounds {
   switch (timeIntent.type) {
     case 'unconstrained':
@@ -227,10 +267,14 @@ export function resolveIntentTimeBounds(
       return { preferredTimeOfDay: timeIntent.preference };
 
     case 'exact_time': {
+      const span =
+        maxDurationMinutes !== undefined && maxDurationMinutes > durationMinutes
+          ? maxDurationMinutes
+          : durationMinutes;
       const minute = timeIntent.hour * 60 + timeIntent.minute;
       return {
         earliestMinute: minute,
-        latestMinute: Math.min(24 * 60, minute + durationMinutes),
+        latestMinute: Math.min(24 * 60, minute + span),
         preferredTimeOfDay: timeOfDayFromHour(timeIntent.hour),
         noteHint: `Scheduled for exact time ${formatClockTime(timeIntent.hour, timeIntent.minute)}`,
       };
@@ -317,8 +361,29 @@ export function formatIntentDateLabel(dateIntent: DateIntent): string | null {
       const name = WEEKDAY_NAMES_TITLE[dateIntent.weekday] ?? dateIntent.weekday;
       return dateIntent.modifier === 'next' ? `Next ${name}` : name;
     }
-    case 'weekend':
-      return dateIntent.modifier === 'next' ? 'Next weekend' : 'This weekend';
+    case 'weekend': {
+      const isNext = dateIntent.modifier === 'next';
+      if (dateIntent.preference === 'late') {
+        return isNext ? 'End of next weekend' : 'End of this weekend';
+      }
+      if (dateIntent.preference === 'early') {
+        return isNext ? 'Early next weekend' : 'Early this weekend';
+      }
+      return isNext ? 'Next weekend' : 'This weekend';
+    }
+    case 'relative_week': {
+      const isNext = dateIntent.modifier === 'next';
+      if (dateIntent.preference === 'late') {
+        return isNext ? 'Later next week' : 'Later this week';
+      }
+      if (dateIntent.preference === 'early') {
+        return isNext ? 'Early next week' : 'Early this week';
+      }
+      if (dateIntent.preference === 'middle') {
+        return isNext ? 'Mid next week' : 'Mid this week';
+      }
+      return isNext ? 'Next week' : 'This week';
+    }
     case 'explicit_date':
       return dateIntent.date;
   }

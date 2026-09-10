@@ -4,9 +4,17 @@ export interface ExpectedIntent {
     | { type: 'exact' | 'approximate'; minutes: number }
     | { type: 'range'; minMinutes: number; maxMinutes: number }
     | null;
-  dateType?: 'unconstrained' | 'today' | 'tomorrow' | 'weekday' | 'weekend' | 'explicit_date';
+  dateType?:
+    | 'unconstrained'
+    | 'today'
+    | 'tomorrow'
+    | 'weekday'
+    | 'weekend'
+    | 'relative_week'
+    | 'explicit_date';
   dateWeekday?: string;
   dateModifier?: 'this' | 'next' | 'none';
+  datePreference?: 'early' | 'middle' | 'late' | 'any';
   timeType?:
     | 'unconstrained'
     | 'exact_time'
@@ -77,7 +85,7 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
   },
   {
     id: 'range-weekend',
-    description: 'Bounded duration range (1-2h) on weekend.',
+    description: 'Bounded duration range (1-2h) toward the end of this weekend.',
     input: {
       ...DEFAULT_CONTEXT,
       rawText: 'find me an hour or two toward the end of this weekend',
@@ -85,7 +93,51 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
     expected: {
       duration: { type: 'range', minMinutes: 60, maxMinutes: 120 },
       dateType: 'weekend',
-      timePreference: 'afternoon',
+      datePreference: 'late',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'early-weekend',
+    description: 'Meeting early this weekend.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'coffee early this weekend',
+    },
+    expected: {
+      titleContains: 'coffee',
+      dateType: 'weekend',
+      datePreference: 'early',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'later-next-week',
+    description: 'Deep work later next week.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'deep work later next week',
+    },
+    expected: {
+      titleContains: 'deep work',
+      dateType: 'relative_week',
+      dateModifier: 'next',
+      datePreference: 'late',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'range-exact-time',
+    description: 'Duration range with exact start time.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'catchup for an hour or two at exactly 3pm',
+    },
+    expected: {
+      titleContains: 'catchup',
+      duration: { type: 'range', minMinutes: 60, maxMinutes: 120 },
+      timeType: 'exact_time',
+      timeHour: 15,
       requiresClarification: false,
     },
   },
@@ -243,6 +295,30 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
     input: {
       ...DEFAULT_CONTEXT,
       rawText: 'book a slot',
+    },
+    expected: {
+      requiresClarification: true,
+      clarificationQuestionContains: '?',
+    },
+  },
+  {
+    id: 'clarification-impossible-date',
+    description: 'Impossible calendar date requires clarification.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'meeting with Andrew on February 30th',
+    },
+    expected: {
+      requiresClarification: true,
+      clarificationQuestionContains: '?',
+    },
+  },
+  {
+    id: 'clarification-past-date',
+    description: 'Request for past date requires clarification.',
+    input: {
+      ...DEFAULT_CONTEXT,
+      rawText: 'call with Sarah yesterday at 2pm',
     },
     expected: {
       requiresClarification: true,

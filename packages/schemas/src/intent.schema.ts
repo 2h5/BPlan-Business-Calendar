@@ -71,17 +71,47 @@ export const dateIntentWeekdaySchema = z
   })
   .strict();
 
+/**
+ * Verifies that a YYYY-MM-DD string is an authentic calendar date that does
+ * not wrap or overflow (e.g. rejects 2026-02-30, 2026-04-31, 2026-13-45).
+ */
+export function isValidCalendarDate(dateString: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+export const datePreferenceSchema = z.enum(['early', 'middle', 'late', 'any']);
+export type DatePreference = z.infer<typeof datePreferenceSchema>;
+
 export const dateIntentWeekendSchema = z
   .object({
     type: z.literal('weekend'),
     modifier: relativeModifierSchema.default('none'),
+    preference: z.enum(['early', 'late', 'any']).default('any'),
+  })
+  .strict();
+
+export const dateIntentRelativeWeekSchema = z
+  .object({
+    type: z.literal('relative_week'),
+    modifier: z.enum(['this', 'next']).default('this'),
+    preference: datePreferenceSchema.default('any'),
   })
   .strict();
 
 export const dateIntentExplicitSchema = z
   .object({
     type: z.literal('explicit_date'),
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format'),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format')
+      .refine(isValidCalendarDate, { message: 'Date must be a valid calendar date' }),
   })
   .strict();
 
@@ -91,6 +121,7 @@ export const dateIntentSchema = z.discriminatedUnion('type', [
   dateIntentTomorrowSchema,
   dateIntentWeekdaySchema,
   dateIntentWeekendSchema,
+  dateIntentRelativeWeekSchema,
   dateIntentExplicitSchema,
 ]);
 export type DateIntent = z.infer<typeof dateIntentSchema>;

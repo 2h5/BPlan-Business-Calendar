@@ -111,7 +111,7 @@ describe('resolveIntentDateWindow', () => {
 
   it('resolves "this weekend" from Wednesday to Saturday–Sunday', () => {
     const { windowStart, windowEnd } = resolveIntentDateWindow(
-      { type: 'weekend', modifier: 'this' },
+      { type: 'weekend', modifier: 'this', preference: 'any' },
       tz,
       wednesdayNoon,
     );
@@ -122,7 +122,7 @@ describe('resolveIntentDateWindow', () => {
 
   it('resolves "next weekend" from Wednesday to the following weekend', () => {
     const { windowStart, windowEnd } = resolveIntentDateWindow(
-      { type: 'weekend', modifier: 'next' },
+      { type: 'weekend', modifier: 'next', preference: 'any' },
       tz,
       wednesdayNoon,
     );
@@ -261,12 +261,186 @@ describe('readback formatting', () => {
     expect(formatIntentDurationLabel({ type: 'exact', minutes: 30 })).toBe('30 min');
     expect(formatIntentDurationLabel({ type: 'approximate', minutes: 45 })).toBe('45 min (approx)');
     expect(formatIntentDateLabel({ type: 'tomorrow' })).toBe('Tomorrow');
-    expect(formatIntentDateLabel({ type: 'weekend', modifier: 'next' })).toBe('Next weekend');
+    expect(formatIntentDateLabel({ type: 'weekend', modifier: 'next', preference: 'any' })).toBe(
+      'Next weekend',
+    );
+    expect(formatIntentDateLabel({ type: 'weekend', modifier: 'this', preference: 'late' })).toBe(
+      'End of this weekend',
+    );
+    expect(formatIntentDateLabel({ type: 'weekend', modifier: 'next', preference: 'early' })).toBe(
+      'Early next weekend',
+    );
+    expect(
+      formatIntentDateLabel({ type: 'relative_week', modifier: 'next', preference: 'late' }),
+    ).toBe('Later next week');
+    expect(
+      formatIntentDateLabel({ type: 'relative_week', modifier: 'this', preference: 'early' }),
+    ).toBe('Early this week');
     expect(formatIntentTimeLabel({ type: 'around_time', hour: 14, minute: 0 })).toBe(
       'Around 2:00 PM',
     );
     expect(timeOfDayFromHour(9)).toBe('morning');
     expect(timeOfDayFromHour(14)).toBe('afternoon');
     expect(timeOfDayFromHour(19)).toBe('evening');
+  });
+});
+
+describe('explicit date and calendar validation', () => {
+  it('validates calendar dates strictly with round-trip check', async () => {
+    const { isValidCalendarDate } = await import('@cal/schemas/scheduling');
+
+    // Valid dates
+    expect(isValidCalendarDate('2026-02-28')).toBe(true);
+    expect(isValidCalendarDate('2024-02-29')).toBe(true); // 2024 is leap year
+    expect(isValidCalendarDate('2026-04-30')).toBe(true);
+    expect(isValidCalendarDate('2026-12-31')).toBe(true);
+
+    // Impossible dates that JS Date normally wraps
+    expect(isValidCalendarDate('2026-02-29')).toBe(false); // 2026 is not leap year
+    expect(isValidCalendarDate('2026-02-30')).toBe(false); // February 30th
+    expect(isValidCalendarDate('2026-04-31')).toBe(false); // April has 30 days
+    expect(isValidCalendarDate('2026-06-31')).toBe(false); // June has 30 days
+    expect(isValidCalendarDate('2026-13-01')).toBe(false); // Month 13
+    expect(isValidCalendarDate('2026-00-10')).toBe(false); // Month 0
+    expect(isValidCalendarDate('not-a-date')).toBe(false);
+  });
+
+  it('flags impossible dates in resolveIntentDateWindow', () => {
+    const tz = 'America/New_York';
+    const now = new Date('2026-09-09T16:00:00.000Z');
+    const result = resolveIntentDateWindow({ type: 'explicit_date', date: '2026-02-30' }, tz, now);
+    expect(result.isImpossibleDate).toBe(true);
+  });
+
+  it('flags past dates in resolveIntentDateWindow', () => {
+    const tz = 'America/New_York';
+    const now = new Date('2026-09-09T16:00:00.000Z');
+    const result = resolveIntentDateWindow({ type: 'explicit_date', date: '2026-01-15' }, tz, now);
+    expect(result.isPast).toBe(true);
+  });
+
+  it('handles DST transition dates cleanly', () => {
+    const tz = 'America/New_York';
+    // Fall back Sunday in 2026: November 1, 2026
+    const fallBackDate = '2026-11-01';
+    const now = new Date('2026-10-15T12:00:00.000Z');
+    const { windowStart, windowEnd } = resolveIntentDateWindow(
+      { type: 'explicit_date', date: fallBackDate },
+      tz,
+      now,
+    );
+    // Start of day in NY on 2026-11-01 is 04:00 UTC (EDT UTC-4)
+    expect(windowStart.toISOString()).toBe('2026-11-01T04:00:00.000Z');
+    // Start of next day in NY on 2026-11-02 is 05:00 UTC (EST UTC-5)
+    expect(windowEnd.toISOString()).toBe('2026-11-02T05:00:00.000Z');
+    // The day has 25 hours across DST transition
+    const diffHours = (windowEnd.getTime() - windowStart.getTime()) / (1000 * 60 * 60);
+    expect(diffHours).toBe(25);
+  });
+});
+
+describe('exact time with duration range', () => {
+  it('expands latestMinute to accommodate maxDurationMinutes so all candidate durations fit at exact start', () => {
+    // User requested "an hour or two at exactly 3pm" (15:00)
+    // Duration: range [60, 120] -> allowedDurations: [60, 90, 120]
+    // Time: exact_time at 15:00
+    const resolved = resolveIntentTimeBounds(
+      { type: 'exact_time', hour: 15, minute: 0 },
+      60,
+      120, // maxDurationMinutes
+    );
+
+    // 15:00 = 900 minutes
+    expect(resolved.earliestMinute).toBe(900);
+    // latestMinute is 15:00 + 120m = 1020 minutes (17:00), NOT clipped at 15:00 + 60m (960)
+    expect(resolved.latestMinute).toBe(1020);
+
+    // When candidates are generated with granularity 15 and allowedDurations [60, 90, 120],
+    // slots starting at 15:00 for 60m, 90m, and 120m are all generated
+    const slots = generateCandidateSlots({
+      constraints: {
+        durationMinutes: 60,
+        allowedDurationsMinutes: [60, 90, 120],
+        windowStart: '2026-09-09T12:00:00.000Z',
+        windowEnd: '2026-09-09T23:00:00.000Z',
+        workingHours: [{ weekday: 3, startMinute: 9 * 60, endMinute: 18 * 60 }],
+        timezone: 'America/New_York',
+        bufferMinutes: 0,
+        earliestMinute: resolved.earliestMinute,
+        latestMinute: resolved.latestMinute,
+        granularityMinutes: 15,
+        splittable: false,
+        minSplitMinutes: 30,
+        preferredTimeOfDay: 'afternoon',
+      },
+      busy: [],
+    });
+
+    const slotsStartingAt3pm = slots.filter((s) => {
+      const d = new Date(s.start);
+      // In America/New_York (EDT UTC-4), 15:00 is 19:00 UTC
+      return d.getUTCHours() === 19 && d.getUTCMinutes() === 0;
+    });
+
+    const candidateDurationsAt3pm = slotsStartingAt3pm.map((s) => (s.end - s.start) / 60_000);
+    expect(candidateDurationsAt3pm).toContain(60);
+    expect(candidateDurationsAt3pm).toContain(90);
+    expect(candidateDurationsAt3pm).toContain(120);
+  });
+});
+
+describe('richer relative-date preferences', () => {
+  const tz = 'America/New_York';
+  const wednesdayNoon = new Date('2026-09-09T16:00:00.000Z'); // Wednesday 12:00 EDT
+
+  it('resolves toward the end of this weekend with late placement preference', () => {
+    const result = resolveIntentDateWindow(
+      { type: 'weekend', modifier: 'this', preference: 'late' },
+      tz,
+      wednesdayNoon,
+    );
+
+    // Upcoming weekend from Wednesday Sept 9 is Saturday Sept 12 to Monday Sept 14
+    expect(result.placementPreference).toBe('late');
+    // Saturday Sept 12 00:00 EDT = 04:00 UTC
+    expect(result.windowStart.toISOString()).toBe('2026-09-12T04:00:00.000Z');
+    // Monday Sept 14 00:00 EDT = 04:00 UTC
+    expect(result.windowEnd.toISOString()).toBe('2026-09-14T04:00:00.000Z');
+  });
+
+  it('resolves early this weekend with early placement preference', () => {
+    const result = resolveIntentDateWindow(
+      { type: 'weekend', modifier: 'this', preference: 'early' },
+      tz,
+      wednesdayNoon,
+    );
+
+    expect(result.placementPreference).toBe('early');
+    expect(result.windowStart.toISOString()).toBe('2026-09-12T04:00:00.000Z');
+    expect(result.windowEnd.toISOString()).toBe('2026-09-14T04:00:00.000Z');
+  });
+
+  it('resolves sometime next week and later next week', () => {
+    const sometimeNextWeek = resolveIntentDateWindow(
+      { type: 'relative_week', modifier: 'next', preference: 'any' },
+      tz,
+      wednesdayNoon,
+    );
+
+    // Next Monday from Wednesday Sept 9 is Monday Sept 14
+    expect(sometimeNextWeek.windowStart.toISOString()).toBe('2026-09-14T04:00:00.000Z');
+    // Following Monday is Monday Sept 21
+    expect(sometimeNextWeek.windowEnd.toISOString()).toBe('2026-09-21T04:00:00.000Z');
+    expect(sometimeNextWeek.placementPreference).toBe('any');
+
+    const laterNextWeek = resolveIntentDateWindow(
+      { type: 'relative_week', modifier: 'next', preference: 'late' },
+      tz,
+      wednesdayNoon,
+    );
+
+    expect(laterNextWeek.windowStart.toISOString()).toBe('2026-09-14T04:00:00.000Z');
+    expect(laterNextWeek.windowEnd.toISOString()).toBe('2026-09-21T04:00:00.000Z');
+    expect(laterNextWeek.placementPreference).toBe('late');
   });
 });
