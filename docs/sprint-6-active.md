@@ -2325,9 +2325,11 @@ The next implementer must:
 Current phase:
 
 `Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
-foundation. Live model evaluation, production model selection, the AI client
-experience, and real sandbox purchase E2E remain pending. The independent web
-track has completed Web Phases 0–6; Web Phase 7 Find Time has not started.`
+foundation. The web Find Time proposal/confirmation UX and dedicated
+subscription page are implemented. Live model evaluation, production model
+selection, and real sandbox purchase E2E remain pending. The independent web
+track has completed Web Phases 0–6 plus hardening; production web hardening
+remains pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2374,17 +2376,16 @@ Current blocker:
 
 `The product Pro scope and AI model choice are not final. Live Luna/Terra
 evaluation still needs an authorized server-side OpenAI key and explicit cost
-authorization. The web billing/purchase work is intentionally paused because
-the client purchase surface and the real AI feature experience are not yet
-defined.`
+authorization. The web Find Time experience and subscription page now exist,
+but real RevenueCat purchase E2E remains pending and production billing stays
+disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Do not expand billing or AI scope while paused. When resumed, first confirm
-the Pro feature set and authorize the live model evaluation; then implement the
-web Find Time proposal/confirmation UX and return to the RevenueCat sandbox
-purchase acceptance test. Preserve deterministic candidate membership as the
-sole availability authority.`
+`Do not expand billing or AI scope while paused. When resumed, authorize the
+live model evaluation and select the production model; then run the RevenueCat
+sandbox purchase acceptance test. Preserve deterministic candidate membership
+as the sole availability authority.`
 
 Current Sprint 6 verification evidence:
 
@@ -2397,8 +2398,10 @@ Current Sprint 6 verification evidence:
 
 Current implementation checkpoint:
 
-`673eb12` includes the committed web billing seam and hosted ACL migrations.
+`85c96ed` includes the web Find Time proposal/confirmation UX, subscription
+page, BPlan UI polish, server-side development rate-limit overrides, and the
+committed web billing seam and hosted ACL migrations.
 GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
-passed both the static and hosted migrations/RLS/generated-types jobs. The
-local `pnpm verify` command remains environment-dependent; the latest CI result
-for the documentation checkpoint is reported with the final handoff.
+passed both the static and hosted migrations/RLS/generated-types jobs for the
+earlier billing checkpoint. No newer CI result is claimed in this handoff; the
+local `pnpm verify` command remains environment-dependent.

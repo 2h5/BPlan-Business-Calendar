@@ -17,16 +17,18 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 ```text
 CORE PRODUCT
 ├─ Mobile core ..................... COMPLETE
-├─ Web Phases 0–6 .................. COMPLETE
+├─ Web core / Phases 0–6 ........... COMPLETE + HARDENED
 ├─ Google Calendar integration ..... IMPLEMENTED / major flows verified
 └─ Microsoft integration ........... IMPLEMENTED / live lifecycle gaps remain
 
 AI / PRO
 ├─ Find Time backend ................ COMPLETE + HARDENED
-├─ Find Time client UX .............. NOT STARTED
-├─ Production model selection ...... PENDING
+├─ Find Time web UX ................. IMPLEMENTED / PROPOSE + CONFIRM
+├─ Production model selection ...... PENDING EVALUATION
 ├─ RevenueCat backend ............... IMPLEMENTED
+├─ Subscription / upgrade page ..... IMPLEMENTED
 ├─ Web sandbox billing seam ........ CONFIGURED
+├─ Development rate-limit overrides . CONFIGURED
 └─ Real purchase E2E ................ PENDING
 
 RELEASE
@@ -36,19 +38,20 @@ RELEASE
 └─ Production release hardening .... PENDING
 
 CURRENT STATE
-└─ Development paused at a stable checkpoint.
+└─ Core web product + Find Time UX are functional; live AI and billing E2E are next.
 ```
 
-The implementation checkpoint `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054); this documentation checkpoint is maintained on `main`.
+The earlier billing implementation checkpoint `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054); this documentation checkpoint is maintained on `main`.
 
 ## Current status
 
-**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the RevenueCat hosted sandbox checkout, webhook, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
+**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the web Find Time proposal/confirmation UX, dedicated subscription page, RevenueCat hosted sandbox checkout, webhook, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Server-side development rate-limit overrides are also configured. Live model evaluation, production model selection, and real purchase E2E remain pending; production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
 complete/implemented. Sprint 5's Microsoft
 implementation is complete in code with external lifecycle/device verification
 still tracked separately. The web client has completed Web Phases 0–6 plus
-hardening; Web Phase 7 Find Time is not started and the billing/AI track is
-paused at this checkpoint.
+hardening; its BPlan rebrand/UI polish and Find Time proposal/confirmation
+experience are implemented. Live AI and billing acceptance work remain
+pending.
 
 Google live OAuth, calendar import, initial/incremental sync, and
 provider-first create/update/delete were verified in Sprint 4. Microsoft OAuth,
@@ -77,8 +80,8 @@ Sprint 5 tracker retains Microsoft external-verification evidence.
 | Settings planning preferences                                                 | Done — Sprint 3                                                                                                                      |
 | Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain                                                               |
 | Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                                                                                   |
-| AI Find Time, RevenueCat                                                      | AI Phases 1–4 hardened; RevenueCat hosted sandbox/webhook/web billing foundation configured; client UX and real purchase E2E pending |
-| Web client                                                                    | Web Phases 0–6 + hardening done; Phase 7 Find Time not started/paused                                                                |
+| AI Find Time, RevenueCat                                                      | AI Phases 1–4 hardened; web proposal/confirmation UX and subscription page implemented; hosted sandbox/webhook foundation configured; live model selection and real purchase E2E pending |
+| Web client                                                                    | Web Phases 0–6 + hardening done; BPlan UI polish and Find Time proposal/confirmation UX implemented; production hardening pending   |
 
 ---
 
