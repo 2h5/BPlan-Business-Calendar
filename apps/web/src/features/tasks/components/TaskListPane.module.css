@@ -86,6 +86,11 @@
   max-width: 160px;
 }
 
+.listSelect button,
+.listSelect :global([class*='trigger']) {
+  border-radius: var(--radius-sm);
+}
+
 .quickAddInput:hover:not(:disabled) {
   border-color: var(--color-border-strong);
 }
@@ -98,7 +103,7 @@
 .newTaskBtn,
 .quickAddSubmit {
   height: var(--control-height-sm);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;

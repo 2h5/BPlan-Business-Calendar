@@ -88,10 +88,6 @@ export function TodayView() {
     }).format(today.now);
   }, [today.now, today.timeZone]);
 
-  const liveTimeString = useMemo(() => {
-    return formatTimeOfDay(today.now, today.timeZone, today.hourCycle);
-  }, [today.now, today.timeZone, today.hourCycle]);
-
   // Check if the "next" event is currently active or upcoming
   const nextStatus = useMemo(() => {
     if (!today.next) return null;
@@ -217,11 +213,6 @@ export function TodayView() {
         <div className={styles.heroMain}>
           <div className={styles.heroDateRow}>
             <span className={styles.dateBadge}>{fullDateString}</span>
-            <span className={styles.liveClockChip}>
-              <span className={styles.pulseDot} />
-              {liveTimeString}
-              <span className={styles.timezoneLabel}>{today.timeZone}</span>
-            </span>
           </div>
           <h1 className={styles.heroTitle}>{greeting}</h1>
           <p className={styles.heroSubtitle}>
@@ -235,18 +226,18 @@ export function TodayView() {
           <button
             type="button"
             className={styles.primaryActionButton}
-            onClick={() => navigate('/tasks?newTask=true')}
-          >
-            <PlusIcon />
-            <span>New Task</span>
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryActionButton}
             onClick={() => navigate(`/calendar?date=${today.todayKey}&newEvent=true`)}
           >
             <CalendarIcon />
             <span>New Event</span>
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryActionButton}
+            onClick={() => navigate('/tasks?newTask=true')}
+          >
+            <PlusIcon />
+            <span>New Task</span>
           </button>
           <button
             type="button"

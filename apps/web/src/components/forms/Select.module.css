@@ -29,6 +29,7 @@
 .triggerSmall {
   min-height: var(--control-height-sm);
   font-size: var(--font-size-xs);
+  border-radius: var(--radius-sm);
 }
 
 .trigger:hover:not(:disabled),

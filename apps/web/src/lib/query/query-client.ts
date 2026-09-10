@@ -67,4 +67,7 @@ export const queryKeys = {
     calendars: (providerAccountId: string) =>
       ['integrations', 'calendars', providerAccountId] as const,
   },
+  scheduling: {
+    findTime: () => ['scheduling', 'find-time'] as const,
+  },
 } as const;

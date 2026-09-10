@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CalendarEditor } from './CalendarEditor';
-import { CalendarSidebar } from './CalendarSidebar';
 import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
@@ -216,27 +215,24 @@ export function CalendarView() {
 
   return (
     <div className={styles.workspace}>
-      <CalendarSidebar
-        calendars={result.calendars}
-        timeZone={timeZone}
-        onToggleVisibility={handleToggleVisibility}
-        onCreateCalendar={() => {
-          rememberOpeningControl();
-          setEditingCalendar(null);
-          setCalendarEditorOpen(true);
-        }}
-        onEditCalendar={(calendar) => {
-          rememberOpeningControl();
-          setEditingCalendar(calendar);
-          setCalendarEditorOpen(true);
-        }}
-      />
-
       <section className={styles.calendarMain} aria-label="Calendar">
         <CalendarToolbar
           mode={mode}
           heading={heading}
           isFetching={result.isFetching && !result.isLoading}
+          calendars={result.calendars}
+          timeZone={timeZone}
+          onToggleVisibility={handleToggleVisibility}
+          onCreateCalendar={() => {
+            rememberOpeningControl();
+            setEditingCalendar(null);
+            setCalendarEditorOpen(true);
+          }}
+          onEditCalendar={(calendar) => {
+            rememberOpeningControl();
+            setEditingCalendar(calendar);
+            setCalendarEditorOpen(true);
+          }}
           onModeChange={changeMode}
           onPrevious={() => setSelectedDateKey(shiftDateKey(selectedDateKey, mode, -1, timeZone))}
           onToday={goToToday}

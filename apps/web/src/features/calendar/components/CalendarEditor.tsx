@@ -1,5 +1,5 @@
 import { createCalendarSchema, type Calendar, type CreateCalendarInput } from '@cal/schemas';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 import styles from './CalendarView.module.css';
 
@@ -22,12 +22,52 @@ export function CalendarEditor({
   const [color, setColor] = useState(calendar?.color ?? '#8AA4FF');
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const deleteWrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const closingTimeoutRef = useRef<number | null>(null);
   const isProvider = !!calendar && calendar.sourceType !== 'internal';
 
   useEffect(() => {
+    if (!isConfirmOpen) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!deleteWrapperRef.current?.contains(e.target as Node)) {
+        setIsConfirmOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    return () => window.removeEventListener('pointerdown', handlePointerDown);
+  }, [isConfirmOpen]);
+
+  const requestClose = useCallback(() => {
+    if (isClosing || isSaving) return;
+    setIsClosing(true);
+  }, [isClosing, isSaving]);
+
+  const handleAnimationEnd = (event: React.AnimationEvent) => {
+    if (isClosing && event.target === panelRef.current) {
+      if (closingTimeoutRef.current) window.clearTimeout(closingTimeoutRef.current);
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    if (isClosing) {
+      closingTimeoutRef.current = window.setTimeout(() => {
+        onClose();
+      }, 180);
+      return () => {
+        if (closingTimeoutRef.current) window.clearTimeout(closingTimeoutRef.current);
+      };
+    }
+  }, [isClosing, onClose]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSaving) onClose();
+      if (event.key === 'Escape' && !isSaving && !isClosing) requestClose();
       if (event.key === 'Tab') {
         const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
           'button:not(:disabled), input:not(:disabled)',
@@ -46,11 +86,11 @@ export function CalendarEditor({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSaving, onClose]);
+  }, [isClosing, isSaving, requestClose]);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (isProvider) return;
+    if (isProvider || isClosing) return;
     try {
       setError(null);
       setIsSaving(true);
@@ -62,7 +102,7 @@ export function CalendarEditor({
       });
       if (calendar) await onUpdate(calendar, input);
       else await onCreate(input);
-      onClose();
+      requestClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The calendar could not be saved.');
     } finally {
@@ -71,15 +111,12 @@ export function CalendarEditor({
   };
 
   const handleDelete = async () => {
-    if (!calendar || isProvider) return;
-    if (!window.confirm(`Delete ${calendar.name} and all of its events? This cannot be undone.`)) {
-      return;
-    }
+    if (!calendar || isProvider || isClosing) return;
     try {
       setError(null);
       setIsSaving(true);
       await onDelete(calendar);
-      onClose();
+      requestClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'The calendar could not be deleted.');
     } finally {
@@ -89,21 +126,45 @@ export function CalendarEditor({
 
   return (
     <div className={styles.modalLayer} role="presentation">
-      <button className={styles.modalBackdrop} type="button" onClick={onClose} aria-label="Close" />
+      <button
+        className={`${styles.modalBackdrop} ${isClosing ? styles.modalBackdropClosing : ''}`}
+        type="button"
+        onClick={requestClose}
+        aria-label="Close"
+      />
       <section
         ref={panelRef}
-        className={styles.calendarEditor}
+        className={`${styles.calendarEditor} ${isClosing ? styles.calendarEditorClosing : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="calendar-editor-title"
+        onAnimationEnd={handleAnimationEnd}
       >
         <div className={styles.editorHeader}>
           <div>
             <span className={styles.eyebrow}>Calendar settings</span>
             <strong id="calendar-editor-title">{calendar ? calendar.name : 'New calendar'}</strong>
           </div>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close">
-            ×
+          <button
+            type="button"
+            className={styles.closeButton}
+            onClick={requestClose}
+            aria-label="Close"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
         <form className={styles.calendarEditorBody} onSubmit={handleSubmit}>
@@ -127,20 +188,23 @@ export function CalendarEditor({
               maxLength={120}
               required
               autoFocus={!isProvider}
-              disabled={isProvider}
+              disabled={isProvider || isClosing}
             />
           </div>
           <div className={styles.editorField}>
             <label htmlFor="calendar-color">Color</label>
             <div className={styles.colorField}>
-              <input
-                id="calendar-color"
-                type="color"
-                value={color}
-                onChange={(event) => setColor(event.target.value.toUpperCase())}
-                disabled={isProvider}
-              />
-              <span>{color}</span>
+              <div className={styles.colorPickerWrap}>
+                <input
+                  id="calendar-color"
+                  type="color"
+                  value={color}
+                  onChange={(event) => setColor(event.target.value.toUpperCase())}
+                  disabled={isProvider || isClosing}
+                  aria-label="Select calendar color"
+                />
+              </div>
+              <span className={styles.colorHexBadge}>{color}</span>
             </div>
           </div>
           {calendar?.isDefault ? (
@@ -150,26 +214,70 @@ export function CalendarEditor({
           ) : null}
           <div className={styles.editorFooter}>
             {calendar && !isProvider && !calendar.isDefault ? (
-              <button
-                type="button"
-                className={styles.deleteButton}
-                disabled={isSaving}
-                onClick={() => void handleDelete()}
-              >
-                Delete calendar
-              </button>
+              <div ref={deleteWrapperRef} className={styles.deleteWrapper}>
+                <button
+                  type="button"
+                  className={`${styles.deleteButton} ${isConfirmOpen ? styles.deleteButtonActive : ''}`}
+                  disabled={isSaving || isClosing}
+                  onClick={() => setIsConfirmOpen(true)}
+                  aria-expanded={isConfirmOpen}
+                  aria-haspopup="dialog"
+                >
+                  Delete calendar
+                </button>
+
+                {isConfirmOpen && (
+                  <div
+                    className={styles.deleteConfirmPopup}
+                    role="dialog"
+                    aria-label="Confirm calendar deletion"
+                  >
+                    <div className={styles.deleteConfirmContent}>
+                      <span className={styles.deleteConfirmTitle}>Delete this calendar?</span>
+                      <span className={styles.deleteConfirmDesc}>
+                        Delete {calendar.name} and all of its events? This action cannot be undone.
+                      </span>
+                    </div>
+                    <div className={styles.deleteConfirmActions}>
+                      <button
+                        type="button"
+                        className={styles.deleteConfirmCancelBtn}
+                        onClick={() => setIsConfirmOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteConfirmBtn}
+                        onClick={() => {
+                          setIsConfirmOpen(false);
+                          void handleDelete();
+                        }}
+                        disabled={isSaving}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <span />
             )}
             <div>
-              <button type="button" className={styles.secondaryButton} onClick={onClose}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={requestClose}
+                disabled={isSaving || isClosing}
+              >
                 {isProvider ? 'Close' : 'Cancel'}
               </button>
               {!isProvider ? (
                 <button
                   type="submit"
                   className={styles.primaryButton}
-                  disabled={isSaving || !name.trim()}
+                  disabled={isSaving || isClosing || !name.trim()}
                 >
                   {isSaving ? 'Saving…' : calendar ? 'Save calendar' : 'Create calendar'}
                 </button>

@@ -1,5 +1,5 @@
 import { formatDuration } from '@cal/domain';
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
@@ -11,16 +11,28 @@ import {
   type FindTimeSuggestion,
 } from '../api/find-time.api';
 import { useConfirmSlot } from '../hooks/useConfirmSlot';
-import { useFindTime } from '../hooks/useFindTime';
+import {
+  clearStoredFindTimeDraft,
+  getStoredFindTimeDraft,
+  saveStoredFindTimeDraft,
+  useFindTime,
+} from '../hooks/useFindTime';
 
 const PLACEHOLDER = 'Try “15-minute meeting with Andrew”';
 
 const BANNER_STORAGE_KEY = 'bplan_recent_scheduled_banner';
+const CONFIRMATION_DISPLAY_DURATION_MS = 5000;
 const BANNER_TOTAL_DURATION_MS = 30000;
+
+type ScheduledNoticePhase = 'confirmation' | 'banner';
 
 interface StoredScheduledBanner {
   confirmation: FindTimeConfirmation;
+  phase?: ScheduledNoticePhase;
+  /** Expiry for the currently stored phase. */
   expiresAt: number;
+  /** Absolute expiry for the compact banner after the confirmation phase. */
+  bannerExpiresAt?: number;
   totalDurationMs: number;
 }
 
@@ -34,7 +46,46 @@ function getStoredBanner(): StoredScheduledBanner | null {
       window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
       return null;
     }
-    return parsed;
+
+    const now = Date.now();
+    const phase: ScheduledNoticePhase = parsed.phase === 'confirmation' ? 'confirmation' : 'banner';
+    const totalDurationMs =
+      Number.isFinite(parsed.totalDurationMs) && parsed.totalDurationMs > 0
+        ? parsed.totalDurationMs
+        : BANNER_TOTAL_DURATION_MS;
+
+    if (phase === 'confirmation') {
+      const bannerExpiresAt =
+        typeof parsed.bannerExpiresAt === 'number'
+          ? parsed.bannerExpiresAt
+          : parsed.expiresAt + totalDurationMs;
+
+      if (parsed.expiresAt > now) {
+        return { ...parsed, phase, bannerExpiresAt, totalDurationMs };
+      }
+
+      if (bannerExpiresAt > now) {
+        const migrated = {
+          ...parsed,
+          phase: 'banner' as const,
+          expiresAt: bannerExpiresAt,
+          bannerExpiresAt,
+          totalDurationMs,
+        };
+        saveBannerRecord(migrated);
+        return migrated;
+      }
+
+      window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
+      return null;
+    }
+
+    if (parsed.expiresAt > now) {
+      return { ...parsed, phase, totalDurationMs };
+    }
+
+    window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
+    return null;
   } catch {
     return null;
   }
@@ -71,7 +122,10 @@ export interface FindTimeBoxProps {
  * in `@cal/domain`; the server finds genuinely open slots and ranks them.
  */
 export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
-  const [text, setText] = useState('');
+  const findTime = useFindTime();
+  const confirmSlot = useConfirmSlot();
+
+  const [text, setText] = useState(() => findTime.promptText || getStoredFindTimeDraft());
 
   // Restore any active scheduled banner from sessionStorage (survives route navigation)
   const [storedRecord] = useState<StoredScheduledBanner | null>(() => {
@@ -86,23 +140,26 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   });
 
   const initialRemaining = storedRecord
-    ? Math.max(0, storedRecord.expiresAt - Date.now())
+    ? storedRecord.phase === 'banner'
+      ? Math.max(0, storedRecord.expiresAt - Date.now())
+      : BANNER_TOTAL_DURATION_MS
     : BANNER_TOTAL_DURATION_MS;
 
   const [recentScheduled, setRecentScheduled] = useState<FindTimeConfirmation | null>(
-    () => storedRecord?.confirmation ?? null,
+    () => storedRecord?.confirmation ?? confirmSlot.confirmation ?? null,
   );
-  const [isSchedulingAnother, setIsSchedulingAnother] = useState<boolean>(
-    () => storedRecord !== null,
-  );
+  const [noticePhase, setNoticePhase] = useState<ScheduledNoticePhase | null>(() => {
+    if (storedRecord) return storedRecord.phase ?? 'banner';
+    if (confirmSlot.confirmation) return 'confirmation';
+    return null;
+  });
+  const isSchedulingAnother = noticePhase === 'banner';
   const [isBannerExiting, setIsBannerExiting] = useState(false);
   const [bannerRemainingMs, setBannerRemainingMs] = useState<number>(initialRemaining);
   const [bannerTotalDurationMs, setBannerTotalDurationMs] = useState<number>(
     () => storedRecord?.totalDurationMs ?? BANNER_TOTAL_DURATION_MS,
   );
 
-  const findTime = useFindTime();
-  const confirmSlot = useConfirmSlot();
   const subscription = useSubscription();
   const statusInfo = getSubscriptionStatusInfo(subscription.data);
   const isCheckingSubscription = subscription.isLoading;
@@ -110,33 +167,109 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastHandledConfirmationRef = useRef<string | null>(null);
 
   // Smooth exit state for proposal when user clears/deletes input
-  const [displayedProposal, setDisplayedProposal] = useState<FindTimeProposal | null>(null);
+  const [displayedProposal, setDisplayedProposal] = useState<FindTimeProposal | null>(
+    () => findTime.proposal,
+  );
   const [isProposalExiting, setIsProposalExiting] = useState(false);
   const proposalExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // If mounted with an active banner from storage, set its dismiss timer
   useEffect(() => {
-    if (storedRecord && isSchedulingAnother) {
+    if (findTime.promptText && !text) {
+      setText(findTime.promptText);
+    }
+  }, [findTime.promptText, text]);
+
+  const triggerBannerDismiss = useCallback(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+    lastHandledConfirmationRef.current = null;
+    setIsBannerExiting(true);
+    clearBannerRecord();
+    confirmSlot.reset();
+    setTimeout(() => {
+      setRecentScheduled(null);
+      setNoticePhase(null);
+      setIsBannerExiting(false);
+    }, 350);
+  }, [confirmSlot]);
+
+  const transitionToBanner = useCallback(
+    (target: FindTimeConfirmation, bannerExpiresAt: number) => {
+      const remaining = bannerExpiresAt - Date.now();
+      if (remaining <= 0) {
+        clearBannerRecord();
+        confirmSlot.reset();
+        lastHandledConfirmationRef.current = null;
+        setRecentScheduled(null);
+        setNoticePhase(null);
+        return;
+      }
+
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+      confirmSlot.reset();
+      setRecentScheduled(target);
+      setNoticePhase('banner');
+      setIsBannerExiting(false);
+      setBannerRemainingMs(remaining);
+      setBannerTotalDurationMs(BANNER_TOTAL_DURATION_MS);
+      saveBannerRecord({
+        confirmation: target,
+        phase: 'banner',
+        expiresAt: bannerExpiresAt,
+        bannerExpiresAt,
+        totalDurationMs: BANNER_TOTAL_DURATION_MS,
+      });
+      dismissTimerRef.current = setTimeout(() => {
+        triggerBannerDismiss();
+      }, remaining);
+    },
+    [confirmSlot, triggerBannerDismiss],
+  );
+
+  // Restore the appropriate scheduled notice phase from storage and keep its
+  // absolute transition/expiry times running across route navigation.
+  useEffect(() => {
+    if (!storedRecord) return;
+
+    if (storedRecord.phase === 'confirmation') {
+      const bannerExpiresAt =
+        storedRecord.bannerExpiresAt ?? storedRecord.expiresAt + BANNER_TOTAL_DURATION_MS;
       const remaining = storedRecord.expiresAt - Date.now();
       if (remaining > 0) {
-        setBannerRemainingMs(remaining);
         if (dismissTimerRef.current) {
           clearTimeout(dismissTimerRef.current);
         }
         dismissTimerRef.current = setTimeout(() => {
-          triggerBannerDismiss();
+          transitionToBanner(storedRecord.confirmation, bannerExpiresAt);
         }, remaining);
       } else {
-        clearBannerRecord();
-        setRecentScheduled(null);
-        setIsSchedulingAnother(false);
+        transitionToBanner(storedRecord.confirmation, bannerExpiresAt);
       }
+      return;
     }
-  }, [isSchedulingAnother, storedRecord]);
 
-  // Sync displayed proposal when a new one arrives from findTime
+    const remaining = storedRecord.expiresAt - Date.now();
+    if (remaining > 0) {
+      setBannerRemainingMs(remaining);
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+      dismissTimerRef.current = setTimeout(() => {
+        triggerBannerDismiss();
+      }, remaining);
+    } else {
+      triggerBannerDismiss();
+    }
+  }, [storedRecord, transitionToBanner, triggerBannerDismiss]);
+
+  // Sync displayed proposal when a new one arrives from findTime or when reset
   useEffect(() => {
     if (findTime.proposal) {
       setDisplayedProposal(findTime.proposal);
@@ -145,30 +278,47 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         clearTimeout(proposalExitTimerRef.current);
         proposalExitTimerRef.current = null;
       }
+    } else if (!findTime.isPending && !isProposalExiting) {
+      setDisplayedProposal(null);
     }
-  }, [findTime.proposal]);
+  }, [findTime.proposal, findTime.isPending, isProposalExiting]);
 
   // When a slot is confirmed, update state and save to sessionStorage
   useEffect(() => {
-    if (confirmSlot.confirmation) {
-      setRecentScheduled(confirmSlot.confirmation);
-      setIsSchedulingAnother(false);
+    const confirmation = confirmSlot.confirmation;
+    if (confirmation && lastHandledConfirmationRef.current !== confirmation.suggestionId) {
+      lastHandledConfirmationRef.current = confirmation.suggestionId;
+
+      setText('');
+      clearStoredFindTimeDraft();
+      setDisplayedProposal(null);
+      setIsProposalExiting(false);
+
+      const confirmationExpiresAt = Date.now() + CONFIRMATION_DISPLAY_DURATION_MS;
+      const bannerExpiresAt = confirmationExpiresAt + BANNER_TOTAL_DURATION_MS;
+
+      setRecentScheduled(confirmation);
+      setNoticePhase('confirmation');
       setIsBannerExiting(false);
       setBannerRemainingMs(BANNER_TOTAL_DURATION_MS);
       setBannerTotalDurationMs(BANNER_TOTAL_DURATION_MS);
 
       saveBannerRecord({
-        confirmation: confirmSlot.confirmation,
-        expiresAt: Date.now() + BANNER_TOTAL_DURATION_MS,
+        confirmation,
+        phase: 'confirmation',
+        expiresAt: confirmationExpiresAt,
+        bannerExpiresAt,
         totalDurationMs: BANNER_TOTAL_DURATION_MS,
       });
 
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
-        dismissTimerRef.current = null;
       }
+      dismissTimerRef.current = setTimeout(() => {
+        transitionToBanner(confirmation, bannerExpiresAt);
+      }, CONFIRMATION_DISPLAY_DURATION_MS);
     }
-  }, [confirmSlot.confirmation]);
+  }, [confirmSlot.confirmation, transitionToBanner]);
 
   useEffect(() => {
     return () => {
@@ -181,16 +331,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     };
   }, []);
 
-  const triggerBannerDismiss = () => {
-    setIsBannerExiting(true);
-    clearBannerRecord();
-    setTimeout(() => {
-      setRecentScheduled(null);
-      setIsBannerExiting(false);
-      setIsSchedulingAnother(false);
-    }, 350);
-  };
-
   const triggerProposalExit = () => {
     if (isProposalExiting) return;
     setIsProposalExiting(true);
@@ -200,43 +340,28 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     proposalExitTimerRef.current = setTimeout(() => {
       setDisplayedProposal(null);
       setIsProposalExiting(false);
+      clearStoredFindTimeDraft();
       findTime.reset();
       proposalExitTimerRef.current = null;
     }, 280);
   };
 
   const handleScheduleAnother = () => {
-    setIsSchedulingAnother(true);
-    setIsBannerExiting(false);
+    const target = recentScheduled ?? confirmSlot.confirmation;
     setText('');
+    clearStoredFindTimeDraft();
     findTime.reset();
     confirmSlot.reset();
     setDisplayedProposal(null);
     setIsProposalExiting(false);
 
-    setBannerRemainingMs(BANNER_TOTAL_DURATION_MS);
-    setBannerTotalDurationMs(BANNER_TOTAL_DURATION_MS);
-
-    const target = recentScheduled ?? confirmSlot.confirmation;
     if (target) {
-      setRecentScheduled(target);
-      saveBannerRecord({
-        confirmation: target,
-        expiresAt: Date.now() + BANNER_TOTAL_DURATION_MS,
-        totalDurationMs: BANNER_TOTAL_DURATION_MS,
-      });
+      transitionToBanner(target, Date.now() + BANNER_TOTAL_DURATION_MS);
     }
 
     setTimeout(() => {
       inputRef.current?.focus();
     }, 50);
-
-    if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current);
-    }
-    dismissTimerRef.current = setTimeout(() => {
-      triggerBannerDismiss();
-    }, BANNER_TOTAL_DURATION_MS);
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -261,106 +386,24 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   };
 
   const handleSelect = (suggestion: FindTimeSuggestion) => {
+    setText('');
+    clearStoredFindTimeDraft();
+    setDisplayedProposal(null);
+    findTime.reset();
     confirmSlot.confirm(suggestion.id);
     onScheduled?.(suggestion);
   };
 
   const canSubmit = isPro && text.trim().length > 0 && !findTime.isPending;
-  const { confirmation } = confirmSlot;
+  const activeConfirmation =
+    noticePhase === 'banner' ? null : (recentScheduled ?? confirmSlot.confirmation);
 
-  const calendarLink = confirmation
-    ? `/calendar?date=${getEventDateKey(confirmation.event.startAt)}&event=${confirmation.event.id}`
+  const calendarLink = activeConfirmation?.event?.id
+    ? `/calendar?date=${getEventDateKey(activeConfirmation.event.startAt)}&event=${activeConfirmation.event.id}`
     : '/calendar';
 
   return (
     <section className={styles.container} aria-label="Find a time">
-      {/* Docked Recent Scheduled Notification */}
-      {isSchedulingAnother && recentScheduled && (
-        <div
-          className={`${styles.recentBanner} ${isBannerExiting ? styles.recentBannerExiting : ''}`}
-          role="status"
-        >
-          <div className={styles.recentBannerMain}>
-            <div className={styles.recentCheckIcon}>
-              <CheckIcon />
-            </div>
-            <div className={styles.recentText}>
-              <span className={styles.recentTag}>Scheduled</span>
-              <span className={styles.recentTitle}>{recentScheduled.event.title}</span>
-              <span className={styles.recentSeparator}>·</span>
-              <span className={styles.recentTime}>
-                {formatSlot(recentScheduled.event.startAt, recentScheduled.event.endAt, timeZone)}
-              </span>
-            </div>
-          </div>
-          <div className={styles.recentActions}>
-            <Link
-              to={`/calendar?date=${getEventDateKey(recentScheduled.event.startAt)}&event=${recentScheduled.event.id}`}
-              className={styles.recentCalendarLink}
-            >
-              <span>View in Calendar</span>
-              <ArrowRightIcon />
-            </Link>
-            <button
-              type="button"
-              className={styles.recentDismissButton}
-              onClick={triggerBannerDismiss}
-              aria-label="Dismiss scheduled notice"
-            >
-              ✕
-            </button>
-          </div>
-          <div
-            className={styles.bannerTimerBar}
-            style={
-              {
-                '--start-width': `${Math.max(0, Math.min(100, (bannerRemainingMs / bannerTotalDurationMs) * 100))}%`,
-                '--deplete-duration': `${bannerRemainingMs}ms`,
-              } as React.CSSProperties
-            }
-          />
-        </div>
-      )}
-
-      {/* Beautiful Scheduled Confirmation (preserved in both Pro and Free) */}
-      {confirmation && !isSchedulingAnother && (
-        <div className={styles.confirmationCard} role="status">
-          <div className={styles.confirmationHeader}>
-            <div className={styles.checkIconWrap}>
-              <CheckCircleIcon />
-            </div>
-            <div className={styles.confirmationMain}>
-              <div className={styles.confirmationBadgeRow}>
-                <span className={styles.confirmationBadge}>Successfully Scheduled</span>
-                <span className={styles.confirmationLiveIndicator}>✦ Synced</span>
-              </div>
-              <h3 className={styles.confirmationTitle}>{confirmation.event.title}</h3>
-              <div className={styles.confirmationTimeRow}>
-                <CalendarIcon />
-                <span>
-                  {formatSlot(confirmation.event.startAt, confirmation.event.endAt, timeZone)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.confirmationActions}>
-            <button
-              type="button"
-              className={styles.actionResetButton}
-              onClick={handleScheduleAnother}
-            >
-              <PlusIcon />
-              <span>Schedule another</span>
-            </button>
-            <Link to={calendarLink} className={styles.actionCalendarButton}>
-              <span>View in Calendar</span>
-              <ArrowRightIcon />
-            </Link>
-          </div>
-        </div>
-      )}
-
       {!isPro ? (
         <div className={styles.lockedTeaser}>
           <div className={styles.lockedHeader}>
@@ -369,7 +412,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                 <SparkleIcon className={styles.proSparkleIcon} />
                 <span>PRO</span>
               </span>
-              <span className={styles.lockedHeading}>Find Time with Luna</span>
+              <span className={styles.lockedHeading}>Find Time with AI</span>
             </div>
             <span className={styles.lockedSubheading}>AI-assisted natural language scheduling</span>
           </div>
@@ -397,8 +440,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
           </div>
 
           <p className={styles.lockedDescription}>
-            Luna interprets your natural-language requests and finds optimal, conflict-free openings
-            on your calendar. Upgrade to Pro to unlock AI scheduling.
+            BPlan interprets your natural-language requests and finds optimal, conflict-free
+            openings on your calendar. Upgrade to Pro to unlock AI scheduling.
           </p>
         </div>
       ) : (
@@ -424,6 +467,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                 onChange={(event) => {
                   const newText = event.target.value;
                   setText(newText);
+                  saveStoredFindTimeDraft(newText);
                   if (confirmSlot.errorMessage) confirmSlot.reset();
                   if (findTime.errorMessage) findTime.reset();
 
@@ -442,6 +486,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                 onKeyDown={(event) => {
                   if (event.key === 'Escape') {
                     setText('');
+                    clearStoredFindTimeDraft();
                     if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
                       triggerProposalExit();
                     }
@@ -468,7 +513,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
             </button>
           </form>
 
-          {!confirmation && (
+          {!activeConfirmation && (
             <p className={styles.hint}>
               Describe a meeting and BPlan will suggest the three best open slots in your schedule.
             </p>
@@ -515,15 +560,15 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
             </div>
           )}
 
-          {/* Luna Clarification Notice */}
-          {findTime.clarification && !confirmation && !findTime.isPending && (
+          {/* Clarification Notice */}
+          {findTime.clarification && !activeConfirmation && !findTime.isPending && (
             <div className={styles.clarificationCard} role="status">
               <div className={styles.clarificationHeader}>
                 <div className={styles.clarificationIconWrap}>
                   <HelpCircleIcon />
                 </div>
                 <div className={styles.clarificationMain}>
-                  <div className={styles.clarificationTag}>Luna needs clarification</div>
+                  <div className={styles.clarificationTag}>BPlan needs more verification</div>
                   <p className={styles.clarificationQuestion}>
                     {findTime.clarification.clarificationQuestion}
                   </p>
@@ -533,7 +578,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
           )}
 
           {/* Parsed Intent Readback */}
-          {displayedProposal && !confirmation && !findTime.isPending && (
+          {displayedProposal && !activeConfirmation && !findTime.isPending && (
             <div
               className={`${styles.readback} ${isProposalExiting ? styles.proposalExiting : ''}`}
             >
@@ -581,7 +626,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
           )}
 
           {/* Available Slots Display */}
-          {displayedProposal && !confirmation && !findTime.isPending && (
+          {displayedProposal && !activeConfirmation && !findTime.isPending && (
             <div className={`${styles.results} ${isProposalExiting ? styles.proposalExiting : ''}`}>
               <div className={styles.resultsHeader}>
                 <div className={styles.resultsTitleGroup}>
@@ -656,6 +701,101 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </>
       )}
 
+      {/* Beautiful Scheduled Confirmation (preserved in both Pro and Free) */}
+      {activeConfirmation?.event && !isSchedulingAnother && (
+        <div className={styles.confirmationCard} role="status">
+          <div className={styles.confirmationHeader}>
+            <div className={styles.checkIconWrap}>
+              <CheckCircleIcon />
+            </div>
+            <div className={styles.confirmationMain}>
+              <div className={styles.confirmationBadgeRow}>
+                <span className={styles.confirmationBadge}>Successfully Scheduled</span>
+                <span className={styles.confirmationLiveIndicator}>✦ Synced</span>
+              </div>
+              <h3 className={styles.confirmationTitle}>{activeConfirmation.event.title}</h3>
+              <div className={styles.confirmationTimeRow}>
+                <CalendarIcon />
+                <span>
+                  {formatSlot(
+                    activeConfirmation.event.startAt,
+                    activeConfirmation.event.endAt,
+                    timeZone,
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.confirmationActions}>
+            <button
+              type="button"
+              className={styles.actionResetButton}
+              onClick={handleScheduleAnother}
+            >
+              <PlusIcon />
+              <span>Schedule another</span>
+            </button>
+            <Link to={calendarLink} className={styles.actionCalendarButton}>
+              <span>View in Calendar</span>
+              <ArrowRightIcon />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Docked Recent Scheduled Notification */}
+      {isSchedulingAnother && recentScheduled?.event && (
+        <div
+          className={`${styles.recentBanner} ${isBannerExiting ? styles.recentBannerExiting : ''}`}
+          role="status"
+        >
+          <div className={styles.recentBannerMain}>
+            <div className={styles.recentCheckIcon}>
+              <CheckIcon />
+            </div>
+            <div className={styles.recentText}>
+              <span className={styles.recentTag}>Scheduled</span>
+              <span className={styles.recentTitle}>{recentScheduled.event.title}</span>
+              <span className={styles.recentSeparator}>·</span>
+              <span className={styles.recentTime}>
+                {formatSlot(recentScheduled.event.startAt, recentScheduled.event.endAt, timeZone)}
+              </span>
+            </div>
+          </div>
+          <div className={styles.recentActions}>
+            <Link
+              to={
+                recentScheduled.event.id
+                  ? `/calendar?date=${getEventDateKey(recentScheduled.event.startAt)}&event=${recentScheduled.event.id}`
+                  : '/calendar'
+              }
+              className={styles.recentCalendarLink}
+            >
+              <span>View in Calendar</span>
+              <ArrowRightIcon />
+            </Link>
+            <button
+              type="button"
+              className={styles.recentDismissButton}
+              onClick={triggerBannerDismiss}
+              aria-label="Dismiss scheduled notice"
+            >
+              ✕
+            </button>
+          </div>
+          <div
+            className={styles.bannerTimerBar}
+            style={
+              {
+                '--start-width': `${Math.max(0, Math.min(100, (bannerRemainingMs / bannerTotalDurationMs) * 100))}%`,
+                '--deplete-duration': `${bannerRemainingMs}ms`,
+              } as React.CSSProperties
+            }
+          />
+        </div>
+      )}
+
       {(findTime.errorMessage ?? confirmSlot.errorMessage) && (
         <p className={styles.error} role="alert">
           {findTime.errorMessage ?? confirmSlot.errorMessage}
@@ -665,34 +805,49 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   );
 }
 
-function getEventDateKey(startAt: string): string {
+function getEventDateKey(startAt?: string): string {
   try {
-    return new Date(startAt).toISOString().slice(0, 10);
+    if (!startAt) return '';
+    const date = new Date(startAt);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
   } catch {
     return '';
   }
 }
 
 /** e.g. "Thu, Sep 10 · 10:15 AM – 10:30 AM". */
-function formatSlot(startAt: string, endAt: string, timeZone: string): string {
-  const start = new Date(startAt);
-  const end = new Date(endAt);
-  const day = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone,
-  }).format(start);
+function formatSlot(startAt?: string, endAt?: string, timeZone?: string): string {
+  if (!startAt || !endAt) return '';
+  try {
+    const tz = timeZone || 'UTC';
+    const start = new Date(startAt);
+    const end = new Date(endAt);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+    const day = new Intl.DateTimeFormat('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: tz,
+    }).format(start);
 
-  return `${day} · ${clockTime(start, timeZone)} – ${clockTime(end, timeZone)}`;
+    return `${day} · ${clockTime(start, tz)} – ${clockTime(end, tz)}`;
+  } catch {
+    return '';
+  }
 }
 
 function clockTime(value: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone,
-  }).format(value);
+  try {
+    if (isNaN(value.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone,
+    }).format(value);
+  } catch {
+    return '';
+  }
 }
 
 function StarIcon() {

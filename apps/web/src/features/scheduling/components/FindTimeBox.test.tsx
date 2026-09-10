@@ -19,6 +19,9 @@ vi.mock('../../billing/hooks/useBilling', () => ({
 
 vi.mock('../hooks/useFindTime', () => ({
   useFindTime: vi.fn(),
+  getStoredFindTimeDraft: vi.fn(() => ''),
+  saveStoredFindTimeDraft: vi.fn(),
+  clearStoredFindTimeDraft: vi.fn(),
 }));
 
 vi.mock('../hooks/useConfirmSlot', () => ({
@@ -81,7 +84,7 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
 
     // Must show PRO badge and teaser heading
     expect(html).toContain('PRO');
-    expect(html).toContain('Find Time with Luna');
+    expect(html).toContain('Find Time with AI');
     expect(html).toContain('Upgrade to Pro');
     expect(html).toContain('href="/subscription"');
 
@@ -104,7 +107,7 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
 
     const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
 
-    expect(html).toContain('Find Time with Luna');
+    expect(html).toContain('Find Time with AI');
     expect(html).toContain('Upgrade to Pro');
     expect(html).toContain('disabled');
     expect(html).not.toContain('Find time</span>');
@@ -123,7 +126,7 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
 
     // Must NOT show locked teaser upgrade button
     expect(html).not.toContain('Upgrade to Pro');
-    expect(html).not.toContain('Find Time with Luna');
+    expect(html).not.toContain('Find Time with AI');
 
     // Must show interactive form input
     expect(html).toContain('placeholder="Try “15-minute meeting with Andrew”"');
@@ -154,5 +157,241 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
     expect(html).toContain('Design Review with Luna');
     expect(html).toContain('Schedule another');
     expect(html).toContain('View in Calendar');
+  });
+
+  it('restores the full confirmation card below the input during its five-second phase', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    const storedConfirmation = {
+      status: 'accepted',
+      suggestionId: 'sugg-456',
+      event: {
+        id: 'event-456',
+        title: 'Meet with Andrew',
+        startAt: '2026-09-12T13:30:00Z',
+        endAt: '2026-09-12T13:45:00Z',
+      },
+    };
+    const storage = {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          confirmation: storedConfirmation,
+          phase: 'confirmation',
+          expiresAt: Date.now() + 3000,
+          bannerExpiresAt: Date.now() + 33000,
+          totalDurationMs: 30000,
+        }),
+      ),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { sessionStorage: storage },
+    });
+
+    try {
+      const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+      const inputPosition = html.indexOf('aria-label="Describe what you want to schedule"');
+      const confirmationPosition = html.indexOf('Successfully Scheduled');
+
+      expect(inputPosition).toBeGreaterThanOrEqual(0);
+      expect(confirmationPosition).toBeGreaterThan(inputPosition);
+      expect(html).toContain('Meet with Andrew');
+    } finally {
+      if (previousWindow) {
+        Object.defineProperty(globalThis, 'window', previousWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, 'window');
+      }
+    }
+  });
+
+  it('restores the compact banner when returning after the confirmation phase', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    const storage = {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          confirmation: {
+            status: 'accepted',
+            suggestionId: 'sugg-789',
+            event: {
+              id: 'event-789',
+              title: 'Planning session',
+              startAt: '2026-09-12T13:30:00Z',
+              endAt: '2026-09-12T13:45:00Z',
+            },
+          },
+          phase: 'confirmation',
+          expiresAt: Date.now() - 1000,
+          bannerExpiresAt: Date.now() + 29000,
+          totalDurationMs: 30000,
+        }),
+      ),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { sessionStorage: storage },
+    });
+
+    try {
+      const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+      expect(html).not.toContain('Successfully Scheduled');
+      expect(html).toContain('>Scheduled</span>');
+      expect(storage.setItem).toHaveBeenCalled();
+    } finally {
+      if (previousWindow) {
+        Object.defineProperty(globalThis, 'window', previousWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, 'window');
+      }
+    }
+  });
+
+  it('renders verified open slots when a proposal is present for active Pro users', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    vi.mocked(useFindTime).mockReturnValue({
+      ...defaultFindTime,
+      proposal: {
+        status: 'proposed',
+        requestId: 'req-slots',
+        task: {
+          id: null,
+          title: 'Sync with Andrew',
+          durationMinutes: 15,
+          deadlineAt: null,
+        },
+        targetCalendar: { id: 'cal-1', name: 'Primary' },
+        suggestions: [
+          {
+            id: 'sugg-1',
+            slotId: 'slot-1',
+            startAt: '2026-09-10T16:15:00Z',
+            endAt: '2026-09-10T16:30:00Z',
+            rank: 1,
+            score: 0.98,
+            reason: 'Evening timing with ample buffer.',
+          },
+        ],
+      },
+    });
+
+    const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+    expect(html).toContain('Verified Open Slots');
+    expect(html).toContain('Guaranteed Conflict-Free');
+    expect(html).toContain('Evening timing with ample buffer.');
+    expect(html).toContain('Schedule');
+  });
+
+  it('does NOT render verified slots while docked in the persistent banner state', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    // Even if findTime hook has a stale proposal, docked banner state must not show old slots
+    vi.mocked(useFindTime).mockReturnValue({
+      ...defaultFindTime,
+      proposal: null,
+    });
+
+    const storage = {
+      getItem: vi.fn(() =>
+        JSON.stringify({
+          confirmation: {
+            status: 'accepted',
+            suggestionId: 'sugg-banner',
+            event: {
+              id: 'event-banner',
+              title: 'Meeting with Andrew',
+              startAt: '2026-09-10T16:15:00Z',
+              endAt: '2026-09-10T16:30:00Z',
+            },
+          },
+          phase: 'banner',
+          expiresAt: Date.now() + 25000,
+          totalDurationMs: 30000,
+        }),
+      ),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { sessionStorage: storage },
+    });
+
+    try {
+      const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+      // Must show the docked banner
+      expect(html).toContain('>Scheduled</span>');
+      expect(html).toContain('Meeting with Andrew');
+      // Must NOT show the big green confirmation box
+      expect(html).not.toContain('Successfully Scheduled');
+      // Must NOT show the slots
+      expect(html).not.toContain('Verified Open Slots');
+    } finally {
+      if (previousWindow) {
+        Object.defineProperty(globalThis, 'window', previousWindow);
+      } else {
+        Reflect.deleteProperty(globalThis, 'window');
+      }
+    }
+  });
+
+  it('renders clarification card with "BPlan needs more verification"', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    vi.mocked(useFindTime).mockReturnValue({
+      ...defaultFindTime,
+      clarification: {
+        status: 'clarification_required',
+        requestId: 'req-clarify',
+        clarificationQuestion: 'Did you mean Thursday morning or afternoon?',
+      },
+    });
+
+    const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+    expect(html).toContain('BPlan needs more verification');
+    expect(html).not.toContain('Luna');
+    expect(html).toContain('Did you mean Thursday morning or afternoon?');
   });
 });
