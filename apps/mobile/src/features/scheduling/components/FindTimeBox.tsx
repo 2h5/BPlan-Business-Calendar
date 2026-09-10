@@ -259,9 +259,7 @@ function SlotRow({ suggestion, timeZone, isBooking, disabled, onPress }: SlotRow
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
+        gap: theme.spacing.sm,
         padding: theme.spacing.md,
         borderRadius: theme.radius.sm,
         borderWidth: theme.borderWidth.hairline,
@@ -270,61 +268,91 @@ function SlotRow({ suggestion, timeZone, isBooking, disabled, onPress }: SlotRow
         opacity: disabled && !isBooking ? 0.6 : 1,
       })}
     >
-      <View
-        style={{
-          width: 24,
-          height: 24,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: theme.radius.sm,
-          backgroundColor: theme.colors.surfaceElevated,
-        }}
-      >
-        <Text variant="footnote" color="tertiary" style={{ fontWeight: '600' }}>
-          {suggestion.rank}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        <View
+          style={{
+            width: 24,
+            height: 24,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: theme.radius.sm,
+            backgroundColor: theme.colors.surfaceElevated,
+          }}
+        >
+          <Text variant="footnote" color="tertiary" style={{ fontWeight: '600' }}>
+            {suggestion.rank}
+          </Text>
+        </View>
+
+        {/* Day above time: one long "Thu, Sep 10 · 3:45 PM – 4:00 PM" cannot
+            share a 306pt line with the rank and the action without wrapping
+            mid-phrase. */}
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text variant="caption" color="tertiary" uppercase numberOfLines={1}>
+            {formatSlotDay(suggestion.startAt, timeZone)}
+          </Text>
+          <Text variant="subhead" numberOfLines={1} style={{ fontWeight: '600' }}>
+            {formatSlotRange(suggestion.startAt, suggestion.endAt, timeZone)}
+          </Text>
+        </View>
+
+        <Text variant="footnote" color="accent" style={{ flexShrink: 0, fontWeight: '600' }}>
+          {isBooking ? 'Booking…' : 'Schedule'}
         </Text>
       </View>
 
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="subhead" numberOfLines={2} style={{ fontWeight: '600' }}>
-          {formatSlot(suggestion.startAt, suggestion.endAt, timeZone)}
-        </Text>
-        <Text variant="footnote" color="tertiary" numberOfLines={2}>
-          {suggestion.reason}
-        </Text>
-      </View>
-
-      <Text variant="footnote" color="accent" style={{ fontWeight: '600' }}>
-        {isBooking ? 'Booking…' : 'Schedule'}
+      {/* The reason spans the full row so it never has to be truncated. */}
+      <Text variant="footnote" color="tertiary">
+        {suggestion.reason}
       </Text>
     </Pressable>
   );
 }
 
-/** e.g. "Thu, Sep 10 · 10:15 AM – 10:30 AM". */
-function formatSlot(startAt: string, endAt: string, timeZone: string): string {
-  const start = new Date(startAt);
-  const end = new Date(endAt);
-  const day = new Intl.DateTimeFormat('en-US', {
+/** e.g. "Thu, Sep 10". */
+function formatSlotDay(startAt: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     timeZone,
-  }).format(start);
-
-  return `${day} · ${clockTime(start, timeZone)} – ${clockTime(end, timeZone)}`;
+  }).format(new Date(startAt));
 }
 
-function clockTime(value: Date, timeZone: string): string {
-  return (
-    new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone,
-    })
-      .format(value)
-      // "4:30 PM" -> "4:30PM". The row is 402pt wide and carries a rank chip and
-      // a Schedule action beside the time; the space is the cheapest thing to cut.
-      .replace(' ', '')
-  );
+/**
+ * e.g. "3:45 – 4:00 PM", or "11:45 AM – 12:15 PM" when the slot crosses noon or
+ * midnight. Repeating a meridiem that has not changed only costs width.
+ */
+function formatSlotRange(startAt: string, endAt: string, timeZone: string): string {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const startParts = clockParts(start, timeZone);
+  const endParts = clockParts(end, timeZone);
+
+  return startParts.meridiem === endParts.meridiem
+    ? `${startParts.time} – ${endParts.time} ${endParts.meridiem}`
+    : `${startParts.time} ${startParts.meridiem} – ${endParts.time} ${endParts.meridiem}`;
+}
+
+/** e.g. "Thu, Sep 10 · 3:45 PM – 4:00 PM". Used where width is not scarce. */
+function formatSlot(startAt: string, endAt: string, timeZone: string): string {
+  return `${formatSlotDay(startAt, timeZone)} · ${formatSlotRange(startAt, endAt, timeZone)}`;
+}
+
+function clockParts(value: Date, timeZone: string): { time: string; meridiem: string } {
+  const formatted = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  }).format(value);
+
+  // "3:45 PM" -> { time: "3:45", meridiem: "PM" }. A 24-hour locale has no
+  // meridiem to split off, in which case the whole string is the time.
+  const separator = formatted.lastIndexOf(' ');
+  if (separator === -1) return { time: formatted, meridiem: '' };
+
+  return {
+    time: formatted.slice(0, separator),
+    meridiem: formatted.slice(separator + 1),
+  };
 }
