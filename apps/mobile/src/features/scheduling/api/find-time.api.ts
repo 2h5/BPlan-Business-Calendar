@@ -1,4 +1,3 @@
-import { addZonedDays, startOfZonedDay, type SchedulingIntent } from '@cal/domain';
 import { z } from 'zod';
 
 import { toAppError } from '../../../lib/errors/app-error';
@@ -20,6 +19,35 @@ const suggestionSchema = z.object({
   reason: z.string().min(1),
 });
 
+/**
+ * The server's own account of what it understood. Mobile renders this rather
+ * than re-deriving labels on the client: the phone must never disagree with
+ * the window the server actually searched.
+ */
+export const readbackSchema = z.object({
+  title: z.string(),
+  durationMinutes: z.number().int().nullable(),
+  durationLabel: z.string(),
+  dateLabel: z.string().nullable(),
+  timeLabel: z.string().nullable(),
+  location: z.string().nullable(),
+});
+
+export type FindTimeReadback = z.infer<typeof readbackSchema>;
+
+/**
+ * Luna asks rather than guesses when the text is genuinely ambiguous. This is
+ * a normal outcome, not an error, so it must not collapse into the error path.
+ */
+export const clarificationSchema = z.object({
+  status: z.literal('clarification_required'),
+  requestId: z.string().min(1),
+  clarificationQuestion: z.string().min(1),
+  intent: z.unknown().optional(),
+});
+
+export type FindTimeClarification = z.infer<typeof clarificationSchema>;
+
 const proposalSchema = z.object({
   status: z.literal('proposed'),
   requestId: z.string().min(1),
@@ -31,10 +59,13 @@ const proposalSchema = z.object({
   }),
   targetCalendar: z.object({ id: z.string(), name: z.string() }),
   suggestions: z.array(suggestionSchema).min(1),
+  readback: readbackSchema.optional(),
+  intent: z.unknown().optional(),
 });
 
 export type FindTimeSuggestion = z.infer<typeof suggestionSchema>;
 export type FindTimeProposal = z.infer<typeof proposalSchema>;
+export type FindTimeResult = FindTimeProposal | FindTimeClarification;
 
 const confirmationSchema = z.object({
   status: z.literal('accepted'),
@@ -44,6 +75,8 @@ const confirmationSchema = z.object({
     title: z.string(),
     startAt: z.string().min(1),
     endAt: z.string().min(1),
+    location: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
   }),
 });
 
@@ -54,25 +87,21 @@ const errorEnvelopeSchema = z.object({
 });
 
 /**
- * Asks the server for ranked open slots for an ad-hoc block. The client sends
- * the parsed duration; the server's deterministic engine — never the model —
- * decides which times are actually free.
+ * Submits the raw text to the server, which interprets it with Luna, resolves
+ * the date window deterministically, verifies real availability, and ranks the
+ * candidates.
+ *
+ * The window is deliberately NOT computed here. A phone that guessed its own
+ * window could only express the handful of phrases it knew how to parse, which
+ * is what previously collapsed "next week" onto the default horizon.
  */
-export async function findTimeForIntent(
-  intent: SchedulingIntent,
-  timeZone: string,
-  now: Date = new Date(),
-): Promise<FindTimeProposal> {
-  const window = resolveWindow(intent.dayHint, timeZone, now);
+export async function findTimeForText(text: string, _timeZone?: string): Promise<FindTimeResult> {
+  const response = await invoke('ai-find-time', { text });
 
-  const proposal = await invoke('ai-find-time', {
-    title: intent.title,
-    durationMinutes: intent.durationMinutes ?? DEFAULT_MEETING_MINUTES,
-    preferredTimeOfDay: intent.preferredTimeOfDay,
-    ...window,
-  });
+  const clarification = clarificationSchema.safeParse(response);
+  if (clarification.success) return clarification.data;
 
-  const parsed = proposalSchema.parse(proposal);
+  const parsed = proposalSchema.parse(response);
   return {
     ...parsed,
     suggestions: [...parsed.suggestions]
@@ -90,24 +119,6 @@ export async function confirmFindTimeSuggestion(
   suggestionId: string,
 ): Promise<FindTimeConfirmation> {
   return confirmationSchema.parse(await invoke('ai-confirm-time', { suggestionId }));
-}
-
-/**
- * A named day narrows the search window. Anything else is left to the server's
- * default horizon rather than guessed at here.
- */
-function resolveWindow(
-  dayHint: SchedulingIntent['dayHint'],
-  timeZone: string,
-  now: Date,
-): { windowStart?: string; windowEnd?: string } {
-  if (dayHint === null) return {};
-
-  const dayStart =
-    dayHint === 'tomorrow' ? addZonedDays(startOfZonedDay(now, timeZone), 1, timeZone) : now;
-  const dayEnd = addZonedDays(startOfZonedDay(dayStart, timeZone), 1, timeZone);
-
-  return { windowStart: dayStart.toISOString(), windowEnd: dayEnd.toISOString() };
 }
 
 /**

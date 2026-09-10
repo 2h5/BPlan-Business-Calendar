@@ -1,21 +1,14 @@
-import { formatDuration } from '@cal/domain';
 import { Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
-import { DEFAULT_MEETING_MINUTES, type FindTimeSuggestion } from '../api/find-time.api';
+import type { FindTimeReadback, FindTimeSuggestion } from '../api/find-time.api';
 import { useConfirmSlot } from '../hooks/useConfirmSlot';
 import { useFindTime } from '../hooks/useFindTime';
 
-const PLACEHOLDER = 'Try "15-minute meeting with Andrew"';
-
-const TIME_OF_DAY_LABELS: Record<string, string> = {
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-};
+const PLACEHOLDER = 'Try "15 minutes with Patrick next week"';
 
 export interface FindTimeBoxProps {
   timeZone: string;
@@ -24,8 +17,10 @@ export interface FindTimeBoxProps {
 }
 
 /**
- * The free-text scheduling box on Today. The text is parsed deterministically
- * in `@cal/domain`; the server finds genuinely open slots and ranks them.
+ * The free-text scheduling box on Today. The text goes to the server verbatim,
+ * where Luna interprets it and the deterministic engine resolves the window and
+ * finds genuinely open slots — so "next week" and "this weekend" mean the same
+ * thing here as they do on the web.
  *
  * This is the phone's version of the web `FindTimeBox` and shares its api and
  * hooks verbatim — only the presentation differs, so the two surfaces cannot
@@ -86,7 +81,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
             onBlur={() => setFocused(false)}
             onChangeText={(next) => {
               setText(next);
-              if (findTime.proposal || findTime.errorMessage) findTime.reset();
+              if (findTime.proposal || findTime.clarification || findTime.errorMessage)
+                findTime.reset();
               if (confirmSlot.confirmation || confirmSlot.errorMessage) confirmSlot.reset();
             }}
             style={[
@@ -132,27 +128,35 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </Pressable>
       </View>
 
-      {!findTime.proposal && !findTime.errorMessage && !confirmation ? (
+      {!findTime.proposal && !findTime.clarification && !findTime.errorMessage && !confirmation ? (
         <Text variant="footnote" color="tertiary">
-          Describe a meeting and BCal will suggest the three best open slots in your schedule.
+          Describe a meeting — including when, like “next week” or “this weekend” — and BCal will
+          suggest the three best open slots.
         </Text>
       ) : null}
 
-      {/* Parsed-intent readback: the user must be able to see what we understood. */}
-      {findTime.intent && findTime.proposal && !confirmation ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          <ReadbackChip label={findTime.intent.title} emphasis />
-          <ReadbackChip
-            label={`${formatDuration(findTime.intent.durationMinutes ?? DEFAULT_MEETING_MINUTES)}${
-              findTime.intent.durationMinutes === null ? ' (default)' : ''
-            }`}
-          />
-          {findTime.intent.dayHint ? (
-            <ReadbackChip label={findTime.intent.dayHint === 'today' ? 'Today' : 'Tomorrow'} />
-          ) : null}
-          {findTime.intent.preferredTimeOfDay !== 'any' ? (
-            <ReadbackChip label={TIME_OF_DAY_LABELS[findTime.intent.preferredTimeOfDay] ?? ''} />
-          ) : null}
+      {/* Readback: the user must be able to see the window we actually searched,
+          especially when they said something as broad as "next week". */}
+      {findTime.readback && findTime.proposal && !confirmation ? (
+        <ReadbackChips readback={findTime.readback} />
+      ) : null}
+
+      {/* Luna asks instead of guessing. Answering is just another submit, so the
+          question sits inline above the same input rather than in a modal. */}
+      {findTime.clarification && !confirmation ? (
+        <View
+          accessibilityRole="alert"
+          style={{
+            padding: theme.spacing.md,
+            borderRadius: theme.radius.sm,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor: theme.colors.accentSubtle,
+            backgroundColor: theme.colors.inputBackground,
+          }}
+        >
+          <Text variant="footnote" color="secondary">
+            {findTime.clarification.clarificationQuestion}
+          </Text>
         </View>
       ) : null}
 
@@ -236,6 +240,25 @@ function ReadbackChip({ label, emphasis = false }: { label: string; emphasis?: b
       >
         {label}
       </Text>
+    </View>
+  );
+}
+
+/**
+ * Renders the server's readback. Only the fields the server actually resolved
+ * are shown: an absent date label means the search was left unconstrained, and
+ * inventing a label for it here would misreport the window.
+ */
+function ReadbackChips({ readback }: { readback: FindTimeReadback }) {
+  const theme = useTheme();
+
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
+      <ReadbackChip label={readback.title} emphasis />
+      <ReadbackChip label={readback.durationLabel} />
+      {readback.dateLabel ? <ReadbackChip label={readback.dateLabel} /> : null}
+      {readback.timeLabel ? <ReadbackChip label={readback.timeLabel} /> : null}
+      {readback.location ? <ReadbackChip label={readback.location} /> : null}
     </View>
   );
 }

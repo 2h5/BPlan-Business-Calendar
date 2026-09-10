@@ -1,12 +1,19 @@
-import { parseSchedulingIntent, type SchedulingIntent } from '@cal/domain';
+import type { SchedulingIntent } from '@cal/schemas/scheduling';
 import { useMutation } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
-import { findTimeForIntent, type FindTimeProposal } from '../api/find-time.api';
+import {
+  findTimeForText,
+  type FindTimeClarification,
+  type FindTimeProposal,
+  type FindTimeReadback,
+} from '../api/find-time.api';
 
 export interface FindTimeState {
   intent: SchedulingIntent | null;
+  readback: FindTimeReadback | null;
   proposal: FindTimeProposal | null;
+  clarification: FindTimeClarification | null;
   errorMessage: string | null;
   isPending: boolean;
   submit: (text: string, timeZone: string) => void;
@@ -14,21 +21,20 @@ export interface FindTimeState {
 }
 
 /**
- * Drives the free-text Find Time box: parse the text deterministically, then
- * ask the server to rank the open slots the engine found.
+ * Drives the natural-language Find Time box: sends the raw text to Luna for
+ * server-side intent interpretation, then renders the ranked slots the
+ * deterministic engine verified.
+ *
+ * This is the phone's version of the web hook and shares its api, so the two
+ * surfaces cannot drift on which windows a phrase resolves to.
  */
 export function useFindTime(): FindTimeState {
-  const [intent, setIntent] = useState<SchedulingIntent | null>(null);
-
   const mutation = useMutation({
-    mutationFn: ({ text, timeZone }: { text: string; timeZone: string }) => {
-      const parsed = parseSchedulingIntent(text);
-      setIntent(parsed);
-      return findTimeForIntent(parsed, timeZone);
-    },
+    mutationFn: ({ text, timeZone }: { text: string; timeZone: string }) =>
+      findTimeForText(text, timeZone),
   });
 
-  const { mutate, reset: resetMutation } = mutation;
+  const { mutate, reset: resetMutation, data } = mutation;
 
   const submit = useCallback(
     (text: string, timeZone: string) => {
@@ -39,13 +45,18 @@ export function useFindTime(): FindTimeState {
   );
 
   const reset = useCallback(() => {
-    setIntent(null);
     resetMutation();
   }, [resetMutation]);
 
+  // A clarification is a successful response with a question in it, not a failure.
+  const clarification = data?.status === 'clarification_required' ? data : null;
+  const proposal = data?.status === 'proposed' ? data : null;
+
   return {
-    intent,
-    proposal: mutation.data ?? null,
+    intent: ((proposal?.intent ?? clarification?.intent) as SchedulingIntent | undefined) ?? null,
+    readback: proposal?.readback ?? null,
+    proposal,
+    clarification,
     errorMessage: mutation.error ? messageForError(mutation.error) : null,
     isPending: mutation.isPending,
     submit,
@@ -59,18 +70,24 @@ export function useFindTime(): FindTimeState {
  */
 function messageForError(error: unknown): string {
   switch (codeOf(error)) {
+    case 'NOT_AUTHENTICATED':
+      return 'Your session has expired. Please sign out and sign in again.';
+    case 'AI_PROVIDER_UNAVAILABLE':
+      return 'AI scheduling is temporarily unavailable. Please try again shortly.';
     case 'SUBSCRIPTION_REQUIRED':
       return 'Find Time is a Pro feature. Upgrade to let BCal find open slots for you.';
     case 'AI_NO_VALID_SLOT':
-      return 'No open time fits that in the next week. Try a shorter block or a wider window.';
+      return 'No open time fits that in the window you asked for. Try a shorter block or a wider window.';
     case 'AI_RATE_LIMITED':
       return "You've used all 10 Find Time attempts this hour. Try again shortly.";
     case 'AI_DEFAULT_CALENDAR_MISSING':
       return 'Restore a writable default BCal calendar before finding time.';
     case 'AI_SCHEDULING_WINDOW_INVALID':
       return 'Check the timezone and working hours in your planning preferences.';
+    case 'AI_INVALID_OUTPUT':
+      return 'Could not read that request. Try describing it like “15 minutes with Patrick next week”.';
     case 'VALIDATION_FAILED':
-      return 'Try describing it like “15-minute meeting with Andrew”.';
+      return 'Try describing it like “15 minutes with Patrick next week”.';
     default:
       return 'Could not find a time right now. Please try again.';
   }
