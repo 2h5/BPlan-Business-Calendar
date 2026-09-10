@@ -38,6 +38,7 @@ export function TodayView() {
   const [quickListId, setQuickListId] = useState<string>('');
   const [quickPriority, setQuickPriority] = useState<TaskPriority>('normal');
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+  const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const quickInputRef = useRef<HTMLInputElement>(null);
 
   const listOptions = useMemo(
@@ -728,32 +729,49 @@ export function TodayView() {
 
           {/* Completed Today Collapsible Section */}
           {today.completedToday.length > 0 && (
-            <details className={styles.completedCollapsible}>
-              <summary className={styles.completedSummary}>
+            <div className={styles.completedCollapsible}>
+              <button
+                type="button"
+                className={styles.completedSummary}
+                onClick={() => setIsCompletedOpen((prev) => !prev)}
+                aria-expanded={isCompletedOpen}
+                aria-controls="completed-today-list"
+              >
                 <span className={styles.completedSummaryLeft}>
                   <CheckIcon className={styles.checkIconGreen} />
                   <span>Completed today</span>
                   <span className={styles.completedCountBadge}>{today.completedToday.length}</span>
                 </span>
-                <ChevronDownIcon className={styles.chevronIcon} />
-              </summary>
-              <div className={styles.completedList}>
-                {today.completedToday.map((task) => (
-                  <TodayTaskRow
-                    key={task.id}
-                    task={task}
-                    lists={today.lists}
-                    now={today.now}
-                    timeZone={today.timeZone}
-                    hourCycle={today.hourCycle}
-                    onOpen={(id) => navigate(`/tasks?task=${id}`)}
-                    onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
-                    onSnooze={handleSnooze}
-                    onDelete={handleDelete}
-                  />
-                ))}
+                <ChevronDownIcon
+                  className={`${styles.chevronIcon} ${isCompletedOpen ? styles.chevronIconOpen : ''}`}
+                />
+              </button>
+              <div
+                id="completed-today-list"
+                className={`${styles.completedAccordion} ${
+                  isCompletedOpen ? styles.completedAccordionOpen : ''
+                }`}
+              >
+                <div className={styles.completedAccordionInner}>
+                  <div className={styles.completedList}>
+                    {today.completedToday.map((task) => (
+                      <TodayTaskRow
+                        key={task.id}
+                        task={task}
+                        lists={today.lists}
+                        now={today.now}
+                        timeZone={today.timeZone}
+                        hourCycle={today.hourCycle}
+                        onOpen={(id) => navigate(`/tasks?task=${id}`)}
+                        onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
+                        onSnooze={handleSnooze}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-            </details>
+            </div>
           )}
         </section>
       </div>
