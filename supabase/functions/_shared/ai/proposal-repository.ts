@@ -19,11 +19,13 @@ export interface AiRequestSnapshot {
 }
 
 /**
- * What a claimed request is for: an existing task, or an ad-hoc block whose
- * title and duration came from the deterministic intent parser.
+ * What a claimed request is for: an existing task, an ad-hoc block whose
+ * title and duration were supplied directly, or raw natural language text.
  */
 export type AiRequestTarget =
-  { taskId: string } | { taskId: null; title: string; durationMinutes: number };
+  | { taskId: string }
+  | { taskId: null; title: string; durationMinutes: number }
+  | { taskId: null; rawText: string };
 
 export interface AiSuggestionToPersist {
   slotId: string;
@@ -40,6 +42,12 @@ export interface PersistedAiSuggestion extends AiSuggestionToPersist {
 
 export interface AiRequestUpdate {
   status?: 'pending' | 'proposed' | 'failed';
+  rawText?: string | null;
+  adHocTitle?: string | null;
+  adHocDurationMinutes?: number | null;
+  adHocLocation?: string | null;
+  adHocDescription?: string | null;
+  parsedIntent?: unknown;
   constraints?: ScheduleConstraints;
   targetCalendarId?: string;
   taskVersion?: string | null;
@@ -71,11 +79,16 @@ export interface AiScheduleRepository {
 export function supabaseAiScheduleRepository(admin: SupabaseClient): AiScheduleRepository {
   return {
     async claimRatedRequest(userId, target) {
+      const isTask = 'taskId' in target && target.taskId !== null;
+      const isParsedAdHoc = !isTask && 'title' in target;
+      const isRawText = !isTask && 'rawText' in target;
+
       const { data, error } = await admin.rpc('claim_ai_schedule_request', {
         p_user_id: userId,
-        p_task_id: target.taskId,
-        p_ad_hoc_title: target.taskId === null ? target.title : null,
-        p_ad_hoc_duration_minutes: target.taskId === null ? target.durationMinutes : null,
+        p_task_id: isTask ? target.taskId : null,
+        p_ad_hoc_title: isParsedAdHoc ? target.title : null,
+        p_ad_hoc_duration_minutes: isParsedAdHoc ? target.durationMinutes : null,
+        p_raw_text: isRawText ? target.rawText : null,
       });
       if (error) throw persistenceError('claim', error.code);
       if (data === null) return null;
@@ -88,6 +101,16 @@ export function supabaseAiScheduleRepository(admin: SupabaseClient): AiScheduleR
     async updateRequest(userId, requestId, patch) {
       const payload: Record<string, unknown> = {};
       if (patch.status !== undefined) payload.status = patch.status;
+      if (patch.rawText !== undefined) payload.raw_text = patch.rawText;
+      if (patch.adHocTitle !== undefined) payload.ad_hoc_title = patch.adHocTitle;
+      if (patch.adHocDurationMinutes !== undefined) {
+        payload.ad_hoc_duration_minutes = patch.adHocDurationMinutes;
+      }
+      if (patch.adHocLocation !== undefined) payload.ad_hoc_location = patch.adHocLocation;
+      if (patch.adHocDescription !== undefined) {
+        payload.ad_hoc_description = patch.adHocDescription;
+      }
+      if (patch.parsedIntent !== undefined) payload.parsed_intent = patch.parsedIntent;
       if (patch.constraints !== undefined) payload.constraints = patch.constraints;
       if (patch.targetCalendarId !== undefined) {
         payload.target_calendar_id = patch.targetCalendarId;

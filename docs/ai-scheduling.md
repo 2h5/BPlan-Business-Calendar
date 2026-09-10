@@ -22,34 +22,29 @@ No AI provider is configured. `ai-find-time` requires `OPENAI_API_KEY` and will
 fail without it, so the box cannot return suggestions until a model is chosen
 (`AI_MODEL`, default `gpt-5.6-luna`).
 
+### Natural-language scheduling intent (Luna)
+
+The Find Time box accepts human language (e.g. `"meeting with Andrew lasting 15m"`, `"30-ish minutes Friday sometime after 4"`, `"find me an hour or two toward the end of this weekend"`, `"dentist next Tuesday around 2 at the Paramus office"`).
+
+1. **Pre-Model Quota Gate**: Before calling any billable intent model, the server claims a quota unit in `ai_schedule_requests` under an advisory lock (`claim_ai_schedule_request` with `p_raw_text`). A rate-limited user (10/hour) fails immediately with HTTP 429 without making a model request.
+2. **Intent Interpretation**: Luna (`gpt-5.6-luna`, reasoning effort `low` by default) extracts structured intent adhering strictly to `schedulingIntentSchema` (`packages/schemas/src/intent.schema.ts`). It extracts title (stripping trailing duration prepositions), duration (exact, approximate, or bounded range), relative/explicit date, time constraints, location, and description. The privacy boundary is preserved: only the raw text, timezone, and current local date/time cross the provider boundary.
+3. **Clarification Flow**: If the user's intent is ambiguous or missing essential details (e.g. `"schedule something"`), Luna returns `requiresClarification: true` with a polite clarification question. The server updates the request row with `errorCode: 'AI_CLARIFICATION_REQUIRED'`, records token/latency usage, and returns a 200 clarification response. No slots are generated or booked, and the attempt consumes 1 quota unit.
+4. **Deterministic Normalization (`@cal/domain/scheduling`)**:
+   - `resolveIntentDuration`: Bounded duration ranges (e.g. 1–2 hours) are resolved deterministically into candidate durations `allowedDurationsMinutes: [60, 90, 120]`.
+   - `resolveIntentDateWindow`: Deterministic date arithmetic converts relative dates ("Friday", "next Tuesday", "this weekend") into UTC window bounds using the user's timezone.
+   - `resolveIntentTimeBounds`: Maps time intent into deterministic minute-of-day constraints (`earliestMinute`, `latestMinute`, `preferredTimeOfDay`).
+   - `generateIntentReadback`: Produces clean UI readback metadata (`title`, `durationLabel`, `dateLabel`, `timeLabel`, `location`).
+5. **Deterministic Availability Engine**: `generateCandidateSlots` produces candidate slots across all allowed durations on the local grid. Only conflict-free slots within working hours are generated.
+6. **Candidate Ranking**: Luna ranks the verified candidates and explains its choices.
+7. **Ad-Hoc Confirmation**: On confirmation, `confirm_ai_schedule_suggestion` creates the internal event, populating `location` and `description` from the persisted request row.
+
 ### Ad-hoc requests
 
-A request now targets **either** an existing task **or** an ad-hoc block typed
-into the box. `aiScheduleRequestSchema` enforces exactly one mode, and
-`ai_schedule_requests` mirrors it with a check constraint: `task_id` is
-nullable, and an ad-hoc row instead carries `ad_hoc_title` and
-`ad_hoc_duration_minutes`.
-
-Free text is interpreted by `parseSchedulingIntent`
-(`packages/domain/src/scheduling/intent.ts`) — deterministic code, not a model.
-It extracts duration, time-of-day preference, and a today/tomorrow hint, and
-leaves the remainder as the title. Duration is parsed deterministically
-precisely because it changes which slots the engine generates. Text with no
-duration falls back to 30 minutes, and an ad-hoc block with no deadline
-searches a 7-day horizon.
-
-Attendees are not modelled: "with Andrew" stays in the title, and no invite is
-sent to anyone.
+A request targets an existing task, a raw natural language text string, or an explicit ad-hoc title + duration. `aiScheduleRequestSchema` enforces exactly one mode, and `ai_schedule_requests` mirrors it with a check constraint: `task_id` is nullable, and an ad-hoc row carries `raw_text`, `ad_hoc_title`, `ad_hoc_duration_minutes`, `ad_hoc_location`, `ad_hoc_description`, and `parsed_intent`.
 
 ### Ad-hoc confirmation
 
-`confirm_ai_schedule_suggestion` makes its task steps conditional on
-`task_id`: an ad-hoc confirmation takes the event title from `ad_hoc_title`,
-links no task, and requires `task_version` to be absent. Everything else is
-shared with the task path and unchanged — the per-user advisory lock, the
-start-time guard, the profile and default-calendar version checks, the
-recurrence-aware conflict predicate, and the single-transaction commit. A
-repeated confirmation still returns the same event and creates no duplicate.
+`confirm_ai_schedule_suggestion` makes its task steps conditional on `task_id`: an ad-hoc confirmation takes the event title from `ad_hoc_title`, location from `ad_hoc_location`, description from `ad_hoc_description`, links no task, and requires `task_version` to be absent. Everything else is shared with the task path and unchanged — the per-user advisory lock, the start-time guard, the profile and default-calendar version checks, the recurrence-aware conflict predicate, and the single-transaction commit. A repeated confirmation returns the same event and creates no duplicate.
 
 The only currently scoped Pro capability is **Find Time with AI**. Other AI
 ideas in the product plan remain potential future features and are not part of

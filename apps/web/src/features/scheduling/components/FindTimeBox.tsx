@@ -1,10 +1,9 @@
-import { formatDuration, type SchedulingIntent } from '@cal/domain';
+import { formatDuration } from '@cal/domain';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
 import {
-  DEFAULT_MEETING_MINUTES,
   type FindTimeConfirmation,
   type FindTimeProposal,
   type FindTimeSuggestion,
@@ -13,12 +12,6 @@ import { useConfirmSlot } from '../hooks/useConfirmSlot';
 import { useFindTime } from '../hooks/useFindTime';
 
 const PLACEHOLDER = 'Try “15-minute meeting with Andrew”';
-
-const TIME_OF_DAY_LABELS: Record<string, string> = {
-  morning: 'Morning',
-  afternoon: 'Afternoon',
-  evening: 'Evening',
-};
 
 const BANNER_STORAGE_KEY = 'bplan_recent_scheduled_banner';
 const BANNER_TOTAL_DURATION_MS = 30000;
@@ -112,9 +105,8 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Smooth exit state for proposal and intent when user clears/deletes input
+  // Smooth exit state for proposal when user clears/deletes input
   const [displayedProposal, setDisplayedProposal] = useState<FindTimeProposal | null>(null);
-  const [displayedIntent, setDisplayedIntent] = useState<SchedulingIntent | null>(null);
   const [isProposalExiting, setIsProposalExiting] = useState(false);
   const proposalExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -138,18 +130,17 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     }
   }, [isSchedulingAnother, storedRecord]);
 
-  // Sync displayed proposal/intent when new ones arrive from findTime
+  // Sync displayed proposal when a new one arrives from findTime
   useEffect(() => {
     if (findTime.proposal) {
       setDisplayedProposal(findTime.proposal);
-      setDisplayedIntent(findTime.intent);
       setIsProposalExiting(false);
       if (proposalExitTimerRef.current) {
         clearTimeout(proposalExitTimerRef.current);
         proposalExitTimerRef.current = null;
       }
     }
-  }, [findTime.proposal, findTime.intent]);
+  }, [findTime.proposal]);
 
   // When a slot is confirmed, update state and save to sessionStorage
   useEffect(() => {
@@ -202,7 +193,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     }
     proposalExitTimerRef.current = setTimeout(() => {
       setDisplayedProposal(null);
-      setDisplayedIntent(null);
       setIsProposalExiting(false);
       findTime.reset();
       proposalExitTimerRef.current = null;
@@ -216,7 +206,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     findTime.reset();
     confirmSlot.reset();
     setDisplayedProposal(null);
-    setDisplayedIntent(null);
     setIsProposalExiting(false);
 
     setBannerRemainingMs(BANNER_TOTAL_DURATION_MS);
@@ -252,7 +241,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     }
     setIsProposalExiting(false);
     setDisplayedProposal(null);
-    setDisplayedIntent(null);
 
     if (dismissTimerRef.current) {
       clearTimeout(dismissTimerRef.current);
@@ -439,30 +427,65 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </div>
       )}
 
+      {/* Luna Clarification Notice */}
+      {findTime.clarification && !confirmation && !findTime.isPending && (
+        <div className={styles.clarificationCard} role="status">
+          <div className={styles.clarificationHeader}>
+            <div className={styles.clarificationIconWrap}>
+              <HelpCircleIcon />
+            </div>
+            <div className={styles.clarificationMain}>
+              <div className={styles.clarificationTag}>Luna needs clarification</div>
+              <p className={styles.clarificationQuestion}>
+                {findTime.clarification.clarificationQuestion}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Parsed Intent Readback */}
-      {displayedIntent && displayedProposal && !confirmation && !findTime.isPending && (
+      {displayedProposal && !confirmation && !findTime.isPending && (
         <div className={`${styles.readback} ${isProposalExiting ? styles.proposalExiting : ''}`}>
-          <span className={`${styles.chip} ${styles.chipTitle}`}>
-            <StarIcon />
-            <span>{displayedIntent.title}</span>
-          </span>
-          <span className={styles.chip}>
-            <ClockIcon />
-            <span>
-              {formatDuration(displayedIntent.durationMinutes ?? DEFAULT_MEETING_MINUTES)}
-              {displayedIntent.durationMinutes === null ? ' (default)' : ''}
-            </span>
-          </span>
-          {displayedIntent.dayHint && (
-            <span className={styles.chip}>
-              <CalendarIcon />
-              <span>{displayedIntent.dayHint === 'today' ? 'Today' : 'Tomorrow'}</span>
-            </span>
-          )}
-          {displayedIntent.preferredTimeOfDay !== 'any' && (
-            <span className={styles.chip}>
-              <span>{TIME_OF_DAY_LABELS[displayedIntent.preferredTimeOfDay]}</span>
-            </span>
+          {displayedProposal.readback ? (
+            <>
+              <span className={`${styles.chip} ${styles.chipTitle}`}>
+                <StarIcon />
+                <span>{displayedProposal.readback.title}</span>
+              </span>
+              <span className={styles.chip}>
+                <ClockIcon />
+                <span>{displayedProposal.readback.durationLabel}</span>
+              </span>
+              {displayedProposal.readback.dateLabel && (
+                <span className={styles.chip}>
+                  <CalendarIcon />
+                  <span>{displayedProposal.readback.dateLabel}</span>
+                </span>
+              )}
+              {displayedProposal.readback.timeLabel && (
+                <span className={styles.chip}>
+                  <span>{displayedProposal.readback.timeLabel}</span>
+                </span>
+              )}
+              {displayedProposal.readback.location && (
+                <span className={styles.chip}>
+                  <MapPinIcon />
+                  <span>{displayedProposal.readback.location}</span>
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className={`${styles.chip} ${styles.chipTitle}`}>
+                <StarIcon />
+                <span>{displayedProposal.task.title}</span>
+              </span>
+              <span className={styles.chip}>
+                <ClockIcon />
+                <span>{formatDuration(displayedProposal.task.durationMinutes)}</span>
+              </span>
+            </>
           )}
         </div>
       )}
@@ -777,6 +800,45 @@ function CheckIcon() {
       aria-hidden="true"
     >
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function HelpCircleIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   );
 }

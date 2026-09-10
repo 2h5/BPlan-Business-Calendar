@@ -168,29 +168,43 @@ export function findFreeIntervals(input: AvailabilityInput): Interval[] {
  */
 export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[] {
   const { constraints } = input;
-  const duration = constraints.durationMinutes * MINUTE_MS;
+  const durations =
+    constraints.allowedDurationsMinutes && constraints.allowedDurationsMinutes.length > 0
+      ? [...new Set(constraints.allowedDurationsMinutes)]
+      : [constraints.durationMinutes];
   const step = constraints.granularityMinutes * MINUTE_MS;
   const free = findFreeIntervals(input);
 
   const slots: CandidateSlot[] = [];
   for (const interval of free) {
-    if (interval.end - interval.start < duration) continue;
+    for (const durationMinutes of durations) {
+      const duration = durationMinutes * MINUTE_MS;
+      if (interval.end - interval.start < duration) continue;
 
-    for (
-      let start = alignToGrid(interval.start, constraints.granularityMinutes, constraints.timezone);
-      start + duration <= interval.end;
-      start += step
-    ) {
-      if (start < interval.start) continue;
-      slots.push({
-        id: `slot_${slots.length + 1}`,
-        start,
-        end: start + duration,
-      });
+      for (
+        let start = alignToGrid(
+          interval.start,
+          constraints.granularityMinutes,
+          constraints.timezone,
+        );
+        start + duration <= interval.end;
+        start += step
+      ) {
+        if (start < interval.start) continue;
+        slots.push({
+          id: `slot_${slots.length + 1}`,
+          start,
+          end: start + duration,
+        });
+      }
     }
   }
 
-  return slots;
+  slots.sort((a, b) => a.start - b.start || a.end - a.start - (b.end - b.start));
+  return slots.map((slot, index) => ({
+    ...slot,
+    id: `slot_${index + 1}`,
+  }));
 }
 
 /** Round an instant up to the next local `granularity`-minute boundary. */

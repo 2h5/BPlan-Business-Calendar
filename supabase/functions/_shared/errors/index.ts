@@ -25,7 +25,8 @@ export type EdgeErrorCode =
   | 'AI_NO_VALID_SLOT'
   | 'AI_INVALID_OUTPUT'
   | 'AI_PROVIDER_UNAVAILABLE'
-  | 'AI_PROPOSAL_STALE';
+  | 'AI_PROPOSAL_STALE'
+  | 'AI_CLARIFICATION_REQUIRED';
 
 export class EdgeError extends Error {
   constructor(

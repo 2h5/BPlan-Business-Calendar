@@ -23,6 +23,8 @@ const requestRowSchema = z.object({
   user_id: uuidSchema,
   task_id: uuidSchema.nullable(),
   ad_hoc_title: z.string().nullable(),
+  ad_hoc_location: z.string().nullable().optional(),
+  ad_hoc_description: z.string().nullable().optional(),
   status: requestStatusSchema,
   constraints: z.unknown(),
   target_calendar_id: uuidSchema.nullable(),
@@ -83,6 +85,8 @@ export interface PersistedAiConfirmation {
   /** Null for an ad-hoc block described in the Find Time box. */
   taskId: string | null;
   adHocTitle: string | null;
+  adHocLocation?: string | null;
+  adHocDescription?: string | null;
   requestStatus: z.infer<typeof requestStatusSchema>;
   constraints: unknown;
   targetCalendarId: string | null;
@@ -165,7 +169,7 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
       const { data: requestData, error: requestError } = await admin
         .from('ai_schedule_requests')
         .select(
-          'id, task_id, ad_hoc_title, status, constraints, target_calendar_id, task_version, ' +
+          'id, task_id, ad_hoc_title, ad_hoc_location, ad_hoc_description, status, constraints, target_calendar_id, task_version, ' +
             'profile_version, target_calendar_version, accepted_event_id, user_id',
         )
         .eq('id', suggestion.request_id)
@@ -181,6 +185,8 @@ export function supabaseAiConfirmationRepository(admin: SupabaseClient): AiConfi
         requestId: request.id,
         taskId: request.task_id,
         adHocTitle: request.ad_hoc_title,
+        adHocLocation: request.ad_hoc_location ?? null,
+        adHocDescription: request.ad_hoc_description ?? null,
         requestStatus: request.status,
         constraints: request.constraints,
         targetCalendarId: request.target_calendar_id,

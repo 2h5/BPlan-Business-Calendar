@@ -5,4 +5,5 @@ export * from './calendar.schema';
 export * from './task.schema';
 export * from './integration.schema';
 export * from './scheduling.schema';
+export * from './intent.schema';
 export * from './subscription.schema';

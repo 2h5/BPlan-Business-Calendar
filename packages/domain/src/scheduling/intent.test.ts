@@ -95,6 +95,12 @@ describe('parseSchedulingIntent', () => {
     );
   });
 
+  it('cleans title correctly when duration uses "lasting"', () => {
+    const result = parseSchedulingIntent('meeting with Andrew lasting 15m');
+    expect(result.title).toBe('Meeting with Andrew');
+    expect(result.durationMinutes).toBe(15);
+  });
+
   it('clamps an implausibly long duration to the engine maximum', () => {
     expect(parseSchedulingIntent('40 hour marathon').durationMinutes).toBe(12 * 60);
   });

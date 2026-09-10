@@ -5,6 +5,34 @@ SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
 IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
 EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
 
+### Natural-Language Scheduling Intent Layer (Luna) — 2026-09-10
+
+Implemented the AI-first natural-language intent layer for Web Find Time using Luna (`gpt-5.6-luna`), strictly preserving the deterministic scheduling engine as the sole availability authority:
+
+- **Schemas (`packages/schemas`)**: `intent.schema.ts` defines strict Zod contracts for `durationIntentSchema` (exact, approximate, range), `dateIntentSchema`, `timeIntentSchema`, `schedulingIntentSchema`, `aiFindTimeClarificationSchema`, and `aiFindTimeReadbackSchema`. `scheduling.schema.ts` accepts `text?: string` (enforcing exactly one mode: `taskId` XOR `text` XOR (`title` AND `durationMinutes`)) and `allowedDurationsMinutes`.
+- **Domain (`packages/domain`)**:
+  - `intent.ts`: Fixed title preposition cleanup bug (`lasting 15m` leaving `lasting`).
+  - `intent-resolution.ts`: Deterministic resolution of duration ranges into candidate durations (`[min, mid, max]` on 15m grid), relative dates/weekdays using user's timezone arithmetic, and time bounds.
+  - `availability.ts`: `generateCandidateSlots` produces candidates across all allowed durations.
+- **Database & Migration (`supabase/migrations/20260910000002_ai_natural_language_intent.sql`)**:
+  - Adds `raw_text`, `ad_hoc_location`, `ad_hoc_description`, `parsed_intent` columns to `ai_schedule_requests`.
+  - Updates `claim_ai_schedule_request` to accept `p_raw_text`, claiming quota under advisory lock before any billable model request.
+  - Updates `confirm_ai_schedule_suggestion` to populate `location` and `description` from the persisted request row.
+- **Edge Functions (`supabase/functions`)**:
+  - `_shared/ai/intent.ts`: Strict Responses API schema and instructions for Luna.
+  - `_shared/ai/openai-intent.ts`: OpenAI Responses API provider with retries, timeout, and usage tracking.
+  - `_shared/ai/proposal.ts`: Natural language branch claiming quota atomically before billable model call, handling clarification (returning 200 clarification without slots and updating request row with `AI_CLARIFICATION_REQUIRED`), deterministically resolving constraints, and ranking candidate slots.
+  - `_shared/ai/confirmation-repository.ts`: Loads `ad_hoc_location` and `ad_hoc_description` and populates them on confirmation.
+- **Web App (`apps/web`)**:
+  - `api/find-time.api.ts`: `findTimeForText` invokes `ai-find-time` with `{ text }`, parses proposals with readbacks or clarification requests.
+  - `hooks/useFindTime.ts`: Manages proposal and clarification states, mapping error codes.
+  - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips (title, duration, date, time, location) and displays a clean clarification notice when clarification is needed.
+- **Evaluation Suite (`supabase/functions/_shared/ai/evaluation`)**:
+  - `intent-fixtures.ts`: 14 comprehensive fixtures covering 10 core phrases, adversarial prompt injections, duration ranges, and clarification cases.
+  - `intent-harness.ts`: Evaluates schema validity, extraction accuracy, clarification pass rate, latency, and tokens/cost.
+  - `intent-harness.test.ts`: Automated tests for intent evaluation harness.
+  - `run-live-intent.ts`: Live CLI runner for comparing Luna Low vs Luna Medium.
+
 ### Web Find Time box — 2026-09-09
 
 Added the free-text Find Time box to the web Today page, above the bento grid.

@@ -96,6 +96,7 @@ export async function prepareDeterministicFindTime(
     now?: Date;
     /** Phase 3 persists a controlled no-slot request instead of losing context. */
     allowNoValidSlot?: boolean;
+    allowedDurationsMinutes?: number[];
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -136,6 +137,7 @@ export async function prepareDeterministicFindTime(
   const window = resolveWindow(task, input.request, profile.timezone, now);
   const constraints = parseConstraints({
     durationMinutes,
+    allowedDurationsMinutes: input.allowedDurationsMinutes,
     windowStart: window.start.toISOString(),
     windowEnd: window.end.toISOString(),
     workingHours: profile.workingHours,

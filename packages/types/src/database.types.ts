@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -36,7 +36,9 @@ export type Database = {
       ai_schedule_requests: {
         Row: {
           accepted_event_id: string | null
+          ad_hoc_description: string | null
           ad_hoc_duration_minutes: number | null
+          ad_hoc_location: string | null
           ad_hoc_title: string | null
           candidate_count: number
           completed_at: string | null
@@ -48,9 +50,11 @@ export type Database = {
           latency_ms: number | null
           model: string | null
           output_tokens: number | null
+          parsed_intent: Json | null
           profile_version: string | null
           prompt_version: string | null
           provider: string | null
+          raw_text: string | null
           reasoning_tokens: number | null
           status: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id: string | null
@@ -62,7 +66,9 @@ export type Database = {
         }
         Insert: {
           accepted_event_id?: string | null
+          ad_hoc_description?: string | null
           ad_hoc_duration_minutes?: number | null
+          ad_hoc_location?: string | null
           ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
@@ -74,9 +80,11 @@ export type Database = {
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null
+          parsed_intent?: Json | null
           profile_version?: string | null
           prompt_version?: string | null
           provider?: string | null
+          raw_text?: string | null
           reasoning_tokens?: number | null
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
@@ -88,7 +96,9 @@ export type Database = {
         }
         Update: {
           accepted_event_id?: string | null
+          ad_hoc_description?: string | null
           ad_hoc_duration_minutes?: number | null
+          ad_hoc_location?: string | null
           ad_hoc_title?: string | null
           candidate_count?: number
           completed_at?: string | null
@@ -100,9 +110,11 @@ export type Database = {
           latency_ms?: number | null
           model?: string | null
           output_tokens?: number | null
+          parsed_intent?: Json | null
           profile_version?: string | null
           prompt_version?: string | null
           provider?: string | null
+          raw_text?: string | null
           reasoning_tokens?: number | null
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
@@ -970,7 +982,8 @@ export type Database = {
           p_ad_hoc_duration_minutes?: number
           p_ad_hoc_title?: string
           p_limit?: number
-          p_task_id: string
+          p_raw_text?: string
+          p_task_id?: string
           p_user_id: string
         }
         Returns: string
