@@ -1,6 +1,6 @@
 import { describeTaskDue, formatTimeOfDay, toZonedDateKey } from '@cal/domain';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import styles from './SearchView.module.css';
 import { useProfile } from '../../settings/hooks/useSettings';
@@ -15,8 +15,10 @@ type ResultItem = {
 };
 
 export function SearchView() {
-  const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
+  const [query, setQuery] = useState(initialQuery);
+  const [debounced, setDebounced] = useState(initialQuery);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();

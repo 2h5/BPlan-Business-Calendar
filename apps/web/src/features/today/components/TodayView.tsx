@@ -9,7 +9,7 @@ import {
   zonedWallClockToUtc,
 } from '@cal/domain';
 import type { TaskList, TaskPriority } from '@cal/schemas';
-import React, { useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import styles from './TodayView.module.css';
@@ -40,6 +40,75 @@ export function TodayView() {
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
   const [isCompletedOpen, setIsCompletedOpen] = useState(false);
   const quickInputRef = useRef<HTMLInputElement>(null);
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchButtonRef = useRef<HTMLButtonElement>(null);
+  const heroActionsRef = useRef<HTMLDivElement>(null);
+
+  const handleOpenSearch = () => {
+    setIsSearchOpen(true);
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+  };
+
+  const handleCloseSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    searchButtonRef.current?.focus();
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      navigate(`/search?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate('/search');
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => {
+          if (!prev) {
+            requestAnimationFrame(() => {
+              searchInputRef.current?.focus();
+            });
+            return true;
+          } else {
+            searchInputRef.current?.focus();
+            return true;
+          }
+        });
+      } else if (e.key === 'Escape' && isSearchOpen) {
+        setIsSearchOpen(false);
+        setSearchQuery('');
+        searchButtonRef.current?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen]);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+
+    const handlePointerDownOutside = (e: MouseEvent) => {
+      if (heroActionsRef.current && !heroActionsRef.current.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+        setSearchQuery('');
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
+  }, [isSearchOpen]);
 
   const listOptions = useMemo(
     () => [
@@ -223,33 +292,81 @@ export function TodayView() {
           </p>
         </div>
 
-        <div className={styles.heroActions}>
-          <button
-            type="button"
-            className={styles.primaryActionButton}
-            onClick={() => navigate(`/calendar?date=${today.todayKey}&newEvent=true`)}
+        <div className={styles.heroActions} ref={heroActionsRef}>
+          <div
+            className={`${styles.heroActionButtons} ${
+              isSearchOpen ? styles.heroActionButtonsHidden : ''
+            }`}
           >
-            <CalendarIcon />
-            <span>New Event</span>
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryActionButton}
-            onClick={() => navigate('/tasks?newTask=true')}
+            <button
+              type="button"
+              className={styles.primaryActionButton}
+              onClick={() => navigate(`/calendar?date=${today.todayKey}&newEvent=true`)}
+            >
+              <CalendarIcon />
+              <span>New Event</span>
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryActionButton}
+              onClick={() => navigate('/tasks?newTask=true')}
+            >
+              <PlusIcon />
+              <span>New Task</span>
+            </button>
+          </div>
+
+          <div
+            className={`${styles.searchExpandable} ${
+              isSearchOpen ? styles.searchExpandableOpen : ''
+            }`}
           >
-            <PlusIcon />
-            <span>New Task</span>
-          </button>
-          <button
-            type="button"
-            className={styles.iconSearchButton}
-            onClick={() => navigate('/search')}
-            title="Search (⌘K)"
-            aria-label="Search"
-          >
-            <SearchIcon />
-            <kbd className={styles.keyboardHint}>⌘K</kbd>
-          </button>
+            <button
+              ref={searchButtonRef}
+              type="button"
+              className={`${styles.searchTriggerButton} ${
+                isSearchOpen ? styles.searchTriggerButtonHidden : ''
+              }`}
+              onClick={handleOpenSearch}
+              title="Search (⌘K)"
+              aria-label="Search"
+              tabIndex={isSearchOpen ? -1 : 0}
+            >
+              <SearchIcon />
+            </button>
+
+            <form
+              className={`${styles.searchBarForm} ${
+                isSearchOpen ? styles.searchBarFormVisible : ''
+              }`}
+              onSubmit={handleSearchSubmit}
+              role="search"
+            >
+              <span className={styles.searchBarIcon} aria-hidden="true">
+                <SearchIcon />
+              </span>
+              <input
+                ref={searchInputRef}
+                type="text"
+                className={styles.searchBarInput}
+                placeholder="Search events, tasks…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                tabIndex={isSearchOpen ? 0 : -1}
+                aria-label="Search query"
+              />
+              <button
+                type="button"
+                className={styles.searchBarCloseButton}
+                onClick={handleCloseSearch}
+                title="Close search (Esc)"
+                aria-label="Close search"
+                tabIndex={isSearchOpen ? 0 : -1}
+              >
+                <CloseIcon />
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 
@@ -940,6 +1057,24 @@ function SearchIcon() {
     >
       <circle cx="11" cy="11" r="8" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
