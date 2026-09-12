@@ -14,6 +14,7 @@ import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+const HOLD_DELAY_MS = 180;
 
 export interface SlotSelection {
   dateKey: string;
@@ -30,6 +31,7 @@ export interface DraftEventState {
   allDay?: boolean;
   title?: string;
   calendarColor?: string;
+  isClosing?: boolean;
 }
 
 interface TimelineViewProps {
@@ -152,9 +154,24 @@ export function TimelineView({
     colRect: DOMRect;
   } | null>(null);
 
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleColumnPointerDown = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
     if ((e.target as HTMLElement).closest(`.${styles.timelineEvent}`)) return;
     if (e.button !== 0) return;
+
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
 
     const colRect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - colRect.top;
@@ -169,11 +186,18 @@ export function TimelineView({
       colRect,
     };
 
-    setDragSelection({
-      dateKey,
-      startMinute,
-      endMinute: Math.min(24 * 60, startMinute + 15),
-    });
+    // If user holds down the pointer, display the 15-minute selection box after the hold delay.
+    // Quick clicks release before this timer fires, preventing any 1-frame flash before the animation.
+    holdTimerRef.current = setTimeout(() => {
+      holdTimerRef.current = null;
+      if (dragRef.current && dragRef.current.dateKey === dateKey) {
+        setDragSelection({
+          dateKey,
+          startMinute,
+          endMinute: Math.min(24 * 60, startMinute + 15),
+        });
+      }
+    }, HOLD_DELAY_MS);
 
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -184,6 +208,19 @@ export function TimelineView({
 
   const handleColumnPointerMove = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
     if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
+
+    const distY = Math.abs(e.clientY - dragRef.current.startY);
+    const distX = Math.abs(e.clientX - dragRef.current.startX);
+    const hasMoved = distY >= 6 || distX >= 6;
+
+    if (!hasMoved && !dragSelection) {
+      return;
+    }
+
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
 
     const colRect = dragRef.current.colRect;
     const y = Math.max(0, Math.min(colRect.height, e.clientY - colRect.top));
@@ -203,6 +240,11 @@ export function TimelineView({
   const handleColumnPointerUp = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
     if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
 
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch {
@@ -213,7 +255,8 @@ export function TimelineView({
     dragRef.current = null;
 
     const distY = Math.abs(e.clientY - dragInfo.startY);
-    const isClick = distY < 6;
+    const distX = Math.abs(e.clientX - dragInfo.startX);
+    const isClick = distY < 6 && distX < 6;
 
     let finalStart = dragInfo.startMinute;
     let finalEnd = Math.min(24 * 60, dragInfo.startMinute + defaultDurationMinutes);
@@ -247,6 +290,10 @@ export function TimelineView({
   };
 
   const handleColumnPointerCancel = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
     if (dragRef.current?.dateKey === dateKey) {
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
@@ -281,7 +328,7 @@ export function TimelineView({
   return (
     <div className={styles.timelineViewport} ref={scrollRef}>
       <div
-        className={`${styles.timelineCanvas} ${isWeek ? styles.weekCanvas : styles.dayCanvas}`}
+        className={`${styles.timelineCanvas} ${isWeek ? styles.weekCanvas : styles.dayCanvas} ${hasAllDay ? styles.timelineCanvasWithAllDay : ''}`}
         style={
           {
             '--hour-height': `${hourHeight}px`,
@@ -355,7 +402,13 @@ export function TimelineView({
                   ))}
                   {draftEvent && draftEvent.dateKey === dateKey && draftEvent.allDay && (
                     <div
-                      className={`${styles.timelineEvent} ${styles.timelineEventCompact} ${styles.monthEventDraft}`}
+                      className={`${styles.timelineEvent} ${styles.timelineEventCompact} ${styles.monthEventDraft} ${
+                        isWeek
+                          ? draftEvent.isClosing
+                            ? styles.monthEventDraftClosing
+                            : styles.monthEventDraftEntering
+                          : ''
+                      }`}
                       style={
                         {
                           '--event-color': draftEvent.calendarColor || 'var(--color-accent)',
@@ -375,7 +428,11 @@ export function TimelineView({
 
         <div className={styles.hourLabels}>
           {HOURS.map((hour) => (
-            <span key={hour} style={{ top: hour * hourHeight }}>
+            <span
+              key={hour}
+              className={hour === 0 ? styles.firstHourLabel : undefined}
+              style={{ top: hour * hourHeight }}
+            >
               {formatHour(hour, hourCycle)}
             </span>
           ))}
@@ -434,7 +491,13 @@ export function TimelineView({
                   draftEvent.endMinute !== undefined &&
                   !dragSelection && (
                     <div
-                      className={styles.draftTimelineEvent}
+                      className={`${styles.draftTimelineEvent} ${
+                        isWeek
+                          ? draftEvent.isClosing
+                            ? styles.draftTimelineEventBubbleExit
+                            : styles.draftTimelineEventBubbleEnter
+                          : ''
+                      }`}
                       style={
                         {
                           top: (draftEvent.startMinute / 60) * hourHeight,

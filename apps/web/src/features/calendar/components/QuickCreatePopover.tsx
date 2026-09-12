@@ -38,6 +38,7 @@ export interface QuickCreatePopoverProps {
   defaultDurationMinutes: number;
   isSaving: boolean;
   onClose: () => void;
+  onClosing?: () => void;
   onCreateEvent: (input: ReturnType<typeof eventInputFromForm>) => Promise<void>;
   onUpdateEvent?: (
     event: CalendarEvent,
@@ -72,6 +73,7 @@ export function QuickCreatePopover({
   defaultDurationMinutes,
   isSaving,
   onClose,
+  onClosing,
   onCreateEvent,
   onUpdateEvent,
   onDeleteEvent,
@@ -284,7 +286,8 @@ export function QuickCreatePopover({
   const handleRequestClose = useCallback(() => {
     if (isSaving || isClosing) return;
     setIsClosing(true);
-  }, [isSaving, isClosing]);
+    onClosing?.();
+  }, [isSaving, isClosing, onClosing]);
 
   const handleAnimationEnd = (e: React.AnimationEvent) => {
     if (isClosing && e.target === popoverRef.current) {

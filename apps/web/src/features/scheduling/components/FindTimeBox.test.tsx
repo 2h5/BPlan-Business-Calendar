@@ -128,9 +128,11 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
     expect(html).not.toContain('Upgrade to Pro');
     expect(html).not.toContain('Find Time with AI');
 
-    // Must show interactive form input
-    expect(html).toContain('placeholder="Try “15-minute meeting with Andrew”"');
+    // Must show interactive form input with custom rotating prompt
+    expect(html).toContain('placeholder=""');
     expect(html).toContain('aria-label="Describe what you want to schedule"');
+    expect(html).toContain('>Try</span>');
+    expect(html).toContain('“15-minute meeting with Andrew”');
     expect(html).toContain('Find time</span>');
   });
 
@@ -393,5 +395,41 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
     expect(html).toContain('BPlan needs more verification');
     expect(html).not.toContain('Luna');
     expect(html).toContain('Did you mean Thursday morning or afternoon?');
+  });
+
+  it('hides the rotating prompt overlay when user has typed text or draft exists', () => {
+    vi.mocked(useSubscription).mockReturnValue(
+      mockSubscriptionQuery({
+        status: 'active',
+        entitlement: 'pro',
+        expiresAt: '2026-12-31T00:00:00Z',
+      }),
+    );
+
+    vi.mocked(useFindTime).mockReturnValue({
+      ...defaultFindTime,
+      promptText: '30-minute sync with Dave',
+    });
+
+    const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+    // Must show the real user's input
+    expect(html).toContain('value="30-minute sync with Dave"');
+    // Must NOT render the rotating prompt overlay
+    expect(html).not.toContain('promptOverlay');
+    expect(html).not.toContain('>Try</span>');
+    expect(html).not.toContain('“15-minute meeting with Andrew”');
+  });
+
+  it('renders locked teaser with static first example placeholder for Free users', () => {
+    vi.mocked(useSubscription).mockReturnValue(mockSubscriptionQuery(null));
+
+    const html = renderToStaticMarkup(<FindTimeBox timeZone="America/New_York" />);
+
+    // Locked teaser must have static placeholder matching the first curated example
+    expect(html).toContain('placeholder="Try “15-minute meeting with Andrew”"');
+    expect(html).toContain('aria-label="Find Time with AI is available on the Pro plan"');
+    // Locked teaser does not render animated overlay
+    expect(html).not.toContain('promptOverlay');
   });
 });

@@ -639,11 +639,14 @@
 
 .timelineCanvas {
   position: relative;
-  min-height: calc(24 * var(--hour-height) + 96px);
   display: grid;
   grid-template-columns: 62px minmax(0, 1fr);
-  grid-template-rows: 62px auto calc(24 * var(--hour-height));
+  grid-template-rows: 62px calc(24 * var(--hour-height));
   background: var(--color-bg-app);
+}
+
+.timelineCanvasWithAllDay {
+  grid-template-rows: 62px auto calc(24 * var(--hour-height));
 }
 
 .weekCanvas {
@@ -750,6 +753,7 @@
   z-index: 2;
   left: 0;
   background: var(--color-bg-app);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .hourLabels span {
@@ -759,10 +763,18 @@
   color: var(--color-text-tertiary);
   font-size: 0.625rem;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.firstHourLabel,
+.hourLabels span:first-child {
+  transform: translateY(2px);
 }
 
 .dayColumns {
   height: calc(24 * var(--hour-height));
+  border-bottom: 1px solid var(--color-border-subtle);
+  overflow: hidden;
 }
 
 .dayColumn {
@@ -1931,8 +1943,14 @@
   .detailsBackdrop,
   .detailsBackdropClosing,
   .draftTimelineEvent,
-  .monthEventDraft {
-    animation-duration: 1ms;
+  .monthEventDraft,
+  .monthEventDraftEntering,
+  .monthEventDraftClosing,
+  .draftTimelineEventBubbleEnter,
+  .draftTimelineEventBubbleExit {
+    animation: none !important;
+    animation-duration: 1ms !important;
+    transform: none !important;
   }
 }
 
@@ -1990,6 +2008,76 @@
   border: 1px dashed var(--event-color, var(--color-accent)) !important;
   opacity: 0.85;
   animation: draft-pulse 2s ease-in-out infinite;
+}
+
+.monthEventDraftEntering {
+  animation:
+    month-draft-enter 180ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    draft-pulse 2s ease-in-out 180ms infinite;
+}
+
+.monthEventDraftClosing {
+  animation: month-draft-exit 140ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+@keyframes month-draft-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-2px);
+  }
+  to {
+    opacity: 0.85;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes month-draft-exit {
+  from {
+    opacity: 0.85;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(-2px);
+  }
+}
+
+.draftTimelineEventBubbleEnter {
+  transform-origin: top center;
+  animation:
+    weekly-bubble-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    draft-pulse 2s ease-in-out 200ms infinite;
+}
+
+.draftTimelineEventBubbleExit {
+  transform-origin: top center;
+  animation: weekly-bubble-exit 140ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+}
+
+@keyframes weekly-bubble-enter {
+  0% {
+    opacity: 0;
+    transform: scaleY(0) scaleX(0.92);
+  }
+  65% {
+    opacity: 1;
+    transform: scaleY(1.04) scaleX(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1) scaleX(1);
+  }
+}
+
+@keyframes weekly-bubble-exit {
+  0% {
+    opacity: 1;
+    transform: scaleY(1) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleY(0) scaleX(0.92);
+  }
 }
 
 @keyframes draft-pulse {

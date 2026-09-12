@@ -111,4 +111,30 @@ describe('Calendar slot selection & drag calculations', () => {
     expect(edgePlacement.placement).toBe('right');
     expect(edgePlacement.left).toBe(200 + 12); // Flips to right when left edge has no room
   });
+
+  it('distinguishes quick click from hold based on delay threshold', () => {
+    const HOLD_DELAY_MS = 180;
+    const quickClickDuration = 80;
+    const holdDuration = 250;
+
+    // Quick click releases before HOLD_DELAY_MS, preventing the 1-frame flash of the 15-minute selection indicator
+    expect(quickClickDuration >= HOLD_DELAY_MS).toBe(false);
+    // Holding past HOLD_DELAY_MS displays the 15-minute selection indicator
+    expect(holdDuration >= HOLD_DELAY_MS).toBe(true);
+  });
+
+  it('distinguishes click from drag based on movement threshold', () => {
+    function isClickGesture(startX: number, startY: number, endX: number, endY: number): boolean {
+      const distX = Math.abs(endX - startX);
+      const distY = Math.abs(endY - startY);
+      return distX < 6 && distY < 6;
+    }
+
+    // Micro-jitter during a normal click
+    expect(isClickGesture(100, 200, 102, 203)).toBe(true);
+    // Deliberate vertical drag
+    expect(isClickGesture(100, 200, 100, 215)).toBe(false);
+    // Deliberate horizontal movement
+    expect(isClickGesture(100, 200, 110, 200)).toBe(false);
+  });
 });

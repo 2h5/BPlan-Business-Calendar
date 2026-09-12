@@ -110,6 +110,7 @@ export function CalendarView() {
     title: string;
     calendarColor: string;
   } | null>(null);
+  const [isDraftClosing, setIsDraftClosing] = useState(false);
   const [editorInitialValues, setEditorInitialValues] = useState<Partial<EventFormValues> | null>(
     null,
   );
@@ -246,6 +247,7 @@ export function CalendarView() {
           ? `${pad(Math.floor(endMinute / 60))}:${pad(endMinute % 60)}`
           : undefined;
 
+      setIsDraftClosing(false);
       setQuickCreateState({
         isOpen: true,
         dateKey,
@@ -270,8 +272,9 @@ export function CalendarView() {
       allDay: quickCreateState.allDay,
       title: draftState?.title,
       calendarColor: draftState?.calendarColor,
+      isClosing: isDraftClosing,
     };
-  }, [quickCreateState, draftState]);
+  }, [quickCreateState, draftState, isDraftClosing]);
 
   const handleToggleVisibility = useCallback(
     (calendar: Calendar) => {
@@ -296,6 +299,7 @@ export function CalendarView() {
       setMode(nextMode);
       setSelectedOccurrence(null);
       setIsDraft(false);
+      setIsDraftClosing(false);
       setIsEventEditorClosing(false);
       setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
@@ -493,9 +497,11 @@ export function CalendarView() {
           removeEvent.isPending ||
           createTaskMutation.isPending
         }
-        onClose={() =>
-          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }))
-        }
+        onClosing={() => setIsDraftClosing(true)}
+        onClose={() => {
+          setIsDraftClosing(false);
+          setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
+        }}
         onCreateEvent={async (input) => {
           await createEvent.mutateAsync(input);
           setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));

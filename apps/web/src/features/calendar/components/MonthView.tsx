@@ -115,7 +115,11 @@ export function MonthView({
                   ))}
                   {draftEvent && draftEvent.dateKey === dateKey && (
                     <div
-                      className={`${styles.monthEvent} ${styles.monthEventDraft}`}
+                      className={`${styles.monthEvent} ${styles.monthEventDraft} ${
+                        draftEvent.isClosing
+                          ? styles.monthEventDraftClosing
+                          : styles.monthEventDraftEntering
+                      }`}
                       style={
                         {
                           '--event-color': draftEvent.calendarColor ?? 'var(--color-accent)',
