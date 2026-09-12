@@ -575,41 +575,12 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  will-change: transform, opacity;
 }
 
-.viewTransitionZoomIn {
-  animation: viewZoomIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.viewTransitionZoomOut {
-  animation: viewZoomOut 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
+.viewTransitionZoomIn,
+.viewTransitionZoomOut,
 .viewTransitionFade {
-  animation: viewFade 180ms ease-out both;
-}
-
-@keyframes viewZoomIn {
-  from {
-    opacity: 0;
-    transform: scale(1.02);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes viewZoomOut {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  animation: viewFade 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes viewFade {
@@ -811,8 +782,9 @@
   color: var(--color-text-primary);
   text-align: left;
   transition:
-    filter var(--transition-fast),
-    transform var(--transition-fast);
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .allDayColumn .timelineEvent {
@@ -822,19 +794,25 @@
   height: 24px;
 }
 
-.timelineEvent:hover,
+.timelineEvent:hover {
+  background: color-mix(in srgb, var(--event-color) 26%, var(--color-bg-surface));
+  border-color: color-mix(in srgb, var(--event-color) 50%, transparent);
+}
+
 .monthEvent:hover {
-  filter: brightness(1.16);
+  background: color-mix(in srgb, var(--event-color) 22%, transparent);
+  color: var(--color-text-primary);
 }
 
 .timelineEvent:active {
-  transform: translateY(1px);
+  opacity: 0.92;
 }
 
 .timelineEventResizing,
 .timelineEventResizing:active {
   z-index: 5;
-  filter: brightness(1.1);
+  background: color-mix(in srgb, var(--event-color) 24%, var(--color-bg-surface));
+  border-color: color-mix(in srgb, var(--event-color) 60%, transparent);
   transform: none;
   transition: none;
 }
@@ -1052,6 +1030,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .monthEvent span {
