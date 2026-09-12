@@ -142,3 +142,22 @@ export function eventInputFromForm(
     alerts: values.alerts,
   });
 }
+
+export function eventInputWithTiming(
+  event: CalendarEvent,
+  startAt: string,
+  endAt: string,
+): CreateEventInput {
+  return createEventSchema.parse({
+    calendarId: event.calendarId,
+    title: event.title,
+    description: event.description,
+    location: event.location,
+    startAt,
+    endAt,
+    allDay: event.allDay,
+    timezone: event.timezone,
+    recurrenceRule: event.recurrenceRule,
+    alerts: event.alerts,
+  });
+}

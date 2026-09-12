@@ -12,6 +12,15 @@ import styles from './CalendarView.module.css';
 import type { AnchorRect } from './QuickCreatePopover';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
+import {
+  dateMinuteToInstant,
+  hasTimingChanged,
+  isEventResizable,
+  pointerYToSnappedMinute,
+  resizeMinuteInterval,
+  type MinuteInterval,
+  type ResizeEdge,
+} from '../utils/event-resize';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const HOLD_DELAY_MS = 180;
@@ -34,6 +43,11 @@ export interface DraftEventState {
   isClosing?: boolean;
 }
 
+export interface EventTiming {
+  start: number;
+  end: number;
+}
+
 interface TimelineViewProps {
   dateKeys: readonly string[];
   byDateKey: ReadonlyMap<string, EventOccurrence[]>;
@@ -43,6 +57,8 @@ interface TimelineViewProps {
   now: Date;
   onSelectDate: (dateKey: string) => void;
   onSelectEvent: (occurrence: EventOccurrence, anchorRect?: AnchorRect) => void;
+  onResizeEvent?: (occurrence: EventOccurrence, timing: EventTiming) => void;
+  timingOverrides?: ReadonlyMap<string, EventTiming>;
   onSelectSlot?: (selection: SlotSelection) => void;
   draftEvent?: DraftEventState | null;
   defaultDurationMinutes?: number;
@@ -71,6 +87,12 @@ interface EventButtonProps {
   compact: boolean;
   style?: React.CSSProperties;
   onSelect: (anchorRect?: AnchorRect) => void;
+  onResizePointerDown?: (event: React.PointerEvent<HTMLSpanElement>, edge: ResizeEdge) => void;
+  onResizePointerMove?: (event: React.PointerEvent<HTMLSpanElement>) => void;
+  onResizePointerUp?: (event: React.PointerEvent<HTMLSpanElement>) => void;
+  onResizePointerCancel?: (event: React.PointerEvent<HTMLSpanElement>) => void;
+  shouldSuppressSelect?: () => boolean;
+  resizePreview?: MinuteInterval;
 }
 
 function EventButton({
@@ -80,15 +102,22 @@ function EventButton({
   compact,
   style,
   onSelect,
+  onResizePointerDown,
+  onResizePointerMove,
+  onResizePointerUp,
+  onResizePointerCancel,
+  shouldSuppressSelect,
+  resizePreview,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
   return (
     <button
       type="button"
-      className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''}`}
+      className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${resizePreview ? styles.timelineEventResizing : ''}`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
       onClick={(e) => {
         e.stopPropagation();
+        if (shouldSuppressSelect?.()) return;
         const rect = e.currentTarget.getBoundingClientRect();
         onSelect({
           top: rect.top,
@@ -101,11 +130,37 @@ function EventButton({
       }}
       title={`${occurrence.event.title}, ${formatEventTime(occurrence.start, timeZone, hourCycle)}`}
     >
+      {onResizePointerDown ? (
+        <span
+          className={`${styles.timelineResizeHandle} ${styles.timelineResizeHandleTop}`}
+          data-resize-edge="start"
+          onPointerDown={(event) => onResizePointerDown(event, 'start')}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerCancel}
+        />
+      ) : null}
       <span className={styles.timelineEventTitle}>{occurrence.event.title}</span>
-      {!compact ? (
+      {resizePreview ? (
+        <span className={styles.timelineResizeFeedback}>
+          {formatMinute(resizePreview.startMinute, hourCycle)} –{' '}
+          {formatMinute(resizePreview.endMinute, hourCycle)} ·{' '}
+          {formatDuration(resizePreview.endMinute - resizePreview.startMinute)}
+        </span>
+      ) : !compact ? (
         <span className={styles.timelineEventTime}>
           {formatEventTime(occurrence.start, timeZone, hourCycle)}
         </span>
+      ) : null}
+      {onResizePointerDown ? (
+        <span
+          className={`${styles.timelineResizeHandle} ${styles.timelineResizeHandleBottom}`}
+          data-resize-edge="end"
+          onPointerDown={(event) => onResizePointerDown(event, 'end')}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerCancel}
+        />
       ) : null}
     </button>
   );
@@ -114,12 +169,21 @@ function EventButton({
 const pad = (n: number) => String(n).padStart(2, '0');
 
 function formatMinute(minute: number, hourCycle: HourCycle): string {
+  if (minute === 24 * 60) return hourCycle === 'h23' ? '24:00' : '12:00 AM';
   const h = Math.floor(minute / 60);
   const m = minute % 60;
   if (hourCycle === 'h23') return `${pad(h)}:${pad(m)}`;
   const period = h >= 12 ? 'PM' : 'AM';
   const displayH = h % 12 === 0 ? 12 : h % 12;
   return `${displayH}:${pad(m)} ${period}`;
+}
+
+function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours === 0) return `${remainingMinutes}m`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 export function TimelineView({
@@ -131,6 +195,8 @@ export function TimelineView({
   now,
   onSelectDate,
   onSelectEvent,
+  onResizeEvent,
+  timingOverrides,
   onSelectSlot,
   draftEvent,
   defaultDurationMinutes = 60,
@@ -145,6 +211,23 @@ export function TimelineView({
     startMinute: number;
     endMinute: number;
   } | null>(null);
+  const [resizePreview, setResizePreview] = useState<{
+    occurrenceKey: string;
+    interval: MinuteInterval;
+  } | null>(null);
+
+  const resizeRef = useRef<{
+    occurrence: EventOccurrence;
+    dateKey: string;
+    edge: ResizeEdge;
+    originalMinutes: MinuteInterval;
+    currentMinutes: MinuteInterval;
+    originalTiming: EventTiming;
+    pointerId: number;
+    handle: HTMLSpanElement;
+    columnTop: number;
+  } | null>(null);
+  const suppressedClickKeyRef = useRef<string | null>(null);
 
   const dragRef = useRef<{
     dateKey: string;
@@ -305,6 +388,98 @@ export function TimelineView({
     }
   };
 
+  const handleResizePointerDown = (
+    e: React.PointerEvent<HTMLSpanElement>,
+    occurrence: EventOccurrence,
+    dateKey: string,
+    edge: ResizeEdge,
+    interval: MinuteInterval,
+  ) => {
+    if (e.button !== 0 || !onResizeEvent) return;
+    const column = e.currentTarget.closest<HTMLElement>('[data-date-key]');
+    if (!column) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    const override = timingOverrides?.get(occurrence.event.id);
+    const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
+    resizeRef.current = {
+      occurrence,
+      dateKey,
+      edge,
+      originalMinutes: interval,
+      currentMinutes: interval,
+      originalTiming,
+      pointerId: e.pointerId,
+      handle: e.currentTarget,
+      columnTop: column.getBoundingClientRect().top,
+    };
+    suppressedClickKeyRef.current = occurrence.key;
+    setResizePreview({ occurrenceKey: occurrence.key, interval });
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Pointer capture is best-effort in synthetic/test environments.
+    }
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLSpanElement>) => {
+    const active = resizeRef.current;
+    if (!active || active.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const pointerMinute = pointerYToSnappedMinute(e.clientY, active.columnTop, hourHeight);
+    const next = resizeMinuteInterval(active.originalMinutes, active.edge, pointerMinute);
+    if (
+      next.startMinute === active.currentMinutes.startMinute &&
+      next.endMinute === active.currentMinutes.endMinute
+    ) {
+      return;
+    }
+
+    const nextStart = dateMinuteToInstant(active.dateKey, next.startMinute, timeZone);
+    const nextEnd = dateMinuteToInstant(active.dateKey, next.endMinute, timeZone);
+    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
+
+    active.currentMinutes = next;
+    setResizePreview({ occurrenceKey: active.occurrence.key, interval: next });
+  };
+
+  const finishResize = (e: React.PointerEvent<HTMLSpanElement>, cancelled: boolean) => {
+    const active = resizeRef.current;
+    if (!active || active.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      active.handle.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    resizeRef.current = null;
+    setResizePreview(null);
+    const suppressedKey = active.occurrence.key;
+    globalThis.setTimeout(() => {
+      if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
+    }, 0);
+    if (cancelled) return;
+
+    const nextStart = dateMinuteToInstant(
+      active.dateKey,
+      active.currentMinutes.startMinute,
+      timeZone,
+    );
+    const nextEnd = dateMinuteToInstant(active.dateKey, active.currentMinutes.endMinute, timeZone);
+    if (!nextStart || !nextEnd) return;
+
+    const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
+    if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
+    onResizeEvent?.(active.occurrence, nextTiming);
+  };
+
   useEffect(() => {
     const initialHour =
       todayKey && dateKeys.includes(todayKey)
@@ -442,7 +617,26 @@ export function TimelineView({
           {dateKeys.map((dateKey) => {
             const dayStart = dateKeyToInstant(dateKey, timeZone);
             const dayEnd = addZonedDays(dayStart, 1, timeZone);
-            const timed = (byDateKey.get(dateKey) ?? []).filter((item) => !item.event.allDay);
+            const timed = (byDateKey.get(dateKey) ?? [])
+              .filter((item) => !item.event.allDay)
+              .map((item) => {
+                const optimistic = timingOverrides?.get(item.event.id);
+                const active = resizePreview?.occurrenceKey === item.key ? resizeRef.current : null;
+                if (active) {
+                  const start = dateMinuteToInstant(
+                    dateKey,
+                    active.currentMinutes.startMinute,
+                    timeZone,
+                  );
+                  const end = dateMinuteToInstant(
+                    dateKey,
+                    active.currentMinutes.endMinute,
+                    timeZone,
+                  );
+                  if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
+                }
+                return optimistic ? { ...item, ...optimistic } : item;
+              });
             const laidOut = layoutOverlappingEvents(timed, (item) => ({
               start: Math.max(item.start, dayStart.getTime()),
               end: Math.max(
@@ -519,6 +713,10 @@ export function TimelineView({
                     </div>
                   )}
                 {laidOut.map((placed) => {
+                  const sourceOccurrence =
+                    (byDateKey.get(dateKey) ?? []).find(
+                      (occurrence) => occurrence.key === placed.item.key,
+                    ) ?? placed.item;
                   const startMinute =
                     placed.interval.start <= dayStart.getTime()
                       ? 0
@@ -532,20 +730,44 @@ export function TimelineView({
                     ((endMinute - startMinute) / 60) * hourHeight - 2,
                     isWeek ? 20 : 24,
                   );
+                  const canResize =
+                    Boolean(onResizeEvent) && isEventResizable(sourceOccurrence, dateKey, timeZone);
+                  const activeResize =
+                    resizePreview?.occurrenceKey === placed.item.key
+                      ? resizePreview.interval
+                      : undefined;
                   return (
                     <EventButton
                       key={placed.item.key}
                       occurrence={placed.item}
                       timeZone={timeZone}
                       hourCycle={hourCycle}
-                      compact={isWeek || height < 42}
+                      compact={(isWeek || height < 42) && !activeResize}
                       style={{
                         top,
                         height,
                         left: `calc(${placed.left * 100}% + 2px)`,
                         width: `calc(${placed.width * 100}% - 4px)`,
                       }}
-                      onSelect={(anchorRect) => onSelectEvent(placed.item, anchorRect)}
+                      onSelect={(anchorRect) => onSelectEvent(sourceOccurrence, anchorRect)}
+                      onResizePointerDown={
+                        canResize
+                          ? (event, edge) =>
+                              handleResizePointerDown(event, sourceOccurrence, dateKey, edge, {
+                                startMinute,
+                                endMinute,
+                              })
+                          : undefined
+                      }
+                      onResizePointerMove={handleResizePointerMove}
+                      onResizePointerUp={(event) => finishResize(event, false)}
+                      onResizePointerCancel={(event) => finishResize(event, true)}
+                      shouldSuppressSelect={() => {
+                        if (suppressedClickKeyRef.current !== sourceOccurrence.key) return false;
+                        suppressedClickKeyRef.current = null;
+                        return true;
+                      }}
+                      resizePreview={activeResize}
                     />
                   );
                 })}

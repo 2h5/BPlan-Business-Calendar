@@ -9,7 +9,7 @@ import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type SlotSelection } from './TimelineView';
+import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
 import {
   useCreateCalendar,
@@ -23,7 +23,13 @@ import {
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
-import type { EventFormValues } from '../utils/event-form';
+import { eventInputWithTiming, type EventFormValues } from '../utils/event-form';
+
+interface CalendarToast {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
 
 function CalendarState({
   kind,
@@ -87,7 +93,11 @@ export function CalendarView() {
   const [isEventEditorClosing, setIsEventEditorClosing] = useState(false);
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<CalendarToast | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
+    () => new Map(),
+  );
   const openingControlRef = useRef<HTMLElement | null>(null);
 
   const [quickCreateState, setQuickCreateState] = useState<{
@@ -167,7 +177,7 @@ export function CalendarView() {
         anchorRect,
       });
     } else {
-      setToast('Create or connect a writable calendar first.');
+      setToast({ message: 'Create or connect a writable calendar first.' });
     }
   }, [hasRequestedNewEvent, result.isLoading, result.calendars, timeZone]);
 
@@ -229,7 +239,7 @@ export function CalendarView() {
   const handleSlotSelect = useCallback(
     ({ dateKey, startMinute, endMinute, allDay, anchorRect }: SlotSelection) => {
       if (!result.calendars.some((c) => !c.isReadOnly)) {
-        setToast('Create or connect a writable calendar first.');
+        setToast({ message: 'Create or connect a writable calendar first.' });
         return;
       }
       rememberOpeningControl();
@@ -282,7 +292,9 @@ export function CalendarView() {
         { id: calendar.id, isVisible: !calendar.isVisible },
         {
           onError: (error) =>
-            setToast(error instanceof Error ? error.message : 'Visibility could not be saved.'),
+            setToast({
+              message: error instanceof Error ? error.message : 'Visibility could not be saved.',
+            }),
         },
       );
       if (selectedOccurrence?.event.calendarId === calendar.id) setSelectedOccurrence(null);
@@ -348,10 +360,103 @@ export function CalendarView() {
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
-  const showSuccess = useCallback((message: string) => {
-    setToast(message);
-    globalThis.setTimeout(() => setToast(null), 3000);
+  const showToast = useCallback((nextToast: CalendarToast, duration = 6000) => {
+    if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
+    setToast(nextToast);
+    toastTimerRef.current = globalThis.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, duration);
   }, []);
+
+  const showSuccess = useCallback((message: string) => showToast({ message }, 3000), [showToast]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const reflectedEventIds = [...timingOverrides]
+      .filter(([eventId, timing]) => {
+        const authoritative = result.occurrences.find(
+          (occurrence) => occurrence.event.id === eventId,
+        );
+        return authoritative?.start === timing.start && authoritative.end === timing.end;
+      })
+      .map(([eventId]) => eventId);
+    if (reflectedEventIds.length === 0) return;
+
+    setTimingOverrides((current) => {
+      const next = new Map(current);
+      reflectedEventIds.forEach((eventId) => next.delete(eventId));
+      return next;
+    });
+  }, [result.occurrences, timingOverrides]);
+
+  const setTimingOverride = useCallback((eventId: string, timing: EventTiming | null) => {
+    setTimingOverrides((current) => {
+      const next = new Map(current);
+      if (timing) next.set(eventId, timing);
+      else next.delete(eventId);
+      return next;
+    });
+  }, []);
+
+  const handleResizeEvent = useCallback(
+    (occurrence: EventOccurrence, timing: EventTiming) => {
+      const { event } = occurrence;
+      const previous = timingOverrides.get(event.id) ?? {
+        start: occurrence.start,
+        end: occurrence.end,
+      };
+      if (previous.start === timing.start && previous.end === timing.end) return;
+
+      setTimingOverride(event.id, timing);
+      const persist = async () => {
+        try {
+          await updateEvent.mutateAsync({
+            event,
+            input: eventInputWithTiming(
+              event,
+              new Date(timing.start).toISOString(),
+              new Date(timing.end).toISOString(),
+            ),
+          });
+          showToast({
+            message: 'Event resized',
+            actionLabel: 'Undo',
+            onAction: () => {
+              setTimingOverride(event.id, previous);
+              showToast({ message: 'Restoring event…' });
+              void updateEvent
+                .mutateAsync({
+                  event,
+                  input: eventInputWithTiming(
+                    event,
+                    new Date(previous.start).toISOString(),
+                    new Date(previous.end).toISOString(),
+                  ),
+                })
+                .then(() => showSuccess('Resize undone.'))
+                .catch(() => {
+                  setTimingOverride(event.id, null);
+                  result.refetch();
+                  showToast({ message: 'The resize could not be undone.' });
+                });
+            },
+          });
+        } catch {
+          setTimingOverride(event.id, null);
+          showToast({ message: 'The event resize could not be saved.' });
+        }
+      };
+      void persist();
+    },
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+  );
 
   return (
     <div className={styles.workspace}>
@@ -379,7 +484,7 @@ export function CalendarView() {
           onNext={() => setSelectedDateKey(shiftDateKey(selectedDateKey, mode, 1, timeZone))}
           onCreateEvent={() => {
             if (!result.calendars.some((calendar) => !calendar.isReadOnly)) {
-              setToast('Create or connect a writable calendar first.');
+              setToast({ message: 'Create or connect a writable calendar first.' });
               return;
             }
             rememberOpeningControl();
@@ -464,6 +569,8 @@ export function CalendarView() {
                   now={new Date()}
                   onSelectDate={setSelectedDateKey}
                   onSelectEvent={handleEventSelect}
+                  onResizeEvent={handleResizeEvent}
+                  timingOverrides={timingOverrides}
                   onSelectSlot={handleSlotSelect}
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
@@ -596,7 +703,12 @@ export function CalendarView() {
 
       {toast ? (
         <div className={styles.toast} role="status" aria-live="polite">
-          {toast}
+          <span>{toast.message}</span>
+          {toast.actionLabel && toast.onAction ? (
+            <button type="button" onClick={toast.onAction}>
+              {toast.actionLabel}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

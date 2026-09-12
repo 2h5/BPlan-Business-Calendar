@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '@cal/schemas';
+import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -16,6 +16,21 @@ const dateKeys = [
   '2026-09-18',
   '2026-09-19',
 ];
+
+const calendar: Calendar = {
+  id: 'b0000000-0000-0000-0000-000000000001',
+  userId: '11111111-1111-1111-1111-111111111111',
+  name: 'Personal',
+  color: '#6E8BFF',
+  sourceType: 'internal',
+  providerAccountId: null,
+  providerCalendarId: null,
+  isVisible: true,
+  isDefault: true,
+  isReadOnly: false,
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z',
+};
 
 const makeEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
   id: 'a0000000-0000-0000-0000-000000000001',
@@ -228,5 +243,53 @@ describe('TimelineView grid layout and all-day handling', () => {
     expect(html).toContain('draftTimelineEvent');
     expect(html).not.toContain('draftTimelineEventBubbleEnter');
     expect(html).not.toContain('draftTimelineEventBubbleExit');
+  });
+});
+
+describe('TimelineView resize affordances', () => {
+  function renderTimedEvent(eventCalendar: Calendar, recurrenceRule: string | null = null) {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Planning session',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T15:00:00.000Z',
+      recurrenceRule,
+    });
+    const occurrence: EventOccurrence = {
+      key: 'timed-occurrence',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar: eventCalendar,
+    };
+
+    return renderToStaticMarkup(
+      <TimelineView
+        dateKeys={['2026-09-15']}
+        byDateKey={new Map([['2026-09-15', [occurrence]]])}
+        selectedDateKey="2026-09-15"
+        timeZone={timeZone}
+        hourCycle="h12"
+        now={mockNow}
+        onSelectDate={vi.fn()}
+        onSelectEvent={vi.fn()}
+        onResizeEvent={vi.fn()}
+        onSelectSlot={vi.fn()}
+      />,
+    );
+  }
+
+  it('renders two edge hit targets inside the normal clickable event body', () => {
+    const html = renderTimedEvent(calendar);
+    expect(html).toContain('data-resize-edge="start"');
+    expect(html).toContain('data-resize-edge="end"');
+    expect(html).toContain('<button');
+    expect(html).toContain('Planning session');
+  });
+
+  it('does not expose resize handles for read-only or generated recurring events', () => {
+    expect(renderTimedEvent({ ...calendar, isReadOnly: true })).not.toContain('data-resize-edge');
+    expect(renderTimedEvent(calendar, 'FREQ=WEEKLY')).not.toContain('data-resize-edge');
   });
 });
