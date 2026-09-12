@@ -2,7 +2,7 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TimelineView } from './TimelineView';
+import { EventButton, TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 
 const mockNow = new Date('2026-09-15T10:00:00.000Z');
@@ -291,5 +291,79 @@ describe('TimelineView resize affordances', () => {
   it('does not expose resize handles for read-only or generated recurring events', () => {
     expect(renderTimedEvent({ ...calendar, isReadOnly: true })).not.toContain('data-resize-edge');
     expect(renderTimedEvent(calendar, 'FREQ=WEEKLY')).not.toContain('data-resize-edge');
+  });
+
+  it('hides event title and shows only time span and duration when dragging an event less than 45 minutes', () => {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Quick Sync',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T14:30:00.000Z',
+    });
+    const occurrence: EventOccurrence = {
+      key: 'quick-sync',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        resizePreview={{ startMinute: 600, endMinute: 630 }} // 30 minutes (< 45m)
+      />,
+    );
+
+    // Should have short resizing modifiers
+    expect(html).toContain('timelineEventResizingShort');
+    expect(html).toContain('timelineEventTitleResizingShort');
+    expect(html).toContain('timelineResizeFeedbackShort');
+    // Displays time span and duration badge
+    expect(html).toContain('10:00 AM – 10:30 AM');
+    expect(html).toContain('30m');
+    expect(html).toContain('timelineResizeDurationBadge');
+  });
+
+  it('shows event title, time span, and duration once resize reaches at least 45 minutes', () => {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Team Workshop',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T14:45:00.000Z',
+    });
+    const occurrence: EventOccurrence = {
+      key: 'team-workshop',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        resizePreview={{ startMinute: 600, endMinute: 645 }} // 45 minutes (>= 45m)
+      />,
+    );
+
+    // Should NOT have short resizing modifiers
+    expect(html).not.toContain('timelineEventResizingShort');
+    expect(html).toContain('timelineEventTitleResizingNormal');
+    expect(html).toContain('timelineResizeFeedbackNormal');
+    // Displays title as well as time span and duration
+    expect(html).toContain('Team Workshop');
+    expect(html).toContain('10:00 AM – 10:45 AM');
+    expect(html).toContain('45m');
   });
 });

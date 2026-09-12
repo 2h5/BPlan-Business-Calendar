@@ -577,10 +577,38 @@
   flex-direction: column;
 }
 
-.viewTransitionZoomIn,
-.viewTransitionZoomOut,
+.viewTransitionZoomIn {
+  animation: viewZoomIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.viewTransitionZoomOut {
+  animation: viewZoomOut 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 .viewTransitionFade {
   animation: viewFade 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes viewZoomIn {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes viewZoomOut {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes viewFade {
@@ -589,6 +617,7 @@
   }
   to {
     opacity: 1;
+    transform: none;
   }
 }
 
@@ -817,6 +846,11 @@
   transition: none;
 }
 
+.timelineEventResizingShort {
+  justify-content: center;
+  padding-block: 2px;
+}
+
 .timelineResizeHandle {
   position: absolute;
   z-index: 2;
@@ -864,7 +898,6 @@
   position: absolute;
   z-index: 1;
   right: 5px;
-  bottom: 2px;
   left: 7px;
   overflow: hidden;
   color: var(--color-text-primary);
@@ -874,6 +907,75 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  animation: feedback-pop-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    bottom 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    font-weight 140ms ease;
+}
+
+.timelineResizeFeedbackShort {
+  bottom: calc(50% - 6px);
+  font-weight: var(--font-weight-semibold);
+}
+
+.timelineResizeFeedbackNormal {
+  bottom: 2px;
+}
+
+.timelineResizeSpan {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelineResizeDivider {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.timelineResizeDurationBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--event-color) 25%, transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  animation: duration-pill-pop 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes feedback-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes duration-pill-pop {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 .timelineEventTitle {
@@ -884,6 +986,51 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.timelineEventTitleResizingShort {
+  opacity: 0;
+  max-height: 0;
+  line-height: 0;
+  transform: translateY(-4px) scale(0.96);
+  pointer-events: none;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  transition:
+    opacity 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    line-height 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timelineEventTitleResizingNormal {
+  opacity: 1;
+  max-height: 20px;
+  line-height: 1.2;
+  transform: none;
+  overflow: hidden;
+  animation: resize-title-pop-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    line-height 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes resize-title-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(1px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .timelineEventTime {
@@ -2009,9 +2156,16 @@
   .monthEventDraftEntering,
   .monthEventDraftClosing,
   .draftTimelineEventBubbleEnter,
-  .draftTimelineEventBubbleExit {
+  .draftTimelineEventBubbleExit,
+  .timelineResizeFeedback,
+  .timelineResizeFeedbackShort,
+  .timelineResizeFeedbackNormal,
+  .timelineResizeDurationBadge,
+  .timelineEventTitleResizingShort,
+  .timelineEventTitleResizingNormal {
     animation: none !important;
     animation-duration: 1ms !important;
+    transition: none !important;
     transform: none !important;
   }
 }

@@ -80,7 +80,7 @@ function formatEventTime(instant: number, timeZone: string, hourCycle: HourCycle
   }).format(new Date(instant));
 }
 
-interface EventButtonProps {
+export interface EventButtonProps {
   occurrence: EventOccurrence;
   timeZone: string;
   hourCycle: HourCycle;
@@ -95,7 +95,7 @@ interface EventButtonProps {
   resizePreview?: MinuteInterval;
 }
 
-function EventButton({
+export function EventButton({
   occurrence,
   timeZone,
   hourCycle,
@@ -110,10 +110,16 @@ function EventButton({
   resizePreview,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
+  const isResizing = Boolean(resizePreview);
+  const resizeDuration = resizePreview ? resizePreview.endMinute - resizePreview.startMinute : 0;
+  const isShortResize = isResizing && resizeDuration < 45;
+
   return (
     <button
       type="button"
-      className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${resizePreview ? styles.timelineEventResizing : ''}`}
+      className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${
+        isResizing ? styles.timelineEventResizing : ''
+      } ${isShortResize ? styles.timelineEventResizingShort : ''}`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
       onClick={(e) => {
         e.stopPropagation();
@@ -140,12 +146,31 @@ function EventButton({
           onPointerCancel={onResizePointerCancel}
         />
       ) : null}
-      <span className={styles.timelineEventTitle}>{occurrence.event.title}</span>
+      <span
+        className={`${styles.timelineEventTitle} ${
+          isResizing
+            ? isShortResize
+              ? styles.timelineEventTitleResizingShort
+              : styles.timelineEventTitleResizingNormal
+            : ''
+        }`}
+      >
+        {occurrence.event.title}
+      </span>
       {resizePreview ? (
-        <span className={styles.timelineResizeFeedback}>
-          {formatMinute(resizePreview.startMinute, hourCycle)} –{' '}
-          {formatMinute(resizePreview.endMinute, hourCycle)} ·{' '}
-          {formatDuration(resizePreview.endMinute - resizePreview.startMinute)}
+        <span
+          className={`${styles.timelineResizeFeedback} ${
+            isShortResize ? styles.timelineResizeFeedbackShort : styles.timelineResizeFeedbackNormal
+          }`}
+        >
+          <span className={styles.timelineResizeSpan}>
+            {formatMinute(resizePreview.startMinute, hourCycle)} –{' '}
+            {formatMinute(resizePreview.endMinute, hourCycle)}
+          </span>
+          <span className={styles.timelineResizeDivider}>·</span>
+          <span key={resizeDuration} className={styles.timelineResizeDurationBadge}>
+            {formatDuration(resizeDuration)}
+          </span>
         </span>
       ) : !compact ? (
         <span className={styles.timelineEventTime}>
