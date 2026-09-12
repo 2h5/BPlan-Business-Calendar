@@ -603,11 +603,9 @@ export function TimelineView({
                   {draftEvent && draftEvent.dateKey === dateKey && draftEvent.allDay && (
                     <div
                       className={`${styles.timelineEvent} ${styles.timelineEventCompact} ${styles.monthEventDraft} ${
-                        isWeek
-                          ? draftEvent.isClosing
-                            ? styles.monthEventDraftClosing
-                            : styles.monthEventDraftEntering
-                          : ''
+                        draftEvent.isClosing
+                          ? styles.monthEventDraftClosing
+                          : styles.monthEventDraftEntering
                       }`}
                       style={
                         {
@@ -711,11 +709,9 @@ export function TimelineView({
                   !dragSelection && (
                     <div
                       className={`${styles.draftTimelineEvent} ${
-                        isWeek
-                          ? draftEvent.isClosing
-                            ? styles.draftTimelineEventBubbleExit
-                            : styles.draftTimelineEventBubbleEnter
-                          : ''
+                        draftEvent.isClosing
+                          ? styles.draftTimelineEventBubbleExit
+                          : styles.draftTimelineEventBubbleEnter
                       }`}
                       style={
                         {

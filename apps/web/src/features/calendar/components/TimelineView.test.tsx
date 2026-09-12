@@ -217,7 +217,7 @@ describe('TimelineView grid layout and all-day handling', () => {
     expect(html).not.toContain('draftTimelineEventBubbleEnter');
   });
 
-  it('does NOT apply bubble animation to timed draft in day view', () => {
+  it('applies bubble animation to timed draft in day view', () => {
     const byDateKey = new Map<string, EventOccurrence[]>();
 
     const html = renderToStaticMarkup(
@@ -241,7 +241,7 @@ describe('TimelineView grid layout and all-day handling', () => {
     );
 
     expect(html).toContain('draftTimelineEvent');
-    expect(html).not.toContain('draftTimelineEventBubbleEnter');
+    expect(html).toContain('draftTimelineEventBubbleEnter');
     expect(html).not.toContain('draftTimelineEventBubbleExit');
   });
 });
