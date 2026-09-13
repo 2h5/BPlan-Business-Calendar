@@ -810,4 +810,99 @@ describe('TimelineView move affordances and live feedback', () => {
       expect(clampScrollTop(50, 500, 600)).toBe(0);
     });
   });
+
+  describe('TimelineView cross-day rendering with optimistic overrides', () => {
+    it('moves event into new day column and removes from original day column when timing override targets another date', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Cross Day Event',
+        startAt: '2026-09-14T14:00:00.000Z', // Monday
+        endAt: '2026-09-14T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'cross-day-occ',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const byDateKey = new Map<string, EventOccurrence[]>([
+        ['2026-09-14', [occurrence]],
+        ['2026-09-15', []],
+      ]);
+
+      // Optimistic override placing event on Tuesday
+      const timingOverrides = new Map<string, { start: number; end: number }>([
+        [
+          event.id,
+          {
+            start: Date.parse('2026-09-15T14:00:00.000Z'),
+            end: Date.parse('2026-09-15T15:00:00.000Z'),
+          },
+        ],
+      ]);
+
+      const html = renderToStaticMarkup(
+        <TimelineView
+          dateKeys={['2026-09-14', '2026-09-15']}
+          byDateKey={byDateKey}
+          selectedDateKey="2026-09-14"
+          timeZone={timeZone}
+          hourCycle="h12"
+          now={mockNow}
+          onSelectDate={vi.fn()}
+          onSelectEvent={vi.fn()}
+          timingOverrides={timingOverrides}
+        />,
+      );
+
+      // Extract the columns from html
+      const mondayColumnHtml = html.slice(
+        html.indexOf('data-date-key="2026-09-14"'),
+        html.indexOf('data-date-key="2026-09-15"'),
+      );
+      const tuesdayColumnHtml = html.slice(html.indexOf('data-date-key="2026-09-15"'));
+
+      expect(mondayColumnHtml).not.toContain('Cross Day Event');
+      expect(tuesdayColumnHtml).toContain('Cross Day Event');
+    });
+
+    it('remains strictly same-day in Day view with single dateKey', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Single Day Event',
+        startAt: '2026-09-14T14:00:00.000Z',
+        endAt: '2026-09-14T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'single-day-occ',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const byDateKey = new Map<string, EventOccurrence[]>([['2026-09-14', [occurrence]]]);
+
+      const html = renderToStaticMarkup(
+        <TimelineView
+          dateKeys={['2026-09-14']}
+          byDateKey={byDateKey}
+          selectedDateKey="2026-09-14"
+          timeZone={timeZone}
+          hourCycle="h12"
+          now={mockNow}
+          onSelectDate={vi.fn()}
+          onSelectEvent={vi.fn()}
+        />,
+      );
+
+      expect(html).toContain('Single Day Event');
+      expect(html).toContain('data-date-key="2026-09-14"');
+      expect(html).not.toContain('data-date-key="2026-09-15"');
+    });
+  });
 });

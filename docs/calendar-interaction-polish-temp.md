@@ -18,9 +18,13 @@ This document records the design decisions, current state, and execution order f
    - Phase 1.1: small-event `< 45m` layout and micro-animation polish (`31c0738`, `410881c`)
    - Phase 1.2: Chromium rendering & animation hardening (`989cd1d`, `31c0738`, `410881c`)
    - Phase 2: whole-event drag-to-move (`1692a9f`)
+   - Phase 2.2: cross-day whole-event dragging in Week view
    - Phase 3.0: magnetic snapping for move and resize
-3. **What is currently next?** Phase 3.1: Live Conflict Feedback.
-4. **What remains beyond Phase 3.0?** Live conflict feedback (Phase 3.1), origin ghost (Phase 3.2), settle physics (Phase 3.3), edge auto-scroll (Phase 3.4), keyboard manipulation (Phase 4), spatial view transitions (Phase 5), and regression hardening (Phase 2.1).
+   - Phase 3.1: live conflict warning feedback (`6841359`)
+   - Phase 3.3: release settle animation (`8abbd0b`)
+   - Phase 3.4: timeline edge auto-scroll
+3. **What is currently next?** Phase 3.2: Origin Ghost Indicator (or Phase 4 Keyboard Manipulation / Phase 2.1 hardening).
+4. **What remains beyond Phase 3.4?** Origin ghost (Phase 3.2), keyboard manipulation (Phase 4), spatial view transitions (Phase 5), and regression hardening (Phase 2.1).
 5. **What order should the remaining work happen in?** Core drag-to-move first, then manipulation feedback, followed by keyboard shortcuts and spatial continuity transitions.
 6. **What architecture/safety constraints must future agents preserve?** Single save on release, `useUpdateEvent` mutation authority, provider write-routing, timezone purity, strict isolation between gestures, and compositor/rendering safety (no retained transforms or persistent `will-change`).
 7. **When should this temporary file be deleted?** Once the planned manipulation phases are complete and durable documentation is folded into permanent docs (e.g. `docs/calendar-views.md`).
@@ -283,6 +287,38 @@ Implemented smooth timeline container edge auto-scrolling during whole-event mov
 
 ---
 
+## Phase 2.2 — Cross-Day Week Dragging [COMPLETE]
+
+Implemented cross-day horizontal and diagonal whole-event dragging in Week view, extending Phase 2 move semantics.
+
+### Capabilities:
+
+- **Horizontal & Diagonal Movement in Week View**:
+  - Pure horizontal drag moves the event to another day column while preserving its exact local wall-clock start time and duration (e.g. Mon 10:00–11:00 $\to$ Tue 10:00–11:00).
+  - Diagonal drag changes both the date and start time (e.g. Mon 10:00–11:00 $\to$ Wed 14:00–15:00).
+  - Duration invariant is strictly preserved across all cross-day moves and odd durations.
+- **Target Day Column Detection**:
+  - Uses real DOM geometry via `container.querySelectorAll('[data-date-key]')` bounding rects (`clientX >= rect.left && clientX < rect.right`), smoothly mapping pointer X to the active day column.
+  - Graceful boundary clamping prevents dragging outside visible week boundaries.
+- **Dynamic Context Switching**:
+  - Crossing into a new day column instantly switches magnetic targets (`collectMagneticTargets`) and conflict candidates (`collectConflictCandidates`) to the target day.
+  - Magnetic guide line and conflict styling render cleanly on the target day column.
+  - Dragging back to the origin day cleanly restores the original day's magnetic targets and conflict context.
+- **Preview & Optimistic Rendering**:
+  - Rendered dynamically in the target day column with live overlap layout (`layoutOverlappingEvents`) without leaving a ghost or duplicate copy on the origin day.
+  - Optimistic updates via `timingOverrides` in `CalendarView` position the event on the new day without clamping to `24:00` on the original day.
+- **Window Pointer Event Tracking**:
+  - Window-level pointer listeners (`pointermove`, `pointerup`, `pointercancel`) prevent pointer-capture loss during DOM reparenting across day columns.
+- **Day View Isolation**:
+  - Day view (`dateKeys.length === 1`) remains strictly vertical-only movement within the same day.
+- **Single Authoritative Save & Undo**:
+  - Authoritative save dispatched via `useUpdateEvent` on release.
+  - Reversible optimistic UI with full Undo affordance restoring both original date and time.
+- **Ineligible Event Protection**:
+  - Read-only calendars, recurring event occurrences, all-day events, and clipped events remain non-movable.
+
+---
+
 ## Future Polish Phases
 
 - **Phase 3.2 — Origin Ghost Indicator [OPTIONAL / PENDING]**:
@@ -333,6 +369,7 @@ Future agents working on this roadmap must strictly obey these boundaries:
 - [x] Phase 1.2 — Chromium rendering & animation hardening (`989cd1d`, `31c0738`, `410881c`)
 - [x] Phase 2 — whole-event drag-to-move
 - [ ] Phase 2.1 — move/resize regression hardening & gesture collision tests
+- [x] Phase 2.2 — cross-day whole-event dragging in Week view
 - [x] Phase 3.0 — magnetic snapping (`24d8a33`)
 - [x] Phase 3.1 — live conflict warning feedback (`6841359`)
 - [ ] Phase 3.2 — origin ghost outline [OPTIONAL / PENDING]

@@ -81,6 +81,7 @@ export function collectMagneticTargets(params: {
   for (const occ of occurrences) {
     if (occ.event.allDay) continue;
     if (activeOccurrenceKey !== null && occ.key === activeOccurrenceKey) continue;
+    if (occ.end <= dayStart || occ.start >= dayEnd) continue;
 
     const startMinute = occ.start <= dayStart ? 0 : minuteOfDay(new Date(occ.start), timeZone);
     const endMinute =

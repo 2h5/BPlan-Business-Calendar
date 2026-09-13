@@ -323,6 +323,7 @@ export function TimelineView({
   } | null>(null);
   const [movePreview, setMovePreview] = useState<{
     occurrenceKey: string;
+    dateKey: string;
     interval: MinuteInterval;
   } | null>(null);
   const [magneticSnap, setMagneticSnap] = useState<{
@@ -351,7 +352,8 @@ export function TimelineView({
   const moveRef = useRef<{
     status: 'pending' | 'dragging';
     occurrence: EventOccurrence;
-    dateKey: string;
+    originalDateKey: string;
+    currentDateKey: string;
     startY: number;
     startX: number;
     originalMinutes: MinuteInterval;
@@ -601,9 +603,81 @@ export function TimelineView({
     setResizePreview({ occurrenceKey: active.occurrence.key, interval: next });
   };
 
+  const getMagneticTargetsForDate = (dateKey: string, activeKey: string) => {
+    return collectMagneticTargets({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: activeKey,
+      dateKey,
+      timeZone,
+      workingHours,
+    });
+  };
+
+  const getConflictCandidatesForDate = (dateKey: string, activeKey: string) => {
+    return collectConflictCandidates({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: activeKey,
+      dateKey,
+      timeZone,
+    });
+  };
+
+  const findTargetDateKey = (clientX: number): string => {
+    if (dateKeys.length <= 1) {
+      return dateKeys[0] ?? selectedDateKey;
+    }
+    const container = scrollRef.current;
+    if (!container) {
+      return moveRef.current?.currentDateKey ?? selectedDateKey;
+    }
+
+    const columns = Array.from(container.querySelectorAll<HTMLElement>('[data-date-key]'));
+    if (columns.length === 0) {
+      return moveRef.current?.currentDateKey ?? selectedDateKey;
+    }
+
+    const validCols: Array<{ key: string; rect: DOMRect }> = [];
+    for (const col of columns) {
+      const key = col.getAttribute('data-date-key');
+      if (key && dateKeys.includes(key)) {
+        validCols.push({ key, rect: col.getBoundingClientRect() });
+      }
+    }
+
+    const hasLayout = validCols.some((c) => c.rect.width > 0);
+    if (hasLayout) {
+      let closestKey = validCols[0]!.key;
+      let minDistance = Infinity;
+      for (const { key, rect } of validCols) {
+        if (clientX >= rect.left && clientX < rect.right) {
+          return key;
+        }
+        const center = (rect.left + rect.right) / 2;
+        const dist = Math.abs(clientX - center);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestKey = key;
+        }
+      }
+      return closestKey;
+    }
+
+    return moveRef.current?.currentDateKey ?? selectedDateKey;
+  };
+
   const applyMovePosition = (clientX: number, clientY: number, scrollTop: number) => {
     const active = moveRef.current;
     if (!active) return;
+
+    const targetDateKey = findTargetDateKey(clientX);
+    if (targetDateKey !== active.currentDateKey) {
+      active.currentDateKey = targetDateKey;
+      active.targets = getMagneticTargetsForDate(targetDateKey, active.occurrence.key);
+      active.conflictCandidates = getConflictCandidatesForDate(
+        targetDateKey,
+        active.occurrence.key,
+      );
+    }
 
     const scrollDelta = scrollTop - active.initialScrollTop;
     const effectiveCurrentY = clientY + scrollDelta;
@@ -643,7 +717,7 @@ export function TimelineView({
 
     if (resolution.snap) {
       setMagneticSnap({
-        dateKey: active.dateKey,
+        dateKey: active.currentDateKey,
         minute: resolution.snap.snappedMinute,
         edge: resolution.snap.edge,
       });
@@ -655,18 +729,27 @@ export function TimelineView({
     setHasConflict(conflicting);
 
     if (
+      active.currentDateKey === movePreview?.dateKey &&
       targetMinutes.startMinute === active.currentMinutes.startMinute &&
       targetMinutes.endMinute === active.currentMinutes.endMinute
     ) {
       return;
     }
 
-    const nextStart = dateMinuteToInstant(active.dateKey, targetMinutes.startMinute, timeZone);
-    const nextEnd = dateMinuteToInstant(active.dateKey, targetMinutes.endMinute, timeZone);
+    const nextStart = dateMinuteToInstant(
+      active.currentDateKey,
+      targetMinutes.startMinute,
+      timeZone,
+    );
+    const nextEnd = dateMinuteToInstant(active.currentDateKey, targetMinutes.endMinute, timeZone);
     if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
 
     active.currentMinutes = targetMinutes;
-    setMovePreview({ occurrenceKey: active.occurrence.key, interval: targetMinutes });
+    setMovePreview({
+      occurrenceKey: active.occurrence.key,
+      dateKey: active.currentDateKey,
+      interval: targetMinutes,
+    });
   };
 
   const stepAutoScroll = () => {
@@ -866,24 +949,14 @@ export function TimelineView({
 
     const override = timingOverrides?.get(occurrence.event.id);
     const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
-    const targets = collectMagneticTargets({
-      occurrences: byDateKey.get(dateKey) ?? [],
-      activeOccurrenceKey: occurrence.key,
-      dateKey,
-      timeZone,
-      workingHours,
-    });
-    const conflictCandidates = collectConflictCandidates({
-      occurrences: byDateKey.get(dateKey) ?? [],
-      activeOccurrenceKey: occurrence.key,
-      dateKey,
-      timeZone,
-    });
+    const targets = getMagneticTargetsForDate(dateKey, occurrence.key);
+    const conflictCandidates = getConflictCandidatesForDate(dateKey, occurrence.key);
 
     moveRef.current = {
       status: 'pending',
       occurrence,
-      dateKey,
+      originalDateKey: dateKey,
+      currentDateKey: dateKey,
       startY: e.clientY,
       startX: e.clientX,
       originalMinutes: interval,
@@ -914,18 +987,26 @@ export function TimelineView({
     }
   };
 
-  const finishMove = (e: React.PointerEvent<HTMLButtonElement>, cancelled: boolean) => {
+  const finishMove = (
+    e: React.PointerEvent<HTMLButtonElement> | PointerEvent,
+    cancelled: boolean,
+  ) => {
     stopAutoScroll();
     const active = moveRef.current;
-    if (!active || active.pointerId !== e.pointerId) return;
+    if (!active || ('pointerId' in e && active.pointerId !== e.pointerId)) return;
 
     try {
-      active.button.releasePointerCapture(e.pointerId);
+      active.button.releasePointerCapture(active.pointerId);
     } catch {
       // ignore
     }
 
     const wasDragging = active.status === 'dragging';
+    const targetDateKey = active.currentDateKey;
+    const occurrenceKey = active.occurrence.key;
+    const originalTiming = active.originalTiming;
+    const occurrence = active.occurrence;
+
     moveRef.current = null;
     lastPointerRef.current = null;
     setMovePreview(null);
@@ -936,10 +1017,12 @@ export function TimelineView({
       return;
     }
 
-    e.preventDefault();
-    e.stopPropagation();
+    if ('preventDefault' in e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
-    const suppressedKey = active.occurrence.key;
+    const suppressedKey = occurrenceKey;
     suppressedClickKeyRef.current = suppressedKey;
     globalThis.setTimeout(() => {
       if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
@@ -967,24 +1050,69 @@ export function TimelineView({
         }),
     });
 
-    if (resolution.type !== 'move') return;
+    if (resolution.type !== 'move' && resolution.type !== 'noop') return;
 
-    const nextStart = dateMinuteToInstant(
-      active.dateKey,
-      resolution.nextMinutes.startMinute,
-      timeZone,
-    );
-    const nextEnd = dateMinuteToInstant(active.dateKey, resolution.nextMinutes.endMinute, timeZone);
+    const finalMinutes =
+      resolution.type === 'noop' ? active.originalMinutes : resolution.nextMinutes;
+
+    const nextStart = dateMinuteToInstant(targetDateKey, finalMinutes.startMinute, timeZone);
+    const nextEnd = dateMinuteToInstant(targetDateKey, finalMinutes.endMinute, timeZone);
     if (!nextStart || !nextEnd) return;
 
     const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
-    if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
-    triggerSettle(active.occurrence.key);
-    onMoveEvent?.(active.occurrence, nextTiming);
+    if (!hasTimingChanged(originalTiming, nextTiming)) return;
+    triggerSettle(occurrenceKey);
+    onMoveEvent?.(occurrence, nextTiming);
   };
 
   const handleMovePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => finishMove(e, false);
   const handleMovePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => finishMove(e, true);
+
+  const moveHandlersRef = useRef({
+    applyMovePosition,
+    checkAndTriggerAutoScroll,
+    finishMove,
+  });
+  useEffect(() => {
+    moveHandlersRef.current = {
+      applyMovePosition,
+      checkAndTriggerAutoScroll,
+      finishMove,
+    };
+  });
+
+  useEffect(() => {
+    const onWindowPointerMove = (e: PointerEvent) => {
+      const active = moveRef.current;
+      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+      lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+      const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
+      moveHandlersRef.current.applyMovePosition(e.clientX, e.clientY, currentScrollTop);
+      moveHandlersRef.current.checkAndTriggerAutoScroll();
+    };
+
+    const onWindowPointerUp = (e: PointerEvent) => {
+      const active = moveRef.current;
+      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+      moveHandlersRef.current.finishMove(e, false);
+    };
+
+    const onWindowPointerCancel = (e: PointerEvent) => {
+      const active = moveRef.current;
+      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+      moveHandlersRef.current.finishMove(e, true);
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove);
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerCancel);
+
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerCancel);
+    };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1053,6 +1181,20 @@ export function TimelineView({
     [byDateKey, dateKeys],
   );
   const hasAllDay = [...allDayByDate.values()].some((events) => events.length > 0);
+
+  const allTimedOccurrences = useMemo(() => {
+    const seen = new Set<string>();
+    const list: EventOccurrence[] = [];
+    for (const occurrences of byDateKey.values()) {
+      for (const occ of occurrences) {
+        if (!occ.event.allDay && !seen.has(occ.key)) {
+          seen.add(occ.key);
+          list.push(occ);
+        }
+      }
+    }
+    return list;
+  }, [byDateKey]);
 
   return (
     <div className={styles.timelineViewport} ref={scrollRef}>
@@ -1169,14 +1311,30 @@ export function TimelineView({
           {dateKeys.map((dateKey) => {
             const dayStart = dateKeyToInstant(dateKey, timeZone);
             const dayEnd = addZonedDays(dayStart, 1, timeZone);
-            const timed = (byDateKey.get(dateKey) ?? [])
-              .filter((item) => !item.event.allDay)
+            const activeResize = resizeRef.current;
+            const activeMove = moveRef.current;
+            const isDraggingMove =
+              activeMove?.status === 'dragging' &&
+              movePreview?.occurrenceKey === activeMove.occurrence.key;
+
+            const timed = allTimedOccurrences
+              .filter((item) => {
+                if (isDraggingMove && item.key === activeMove.occurrence.key) {
+                  return movePreview.dateKey === dateKey;
+                }
+                const optimistic = timingOverrides?.get(item.event.id);
+                if (optimistic) {
+                  return toZonedDateKey(new Date(optimistic.start), timeZone) === dateKey;
+                }
+                return toZonedDateKey(new Date(item.start), timeZone) === dateKey;
+              })
               .map((item) => {
                 const optimistic = timingOverrides?.get(item.event.id);
-                const activeResize =
-                  resizePreview?.occurrenceKey === item.key ? resizeRef.current : null;
-                const activeMove = movePreview?.occurrenceKey === item.key ? moveRef.current : null;
-                if (activeResize) {
+                const isThisResizing =
+                  resizePreview?.occurrenceKey === item.key && Boolean(activeResize);
+                const isThisMoving = isDraggingMove && item.key === activeMove.occurrence.key;
+
+                if (isThisResizing && activeResize) {
                   const start = dateMinuteToInstant(
                     dateKey,
                     activeResize.currentMinutes.startMinute,
@@ -1189,7 +1347,7 @@ export function TimelineView({
                   );
                   if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
                 }
-                if (activeMove && activeMove.status === 'dragging') {
+                if (isThisMoving && activeMove) {
                   const start = dateMinuteToInstant(
                     dateKey,
                     activeMove.currentMinutes.startMinute,
@@ -1279,9 +1437,11 @@ export function TimelineView({
                   )}
                 {laidOut.map((placed) => {
                   const sourceOccurrence =
-                    (byDateKey.get(dateKey) ?? []).find(
-                      (occurrence) => occurrence.key === placed.item.key,
-                    ) ?? placed.item;
+                    (activeMove?.occurrence.key === placed.item.key
+                      ? activeMove.occurrence
+                      : undefined) ??
+                    allTimedOccurrences.find((occ) => occ.key === placed.item.key) ??
+                    placed.item;
                   const startMinute =
                     placed.interval.start <= dayStart.getTime()
                       ? 0
@@ -1298,13 +1458,15 @@ export function TimelineView({
                   const canResize =
                     Boolean(onResizeEvent) && isEventResizable(sourceOccurrence, dateKey, timeZone);
                   const canMove =
-                    Boolean(onMoveEvent) && isEventMovable(sourceOccurrence, dateKey, timeZone);
-                  const activeResize =
+                    (Boolean(onMoveEvent) && isEventMovable(sourceOccurrence, dateKey, timeZone)) ||
+                    activeMove?.occurrence.key === placed.item.key;
+                  const activeResizeInterval =
                     resizePreview?.occurrenceKey === placed.item.key
                       ? resizePreview.interval
                       : undefined;
-                  const activeMove =
-                    movePreview?.occurrenceKey === placed.item.key
+                  const activeMoveInterval =
+                    movePreview?.occurrenceKey === placed.item.key &&
+                    movePreview.dateKey === dateKey
                       ? movePreview.interval
                       : undefined;
                   return (
@@ -1313,7 +1475,9 @@ export function TimelineView({
                       occurrence={placed.item}
                       timeZone={timeZone}
                       hourCycle={hourCycle}
-                      compact={(isWeek || height < 42) && !activeResize && !activeMove}
+                      compact={
+                        (isWeek || height < 42) && !activeResizeInterval && !activeMoveInterval
+                      }
                       style={{
                         top,
                         height,
@@ -1350,16 +1514,18 @@ export function TimelineView({
                         suppressedClickKeyRef.current = null;
                         return true;
                       }}
-                      resizePreview={activeResize}
-                      movePreview={activeMove}
+                      resizePreview={activeResizeInterval}
+                      movePreview={activeMoveInterval}
                       isMovable={canMove}
                       isMagnetized={Boolean(
                         magneticSnap &&
+                        magneticSnap.dateKey === dateKey &&
                         (resizePreview?.occurrenceKey === placed.item.key ||
                           movePreview?.occurrenceKey === placed.item.key),
                       )}
                       hasConflict={Boolean(
                         hasConflict &&
+                        movePreview?.dateKey === dateKey &&
                         (resizePreview?.occurrenceKey === placed.item.key ||
                           movePreview?.occurrenceKey === placed.item.key),
                       )}
