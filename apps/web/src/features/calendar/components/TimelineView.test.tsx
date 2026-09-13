@@ -501,6 +501,84 @@ describe('TimelineView move affordances and live feedback', () => {
     expect(html).not.toContain('timelineResizeDurationBadge');
   });
 
+  it('renders data-event-id attribute on EventButton for precise DOM querying and FLIP transitions', () => {
+    const event = makeEvent({ id: 'evt-flip-123' });
+    const occurrence: EventOccurrence = {
+      key: 'evt-occ-1',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('data-event-id="evt-flip-123"');
+  });
+
+  it('applies timelineEventSnapLeft when snapDirection is right (moving into column from the left)', () => {
+    const event = makeEvent({ id: 'snap-right' });
+    const occurrence: EventOccurrence = {
+      key: 'snap-right-occ',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        movePreview={{ startMinute: 600, endMinute: 660 }}
+        snapDirection="right"
+      />,
+    );
+
+    expect(html).toContain('timelineEventSnapLeft');
+    expect(html).not.toContain('timelineEventSnapRight');
+  });
+
+  it('applies timelineEventSnapRight when snapDirection is left (moving into column from the right)', () => {
+    const event = makeEvent({ id: 'snap-left' });
+    const occurrence: EventOccurrence = {
+      key: 'snap-left-occ',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        movePreview={{ startMinute: 600, endMinute: 660 }}
+        snapDirection="left"
+      />,
+    );
+
+    expect(html).toContain('timelineEventSnapRight');
+    expect(html).not.toContain('timelineEventSnapLeft');
+  });
+
   describe('TimelineView magnetic snapping affordances and feedback', () => {
     it('applies timelineEventMagnetized class to EventButton when magnetized', () => {
       const event = makeEvent({

@@ -9,7 +9,12 @@ import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
+import {
+  TimelineView,
+  type EventTiming,
+  type RestoringEventInfo,
+  type SlotSelection,
+} from './TimelineView';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
 import {
   useCreateCalendar,
@@ -101,7 +106,11 @@ export function CalendarView() {
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
   const [toast, setToast] = useState<CalendarToast | null>(null);
+  const [isToastExiting, setIsToastExiting] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [restoringEvent, setRestoringEvent] = useState<RestoringEventInfo | null>(null);
+  const clearRestoringEvent = useCallback(() => setRestoringEvent(null), []);
   const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
     () => new Map(),
   );
@@ -376,20 +385,64 @@ export function CalendarView() {
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
-  const showToast = useCallback((nextToast: CalendarToast, duration = 6000) => {
-    if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
-    setToast(nextToast);
-    toastTimerRef.current = globalThis.setTimeout(() => {
-      setToast(null);
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      globalThis.clearTimeout(toastTimerRef.current);
       toastTimerRef.current = null;
-    }, duration);
+    }
+    if (toastExitTimerRef.current) {
+      globalThis.clearTimeout(toastExitTimerRef.current);
+      toastExitTimerRef.current = null;
+    }
+    setIsToastExiting(true);
+    toastExitTimerRef.current = globalThis.setTimeout(() => {
+      setToast(null);
+      setIsToastExiting(false);
+      toastExitTimerRef.current = null;
+    }, 180);
   }, []);
 
+  const showToast = useCallback(
+    (nextToast: CalendarToast, duration = 6000) => {
+      if (toastTimerRef.current) {
+        globalThis.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      if (toastExitTimerRef.current) {
+        globalThis.clearTimeout(toastExitTimerRef.current);
+        toastExitTimerRef.current = null;
+      }
+      setToast(nextToast);
+      setIsToastExiting(false);
+      toastTimerRef.current = globalThis.setTimeout(() => {
+        dismissToast();
+      }, duration);
+    },
+    [dismissToast],
+  );
+
   const showSuccess = useCallback((message: string) => showToast({ message }, 3000), [showToast]);
+
+  const captureEventRect = useCallback((eventId: string): RestoringEventInfo | null => {
+    if (typeof document === 'undefined') return null;
+    const el = document.querySelector<HTMLElement>(`[data-event-id="${eventId}"]`);
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    return {
+      eventId,
+      initialRect: {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+    };
+  }, []);
 
   useEffect(
     () => () => {
       if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
+      if (toastExitTimerRef.current) globalThis.clearTimeout(toastExitTimerRef.current);
     },
     [],
   );
@@ -445,6 +498,8 @@ export function CalendarView() {
             message: 'Event resized',
             actionLabel: 'Undo',
             onAction: () => {
+              const restoring = captureEventRect(event.id);
+              if (restoring) setRestoringEvent(restoring);
               setTimingOverride(event.id, previous);
               showToast({ message: 'Restoring event…' });
               void updateEvent
@@ -471,7 +526,15 @@ export function CalendarView() {
       };
       void persist();
     },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+    [
+      captureEventRect,
+      result,
+      showSuccess,
+      showToast,
+      setTimingOverride,
+      timingOverrides,
+      updateEvent,
+    ],
   );
 
   const handleMoveEvent = useCallback(
@@ -498,6 +561,8 @@ export function CalendarView() {
             message: 'Event moved',
             actionLabel: 'Undo',
             onAction: () => {
+              const restoring = captureEventRect(event.id);
+              if (restoring) setRestoringEvent(restoring);
               setTimingOverride(event.id, previous);
               showToast({ message: 'Restoring event…' });
               void updateEvent
@@ -524,7 +589,15 @@ export function CalendarView() {
       };
       void persist();
     },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+    [
+      captureEventRect,
+      result,
+      showSuccess,
+      showToast,
+      setTimingOverride,
+      timingOverrides,
+      updateEvent,
+    ],
   );
 
   return (
@@ -645,6 +718,8 @@ export function CalendarView() {
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
                   workingHours={result.workingHours}
+                  restoringEvent={restoringEvent}
+                  onRestoringComplete={clearRestoringEvent}
                 />
               )}
             </div>
@@ -773,9 +848,18 @@ export function CalendarView() {
       ) : null}
 
       {toast ? (
-        <div className={styles.toast} role="status" aria-live="polite">
-          <span>{toast.message}</span>
-          {toast.actionLabel && toast.onAction ? (
+        <div
+          className={`${styles.toast} ${isToastExiting ? styles.toastExiting : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className={styles.toastMessage} key={toast.message}>
+            {toast.message === 'Restoring event…' ? (
+              <span className={styles.toastSpinner} aria-hidden="true" />
+            ) : null}
+            <span>{toast.message}</span>
+          </span>
+          {toast.actionLabel && toast.onAction && !isToastExiting ? (
             <button type="button" onClick={toast.onAction}>
               {toast.actionLabel}
             </button>

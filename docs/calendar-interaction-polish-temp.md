@@ -23,8 +23,9 @@ This document records the design decisions, current state, and execution order f
    - Phase 3.1: live conflict warning feedback (`6841359`)
    - Phase 3.3: release settle animation (`8abbd0b`)
    - Phase 3.4: timeline edge auto-scroll
+   - Phase 3.5: smooth motion, cross-day snap transitions, animated toasts, and Undo return animations
 3. **What is currently next?** Phase 3.2: Origin Ghost Indicator (or Phase 4 Keyboard Manipulation / Phase 2.1 hardening).
-4. **What remains beyond Phase 3.4?** Origin ghost (Phase 3.2), keyboard manipulation (Phase 4), spatial view transitions (Phase 5), and regression hardening (Phase 2.1).
+4. **What remains beyond Phase 3.5?** Origin ghost (Phase 3.2), keyboard manipulation (Phase 4), spatial view transitions (Phase 5), and regression hardening (Phase 2.1).
 5. **What order should the remaining work happen in?** Core drag-to-move first, then manipulation feedback, followed by keyboard shortcuts and spatial continuity transitions.
 6. **What architecture/safety constraints must future agents preserve?** Single save on release, `useUpdateEvent` mutation authority, provider write-routing, timezone purity, strict isolation between gestures, and compositor/rendering safety (no retained transforms or persistent `will-change`).
 7. **When should this temporary file be deleted?** Once the planned manipulation phases are complete and durable documentation is folded into permanent docs (e.g. `docs/calendar-views.md`).
@@ -319,6 +320,34 @@ Implemented cross-day horizontal and diagonal whole-event dragging in Week view,
 
 ---
 
+## Phase 3.5 — Smooth Motion & Undo Polish [COMPLETE]
+
+Implemented fluid micro-motion polish for direct manipulation, cross-day snap transitions, animated notifications, and FLIP-based Undo return animations.
+
+### Capabilities:
+
+- **Intra-Day Move Smoothness**:
+  - Separated `.timelineEventMoving` from `.timelineEventResizing` CSS classes.
+  - While resizing retains zero latency (`transition: none`), moving applies a snappy `top 110ms cubic-bezier(0.16, 1, 0.3, 1)` transition so 15-minute grid clicks and magnetic snaps glide smoothly rather than instantly teleporting.
+  - Dynamically glides horizontally (`left 120ms`, `width 120ms`) during overlap re-layout.
+- **Cross-Day Snap Transitions in Week View**:
+  - Detects day column transitions in real time during horizontal drag gestures (`snapDirection`: `'left' | 'right'`).
+  - Applies directional CSS keyframes (`@keyframes event-snap-from-left` and `@keyframes event-snap-from-right` over 140ms `cubic-bezier(0.16, 1, 0.3, 1)`) settling cleanly to `transform: none` as the event reparents into the new day column.
+- **Animated Toast Notifications**:
+  - Replaced abrupt toast mount/unmount with a 220ms springy slide-fade entrance (`@keyframes toast-enter`) and an animated 180ms slide-fade exit (`@keyframes toast-exit`).
+  - Tactile button press feedback (`transform: scale(0.94)`) on toast action buttons.
+  - Active spinner (`.toastSpinner`) and smooth text pop animation during "Restoring event…" in-flight state.
+- **FLIP-Based Undo Return Animation**:
+  - Captures the exact source `DOMRect` of `[data-event-id="${event.id}"]` at the instant "Undo" is clicked.
+  - Computes `dx`, `dy`, and height deltas (`dHeight`) at the restored slot across any time, day, or duration change.
+  - Inverts coordinates via temporary transform, forces reflow, and transitions smoothly over 260ms `cubic-bezier(0.16, 1, 0.3, 1)` to `none`.
+  - Triggers the Phase 3.3 settle pop landing animation (`triggerSettle`) upon reaching destination, and strips all inline style overrides cleanly.
+- **Compositor & Accessibility Compliance**:
+  - Full `@media (prefers-reduced-motion: reduce)` coverage instantly disabling transitions and animations.
+  - All animated elements settle to `transform: none` with zero persistent `will-change: transform`.
+
+---
+
 ## Future Polish Phases
 
 - **Phase 3.2 — Origin Ghost Indicator [OPTIONAL / PENDING]**:
@@ -375,6 +404,7 @@ Future agents working on this roadmap must strictly obey these boundaries:
 - [ ] Phase 3.2 — origin ghost outline [OPTIONAL / PENDING]
 - [x] Phase 3.3 — release settle animation (`8abbd0b`)
 - [x] Phase 3.4 — timeline edge auto-scroll
+- [x] Phase 3.5 — smooth motion & undo polish
 - [ ] Phase 4 — keyboard nudging shortcuts
 - [ ] Phase 5 — Month / Week / Day spatial continuity transitions
 - [ ] Deferred — safe recurring occurrence mutation
