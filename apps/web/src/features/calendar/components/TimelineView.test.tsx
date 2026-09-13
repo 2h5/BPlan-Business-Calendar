@@ -580,4 +580,90 @@ describe('TimelineView move affordances and live feedback', () => {
       expect(html).toContain('timelineEventMagnetized');
     });
   });
+
+  describe('TimelineView live conflict feedback affordances', () => {
+    it('applies timelineEventConflicted class and renders Conflict badge on EventButton when hasConflict is true during move', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Standup',
+        startAt: '2026-09-15T14:00:00.000Z',
+        endAt: '2026-09-15T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'standup-key',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const htmlConflicted = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          movePreview={{ startMinute: 600, endMinute: 660 }}
+          isMovable
+          hasConflict
+        />,
+      );
+
+      expect(htmlConflicted).toContain('timelineEventConflicted');
+      expect(htmlConflicted).toContain('timelineConflictBadge');
+      expect(htmlConflicted).toContain('Conflict');
+
+      const htmlUnconflicted = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          movePreview={{ startMinute: 600, endMinute: 660 }}
+          isMovable
+          hasConflict={false}
+        />,
+      );
+
+      expect(htmlUnconflicted).not.toContain('timelineEventConflicted');
+      expect(htmlUnconflicted).not.toContain('timelineConflictBadge');
+    });
+
+    it('applies timelineEventConflicted class and renders Conflict badge during resize when hasConflict is true', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Deep Work',
+        startAt: '2026-09-15T14:00:00.000Z',
+        endAt: '2026-09-15T16:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'deep-work-key',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const html = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          resizePreview={{ startMinute: 600, endMinute: 720 }}
+          hasConflict
+        />,
+      );
+
+      expect(html).toContain('timelineEventResizing');
+      expect(html).toContain('timelineEventConflicted');
+      expect(html).toContain('timelineConflictBadge');
+      expect(html).toContain('Conflict');
+    });
+  });
 });

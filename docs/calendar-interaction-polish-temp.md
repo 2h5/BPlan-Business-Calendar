@@ -176,12 +176,39 @@ Implemented subtle magnetic snapping supplementing the foundational 15-minute gr
 
 ---
 
-## Next Phase: Phase 3.1 — Live Conflict Feedback [PENDING]
+## Phase 3.1 — Live Conflict Feedback [COMPLETE]
 
-Execute these as discrete, focused sub-phases after core drag-to-move is solid:
+Implemented live, advisory visual conflict feedback during whole-event moving and resizing in Day and Week views.
 
-- **Phase 3.1 — Live Conflict Feedback**:
-  Non-blocking visual cues (e.g. subtle warning border/tint or conflict badge) while an event is dragged into an overlapping slot; clears instantly on exit.
+### Capabilities:
+
+- **Strict Overlap Math**:
+  - Confined strictly to the active day column.
+  - An overlap occurs if and only if `proposedStart < otherEnd && proposedEnd > otherStart`.
+  - Exact touching boundaries (`proposedStart === otherEnd` or `proposedEnd === otherStart`) are strictly excluded and never flag a conflict.
+  - Active event being moved or resized is completely excluded from candidate comparisons.
+  - All-day events and events on other days are excluded.
+- **Evaluation Pipeline Order**:
+  - Pointer position $\to$ drag / resize snapping (with magnetic snapping taking precedence where active) $\to$ resulting interval $\to$ pure conflict overlap check $\to$ live UI state.
+- **Advisory-Only Interaction Contract**:
+  - Releasing a drag or resize in a conflicting slot proceeds with saving normally via `onMoveEvent` / `onResizeEvent` (or optimistic rollback / error handling on mutation failure).
+  - No blocking modal, confirmation dialog, or prevented drops.
+- **Visual Presentation**:
+  - Event card receives `.timelineEventConflicted` warning border and subtle background tint (`--color-warning`, `--color-warning-subtle`).
+  - When simultaneously magnetized and conflicted, `.timelineEventConflicted.timelineEventMagnetized` gracefully balances both indicators without clipping or illegible contrast.
+  - Timing feedback bar displays a crisp `· Conflict` pill badge (`.timelineConflictBadge`).
+  - Clears immediately upon moving away from the conflicting range, releasing the gesture, cancelling, or pressing Escape.
+- **Chromium Blur Hardening Compliance**:
+  - Zero permanent `will-change`, no filters (`filter: brightness(...)`), left-anchored origins, and clean terminal state.
+- **Zero Network Allocation**:
+  - All conflict calculations occur synchronously and deterministically in pure memory ($O(N)$ active-day candidates pre-filtered at `pointerdown`). Zero network calls during gesture movement.
+
+---
+
+## Next Phase: Phase 3.2 — Origin Ghost Indicator [PENDING]
+
+Execute these as discrete, focused sub-phases after core drag-to-move and snapping are solid:
+
 - **Phase 3.2 — Origin Ghost Indicator**:
   Faint ghost outline at the event's original position during drag if user testing indicates it aids spatial orientation.
 - **Phase 3.3 — Settle Physics / Animation**:

@@ -13,6 +13,11 @@ import type { AnchorRect } from './QuickCreatePopover';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 import {
+  collectConflictCandidates,
+  hasConflict as checkHasConflict,
+  type ConflictCandidate,
+} from '../utils/event-conflict';
+import {
   collectMagneticTargets,
   snapMoveInterval,
   snapResizeInterval,
@@ -108,6 +113,7 @@ export interface EventButtonProps {
   movePreview?: MinuteInterval;
   isMovable?: boolean;
   isMagnetized?: boolean;
+  hasConflict?: boolean;
 }
 
 export function EventButton({
@@ -130,6 +136,7 @@ export function EventButton({
   movePreview,
   isMovable,
   isMagnetized,
+  hasConflict,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
   const isResizing = Boolean(resizePreview);
@@ -154,7 +161,7 @@ export function EventButton({
           : ''
       } ${isMovable && !isPreviewing ? styles.timelineEventMovable : ''} ${
         isMagnetized ? styles.timelineEventMagnetized : ''
-      }`}
+      } ${hasConflict ? styles.timelineEventConflicted : ''}`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
       onPointerDown={onMovePointerDown}
       onPointerMove={onMovePointerMove}
@@ -214,6 +221,12 @@ export function EventButton({
           <span key={currentDuration} className={styles.timelineResizeDurationBadge}>
             {formatDuration(currentDuration)}
           </span>
+          {hasConflict && (
+            <>
+              <span className={styles.timelineResizeDivider}>·</span>
+              <span className={styles.timelineConflictBadge}>Conflict</span>
+            </>
+          )}
         </span>
       ) : movePreview ? (
         <span
@@ -225,6 +238,12 @@ export function EventButton({
             {formatMinute(movePreview.startMinute, hourCycle)} –{' '}
             {formatMinute(movePreview.endMinute, hourCycle)}
           </span>
+          {hasConflict && (
+            <>
+              <span className={styles.timelineResizeDivider}>·</span>
+              <span className={styles.timelineConflictBadge}>Conflict</span>
+            </>
+          )}
         </span>
       ) : !compact ? (
         <span className={styles.timelineEventTime}>
@@ -305,6 +324,7 @@ export function TimelineView({
     minute: number;
     edge: 'start' | 'end';
   } | null>(null);
+  const [hasConflict, setHasConflict] = useState(false);
 
   const resizeRef = useRef<{
     occurrence: EventOccurrence;
@@ -317,6 +337,7 @@ export function TimelineView({
     handle: HTMLSpanElement;
     columnTop: number;
     targets: MagneticTarget[];
+    conflictCandidates: ConflictCandidate[];
   } | null>(null);
 
   const moveRef = useRef<{
@@ -332,6 +353,7 @@ export function TimelineView({
     button: HTMLButtonElement;
     columnTop: number;
     targets: MagneticTarget[];
+    conflictCandidates: ConflictCandidate[];
   } | null>(null);
   const suppressedClickKeyRef = useRef<string | null>(null);
 
@@ -516,6 +538,12 @@ export function TimelineView({
       timeZone,
       workingHours,
     });
+    const conflictCandidates = collectConflictCandidates({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: occurrence.key,
+      dateKey,
+      timeZone,
+    });
     resizeRef.current = {
       occurrence,
       dateKey,
@@ -527,10 +555,12 @@ export function TimelineView({
       handle: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
       targets,
+      conflictCandidates,
     };
     suppressedClickKeyRef.current = occurrence.key;
     setResizePreview({ occurrenceKey: occurrence.key, interval });
     setMagneticSnap(null);
+    setHasConflict(false);
 
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -564,6 +594,9 @@ export function TimelineView({
       setMagneticSnap(null);
     }
 
+    const conflicting = checkHasConflict(next, active.conflictCandidates);
+    setHasConflict(conflicting);
+
     if (
       next.startMinute === active.currentMinutes.startMinute &&
       next.endMinute === active.currentMinutes.endMinute
@@ -594,6 +627,7 @@ export function TimelineView({
     resizeRef.current = null;
     setResizePreview(null);
     setMagneticSnap(null);
+    setHasConflict(false);
     const suppressedKey = active.occurrence.key;
     globalThis.setTimeout(() => {
       if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
@@ -633,6 +667,12 @@ export function TimelineView({
       timeZone,
       workingHours,
     });
+    const conflictCandidates = collectConflictCandidates({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: occurrence.key,
+      dateKey,
+      timeZone,
+    });
 
     moveRef.current = {
       status: 'pending',
@@ -647,7 +687,9 @@ export function TimelineView({
       button: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
       targets,
+      conflictCandidates,
     };
+    setHasConflict(false);
   };
 
   const handleMovePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -699,6 +741,9 @@ export function TimelineView({
       setMagneticSnap(null);
     }
 
+    const conflicting = checkHasConflict(targetMinutes, active.conflictCandidates);
+    setHasConflict(conflicting);
+
     if (
       targetMinutes.startMinute === active.currentMinutes.startMinute &&
       targetMinutes.endMinute === active.currentMinutes.endMinute
@@ -728,6 +773,7 @@ export function TimelineView({
     moveRef.current = null;
     setMovePreview(null);
     setMagneticSnap(null);
+    setHasConflict(false);
 
     if (!wasDragging) {
       return;
@@ -791,6 +837,7 @@ export function TimelineView({
           moveRef.current = null;
           setMovePreview(null);
           setMagneticSnap(null);
+          setHasConflict(false);
           const suppressedKey = active.occurrence.key;
           suppressedClickKeyRef.current = suppressedKey;
           globalThis.setTimeout(() => {
@@ -808,6 +855,7 @@ export function TimelineView({
           resizeRef.current = null;
           setResizePreview(null);
           setMagneticSnap(null);
+          setHasConflict(false);
           const suppressedKey = active.occurrence.key;
           suppressedClickKeyRef.current = suppressedKey;
           globalThis.setTimeout(() => {
@@ -1143,6 +1191,11 @@ export function TimelineView({
                       isMovable={canMove}
                       isMagnetized={Boolean(
                         magneticSnap &&
+                        (resizePreview?.occurrenceKey === placed.item.key ||
+                          movePreview?.occurrenceKey === placed.item.key),
+                      )}
+                      hasConflict={Boolean(
+                        hasConflict &&
                         (resizePreview?.occurrenceKey === placed.item.key ||
                           movePreview?.occurrenceKey === placed.item.key),
                       )}
