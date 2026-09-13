@@ -15,9 +15,11 @@ import { dateKeyToInstant } from '../utils/calendar-window';
 import {
   dateMinuteToInstant,
   hasTimingChanged,
+  isEventMovable,
   isEventResizable,
   pointerYToSnappedMinute,
   resizeMinuteInterval,
+  resolveMoveGesture,
   type MinuteInterval,
   type ResizeEdge,
 } from '../utils/event-resize';
@@ -58,6 +60,7 @@ interface TimelineViewProps {
   onSelectDate: (dateKey: string) => void;
   onSelectEvent: (occurrence: EventOccurrence, anchorRect?: AnchorRect) => void;
   onResizeEvent?: (occurrence: EventOccurrence, timing: EventTiming) => void;
+  onMoveEvent?: (occurrence: EventOccurrence, timing: EventTiming) => void;
   timingOverrides?: ReadonlyMap<string, EventTiming>;
   onSelectSlot?: (selection: SlotSelection) => void;
   draftEvent?: DraftEventState | null;
@@ -91,8 +94,14 @@ export interface EventButtonProps {
   onResizePointerMove?: (event: React.PointerEvent<HTMLSpanElement>) => void;
   onResizePointerUp?: (event: React.PointerEvent<HTMLSpanElement>) => void;
   onResizePointerCancel?: (event: React.PointerEvent<HTMLSpanElement>) => void;
+  onMovePointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onMovePointerMove?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onMovePointerUp?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onMovePointerCancel?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   shouldSuppressSelect?: () => boolean;
   resizePreview?: MinuteInterval;
+  movePreview?: MinuteInterval;
+  isMovable?: boolean;
 }
 
 export function EventButton({
@@ -106,21 +115,42 @@ export function EventButton({
   onResizePointerMove,
   onResizePointerUp,
   onResizePointerCancel,
+  onMovePointerDown,
+  onMovePointerMove,
+  onMovePointerUp,
+  onMovePointerCancel,
   shouldSuppressSelect,
   resizePreview,
+  movePreview,
+  isMovable,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
   const isResizing = Boolean(resizePreview);
-  const resizeDuration = resizePreview ? resizePreview.endMinute - resizePreview.startMinute : 0;
-  const isShortResize = isResizing && resizeDuration < 45;
+  const isMoving = Boolean(movePreview);
+  const isPreviewing = isResizing || isMoving;
+  const activeInterval = resizePreview ?? movePreview;
+  const currentDuration = activeInterval
+    ? activeInterval.endMinute - activeInterval.startMinute
+    : 0;
+  const isShort = isPreviewing && currentDuration < 45;
 
   return (
     <button
       type="button"
       className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${
         isResizing ? styles.timelineEventResizing : ''
-      } ${isShortResize ? styles.timelineEventResizingShort : ''}`}
+      } ${isMoving ? styles.timelineEventMoving : ''} ${
+        isShort
+          ? isResizing
+            ? styles.timelineEventResizingShort
+            : styles.timelineEventMovingShort
+          : ''
+      } ${isMovable && !isPreviewing ? styles.timelineEventMovable : ''}`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
+      onPointerDown={onMovePointerDown}
+      onPointerMove={onMovePointerMove}
+      onPointerUp={onMovePointerUp}
+      onPointerCancel={onMovePointerCancel}
       onClick={(e) => {
         e.stopPropagation();
         if (shouldSuppressSelect?.()) return;
@@ -148,10 +178,14 @@ export function EventButton({
       ) : null}
       <span
         className={`${styles.timelineEventTitle} ${
-          isResizing
-            ? isShortResize
-              ? styles.timelineEventTitleResizingShort
-              : styles.timelineEventTitleResizingNormal
+          isPreviewing
+            ? isShort
+              ? isResizing
+                ? styles.timelineEventTitleResizingShort
+                : styles.timelineEventTitleMovingShort
+              : isResizing
+                ? styles.timelineEventTitleResizingNormal
+                : styles.timelineEventTitleMovingNormal
             : ''
         }`}
       >
@@ -160,7 +194,7 @@ export function EventButton({
       {resizePreview ? (
         <span
           className={`${styles.timelineResizeFeedback} ${
-            isShortResize ? styles.timelineResizeFeedbackShort : styles.timelineResizeFeedbackNormal
+            isShort ? styles.timelineResizeFeedbackShort : styles.timelineResizeFeedbackNormal
           }`}
         >
           <span className={styles.timelineResizeSpan}>
@@ -168,8 +202,19 @@ export function EventButton({
             {formatMinute(resizePreview.endMinute, hourCycle)}
           </span>
           <span className={styles.timelineResizeDivider}>·</span>
-          <span key={resizeDuration} className={styles.timelineResizeDurationBadge}>
-            {formatDuration(resizeDuration)}
+          <span key={currentDuration} className={styles.timelineResizeDurationBadge}>
+            {formatDuration(currentDuration)}
+          </span>
+        </span>
+      ) : movePreview ? (
+        <span
+          className={`${styles.timelineMoveFeedback} ${
+            isShort ? styles.timelineMoveFeedbackShort : styles.timelineMoveFeedbackNormal
+          }`}
+        >
+          <span className={styles.timelineMoveSpan}>
+            {formatMinute(movePreview.startMinute, hourCycle)} –{' '}
+            {formatMinute(movePreview.endMinute, hourCycle)}
           </span>
         </span>
       ) : !compact ? (
@@ -221,6 +266,7 @@ export function TimelineView({
   onSelectDate,
   onSelectEvent,
   onResizeEvent,
+  onMoveEvent,
   timingOverrides,
   onSelectSlot,
   draftEvent,
@@ -240,6 +286,10 @@ export function TimelineView({
     occurrenceKey: string;
     interval: MinuteInterval;
   } | null>(null);
+  const [movePreview, setMovePreview] = useState<{
+    occurrenceKey: string;
+    interval: MinuteInterval;
+  } | null>(null);
 
   const resizeRef = useRef<{
     occurrence: EventOccurrence;
@@ -250,6 +300,20 @@ export function TimelineView({
     originalTiming: EventTiming;
     pointerId: number;
     handle: HTMLSpanElement;
+    columnTop: number;
+  } | null>(null);
+
+  const moveRef = useRef<{
+    status: 'pending' | 'dragging';
+    occurrence: EventOccurrence;
+    dateKey: string;
+    startY: number;
+    startX: number;
+    originalMinutes: MinuteInterval;
+    currentMinutes: MinuteInterval;
+    originalTiming: EventTiming;
+    pointerId: number;
+    button: HTMLButtonElement;
     columnTop: number;
   } | null>(null);
   const suppressedClickKeyRef = useRef<string | null>(null);
@@ -505,6 +569,182 @@ export function TimelineView({
     onResizeEvent?.(active.occurrence, nextTiming);
   };
 
+  const handleMovePointerDown = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    occurrence: EventOccurrence,
+    dateKey: string,
+    interval: MinuteInterval,
+  ) => {
+    if (e.button !== 0 || !onMoveEvent) return;
+    if ((e.target as HTMLElement).closest('[data-resize-edge]')) return;
+    const column = e.currentTarget.closest<HTMLElement>('[data-date-key]');
+    if (!column) return;
+
+    const override = timingOverrides?.get(occurrence.event.id);
+    const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
+
+    moveRef.current = {
+      status: 'pending',
+      occurrence,
+      dateKey,
+      startY: e.clientY,
+      startX: e.clientX,
+      originalMinutes: interval,
+      currentMinutes: interval,
+      originalTiming,
+      pointerId: e.pointerId,
+      button: e.currentTarget,
+      columnTop: column.getBoundingClientRect().top,
+    };
+  };
+
+  const handleMovePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const active = moveRef.current;
+    if (!active || active.pointerId !== e.pointerId) return;
+
+    const resolution = resolveMoveGesture({
+      startY: active.startY,
+      startX: active.startX,
+      currentY: e.clientY,
+      currentX: e.clientX,
+      hourHeight,
+      originalMinutes: active.originalMinutes,
+    });
+
+    if (resolution.type !== 'move' && resolution.type !== 'noop') {
+      return;
+    }
+
+    if (active.status === 'pending') {
+      active.status = 'dragging';
+      suppressedClickKeyRef.current = active.occurrence.key;
+      try {
+        active.button.setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture is best-effort in synthetic/test environments.
+      }
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const targetMinutes =
+      resolution.type === 'noop' ? active.originalMinutes : resolution.nextMinutes;
+
+    if (
+      targetMinutes.startMinute === active.currentMinutes.startMinute &&
+      targetMinutes.endMinute === active.currentMinutes.endMinute
+    ) {
+      return;
+    }
+
+    const nextStart = dateMinuteToInstant(active.dateKey, targetMinutes.startMinute, timeZone);
+    const nextEnd = dateMinuteToInstant(active.dateKey, targetMinutes.endMinute, timeZone);
+    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
+
+    active.currentMinutes = targetMinutes;
+    setMovePreview({ occurrenceKey: active.occurrence.key, interval: targetMinutes });
+  };
+
+  const finishMove = (e: React.PointerEvent<HTMLButtonElement>, cancelled: boolean) => {
+    const active = moveRef.current;
+    if (!active || active.pointerId !== e.pointerId) return;
+
+    try {
+      active.button.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    const wasDragging = active.status === 'dragging';
+    moveRef.current = null;
+    setMovePreview(null);
+
+    if (!wasDragging) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const suppressedKey = active.occurrence.key;
+    suppressedClickKeyRef.current = suppressedKey;
+    globalThis.setTimeout(() => {
+      if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
+    }, 0);
+
+    if (cancelled) return;
+
+    const resolution = resolveMoveGesture({
+      startY: active.startY,
+      startX: active.startX,
+      currentY: e.clientY,
+      currentX: e.clientX,
+      hourHeight,
+      originalMinutes: active.originalMinutes,
+      cancelled,
+    });
+
+    if (resolution.type !== 'move') return;
+
+    const nextStart = dateMinuteToInstant(
+      active.dateKey,
+      resolution.nextMinutes.startMinute,
+      timeZone,
+    );
+    const nextEnd = dateMinuteToInstant(active.dateKey, resolution.nextMinutes.endMinute, timeZone);
+    if (!nextStart || !nextEnd) return;
+
+    const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
+    if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
+    onMoveEvent?.(active.occurrence, nextTiming);
+  };
+
+  const handleMovePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => finishMove(e, false);
+  const handleMovePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => finishMove(e, true);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (moveRef.current?.status === 'dragging') {
+          const active = moveRef.current;
+          try {
+            active.button.releasePointerCapture(active.pointerId);
+          } catch {
+            // ignore
+          }
+          moveRef.current = null;
+          setMovePreview(null);
+          const suppressedKey = active.occurrence.key;
+          suppressedClickKeyRef.current = suppressedKey;
+          globalThis.setTimeout(() => {
+            if (suppressedClickKeyRef.current === suppressedKey) {
+              suppressedClickKeyRef.current = null;
+            }
+          }, 0);
+        } else if (resizeRef.current) {
+          const active = resizeRef.current;
+          try {
+            active.handle.releasePointerCapture(active.pointerId);
+          } catch {
+            // ignore
+          }
+          resizeRef.current = null;
+          setResizePreview(null);
+          const suppressedKey = active.occurrence.key;
+          suppressedClickKeyRef.current = suppressedKey;
+          globalThis.setTimeout(() => {
+            if (suppressedClickKeyRef.current === suppressedKey) {
+              suppressedClickKeyRef.current = null;
+            }
+          }, 0);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   useEffect(() => {
     const initialHour =
       todayKey && dateKeys.includes(todayKey)
@@ -644,16 +884,31 @@ export function TimelineView({
               .filter((item) => !item.event.allDay)
               .map((item) => {
                 const optimistic = timingOverrides?.get(item.event.id);
-                const active = resizePreview?.occurrenceKey === item.key ? resizeRef.current : null;
-                if (active) {
+                const activeResize =
+                  resizePreview?.occurrenceKey === item.key ? resizeRef.current : null;
+                const activeMove = movePreview?.occurrenceKey === item.key ? moveRef.current : null;
+                if (activeResize) {
                   const start = dateMinuteToInstant(
                     dateKey,
-                    active.currentMinutes.startMinute,
+                    activeResize.currentMinutes.startMinute,
                     timeZone,
                   );
                   const end = dateMinuteToInstant(
                     dateKey,
-                    active.currentMinutes.endMinute,
+                    activeResize.currentMinutes.endMinute,
+                    timeZone,
+                  );
+                  if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
+                }
+                if (activeMove && activeMove.status === 'dragging') {
+                  const start = dateMinuteToInstant(
+                    dateKey,
+                    activeMove.currentMinutes.startMinute,
+                    timeZone,
+                  );
+                  const end = dateMinuteToInstant(
+                    dateKey,
+                    activeMove.currentMinutes.endMinute,
                     timeZone,
                   );
                   if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
@@ -753,9 +1008,15 @@ export function TimelineView({
                   );
                   const canResize =
                     Boolean(onResizeEvent) && isEventResizable(sourceOccurrence, dateKey, timeZone);
+                  const canMove =
+                    Boolean(onMoveEvent) && isEventMovable(sourceOccurrence, dateKey, timeZone);
                   const activeResize =
                     resizePreview?.occurrenceKey === placed.item.key
                       ? resizePreview.interval
+                      : undefined;
+                  const activeMove =
+                    movePreview?.occurrenceKey === placed.item.key
+                      ? movePreview.interval
                       : undefined;
                   return (
                     <EventButton
@@ -763,7 +1024,7 @@ export function TimelineView({
                       occurrence={placed.item}
                       timeZone={timeZone}
                       hourCycle={hourCycle}
-                      compact={(isWeek || height < 42) && !activeResize}
+                      compact={(isWeek || height < 42) && !activeResize && !activeMove}
                       style={{
                         top,
                         height,
@@ -783,12 +1044,26 @@ export function TimelineView({
                       onResizePointerMove={handleResizePointerMove}
                       onResizePointerUp={(event) => finishResize(event, false)}
                       onResizePointerCancel={(event) => finishResize(event, true)}
+                      onMovePointerDown={
+                        canMove
+                          ? (event) =>
+                              handleMovePointerDown(event, sourceOccurrence, dateKey, {
+                                startMinute,
+                                endMinute,
+                              })
+                          : undefined
+                      }
+                      onMovePointerMove={canMove ? handleMovePointerMove : undefined}
+                      onMovePointerUp={canMove ? handleMovePointerUp : undefined}
+                      onMovePointerCancel={canMove ? handleMovePointerCancel : undefined}
                       shouldSuppressSelect={() => {
                         if (suppressedClickKeyRef.current !== sourceOccurrence.key) return false;
                         suppressedClickKeyRef.current = null;
                         return true;
                       }}
                       resizePreview={activeResize}
+                      movePreview={activeMove}
+                      isMovable={canMove}
                     />
                   );
                 })}

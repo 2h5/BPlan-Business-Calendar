@@ -367,3 +367,136 @@ describe('TimelineView resize affordances', () => {
     expect(html).toContain('45m');
   });
 });
+
+describe('TimelineView move affordances and live feedback', () => {
+  function renderTimelineEvent(eventCalendar: Calendar, recurrenceRule: string | null = null) {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Design Review',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T15:00:00.000Z',
+      recurrenceRule,
+    });
+    const occurrence: EventOccurrence = {
+      key: 'movable-occurrence',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar: eventCalendar,
+    };
+
+    return renderToStaticMarkup(
+      <TimelineView
+        dateKeys={['2026-09-15']}
+        byDateKey={new Map([['2026-09-15', [occurrence]]])}
+        selectedDateKey="2026-09-15"
+        timeZone={timeZone}
+        hourCycle="h12"
+        now={mockNow}
+        onSelectDate={vi.fn()}
+        onSelectEvent={vi.fn()}
+        onResizeEvent={vi.fn()}
+        onMoveEvent={vi.fn()}
+        onSelectSlot={vi.fn()}
+      />,
+    );
+  }
+
+  it('marks normal writable timed events as movable', () => {
+    const html = renderTimelineEvent(calendar);
+    expect(html).toContain('timelineEventMovable');
+    expect(html).toContain('<button');
+    expect(html).toContain('Design Review');
+  });
+
+  it('does not mark read-only or recurring events as movable', () => {
+    expect(renderTimelineEvent({ ...calendar, isReadOnly: true })).not.toContain(
+      'timelineEventMovable',
+    );
+    expect(renderTimelineEvent(calendar, 'FREQ=WEEKLY')).not.toContain('timelineEventMovable');
+  });
+
+  it('keeps resize handles independent and mutually exclusive with move targets', () => {
+    const html = renderTimelineEvent(calendar);
+    // Resize handles have explicit data attributes and classes
+    expect(html).toContain('data-resize-edge="start"');
+    expect(html).toContain('data-resize-edge="end"');
+    expect(html).toContain('timelineResizeHandleTop');
+    expect(html).toContain('timelineResizeHandleBottom');
+  });
+
+  it('renders live move feedback with snapped time span for small events (< 45m)', () => {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Daily Standup',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T14:30:00.000Z',
+    });
+    const occurrence: EventOccurrence = {
+      key: 'daily-standup',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        movePreview={{ startMinute: 615, endMinute: 645 }} // 30m (< 45m)
+        isMovable
+      />,
+    );
+
+    expect(html).toContain('timelineEventMoving');
+    expect(html).toContain('timelineEventMovingShort');
+    expect(html).toContain('timelineEventTitleMovingShort');
+    expect(html).toContain('timelineMoveFeedbackShort');
+    expect(html).toContain('10:15 AM – 10:45 AM');
+    // Invariant duration: no duration pill badge in move
+    expect(html).not.toContain('timelineResizeDurationBadge');
+  });
+
+  it('renders live move feedback with title and snapped time span for normal events (>= 45m)', () => {
+    const event = makeEvent({
+      allDay: false,
+      title: 'Strategy Session',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T15:00:00.000Z',
+    });
+    const occurrence: EventOccurrence = {
+      key: 'strategy-session',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+        movePreview={{ startMinute: 660, endMinute: 720 }} // 60m (>= 45m)
+        isMovable
+      />,
+    );
+
+    expect(html).toContain('timelineEventMoving');
+    expect(html).not.toContain('timelineEventMovingShort');
+    expect(html).toContain('timelineEventTitleMovingNormal');
+    expect(html).toContain('timelineMoveFeedbackNormal');
+    expect(html).toContain('Strategy Session');
+    expect(html).toContain('11:00 AM – 12:00 PM');
+    expect(html).not.toContain('timelineResizeDurationBadge');
+  });
+});

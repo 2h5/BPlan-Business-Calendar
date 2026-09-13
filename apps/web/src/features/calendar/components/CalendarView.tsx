@@ -458,6 +458,59 @@ export function CalendarView() {
     [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
   );
 
+  const handleMoveEvent = useCallback(
+    (occurrence: EventOccurrence, timing: EventTiming) => {
+      const { event } = occurrence;
+      const previous = timingOverrides.get(event.id) ?? {
+        start: occurrence.start,
+        end: occurrence.end,
+      };
+      if (previous.start === timing.start && previous.end === timing.end) return;
+
+      setTimingOverride(event.id, timing);
+      const persist = async () => {
+        try {
+          await updateEvent.mutateAsync({
+            event,
+            input: eventInputWithTiming(
+              event,
+              new Date(timing.start).toISOString(),
+              new Date(timing.end).toISOString(),
+            ),
+          });
+          showToast({
+            message: 'Event moved',
+            actionLabel: 'Undo',
+            onAction: () => {
+              setTimingOverride(event.id, previous);
+              showToast({ message: 'Restoring event…' });
+              void updateEvent
+                .mutateAsync({
+                  event,
+                  input: eventInputWithTiming(
+                    event,
+                    new Date(previous.start).toISOString(),
+                    new Date(previous.end).toISOString(),
+                  ),
+                })
+                .then(() => showSuccess('Move undone.'))
+                .catch(() => {
+                  setTimingOverride(event.id, null);
+                  result.refetch();
+                  showToast({ message: 'The move could not be undone.' });
+                });
+            },
+          });
+        } catch {
+          setTimingOverride(event.id, null);
+          showToast({ message: 'The event move could not be saved.' });
+        }
+      };
+      void persist();
+    },
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+  );
+
   return (
     <div className={styles.workspace}>
       <section className={styles.calendarMain} aria-label="Calendar">
@@ -570,6 +623,7 @@ export function CalendarView() {
                   onSelectDate={setSelectedDateKey}
                   onSelectEvent={handleEventSelect}
                   onResizeEvent={handleResizeEvent}
+                  onMoveEvent={handleMoveEvent}
                   timingOverrides={timingOverrides}
                   onSelectSlot={handleSlotSelect}
                   draftEvent={activeDraftEvent}

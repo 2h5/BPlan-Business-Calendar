@@ -95,6 +95,7 @@ Committed in `989cd1d` (`fix(web): remove calendar view transition compositing a
 During testing on Chrome/Windows, calendar event text could render noticeably blurry immediately after page load or navigation. Resizing or maximizing the Chrome window forced Chromium to re-rasterize the layer, temporarily making text crisp again.
 
 The root cause was persistent GPU compositing and retained transforms on large calendar view containers:
+
 - `.calendarViewTransition` had permanent `will-change: transform, opacity`.
 - View animations used `scale(...)` transforms with `animation-fill-mode: both / forwards`, causing Chromium to retain fractional-pixel texture scaling across the entire calendar subtree.
 
@@ -115,24 +116,30 @@ The root cause was persistent GPU compositing and retained transforms on large c
 
 ---
 
-## Next Phase: Phase 2 — Whole-Event Drag-to-Move [PENDING]
+## Phase 2 — Whole-Event Drag-to-Move [COMPLETE]
 
-The next major interaction is whole-event direct manipulation.
+Implemented direct manipulation whole-event dragging for timed events in Day and Week views.
 
-### Desired Behavior:
+### Capabilities:
 
-- **Trigger**: Dragging the event body (outside the top/bottom resize handles) initiates movement.
-- **Duration Invariant**: The event duration (`end - start`) remains constant; both start and end shift together.
-- **15-Minute Grid Snapping**: Reuses `event-resize.ts` / `pointerYToSnappedMinute` concepts for consistent time math.
-- **Live Geometry & Feedback**: Event card tracks pointer vertically with live time range pill feedback.
-- **Single Save on Release**: No network updates during motion; one authoritative mutation dispatched on `pointerup`.
-- **Optimistic State & Rollback**: Uses `timingOverrides` pattern with error rollback and Undo toast on success.
-- **Gesture Disambiguation**:
-  - Distance threshold: Pointer movement $< 6\text{px}$ is treated as a click (opens details popover).
-  - Movement $\ge 6\text{px}$ begins whole-event drag.
-  - Resize handles remain strictly resize-only.
-  - Empty-space click/drag remains unaffected.
-- **Scope for Initial Iteration**: Same-day vertical movement within the active day column. Cross-day and multi-day dragging deferred.
+- **Body Drag Trigger**: Dragging the event card body outside the top/bottom resize handles begins a vertical move gesture once exceeding the $\ge 6\text{px}$ movement threshold.
+- **Click Disambiguation**: Pointer movement $< 6\text{px}$ remains a normal click, opening the event details / editor popover without triggering move state.
+- **Resize Handle Collision Safety**: Pointer events on top (`data-resize-edge="start"`) and bottom (`data-resize-edge="end"`) handles stop propagation and are strictly reserved for edge resizing. Move and resize gestures are completely mutually exclusive.
+- **Duration Invariant**: Event duration is strictly invariant across all drag offsets and day boundary clamps.
+- **15-Minute Grid Snapping**: Snaps vertically to 15-minute intervals via `moveMinuteInterval` and `resolveMoveGesture`.
+- **Live Visual Feedback**: Event card updates top position in real time tracking snapped minutes while preserving card height and layout. Live feedback displays formatted start and end time range (`timelineMoveFeedback`), with title dynamically collapsing for short events (`< 45m`).
+- **Compositor & Rendering Safety**: Strictly complies with Phase 1.2 rules (no permanent `will-change`, no retained transforms, no filters, left-anchored origins).
+- **Single Authoritative Mutation**: No network updates during motion. Exactly one authoritative save is dispatched on `pointerup` via `onMoveEvent` -> `CalendarView` -> `useUpdateEvent`.
+- **Optimistic State, Rollback & Undo**:
+  - `timingOverrides` holds optimistic start/end times preventing server flashback.
+  - Successful move shows `Event moved · Undo` toast; clicking Undo restores original timing through `useUpdateEvent`.
+  - Failed move rolls back optimistic override and displays error toast without offering Undo.
+  - No-op drag (releasing in original slot) and cancellation (pointercancel or Escape) dispatch zero network mutations and restore original visual position.
+- **Unsupported Event Protection**: Read-only calendars, recurring series occurrences, all-day events, and multi-day/clipped segments are strictly ineligible for movement via shared `isEventMovable` check.
+
+---
+
+## Next Phase: Phase 2.1 — Move/Resize Regression Hardening & Gesture Collision Tests [PENDING]
 
 ---
 
@@ -199,7 +206,7 @@ Future agents working on this roadmap must strictly obey these boundaries:
 - [x] Phase 1 — timed-event top/bottom resizing (`c547c58`)
 - [x] Phase 1.1 — small-event `< 45m` layout & text animation polish (`31c0738`, `410881c`)
 - [x] Phase 1.2 — Chromium rendering & animation hardening (`989cd1d`, `31c0738`, `410881c`)
-- [ ] Phase 2 — whole-event drag-to-move
+- [x] Phase 2 — whole-event drag-to-move
 - [ ] Phase 2.1 — move/resize regression hardening & gesture collision tests
 - [ ] Phase 3.0 — magnetic snapping
 - [ ] Phase 3.1 — live conflict warning feedback

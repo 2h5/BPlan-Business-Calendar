@@ -4,6 +4,8 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { eventWriteRoute } from './event-ownership';
 
 export const RESIZE_SNAP_MINUTES = 15;
+export const MOVE_SNAP_MINUTES = 15;
+export const MOVE_DRAG_THRESHOLD_PX = 6;
 export const MIN_RESIZE_DURATION_MINUTES = 15;
 export const MINUTES_PER_DAY = 24 * 60;
 
@@ -66,6 +68,50 @@ export function resizeMinuteInterval(
   };
 }
 
+export function moveMinuteInterval(original: MinuteInterval, deltaMinutes: number): MinuteInterval {
+  const duration = original.endMinute - original.startMinute;
+  const snappedDelta = Math.round(deltaMinutes / MOVE_SNAP_MINUTES) * MOVE_SNAP_MINUTES;
+  const targetStart = original.startMinute + snappedDelta;
+  const clampedStart = Math.max(0, Math.min(MINUTES_PER_DAY - duration, targetStart));
+  return {
+    startMinute: clampedStart,
+    endMinute: clampedStart + duration,
+  };
+}
+
+export type MoveGestureResolution =
+  | { type: 'click' }
+  | { type: 'noop' }
+  | { type: 'cancel' }
+  | { type: 'move'; nextMinutes: MinuteInterval };
+
+export function resolveMoveGesture(params: {
+  startY: number;
+  startX: number;
+  currentY: number;
+  currentX: number;
+  hourHeight: number;
+  originalMinutes: MinuteInterval;
+  cancelled?: boolean;
+}): MoveGestureResolution {
+  if (params.cancelled) return { type: 'cancel' };
+  const distY = Math.abs(params.currentY - params.startY);
+  const distX = Math.abs(params.currentX - params.startX);
+  if (distY < MOVE_DRAG_THRESHOLD_PX && distX < MOVE_DRAG_THRESHOLD_PX) {
+    return { type: 'click' };
+  }
+  const deltaY = params.currentY - params.startY;
+  const deltaMinutes = (deltaY / params.hourHeight) * 60;
+  const next = moveMinuteInterval(params.originalMinutes, deltaMinutes);
+  if (
+    next.startMinute === params.originalMinutes.startMinute &&
+    next.endMinute === params.originalMinutes.endMinute
+  ) {
+    return { type: 'noop' };
+  }
+  return { type: 'move', nextMinutes: next };
+}
+
 export function hasTimingChanged(
   original: EventTimingInterval,
   next: EventTimingInterval,
@@ -106,6 +152,14 @@ export function isEventResizable(
   const finalInstant = Math.max(occurrence.start, occurrence.end - 1);
   const endKey = toZonedDateKey(new Date(finalInstant), timeZone);
   return startKey === renderedDateKey && endKey === renderedDateKey;
+}
+
+export function isEventMovable(
+  occurrence: ResizeOccurrence,
+  renderedDateKey: string,
+  timeZone: string,
+): boolean {
+  return isEventResizable(occurrence, renderedDateKey, timeZone);
 }
 
 export function dateMinuteToInstant(

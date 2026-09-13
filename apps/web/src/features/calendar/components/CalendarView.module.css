@@ -837,8 +837,14 @@
   opacity: 0.92;
 }
 
+.timelineEventMovable {
+  cursor: grab;
+}
+
 .timelineEventResizing,
-.timelineEventResizing:active {
+.timelineEventResizing:active,
+.timelineEventMoving,
+.timelineEventMoving:active {
   z-index: 5;
   background: color-mix(in srgb, var(--event-color) 24%, var(--color-bg-surface));
   border-color: color-mix(in srgb, var(--event-color) 60%, transparent);
@@ -846,7 +852,14 @@
   transition: none;
 }
 
-.timelineEventResizingShort {
+.timelineEventMoving,
+.timelineEventMoving:active {
+  cursor: grabbing;
+  box-shadow: var(--shadow-md);
+}
+
+.timelineEventResizingShort,
+.timelineEventMovingShort {
   justify-content: center;
   padding-block: 2px;
 }
@@ -894,7 +907,8 @@
   bottom: 1px;
 }
 
-.timelineResizeFeedback {
+.timelineResizeFeedback,
+.timelineMoveFeedback {
   position: absolute;
   z-index: 1;
   left: 7px;
@@ -920,16 +934,19 @@
     font-weight 140ms ease;
 }
 
-.timelineResizeFeedbackShort {
+.timelineResizeFeedbackShort,
+.timelineMoveFeedbackShort {
   bottom: calc(50% - 6px);
   font-weight: var(--font-weight-semibold);
 }
 
-.timelineResizeFeedbackNormal {
+.timelineResizeFeedbackNormal,
+.timelineMoveFeedbackNormal {
   bottom: 2px;
 }
 
-.timelineResizeSpan {
+.timelineResizeSpan,
+.timelineMoveSpan {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -991,7 +1008,8 @@
   white-space: nowrap;
 }
 
-.timelineEventTitleResizingShort {
+.timelineEventTitleResizingShort,
+.timelineEventTitleMovingShort {
   opacity: 0;
   max-height: 0;
   line-height: 0;
@@ -1008,7 +1026,8 @@
     line-height 170ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.timelineEventTitleResizingNormal {
+.timelineEventTitleResizingNormal,
+.timelineEventTitleMovingNormal {
   opacity: 1;
   max-height: 20px;
   line-height: 1.2;
@@ -2166,8 +2185,13 @@
   .timelineResizeFeedbackShort,
   .timelineResizeFeedbackNormal,
   .timelineResizeDurationBadge,
+  .timelineMoveFeedback,
+  .timelineMoveFeedbackShort,
+  .timelineMoveFeedbackNormal,
   .timelineEventTitleResizingShort,
-  .timelineEventTitleResizingNormal {
+  .timelineEventTitleResizingNormal,
+  .timelineEventTitleMovingShort,
+  .timelineEventTitleMovingNormal {
     animation: none !important;
     animation-duration: 1ms !important;
     transition: none !important;
