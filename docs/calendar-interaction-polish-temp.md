@@ -209,10 +209,45 @@ Implemented live, advisory visual conflict feedback during whole-event moving an
 
 Execute these as discrete, focused sub-phases after core drag-to-move and snapping are solid:
 
-- **Phase 3.2 — Origin Ghost Indicator**:
+- **Phase 3.2 — Origin Ghost Indicator [OPTIONAL / PENDING]**:
   Faint ghost outline at the event's original position during drag if user testing indicates it aids spatial orientation.
-- **Phase 3.3 — Settle Physics / Animation**:
-  Snappy, restrained settle transition upon release into the target slot (0ms lag while actively dragging).
+
+---
+
+## Phase 3.3 — Release Settle Animation [COMPLETE]
+
+Implemented a short, restrained visual settle animation when a timed event is released following a successful local move or resize gesture in Day and Week views.
+
+### Capabilities:
+
+- **When Settle Plays**:
+  - Plays strictly after a successful local whole-event move or edge resize that resulted in actual timing modification (`hasTimingChanged(...) === true`).
+  - Does NOT play for ordinary clicks, cancelled gestures (`pointercancel`, Escape), no-op gestures (releasing in original slot), or unsupported/read-only events.
+- **Visual Feel & Dynamics**:
+  - Duration: 160ms with cubic-bezier(0.16, 1, 0.3, 1).
+  - Keyframe progression:
+    - `0%`: `scale(0.985)` with `box-shadow: var(--shadow-sm)` (subtle compression communicating arrival).
+    - `50%`: `scale(1.008)` with `box-shadow: var(--shadow-md)` (restrained elastic rebound).
+    - `100%`: `transform: none` and `box-shadow: none` (landed firmly in place).
+  - Strictly in-place: event geometry (top, height, left, width) is already in its exact target slot immediately; the animation never translates the event away from its slot.
+- **Zero Interference with Drag**:
+  - While pointer is actively dragging or resizing, settle state is inactive and cleared (`clearSettle()`). Zero transition on top or height fighting cursor coordinates.
+- **Conflict & Magnetic Cleanliness**:
+  - Magnetic guide lines, magnetic borders, and live conflict indicators clear immediately upon gesture release. The settle animation plays strictly on clean card styling.
+- **Optimistic Integration & Lifetime Cleanup**:
+  - Works seamlessly with optimistic `timingOverrides` so there is no layout jump or position flash.
+  - Bounded transient state (`settledOccurrenceKey`) managed by a single timeout ref (`SETTLE_ANIMATION_MS = 180ms`).
+  - Safely clears on component unmount, gesture initiation, or subsequent event manipulation.
+- **Compositor & Text-Blur Hardening Compliance**:
+  - Local to the individual `.timelineEvent` card element.
+  - Zero permanent `will-change`.
+  - Terminal keyframe settles strictly to `transform: none` with no retained `forwards` or `both` compositing layers.
+  - Fully respects `@media (prefers-reduced-motion: reduce)` with `animation: none !important` and `transform: none !important`.
+
+---
+
+## Next Phase: Phase 3.4 — Edge Auto-Scroll [PENDING]
+
 - **Phase 3.4 — Edge Auto-Scroll**:
   Smooth timeline container scrolling when dragging within 40px of the top or bottom viewport edges.
 

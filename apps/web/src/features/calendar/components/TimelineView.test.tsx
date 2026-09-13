@@ -666,4 +666,120 @@ describe('TimelineView move affordances and live feedback', () => {
       expect(html).toContain('Conflict');
     });
   });
+
+  describe('TimelineView release settle animation affordances', () => {
+    it('applies timelineEventSettled class to EventButton when isSettled is true and not previewing', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Settled Meeting',
+        startAt: '2026-09-15T14:00:00.000Z',
+        endAt: '2026-09-15T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'settled-meeting-key',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const htmlSettled = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          isMovable
+          isSettled
+        />,
+      );
+
+      expect(htmlSettled).toContain('timelineEventSettled');
+
+      const htmlNotSettled = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          isMovable
+          isSettled={false}
+        />,
+      );
+
+      expect(htmlNotSettled).not.toContain('timelineEventSettled');
+    });
+
+    it('does not apply timelineEventSettled class while active preview is present', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Moving Meeting',
+        startAt: '2026-09-15T14:00:00.000Z',
+        endAt: '2026-09-15T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'moving-meeting-key',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const html = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          isMovable
+          movePreview={{ startMinute: 600, endMinute: 660 }}
+          isSettled
+        />,
+      );
+
+      expect(html).not.toContain('timelineEventSettled');
+      expect(html).toContain('timelineEventMoving');
+    });
+
+    it('does not retain conflict or magnetic state when settled', () => {
+      const event = makeEvent({
+        allDay: false,
+        title: 'Clean Settle Meeting',
+        startAt: '2026-09-15T14:00:00.000Z',
+        endAt: '2026-09-15T15:00:00.000Z',
+      });
+      const occurrence: EventOccurrence = {
+        key: 'clean-settle-key',
+        occurrenceIndex: 0,
+        start: Date.parse(event.startAt),
+        end: Date.parse(event.endAt),
+        event,
+        calendar,
+      };
+
+      const html = renderToStaticMarkup(
+        <EventButton
+          occurrence={occurrence}
+          timeZone={timeZone}
+          hourCycle="h12"
+          compact={false}
+          onSelect={vi.fn()}
+          isMovable
+          isSettled
+          isMagnetized={false}
+          hasConflict={false}
+        />,
+      );
+
+      expect(html).toContain('timelineEventSettled');
+      expect(html).not.toContain('timelineEventMagnetized');
+      expect(html).not.toContain('timelineEventConflicted');
+      expect(html).not.toContain('timelineConflictBadge');
+    });
+  });
 });

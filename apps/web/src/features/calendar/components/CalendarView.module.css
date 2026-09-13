@@ -886,6 +886,26 @@
     var(--shadow-md);
 }
 
+.timelineEventSettled {
+  animation: timeline-settle 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center center;
+}
+
+@keyframes timeline-settle {
+  0% {
+    transform: scale(0.985);
+    box-shadow: var(--shadow-sm);
+  }
+  50% {
+    transform: scale(1.008);
+    box-shadow: var(--shadow-md);
+  }
+  100% {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
 .timelineMagneticGuide {
   position: absolute;
   right: 0;
@@ -2250,7 +2270,8 @@
   .timelineEventTitleResizingShort,
   .timelineEventTitleResizingNormal,
   .timelineEventTitleMovingShort,
-  .timelineEventTitleMovingNormal {
+  .timelineEventTitleMovingNormal,
+  .timelineEventSettled {
     animation: none !important;
     animation-duration: 1ms !important;
     transition: none !important;

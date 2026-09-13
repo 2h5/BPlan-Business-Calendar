@@ -35,6 +35,7 @@ import {
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const HOLD_DELAY_MS = 180;
+const SETTLE_ANIMATION_MS = 180;
 
 export interface SlotSelection {
   dateKey: string;
@@ -114,6 +115,7 @@ export interface EventButtonProps {
   isMovable?: boolean;
   isMagnetized?: boolean;
   hasConflict?: boolean;
+  isSettled?: boolean;
 }
 
 export function EventButton({
@@ -137,6 +139,7 @@ export function EventButton({
   isMovable,
   isMagnetized,
   hasConflict,
+  isSettled,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
   const isResizing = Boolean(resizePreview);
@@ -161,7 +164,9 @@ export function EventButton({
           : ''
       } ${isMovable && !isPreviewing ? styles.timelineEventMovable : ''} ${
         isMagnetized ? styles.timelineEventMagnetized : ''
-      } ${hasConflict ? styles.timelineEventConflicted : ''}`}
+      } ${hasConflict ? styles.timelineEventConflicted : ''} ${
+        isSettled && !isPreviewing ? styles.timelineEventSettled : ''
+      }`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
       onPointerDown={onMovePointerDown}
       onPointerMove={onMovePointerMove}
@@ -325,6 +330,7 @@ export function TimelineView({
     edge: 'start' | 'end';
   } | null>(null);
   const [hasConflict, setHasConflict] = useState(false);
+  const [settledOccurrenceKey, setSettledOccurrenceKey] = useState<string | null>(null);
 
   const resizeRef = useRef<{
     occurrence: EventOccurrence;
@@ -356,6 +362,27 @@ export function TimelineView({
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
   const suppressedClickKeyRef = useRef<string | null>(null);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const triggerSettle = (occurrenceKey: string) => {
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+    setSettledOccurrenceKey(occurrenceKey);
+    settleTimerRef.current = setTimeout(() => {
+      settleTimerRef.current = null;
+      setSettledOccurrenceKey((current) => (current === occurrenceKey ? null : current));
+    }, SETTLE_ANIMATION_MS);
+  };
+
+  const clearSettle = () => {
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+    setSettledOccurrenceKey(null);
+  };
 
   const dragRef = useRef<{
     dateKey: string;
@@ -371,6 +398,9 @@ export function TimelineView({
     return () => {
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
+      }
+      if (settleTimerRef.current) {
+        clearTimeout(settleTimerRef.current);
       }
     };
   }, []);
@@ -557,6 +587,7 @@ export function TimelineView({
       targets,
       conflictCandidates,
     };
+    clearSettle();
     suppressedClickKeyRef.current = occurrence.key;
     setResizePreview({ occurrenceKey: occurrence.key, interval });
     setMagneticSnap(null);
@@ -644,6 +675,7 @@ export function TimelineView({
 
     const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
     if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
+    triggerSettle(active.occurrence.key);
     onResizeEvent?.(active.occurrence, nextTiming);
   };
 
@@ -717,6 +749,7 @@ export function TimelineView({
 
     if (active.status === 'pending') {
       active.status = 'dragging';
+      clearSettle();
       suppressedClickKeyRef.current = active.occurrence.key;
       try {
         active.button.setPointerCapture(e.pointerId);
@@ -818,6 +851,7 @@ export function TimelineView({
 
     const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
     if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
+    triggerSettle(active.occurrence.key);
     onMoveEvent?.(active.occurrence, nextTiming);
   };
 
@@ -1199,6 +1233,7 @@ export function TimelineView({
                         (resizePreview?.occurrenceKey === placed.item.key ||
                           movePreview?.occurrenceKey === placed.item.key),
                       )}
+                      isSettled={settledOccurrenceKey === placed.item.key}
                     />
                   );
                 })}
