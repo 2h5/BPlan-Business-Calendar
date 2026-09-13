@@ -21,7 +21,11 @@ import {
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
-import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
+import {
+  getActiveCalendarView,
+  isValidCalendarViewMode,
+  setLastCalendarView,
+} from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
 import { eventInputWithTiming, type EventFormValues } from '../utils/event-form';
 
@@ -78,8 +82,11 @@ export function CalendarView() {
   const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const [mode, setMode] = useState<CalendarViewMode>(() => {
     const viewParam = searchParams.get('view');
-    if (isValidCalendarViewMode(viewParam)) return viewParam;
-    return getDefaultCalendarView();
+    if (isValidCalendarViewMode(viewParam)) {
+      setLastCalendarView(viewParam);
+      return viewParam;
+    }
+    return getActiveCalendarView();
   });
   const [transitionDirection, setTransitionDirection] = useState<'in' | 'out' | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState(
@@ -142,6 +149,14 @@ export function CalendarView() {
       setSelectedDateKey(dateParam);
     }
   }, [dateParam]);
+
+  const viewParam = searchParams.get('view');
+  useEffect(() => {
+    if (isValidCalendarViewMode(viewParam) && viewParam !== mode) {
+      setLastCalendarView(viewParam);
+      setMode(viewParam);
+    }
+  }, [viewParam, mode]);
 
   const hasRequestedNewEvent =
     searchParams.get('new') === 'true' || searchParams.get('newEvent') === 'true';
@@ -305,6 +320,7 @@ export function CalendarView() {
   const changeMode = useCallback(
     (nextMode: CalendarViewMode) => {
       if (nextMode === mode) return;
+      setLastCalendarView(nextMode);
       const order: Record<CalendarViewMode, number> = { day: 0, week: 1, month: 2 };
       const dir = order[nextMode] < order[mode] ? 'in' : 'out';
       setTransitionDirection(dir);
