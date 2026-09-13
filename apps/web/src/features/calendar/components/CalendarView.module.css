@@ -847,7 +847,9 @@
   background: color-mix(in srgb, var(--event-color) 24%, var(--color-bg-surface));
   border-color: color-mix(in srgb, var(--event-color) 60%, transparent);
   transform: none;
-  transition: none;
+  transition:
+    top 110ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 110ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .timelineEventMoving,

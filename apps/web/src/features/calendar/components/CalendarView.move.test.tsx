@@ -172,26 +172,12 @@ describe('CalendarView move mutation coordination and undo/rollback', () => {
     expect(toastMessage).toBe('Move undone.');
   });
 
-  it('transitions toast through intermediate Restoring event… state and records restoring rect on Undo', async () => {
-    const testEvent: CalendarEvent = {
-      ...event,
-      id: 'e-toast-test',
-    };
-
+  it('transitions toast through intermediate Restoring event… state on Undo', async () => {
     const messages: string[] = [];
-    type RestoringType = { eventId: string; initialRect: { top: number; left: number } };
-    let restoringInfo: RestoringType | null = null;
 
     // Simulate clicking Undo in CalendarView
     const handleUndo = async () => {
-      // 1. Capture initial rect
-      restoringInfo = {
-        eventId: testEvent.id,
-        initialRect: { top: 800, left: 600 },
-      };
-      // 2. Transition toast to Restoring
       messages.push('Restoring event…');
-      // 3. Complete mutation and transition to Move undone.
       messages.push('Move undone.');
     };
 
@@ -200,8 +186,5 @@ describe('CalendarView move mutation coordination and undo/rollback', () => {
 
     await handleUndo();
     expect(messages).toEqual(['Event moved', 'Restoring event…', 'Move undone.']);
-    expect(restoringInfo).not.toBeNull();
-    expect((restoringInfo as RestoringType | null)?.eventId).toBe('e-toast-test');
-    expect((restoringInfo as RestoringType | null)?.initialRect).toBeDefined();
   });
 });

@@ -61,16 +61,6 @@ export interface EventTiming {
   end: number;
 }
 
-export interface RestoringEventInfo {
-  eventId: string;
-  initialRect: {
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  };
-}
-
 export interface TimelineViewProps {
   dateKeys: readonly string[];
   byDateKey: ReadonlyMap<string, EventOccurrence[]>;
@@ -87,8 +77,6 @@ export interface TimelineViewProps {
   draftEvent?: DraftEventState | null;
   defaultDurationMinutes?: number;
   workingHours?: WorkingHours;
-  restoringEvent?: RestoringEventInfo | null;
-  onRestoringComplete?: () => void;
 }
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
@@ -328,8 +316,6 @@ export function TimelineView({
   draftEvent,
   defaultDurationMinutes = 60,
   workingHours,
-  restoringEvent,
-  onRestoringComplete,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isWeek = dateKeys.length > 1;
@@ -426,66 +412,6 @@ export function TimelineView({
     }
     setSettledOccurrenceKey(null);
   };
-
-  useEffect(() => {
-    if (!restoringEvent) return;
-
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
-    ) {
-      onRestoringComplete?.();
-      return;
-    }
-
-    const { eventId, initialRect } = restoringEvent;
-    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-event-id="${eventId}"]`);
-    if (!el) {
-      onRestoringComplete?.();
-      return;
-    }
-
-    const newRect = el.getBoundingClientRect();
-    const dx = initialRect.left - newRect.left;
-    const dy = initialRect.top - newRect.top;
-    const dHeight = initialRect.height - newRect.height;
-
-    if (Math.abs(dx) > 1 || Math.abs(dy) > 1 || Math.abs(dHeight) > 1) {
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-      if (Math.abs(dHeight) > 1) {
-        el.style.height = `${initialRect.height}px`;
-      }
-      el.style.transition = 'none';
-
-      // Force synchronous reflow
-      void el.offsetHeight;
-
-      const raf = requestAnimationFrame(() => {
-        el.style.transition =
-          'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), height 260ms cubic-bezier(0.16, 1, 0.3, 1)';
-        el.style.transform = 'none';
-        el.style.height = '';
-      });
-
-      const timer = setTimeout(() => {
-        el.style.transition = '';
-        el.style.transform = '';
-        el.style.height = '';
-        triggerSettle(eventId);
-        onRestoringComplete?.();
-      }, 270);
-
-      return () => {
-        cancelAnimationFrame(raf);
-        clearTimeout(timer);
-        el.style.transition = '';
-        el.style.transform = '';
-        el.style.height = '';
-      };
-    } else {
-      onRestoringComplete?.();
-    }
-  }, [restoringEvent, onRestoringComplete]);
 
   const dragRef = useRef<{
     dateKey: string;

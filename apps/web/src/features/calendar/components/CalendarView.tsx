@@ -9,12 +9,7 @@ import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import {
-  TimelineView,
-  type EventTiming,
-  type RestoringEventInfo,
-  type SlotSelection,
-} from './TimelineView';
+import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
 import {
   useCreateCalendar,
@@ -109,8 +104,7 @@ export function CalendarView() {
   const [isToastExiting, setIsToastExiting] = useState(false);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [restoringEvent, setRestoringEvent] = useState<RestoringEventInfo | null>(null);
-  const clearRestoringEvent = useCallback(() => setRestoringEvent(null), []);
+
   const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
     () => new Map(),
   );
@@ -423,22 +417,6 @@ export function CalendarView() {
 
   const showSuccess = useCallback((message: string) => showToast({ message }, 3000), [showToast]);
 
-  const captureEventRect = useCallback((eventId: string): RestoringEventInfo | null => {
-    if (typeof document === 'undefined') return null;
-    const el = document.querySelector<HTMLElement>(`[data-event-id="${eventId}"]`);
-    if (!el) return null;
-    const rect = el.getBoundingClientRect();
-    return {
-      eventId,
-      initialRect: {
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-      },
-    };
-  }, []);
-
   useEffect(
     () => () => {
       if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
@@ -498,8 +476,6 @@ export function CalendarView() {
             message: 'Event resized',
             actionLabel: 'Undo',
             onAction: () => {
-              const restoring = captureEventRect(event.id);
-              if (restoring) setRestoringEvent(restoring);
               setTimingOverride(event.id, previous);
               showToast({ message: 'Restoring event…' });
               void updateEvent
@@ -526,15 +502,7 @@ export function CalendarView() {
       };
       void persist();
     },
-    [
-      captureEventRect,
-      result,
-      showSuccess,
-      showToast,
-      setTimingOverride,
-      timingOverrides,
-      updateEvent,
-    ],
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
   );
 
   const handleMoveEvent = useCallback(
@@ -561,8 +529,6 @@ export function CalendarView() {
             message: 'Event moved',
             actionLabel: 'Undo',
             onAction: () => {
-              const restoring = captureEventRect(event.id);
-              if (restoring) setRestoringEvent(restoring);
               setTimingOverride(event.id, previous);
               showToast({ message: 'Restoring event…' });
               void updateEvent
@@ -589,15 +555,7 @@ export function CalendarView() {
       };
       void persist();
     },
-    [
-      captureEventRect,
-      result,
-      showSuccess,
-      showToast,
-      setTimingOverride,
-      timingOverrides,
-      updateEvent,
-    ],
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
   );
 
   return (
@@ -718,8 +676,6 @@ export function CalendarView() {
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
                   workingHours={result.workingHours}
-                  restoringEvent={restoringEvent}
-                  onRestoringComplete={clearRestoringEvent}
                 />
               )}
             </div>

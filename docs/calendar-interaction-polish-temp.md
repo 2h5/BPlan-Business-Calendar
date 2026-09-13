@@ -326,10 +326,9 @@ Implemented fluid micro-motion polish for direct manipulation, cross-day snap tr
 
 ### Capabilities:
 
-- **Intra-Day Move Smoothness**:
+- **Intra-Day Move & Resize Smoothness**:
   - Separated `.timelineEventMoving` from `.timelineEventResizing` CSS classes.
-  - While resizing retains zero latency (`transition: none`), moving applies a snappy `top 110ms cubic-bezier(0.16, 1, 0.3, 1)` transition so 15-minute grid clicks and magnetic snaps glide smoothly rather than instantly teleporting.
-  - Dynamically glides horizontally (`left 120ms`, `width 120ms`) during overlap re-layout.
+  - Both moving and resizing apply snappy `110ms cubic-bezier(0.16, 1, 0.3, 1)` transitions (`top 110ms`, `height 110ms` for resizing; `top 110ms`, `left 120ms`, `width 120ms` for moving), giving 15-minute grid clicks and magnetic snaps the same smooth, cushioned glide feel when dragging either the event body or the top/bottom resize handles.
 - **Cross-Day Snap Transitions in Week View**:
   - Detects day column transitions in real time during horizontal drag gestures (`snapDirection`: `'left' | 'right'`).
   - Applies directional CSS keyframes (`@keyframes event-snap-from-left` and `@keyframes event-snap-from-right` over 140ms `cubic-bezier(0.16, 1, 0.3, 1)`) settling cleanly to `transform: none` as the event reparents into the new day column.
@@ -337,11 +336,8 @@ Implemented fluid micro-motion polish for direct manipulation, cross-day snap tr
   - Replaced abrupt toast mount/unmount with a 220ms springy slide-fade entrance (`@keyframes toast-enter`) and an animated 180ms slide-fade exit (`@keyframes toast-exit`).
   - Tactile button press feedback (`transform: scale(0.94)`) on toast action buttons.
   - Active spinner (`.toastSpinner`) and smooth text pop animation during "Restoring event…" in-flight state.
-- **FLIP-Based Undo Return Animation**:
-  - Captures the exact source `DOMRect` of `[data-event-id="${event.id}"]` at the instant "Undo" is clicked.
-  - Computes `dx`, `dy`, and height deltas (`dHeight`) at the restored slot across any time, day, or duration change.
-  - Inverts coordinates via temporary transform, forces reflow, and transitions smoothly over 260ms `cubic-bezier(0.16, 1, 0.3, 1)` to `none`.
-  - Triggers the Phase 3.3 settle pop landing animation (`triggerSettle`) upon reaching destination, and strips all inline style overrides cleanly.
+- **Clean Instant Undo Restoration**:
+  - When clicking "Undo", the event immediately snaps back to its prior timing/date without awkward intermediate deform or spring transitions, instantly restoring state and presenting the "Restoring event…" spinner.
 - **Compositor & Accessibility Compliance**:
   - Full `@media (prefers-reduced-motion: reduce)` coverage instantly disabling transitions and animations.
   - All animated elements settle to `transform: none` with zero persistent `will-change: transform`.
