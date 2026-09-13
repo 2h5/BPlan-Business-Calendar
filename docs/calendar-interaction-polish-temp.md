@@ -246,15 +246,47 @@ Implemented a short, restrained visual settle animation when a timed event is re
 
 ---
 
-## Next Phase: Phase 3.4 — Edge Auto-Scroll [PENDING]
+## Phase 3.4 — Timeline Edge Auto-Scroll [COMPLETE]
 
-- **Phase 3.4 — Edge Auto-Scroll**:
-  Smooth timeline container scrolling when dragging within 40px of the top or bottom viewport edges.
+Implemented smooth timeline container edge auto-scrolling during whole-event move and edge-resize gestures in Day and Week views.
+
+### Capabilities:
+
+- **When Auto-Scroll Is Active**:
+  - Runs strictly during an active gesture:
+    - Move: only when `status === 'dragging'` (drag threshold of 6px exceeded; never runs during pending click).
+    - Resize: active during resize manipulation.
+  - Zero auto-scroll during normal clicks, column drag-to-create, empty slot clicks, or ordinary non-gesture mouse movements.
+- **Edge Detection & Velocity Curve**:
+  - Edge zones: top 44px and bottom 44px of the `.timelineViewport` container.
+  - Directional quadratic velocity response:
+    - Top edge zone: upward scroll (`velocity < 0`).
+    - Bottom edge zone: downward scroll (`velocity > 0`).
+    - Center zone (deadband): velocity is exactly 0.
+    - Smooth non-linear acceleration: `minSpeed` (2px/frame) up to `maxSpeed` (16px/frame) as pointer approaches or exceeds the viewport edge.
+- **Dynamic Wall-Clock & Snapping Coordination**:
+  - As the viewport auto-scrolls underneath a stationary pointer, the event's proposed position dynamically and continuously updates to reflect newly exposed wall-clock time.
+  - Re-evaluates the complete coordinate pipeline on each RAF frame:
+    `pointer coordinates + scroll offset -> 15m grid -> magnetic snapping -> interval -> conflict detection -> visual preview`.
+  - Same-day bounds [0, 1440m] are strictly respected.
+  - Live conflict feedback and magnetic snap guides update dynamically as the viewport auto-scrolls.
+- **Clean Lifecycle & Boundary Protection**:
+  - Auto-scroll stops immediately and cancels RAF loop when:
+    - Pointer moves into center deadband.
+    - Scroll reaches physical container boundaries (`scrollTop === 0` or `scrollTop === maxScrollTop`).
+    - Pointer is released (`pointerup`).
+    - Gesture is cancelled (`pointercancel`, `Escape`).
+    - Component unmounts.
+  - Release settle animation (Phase 3.3) plays cleanly upon release if event timing changed.
+- **Compositor & Blur Safety Compliance**:
+  - Zero permanent `will-change`, no filters, no retained GPU layers. Pure DOM `scrollTop` manipulation without layout thrashing.
 
 ---
 
 ## Future Polish Phases
 
+- **Phase 3.2 — Origin Ghost Indicator [OPTIONAL / PENDING]**:
+  Faint ghost outline at the event's original position during drag if user testing indicates it aids spatial orientation.
 - **Phase 4 — Keyboard Manipulation**:
   15-minute keyboard nudging for selected events (e.g. `Alt + Up/Down` to move, `Alt + Shift + Up/Down` to resize) with ARIA live announcements.
 - **Phase 5 — Spatial View Transitions**:
@@ -301,11 +333,11 @@ Future agents working on this roadmap must strictly obey these boundaries:
 - [x] Phase 1.2 — Chromium rendering & animation hardening (`989cd1d`, `31c0738`, `410881c`)
 - [x] Phase 2 — whole-event drag-to-move
 - [ ] Phase 2.1 — move/resize regression hardening & gesture collision tests
-- [ ] Phase 3.0 — magnetic snapping
-- [ ] Phase 3.1 — live conflict warning feedback
-- [ ] Phase 3.2 — origin ghost outline
-- [ ] Phase 3.3 — release settle animation
-- [ ] Phase 3.4 — timeline edge auto-scroll
+- [x] Phase 3.0 — magnetic snapping (`24d8a33`)
+- [x] Phase 3.1 — live conflict warning feedback (`6841359`)
+- [ ] Phase 3.2 — origin ghost outline [OPTIONAL / PENDING]
+- [x] Phase 3.3 — release settle animation (`8abbd0b`)
+- [x] Phase 3.4 — timeline edge auto-scroll
 - [ ] Phase 4 — keyboard nudging shortcuts
 - [ ] Phase 5 — Month / Week / Day spatial continuity transitions
 - [ ] Deferred — safe recurring occurrence mutation

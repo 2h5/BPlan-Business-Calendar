@@ -12,6 +12,7 @@ import styles from './CalendarView.module.css';
 import type { AnchorRect } from './QuickCreatePopover';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
+import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
 import {
   collectConflictCandidates,
   hasConflict as checkHasConflict,
@@ -342,6 +343,7 @@ export function TimelineView({
     pointerId: number;
     handle: HTMLSpanElement;
     columnTop: number;
+    initialScrollTop: number;
     targets: MagneticTarget[];
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
@@ -358,11 +360,21 @@ export function TimelineView({
     pointerId: number;
     button: HTMLButtonElement;
     columnTop: number;
+    initialScrollTop: number;
     targets: MagneticTarget[];
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
   const suppressedClickKeyRef = useRef<string | null>(null);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
+
+  const stopAutoScroll = () => {
+    if (autoScrollRafRef.current !== null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  };
 
   const triggerSettle = (occurrenceKey: string) => {
     if (settleTimerRef.current) {
@@ -396,6 +408,7 @@ export function TimelineView({
 
   useEffect(() => {
     return () => {
+      stopAutoScroll();
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
       }
@@ -546,6 +559,194 @@ export function TimelineView({
     }
   };
 
+  const applyResizePosition = (clientY: number, scrollTop: number) => {
+    const active = resizeRef.current;
+    if (!active) return;
+
+    const scrollDelta = scrollTop - active.initialScrollTop;
+    const rawMinute = ((clientY - active.columnTop + scrollDelta) / hourHeight) * 60;
+    const snapResult = snapResizeInterval({
+      originalMinutes: active.originalMinutes,
+      edge: active.edge,
+      rawPointerMinute: rawMinute,
+      targets: active.targets,
+    });
+    const next = snapResult.interval;
+
+    if (snapResult.snap) {
+      setMagneticSnap({
+        dateKey: active.dateKey,
+        minute: snapResult.snap.snappedMinute,
+        edge: snapResult.snap.edge,
+      });
+    } else {
+      setMagneticSnap(null);
+    }
+
+    const conflicting = checkHasConflict(next, active.conflictCandidates);
+    setHasConflict(conflicting);
+
+    if (
+      next.startMinute === active.currentMinutes.startMinute &&
+      next.endMinute === active.currentMinutes.endMinute
+    ) {
+      return;
+    }
+
+    const nextStart = dateMinuteToInstant(active.dateKey, next.startMinute, timeZone);
+    const nextEnd = dateMinuteToInstant(active.dateKey, next.endMinute, timeZone);
+    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
+
+    active.currentMinutes = next;
+    setResizePreview({ occurrenceKey: active.occurrence.key, interval: next });
+  };
+
+  const applyMovePosition = (clientX: number, clientY: number, scrollTop: number) => {
+    const active = moveRef.current;
+    if (!active) return;
+
+    const scrollDelta = scrollTop - active.initialScrollTop;
+    const effectiveCurrentY = clientY + scrollDelta;
+
+    const resolution = resolveMoveGesture({
+      startY: active.startY,
+      startX: active.startX,
+      currentY: effectiveCurrentY,
+      currentX: clientX,
+      hourHeight,
+      originalMinutes: active.originalMinutes,
+      computeInterval: (deltaMinutes) =>
+        snapMoveInterval({
+          originalMinutes: active.originalMinutes,
+          deltaMinutes,
+          targets: active.targets,
+        }),
+    });
+
+    if (resolution.type !== 'move' && resolution.type !== 'noop') {
+      return;
+    }
+
+    if (active.status === 'pending') {
+      active.status = 'dragging';
+      clearSettle();
+      suppressedClickKeyRef.current = active.occurrence.key;
+      try {
+        active.button.setPointerCapture(active.pointerId);
+      } catch {
+        // Pointer capture is best-effort in synthetic/test environments.
+      }
+    }
+
+    const targetMinutes =
+      resolution.type === 'noop' ? active.originalMinutes : resolution.nextMinutes;
+
+    if (resolution.snap) {
+      setMagneticSnap({
+        dateKey: active.dateKey,
+        minute: resolution.snap.snappedMinute,
+        edge: resolution.snap.edge,
+      });
+    } else {
+      setMagneticSnap(null);
+    }
+
+    const conflicting = checkHasConflict(targetMinutes, active.conflictCandidates);
+    setHasConflict(conflicting);
+
+    if (
+      targetMinutes.startMinute === active.currentMinutes.startMinute &&
+      targetMinutes.endMinute === active.currentMinutes.endMinute
+    ) {
+      return;
+    }
+
+    const nextStart = dateMinuteToInstant(active.dateKey, targetMinutes.startMinute, timeZone);
+    const nextEnd = dateMinuteToInstant(active.dateKey, targetMinutes.endMinute, timeZone);
+    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
+
+    active.currentMinutes = targetMinutes;
+    setMovePreview({ occurrenceKey: active.occurrence.key, interval: targetMinutes });
+  };
+
+  const stepAutoScroll = () => {
+    const scrollContainer = scrollRef.current;
+    const lastPointer = lastPointerRef.current;
+    const isMoveActive = moveRef.current?.status === 'dragging';
+    const isResizeActive = Boolean(resizeRef.current);
+
+    if (!scrollContainer || !lastPointer || (!isMoveActive && !isResizeActive)) {
+      stopAutoScroll();
+      return;
+    }
+
+    const viewportRect = scrollContainer.getBoundingClientRect();
+    const velocity = calculateAutoScrollVelocity(lastPointer.clientY, viewportRect);
+
+    if (velocity === 0) {
+      stopAutoScroll();
+      return;
+    }
+
+    const currentScrollTop = scrollContainer.scrollTop;
+    const newScrollTop = clampScrollTop(
+      currentScrollTop + velocity,
+      scrollContainer.scrollHeight,
+      scrollContainer.clientHeight,
+    );
+
+    if (newScrollTop === currentScrollTop) {
+      stopAutoScroll();
+      return;
+    }
+
+    scrollContainer.scrollTop = newScrollTop;
+
+    if (isResizeActive && resizeRef.current) {
+      applyResizePosition(lastPointer.clientY, newScrollTop);
+    } else if (isMoveActive && moveRef.current) {
+      applyMovePosition(lastPointer.clientX, lastPointer.clientY, newScrollTop);
+    }
+
+    autoScrollRafRef.current = requestAnimationFrame(stepAutoScroll);
+  };
+
+  const checkAndTriggerAutoScroll = () => {
+    const scrollContainer = scrollRef.current;
+    const lastPointer = lastPointerRef.current;
+    const isMoveActive = moveRef.current?.status === 'dragging';
+    const isResizeActive = Boolean(resizeRef.current);
+
+    if (!scrollContainer || !lastPointer || (!isMoveActive && !isResizeActive)) {
+      stopAutoScroll();
+      return;
+    }
+
+    const viewportRect = scrollContainer.getBoundingClientRect();
+    const velocity = calculateAutoScrollVelocity(lastPointer.clientY, viewportRect);
+
+    if (velocity === 0) {
+      stopAutoScroll();
+      return;
+    }
+
+    const currentScrollTop = scrollContainer.scrollTop;
+    const newScrollTop = clampScrollTop(
+      currentScrollTop + velocity,
+      scrollContainer.scrollHeight,
+      scrollContainer.clientHeight,
+    );
+
+    if (newScrollTop === currentScrollTop) {
+      stopAutoScroll();
+      return;
+    }
+
+    if (autoScrollRafRef.current === null) {
+      autoScrollRafRef.current = requestAnimationFrame(stepAutoScroll);
+    }
+  };
+
   const handleResizePointerDown = (
     e: React.PointerEvent<HTMLSpanElement>,
     occurrence: EventOccurrence,
@@ -584,9 +785,11 @@ export function TimelineView({
       pointerId: e.pointerId,
       handle: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
+      initialScrollTop: scrollRef.current?.scrollTop ?? 0,
       targets,
       conflictCandidates,
     };
+    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
     clearSettle();
     suppressedClickKeyRef.current = occurrence.key;
     setResizePreview({ occurrenceKey: occurrence.key, interval });
@@ -606,44 +809,14 @@ export function TimelineView({
     e.preventDefault();
     e.stopPropagation();
 
-    const rawMinute = ((e.clientY - active.columnTop) / hourHeight) * 60;
-    const snapResult = snapResizeInterval({
-      originalMinutes: active.originalMinutes,
-      edge: active.edge,
-      rawPointerMinute: rawMinute,
-      targets: active.targets,
-    });
-    const next = snapResult.interval;
-
-    if (snapResult.snap) {
-      setMagneticSnap({
-        dateKey: active.dateKey,
-        minute: snapResult.snap.snappedMinute,
-        edge: snapResult.snap.edge,
-      });
-    } else {
-      setMagneticSnap(null);
-    }
-
-    const conflicting = checkHasConflict(next, active.conflictCandidates);
-    setHasConflict(conflicting);
-
-    if (
-      next.startMinute === active.currentMinutes.startMinute &&
-      next.endMinute === active.currentMinutes.endMinute
-    ) {
-      return;
-    }
-
-    const nextStart = dateMinuteToInstant(active.dateKey, next.startMinute, timeZone);
-    const nextEnd = dateMinuteToInstant(active.dateKey, next.endMinute, timeZone);
-    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
-
-    active.currentMinutes = next;
-    setResizePreview({ occurrenceKey: active.occurrence.key, interval: next });
+    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
+    applyResizePosition(e.clientY, currentScrollTop);
+    checkAndTriggerAutoScroll();
   };
 
   const finishResize = (e: React.PointerEvent<HTMLSpanElement>, cancelled: boolean) => {
+    stopAutoScroll();
     const active = resizeRef.current;
     if (!active || active.pointerId !== e.pointerId) return;
     e.preventDefault();
@@ -656,6 +829,7 @@ export function TimelineView({
     }
 
     resizeRef.current = null;
+    lastPointerRef.current = null;
     setResizePreview(null);
     setMagneticSnap(null);
     setHasConflict(false);
@@ -718,9 +892,11 @@ export function TimelineView({
       pointerId: e.pointerId,
       button: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
+      initialScrollTop: scrollRef.current?.scrollTop ?? 0,
       targets,
       conflictCandidates,
     };
+    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
     setHasConflict(false);
   };
 
@@ -728,71 +904,18 @@ export function TimelineView({
     const active = moveRef.current;
     if (!active || active.pointerId !== e.pointerId) return;
 
-    const resolution = resolveMoveGesture({
-      startY: active.startY,
-      startX: active.startX,
-      currentY: e.clientY,
-      currentX: e.clientX,
-      hourHeight,
-      originalMinutes: active.originalMinutes,
-      computeInterval: (deltaMinutes) =>
-        snapMoveInterval({
-          originalMinutes: active.originalMinutes,
-          deltaMinutes,
-          targets: active.targets,
-        }),
-    });
-
-    if (resolution.type !== 'move' && resolution.type !== 'noop') {
-      return;
+    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
+    applyMovePosition(e.clientX, e.clientY, currentScrollTop);
+    if (active.status === 'dragging') {
+      e.preventDefault();
+      e.stopPropagation();
+      checkAndTriggerAutoScroll();
     }
-
-    if (active.status === 'pending') {
-      active.status = 'dragging';
-      clearSettle();
-      suppressedClickKeyRef.current = active.occurrence.key;
-      try {
-        active.button.setPointerCapture(e.pointerId);
-      } catch {
-        // Pointer capture is best-effort in synthetic/test environments.
-      }
-    }
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const targetMinutes =
-      resolution.type === 'noop' ? active.originalMinutes : resolution.nextMinutes;
-
-    if (resolution.snap) {
-      setMagneticSnap({
-        dateKey: active.dateKey,
-        minute: resolution.snap.snappedMinute,
-        edge: resolution.snap.edge,
-      });
-    } else {
-      setMagneticSnap(null);
-    }
-
-    const conflicting = checkHasConflict(targetMinutes, active.conflictCandidates);
-    setHasConflict(conflicting);
-
-    if (
-      targetMinutes.startMinute === active.currentMinutes.startMinute &&
-      targetMinutes.endMinute === active.currentMinutes.endMinute
-    ) {
-      return;
-    }
-
-    const nextStart = dateMinuteToInstant(active.dateKey, targetMinutes.startMinute, timeZone);
-    const nextEnd = dateMinuteToInstant(active.dateKey, targetMinutes.endMinute, timeZone);
-    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
-
-    active.currentMinutes = targetMinutes;
-    setMovePreview({ occurrenceKey: active.occurrence.key, interval: targetMinutes });
   };
 
   const finishMove = (e: React.PointerEvent<HTMLButtonElement>, cancelled: boolean) => {
+    stopAutoScroll();
     const active = moveRef.current;
     if (!active || active.pointerId !== e.pointerId) return;
 
@@ -804,6 +927,7 @@ export function TimelineView({
 
     const wasDragging = active.status === 'dragging';
     moveRef.current = null;
+    lastPointerRef.current = null;
     setMovePreview(null);
     setMagneticSnap(null);
     setHasConflict(false);
@@ -823,10 +947,14 @@ export function TimelineView({
 
     if (cancelled) return;
 
+    const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
+    const scrollDelta = currentScrollTop - active.initialScrollTop;
+    const effectiveCurrentY = e.clientY + scrollDelta;
+
     const resolution = resolveMoveGesture({
       startY: active.startY,
       startX: active.startX,
-      currentY: e.clientY,
+      currentY: effectiveCurrentY,
       currentX: e.clientX,
       hourHeight,
       originalMinutes: active.originalMinutes,
@@ -861,6 +989,8 @@ export function TimelineView({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        stopAutoScroll();
+        lastPointerRef.current = null;
         if (moveRef.current?.status === 'dragging') {
           const active = moveRef.current;
           try {

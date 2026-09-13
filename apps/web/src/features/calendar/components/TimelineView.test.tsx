@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { EventButton, TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
 
 const mockNow = new Date('2026-09-15T10:00:00.000Z');
 const timeZone = 'America/New_York';
@@ -780,6 +781,33 @@ describe('TimelineView move affordances and live feedback', () => {
       expect(html).not.toContain('timelineEventMagnetized');
       expect(html).not.toContain('timelineEventConflicted');
       expect(html).not.toContain('timelineConflictBadge');
+    });
+  });
+
+  describe('TimelineView auto-scroll edge velocity and viewport coordination', () => {
+    it('calculates expected velocities across top, center deadband, and bottom zones', () => {
+      const viewport = { top: 100, bottom: 900, height: 800 };
+      // Center zone (deadband): velocity is 0
+      expect(calculateAutoScrollVelocity(500, viewport)).toBe(0);
+
+      // Top edge zone: negative velocity (scroll up)
+      const topVelocity = calculateAutoScrollVelocity(120, viewport);
+      expect(topVelocity).toBeLessThan(0);
+
+      // Bottom edge zone: positive velocity (scroll down)
+      const bottomVelocity = calculateAutoScrollVelocity(880, viewport);
+      expect(bottomVelocity).toBeGreaterThan(0);
+    });
+
+    it('correctly bounds container scrollTop with clampScrollTop', () => {
+      // Within bounds
+      expect(clampScrollTop(250, 1000, 600)).toBe(250);
+      // Below 0 -> clamped to 0
+      expect(clampScrollTop(-50, 1000, 600)).toBe(0);
+      // Above maxScroll (1000 - 600 = 400) -> clamped to 400
+      expect(clampScrollTop(450, 1000, 600)).toBe(400);
+      // Non-scrollable container -> clamped to 0
+      expect(clampScrollTop(50, 500, 600)).toBe(0);
     });
   });
 });
