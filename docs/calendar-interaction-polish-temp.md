@@ -17,8 +17,10 @@ This document records the design decisions, current state, and execution order f
    - Phase 1: timed event top/bottom resizing (`c547c58`)
    - Phase 1.1: small-event `< 45m` layout and micro-animation polish (`31c0738`, `410881c`)
    - Phase 1.2: Chromium rendering & animation hardening (`989cd1d`, `31c0738`, `410881c`)
-3. **What is currently next?** Phase 2: whole-event drag-to-move.
-4. **What remains beyond Phase 2?** Move/resize regression hardening, manipulation polish (magnetic snapping, conflict feedback, origin ghost, settle physics, edge auto-scroll), keyboard manipulation, and richer spatial view transitions.
+   - Phase 2: whole-event drag-to-move (`1692a9f`)
+   - Phase 3.0: magnetic snapping for move and resize
+3. **What is currently next?** Phase 3.1: Live Conflict Feedback.
+4. **What remains beyond Phase 3.0?** Live conflict feedback (Phase 3.1), origin ghost (Phase 3.2), settle physics (Phase 3.3), edge auto-scroll (Phase 3.4), keyboard manipulation (Phase 4), spatial view transitions (Phase 5), and regression hardening (Phase 2.1).
 5. **What order should the remaining work happen in?** Core drag-to-move first, then manipulation feedback, followed by keyboard shortcuts and spatial continuity transitions.
 6. **What architecture/safety constraints must future agents preserve?** Single save on release, `useUpdateEvent` mutation authority, provider write-routing, timezone purity, strict isolation between gestures, and compositor/rendering safety (no retained transforms or persistent `will-change`).
 7. **When should this temporary file be deleted?** Once the planned manipulation phases are complete and durable documentation is folded into permanent docs (e.g. `docs/calendar-views.md`).
@@ -143,12 +145,41 @@ Implemented direct manipulation whole-event dragging for timed events in Day and
 
 ---
 
-## Subsequent Manipulation Polish (Post-Phase 2)
+## Phase 3.0 — Magnetic Snapping [COMPLETE]
+
+Implemented subtle magnetic snapping supplementing the foundational 15-minute grid during move and resize gestures on the active day.
+
+### Capabilities:
+
+- **Magnetic Targets**:
+  - Start and end of other visible timed events on the active day (excluding the event being manipulated).
+  - Start and end of user-configured working hours for the active day's weekday.
+  - Strict scope: ignores other days, all-day events, recurring mutation series logic, and hidden/off-window events.
+- **Threshold & Catch Behavior**:
+  - Restrained threshold of 7 minutes (~6.3–7.5px across Week/Day views).
+  - Approaching a target within threshold subtly engages magnetic lock; continuing past threshold releases cleanly back to the 15-minute grid.
+  - Nearest deterministic target selection with tie-breaking preferring on-grid targets, event boundaries over working hours, and start over end.
+- **Move Semantics**:
+  - Whole-event movement preserves duration invariant across both start and end snap locks.
+  - Respects same-day bounds [0, 1440m].
+- **Resize Semantics**:
+  - Top resize: start edge magnetizes, end edge remains strictly fixed.
+  - Bottom resize: end edge magnetizes, start edge remains strictly fixed.
+  - Minimum duration (15m) strictly authoritative; candidate snaps resulting in < 15m are rejected.
+- **Visual Feedback**:
+  - Restrained 1px accent guide line (`.timelineMagneticGuide`) spanning the active day column at the snapped boundary with a 6px circular edge anchor.
+  - Subtle accent border on the event card (`.timelineEventMagnetized`).
+  - Clears immediately upon releasing the gesture or dragging past the threshold.
+- **Pure Interaction Math**:
+  - Implemented in `event-magnetic-snap.ts` with zero side effects on provider writes, database persistence, or recurrence logic.
+  - Fully hardened for Chromium blur safety (no permanent `will-change`, no filters, no retained transforms).
+
+---
+
+## Next Phase: Phase 3.1 — Live Conflict Feedback [PENDING]
 
 Execute these as discrete, focused sub-phases after core drag-to-move is solid:
 
-- **Phase 3.0 — Magnetic Snapping**:
-  Subtle magnetic affinity when approaching adjacent event boundaries or working-hours lines, without overriding the foundational 15-minute grid.
 - **Phase 3.1 — Live Conflict Feedback**:
   Non-blocking visual cues (e.g. subtle warning border/tint or conflict badge) while an event is dragged into an overlapping slot; clears instantly on exit.
 - **Phase 3.2 — Origin Ghost Indicator**:

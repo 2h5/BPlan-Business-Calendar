@@ -644,6 +644,7 @@ export function CalendarView() {
                   onSelectSlot={handleSlotSelect}
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
+                  workingHours={result.workingHours}
                 />
               )}
             </div>

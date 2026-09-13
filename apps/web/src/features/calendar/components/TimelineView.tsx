@@ -5,7 +5,7 @@ import {
   minuteOfDay,
   toZonedDateKey,
 } from '@cal/domain';
-import type { HourCycle } from '@cal/schemas';
+import type { HourCycle, WorkingHours } from '@cal/schemas';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import styles from './CalendarView.module.css';
@@ -13,12 +13,16 @@ import type { AnchorRect } from './QuickCreatePopover';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 import {
+  collectMagneticTargets,
+  snapMoveInterval,
+  snapResizeInterval,
+  type MagneticTarget,
+} from '../utils/event-magnetic-snap';
+import {
   dateMinuteToInstant,
   hasTimingChanged,
   isEventMovable,
   isEventResizable,
-  pointerYToSnappedMinute,
-  resizeMinuteInterval,
   resolveMoveGesture,
   type MinuteInterval,
   type ResizeEdge,
@@ -65,6 +69,7 @@ interface TimelineViewProps {
   onSelectSlot?: (selection: SlotSelection) => void;
   draftEvent?: DraftEventState | null;
   defaultDurationMinutes?: number;
+  workingHours?: WorkingHours;
 }
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
@@ -102,6 +107,7 @@ export interface EventButtonProps {
   resizePreview?: MinuteInterval;
   movePreview?: MinuteInterval;
   isMovable?: boolean;
+  isMagnetized?: boolean;
 }
 
 export function EventButton({
@@ -123,6 +129,7 @@ export function EventButton({
   resizePreview,
   movePreview,
   isMovable,
+  isMagnetized,
 }: EventButtonProps) {
   const color = occurrence.calendar?.color ?? 'var(--color-accent)';
   const isResizing = Boolean(resizePreview);
@@ -145,7 +152,9 @@ export function EventButton({
             ? styles.timelineEventResizingShort
             : styles.timelineEventMovingShort
           : ''
-      } ${isMovable && !isPreviewing ? styles.timelineEventMovable : ''}`}
+      } ${isMovable && !isPreviewing ? styles.timelineEventMovable : ''} ${
+        isMagnetized ? styles.timelineEventMagnetized : ''
+      }`}
       style={{ ...style, '--event-color': color } as React.CSSProperties}
       onPointerDown={onMovePointerDown}
       onPointerMove={onMovePointerMove}
@@ -271,6 +280,7 @@ export function TimelineView({
   onSelectSlot,
   draftEvent,
   defaultDurationMinutes = 60,
+  workingHours,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isWeek = dateKeys.length > 1;
@@ -290,6 +300,11 @@ export function TimelineView({
     occurrenceKey: string;
     interval: MinuteInterval;
   } | null>(null);
+  const [magneticSnap, setMagneticSnap] = useState<{
+    dateKey: string;
+    minute: number;
+    edge: 'start' | 'end';
+  } | null>(null);
 
   const resizeRef = useRef<{
     occurrence: EventOccurrence;
@@ -301,6 +316,7 @@ export function TimelineView({
     pointerId: number;
     handle: HTMLSpanElement;
     columnTop: number;
+    targets: MagneticTarget[];
   } | null>(null);
 
   const moveRef = useRef<{
@@ -315,6 +331,7 @@ export function TimelineView({
     pointerId: number;
     button: HTMLButtonElement;
     columnTop: number;
+    targets: MagneticTarget[];
   } | null>(null);
   const suppressedClickKeyRef = useRef<string | null>(null);
 
@@ -492,6 +509,13 @@ export function TimelineView({
     e.stopPropagation();
     const override = timingOverrides?.get(occurrence.event.id);
     const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
+    const targets = collectMagneticTargets({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: occurrence.key,
+      dateKey,
+      timeZone,
+      workingHours,
+    });
     resizeRef.current = {
       occurrence,
       dateKey,
@@ -502,9 +526,11 @@ export function TimelineView({
       pointerId: e.pointerId,
       handle: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
+      targets,
     };
     suppressedClickKeyRef.current = occurrence.key;
     setResizePreview({ occurrenceKey: occurrence.key, interval });
+    setMagneticSnap(null);
 
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -519,8 +545,25 @@ export function TimelineView({
     e.preventDefault();
     e.stopPropagation();
 
-    const pointerMinute = pointerYToSnappedMinute(e.clientY, active.columnTop, hourHeight);
-    const next = resizeMinuteInterval(active.originalMinutes, active.edge, pointerMinute);
+    const rawMinute = ((e.clientY - active.columnTop) / hourHeight) * 60;
+    const snapResult = snapResizeInterval({
+      originalMinutes: active.originalMinutes,
+      edge: active.edge,
+      rawPointerMinute: rawMinute,
+      targets: active.targets,
+    });
+    const next = snapResult.interval;
+
+    if (snapResult.snap) {
+      setMagneticSnap({
+        dateKey: active.dateKey,
+        minute: snapResult.snap.snappedMinute,
+        edge: snapResult.snap.edge,
+      });
+    } else {
+      setMagneticSnap(null);
+    }
+
     if (
       next.startMinute === active.currentMinutes.startMinute &&
       next.endMinute === active.currentMinutes.endMinute
@@ -550,6 +593,7 @@ export function TimelineView({
 
     resizeRef.current = null;
     setResizePreview(null);
+    setMagneticSnap(null);
     const suppressedKey = active.occurrence.key;
     globalThis.setTimeout(() => {
       if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
@@ -582,6 +626,13 @@ export function TimelineView({
 
     const override = timingOverrides?.get(occurrence.event.id);
     const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
+    const targets = collectMagneticTargets({
+      occurrences: byDateKey.get(dateKey) ?? [],
+      activeOccurrenceKey: occurrence.key,
+      dateKey,
+      timeZone,
+      workingHours,
+    });
 
     moveRef.current = {
       status: 'pending',
@@ -595,6 +646,7 @@ export function TimelineView({
       pointerId: e.pointerId,
       button: e.currentTarget,
       columnTop: column.getBoundingClientRect().top,
+      targets,
     };
   };
 
@@ -609,6 +661,12 @@ export function TimelineView({
       currentX: e.clientX,
       hourHeight,
       originalMinutes: active.originalMinutes,
+      computeInterval: (deltaMinutes) =>
+        snapMoveInterval({
+          originalMinutes: active.originalMinutes,
+          deltaMinutes,
+          targets: active.targets,
+        }),
     });
 
     if (resolution.type !== 'move' && resolution.type !== 'noop') {
@@ -630,6 +688,16 @@ export function TimelineView({
 
     const targetMinutes =
       resolution.type === 'noop' ? active.originalMinutes : resolution.nextMinutes;
+
+    if (resolution.snap) {
+      setMagneticSnap({
+        dateKey: active.dateKey,
+        minute: resolution.snap.snappedMinute,
+        edge: resolution.snap.edge,
+      });
+    } else {
+      setMagneticSnap(null);
+    }
 
     if (
       targetMinutes.startMinute === active.currentMinutes.startMinute &&
@@ -659,6 +727,7 @@ export function TimelineView({
     const wasDragging = active.status === 'dragging';
     moveRef.current = null;
     setMovePreview(null);
+    setMagneticSnap(null);
 
     if (!wasDragging) {
       return;
@@ -683,6 +752,12 @@ export function TimelineView({
       hourHeight,
       originalMinutes: active.originalMinutes,
       cancelled,
+      computeInterval: (deltaMinutes) =>
+        snapMoveInterval({
+          originalMinutes: active.originalMinutes,
+          deltaMinutes,
+          targets: active.targets,
+        }),
     });
 
     if (resolution.type !== 'move') return;
@@ -715,6 +790,7 @@ export function TimelineView({
           }
           moveRef.current = null;
           setMovePreview(null);
+          setMagneticSnap(null);
           const suppressedKey = active.occurrence.key;
           suppressedClickKeyRef.current = suppressedKey;
           globalThis.setTimeout(() => {
@@ -731,6 +807,7 @@ export function TimelineView({
           }
           resizeRef.current = null;
           setResizePreview(null);
+          setMagneticSnap(null);
           const suppressedKey = active.occurrence.key;
           suppressedClickKeyRef.current = suppressedKey;
           globalThis.setTimeout(() => {
@@ -1064,9 +1141,22 @@ export function TimelineView({
                       resizePreview={activeResize}
                       movePreview={activeMove}
                       isMovable={canMove}
+                      isMagnetized={Boolean(
+                        magneticSnap &&
+                        (resizePreview?.occurrenceKey === placed.item.key ||
+                          movePreview?.occurrenceKey === placed.item.key),
+                      )}
                     />
                   );
                 })}
+                {magneticSnap && magneticSnap.dateKey === dateKey && (
+                  <div
+                    className={styles.timelineMagneticGuide}
+                    style={{ top: (magneticSnap.minute / 60) * hourHeight }}
+                    data-snap-edge={magneticSnap.edge}
+                    data-snap-minute={magneticSnap.minute}
+                  />
+                )}
                 {nowTop !== null ? (
                   <span className={styles.nowLine} style={{ top: nowTop }}>
                     <i />

@@ -79,13 +79,13 @@ export function moveMinuteInterval(original: MinuteInterval, deltaMinutes: numbe
   };
 }
 
-export type MoveGestureResolution =
-  | { type: 'click' }
-  | { type: 'noop' }
-  | { type: 'cancel' }
-  | { type: 'move'; nextMinutes: MinuteInterval };
+export type MoveGestureResolution<TSnap = unknown> =
+  | { type: 'click'; snap?: undefined }
+  | { type: 'noop'; snap?: TSnap }
+  | { type: 'cancel'; snap?: undefined }
+  | { type: 'move'; nextMinutes: MinuteInterval; snap?: TSnap };
 
-export function resolveMoveGesture(params: {
+export function resolveMoveGesture<TSnap = unknown>(params: {
   startY: number;
   startX: number;
   currentY: number;
@@ -93,7 +93,8 @@ export function resolveMoveGesture(params: {
   hourHeight: number;
   originalMinutes: MinuteInterval;
   cancelled?: boolean;
-}): MoveGestureResolution {
+  computeInterval?: (deltaMinutes: number) => { interval: MinuteInterval; snap?: TSnap | null };
+}): MoveGestureResolution<TSnap> {
   if (params.cancelled) return { type: 'cancel' };
   const distY = Math.abs(params.currentY - params.startY);
   const distX = Math.abs(params.currentX - params.startX);
@@ -102,14 +103,18 @@ export function resolveMoveGesture(params: {
   }
   const deltaY = params.currentY - params.startY;
   const deltaMinutes = (deltaY / params.hourHeight) * 60;
-  const next = moveMinuteInterval(params.originalMinutes, deltaMinutes);
+  const computed = params.computeInterval
+    ? params.computeInterval(deltaMinutes)
+    : { interval: moveMinuteInterval(params.originalMinutes, deltaMinutes), snap: null };
+  const next = computed.interval;
+  const snap = computed.snap ?? undefined;
   if (
     next.startMinute === params.originalMinutes.startMinute &&
     next.endMinute === params.originalMinutes.endMinute
   ) {
-    return { type: 'noop' };
+    return snap ? { type: 'noop', snap } : { type: 'noop' };
   }
-  return { type: 'move', nextMinutes: next };
+  return snap ? { type: 'move', nextMinutes: next, snap } : { type: 'move', nextMinutes: next };
 }
 
 export function hasTimingChanged(

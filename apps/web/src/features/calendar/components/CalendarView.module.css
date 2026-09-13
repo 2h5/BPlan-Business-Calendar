@@ -864,6 +864,35 @@
   padding-block: 2px;
 }
 
+.timelineEventMagnetized {
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent),
+    var(--shadow-md);
+}
+
+.timelineMagneticGuide {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--color-accent);
+  z-index: 7;
+  pointer-events: none;
+}
+
+.timelineMagneticGuide::before {
+  position: absolute;
+  top: -2.5px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-accent) 60%, transparent);
+  content: '';
+}
+
 .timelineResizeHandle {
   position: absolute;
   z-index: 2;
