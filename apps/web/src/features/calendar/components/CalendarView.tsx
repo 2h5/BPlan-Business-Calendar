@@ -9,7 +9,7 @@ import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type SlotSelection } from './TimelineView';
+import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
 import {
   useCreateCalendar,
@@ -21,9 +21,24 @@ import {
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
-import { getDefaultCalendarView, isValidCalendarViewMode } from '../utils/calendar-preferences';
+import {
+  getActiveCalendarView,
+  isValidCalendarViewMode,
+  setLastCalendarView,
+} from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
-import type { EventFormValues } from '../utils/event-form';
+import { eventInputWithTiming, type EventFormValues } from '../utils/event-form';
+import {
+  getTransitionOrigin,
+  getViewTransitionDirection,
+  type ViewTransitionState,
+} from '../utils/view-transition';
+
+interface CalendarToast {
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
 
 function CalendarState({
   kind,
@@ -72,10 +87,14 @@ export function CalendarView() {
   const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const [mode, setMode] = useState<CalendarViewMode>(() => {
     const viewParam = searchParams.get('view');
-    if (isValidCalendarViewMode(viewParam)) return viewParam;
-    return getDefaultCalendarView();
+    if (isValidCalendarViewMode(viewParam)) {
+      setLastCalendarView(viewParam);
+      return viewParam;
+    }
+    return getActiveCalendarView();
   });
-  const [transitionDirection, setTransitionDirection] = useState<'in' | 'out' | null>(null);
+  const [transitionState, setTransitionState] = useState<ViewTransitionState | null>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedDateKey, setSelectedDateKey] = useState(
     () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
   );
@@ -87,7 +106,14 @@ export function CalendarView() {
   const [isEventEditorClosing, setIsEventEditorClosing] = useState(false);
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<CalendarToast | null>(null);
+  const [isToastExiting, setIsToastExiting] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
+    () => new Map(),
+  );
   const openingControlRef = useRef<HTMLElement | null>(null);
 
   const [quickCreateState, setQuickCreateState] = useState<{
@@ -124,7 +150,7 @@ export function CalendarView() {
   const createEvent = useCreateEvent(result.calendars);
   const updateEvent = useUpdateEvent(result.calendars);
   const removeEvent = useDeleteEvent(result.calendars);
-  const { window, timeZone } = result;
+  const { window: calendarWindow, timeZone, weekStartsOn } = result;
 
   const dateParam = searchParams.get('date');
   useEffect(() => {
@@ -167,7 +193,7 @@ export function CalendarView() {
         anchorRect,
       });
     } else {
-      setToast('Create or connect a writable calendar first.');
+      setToast({ message: 'Create or connect a writable calendar first.' });
     }
   }, [hasRequestedNewEvent, result.isLoading, result.calendars, timeZone]);
 
@@ -222,14 +248,14 @@ export function CalendarView() {
   }, [requestedEventId, result.occurrences, handleEventSelect]);
 
   const heading = useMemo(
-    () => formatRangeHeading(mode, selectedDateKey, window, timeZone),
-    [mode, selectedDateKey, timeZone, window],
+    () => formatRangeHeading(mode, selectedDateKey, calendarWindow, timeZone),
+    [mode, selectedDateKey, timeZone, calendarWindow],
   );
 
   const handleSlotSelect = useCallback(
     ({ dateKey, startMinute, endMinute, allDay, anchorRect }: SlotSelection) => {
       if (!result.calendars.some((c) => !c.isReadOnly)) {
-        setToast('Create or connect a writable calendar first.');
+        setToast({ message: 'Create or connect a writable calendar first.' });
         return;
       }
       rememberOpeningControl();
@@ -282,7 +308,9 @@ export function CalendarView() {
         { id: calendar.id, isVisible: !calendar.isVisible },
         {
           onError: (error) =>
-            setToast(error instanceof Error ? error.message : 'Visibility could not be saved.'),
+            setToast({
+              message: error instanceof Error ? error.message : 'Visibility could not be saved.',
+            }),
         },
       );
       if (selectedOccurrence?.event.calendarId === calendar.id) setSelectedOccurrence(null);
@@ -291,11 +319,41 @@ export function CalendarView() {
   );
 
   const changeMode = useCallback(
-    (nextMode: CalendarViewMode) => {
+    (nextMode: CalendarViewMode, targetDateKey?: string) => {
       if (nextMode === mode) return;
-      const order: Record<CalendarViewMode, number> = { day: 0, week: 1, month: 2 };
-      const dir = order[nextMode] < order[mode] ? 'in' : 'out';
-      setTransitionDirection(dir);
+      setLastCalendarView(nextMode);
+
+      const prefersReducedMotion =
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+      const direction = getViewTransitionDirection(mode, nextMode);
+      if (direction && !prefersReducedMotion) {
+        const origin = getTransitionOrigin({
+          fromMode: mode,
+          toMode: nextMode,
+          selectedDateKey: targetDateKey ?? selectedDateKey,
+          timeZone,
+          weekStartsOn,
+          dateKeys: calendarWindow.dateKeys,
+        });
+        setTransitionState({ direction, origin });
+
+        if (transitionTimerRef.current) {
+          clearTimeout(transitionTimerRef.current);
+        }
+        transitionTimerRef.current = setTimeout(() => {
+          setTransitionState(null);
+          transitionTimerRef.current = null;
+        }, 240);
+      } else {
+        if (transitionTimerRef.current) {
+          clearTimeout(transitionTimerRef.current);
+          transitionTimerRef.current = null;
+        }
+        setTransitionState(null);
+      }
+
       setMode(nextMode);
       setSelectedOccurrence(null);
       setIsDraft(false);
@@ -303,13 +361,28 @@ export function CalendarView() {
       setIsEventEditorClosing(false);
       setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
-    [mode],
+    [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys],
   );
+
+  const viewParam = searchParams.get('view');
+  useEffect(() => {
+    if (isValidCalendarViewMode(viewParam) && viewParam !== mode) {
+      changeMode(viewParam);
+    }
+  }, [viewParam, mode, changeMode]);
+
+  useEffect(() => {
+    return () => {
+      if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+      }
+    };
+  }, []);
 
   const selectMonthDate = useCallback(
     (dateKey: string) => {
       setSelectedDateKey(dateKey);
-      changeMode('day');
+      changeMode('day', dateKey);
     },
     [changeMode],
   );
@@ -348,10 +421,184 @@ export function CalendarView() {
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
-  const showSuccess = useCallback((message: string) => {
-    setToast(message);
-    globalThis.setTimeout(() => setToast(null), 3000);
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      globalThis.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    if (toastExitTimerRef.current) {
+      globalThis.clearTimeout(toastExitTimerRef.current);
+      toastExitTimerRef.current = null;
+    }
+    setIsToastExiting(true);
+    toastExitTimerRef.current = globalThis.setTimeout(() => {
+      setToast(null);
+      setIsToastExiting(false);
+      toastExitTimerRef.current = null;
+    }, 180);
   }, []);
+
+  const showToast = useCallback(
+    (nextToast: CalendarToast, duration = 6000) => {
+      if (toastTimerRef.current) {
+        globalThis.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+      if (toastExitTimerRef.current) {
+        globalThis.clearTimeout(toastExitTimerRef.current);
+        toastExitTimerRef.current = null;
+      }
+      setToast(nextToast);
+      setIsToastExiting(false);
+      toastTimerRef.current = globalThis.setTimeout(() => {
+        dismissToast();
+      }, duration);
+    },
+    [dismissToast],
+  );
+
+  const showSuccess = useCallback((message: string) => showToast({ message }, 3000), [showToast]);
+
+  useEffect(
+    () => () => {
+      if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
+      if (toastExitTimerRef.current) globalThis.clearTimeout(toastExitTimerRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const reflectedEventIds = [...timingOverrides]
+      .filter(([eventId, timing]) => {
+        const authoritative = result.occurrences.find(
+          (occurrence) => occurrence.event.id === eventId,
+        );
+        return authoritative?.start === timing.start && authoritative.end === timing.end;
+      })
+      .map(([eventId]) => eventId);
+    if (reflectedEventIds.length === 0) return;
+
+    setTimingOverrides((current) => {
+      const next = new Map(current);
+      reflectedEventIds.forEach((eventId) => next.delete(eventId));
+      return next;
+    });
+  }, [result.occurrences, timingOverrides]);
+
+  const setTimingOverride = useCallback((eventId: string, timing: EventTiming | null) => {
+    setTimingOverrides((current) => {
+      const next = new Map(current);
+      if (timing) next.set(eventId, timing);
+      else next.delete(eventId);
+      return next;
+    });
+  }, []);
+
+  const handleResizeEvent = useCallback(
+    (occurrence: EventOccurrence, timing: EventTiming) => {
+      const { event } = occurrence;
+      const previous = timingOverrides.get(event.id) ?? {
+        start: occurrence.start,
+        end: occurrence.end,
+      };
+      if (previous.start === timing.start && previous.end === timing.end) return;
+
+      setTimingOverride(event.id, timing);
+      const persist = async () => {
+        try {
+          await updateEvent.mutateAsync({
+            event,
+            input: eventInputWithTiming(
+              event,
+              new Date(timing.start).toISOString(),
+              new Date(timing.end).toISOString(),
+            ),
+          });
+          showToast({
+            message: 'Event resized',
+            actionLabel: 'Undo',
+            onAction: () => {
+              setTimingOverride(event.id, previous);
+              showToast({ message: 'Restoring event…' });
+              void updateEvent
+                .mutateAsync({
+                  event,
+                  input: eventInputWithTiming(
+                    event,
+                    new Date(previous.start).toISOString(),
+                    new Date(previous.end).toISOString(),
+                  ),
+                })
+                .then(() => showSuccess('Resize undone.'))
+                .catch(() => {
+                  setTimingOverride(event.id, null);
+                  result.refetch();
+                  showToast({ message: 'The resize could not be undone.' });
+                });
+            },
+          });
+        } catch {
+          setTimingOverride(event.id, null);
+          showToast({ message: 'The event resize could not be saved.' });
+        }
+      };
+      void persist();
+    },
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+  );
+
+  const handleMoveEvent = useCallback(
+    (occurrence: EventOccurrence, timing: EventTiming) => {
+      const { event } = occurrence;
+      const previous = timingOverrides.get(event.id) ?? {
+        start: occurrence.start,
+        end: occurrence.end,
+      };
+      if (previous.start === timing.start && previous.end === timing.end) return;
+
+      setTimingOverride(event.id, timing);
+      const persist = async () => {
+        try {
+          await updateEvent.mutateAsync({
+            event,
+            input: eventInputWithTiming(
+              event,
+              new Date(timing.start).toISOString(),
+              new Date(timing.end).toISOString(),
+            ),
+          });
+          showToast({
+            message: 'Event moved',
+            actionLabel: 'Undo',
+            onAction: () => {
+              setTimingOverride(event.id, previous);
+              showToast({ message: 'Restoring event…' });
+              void updateEvent
+                .mutateAsync({
+                  event,
+                  input: eventInputWithTiming(
+                    event,
+                    new Date(previous.start).toISOString(),
+                    new Date(previous.end).toISOString(),
+                  ),
+                })
+                .then(() => showSuccess('Move undone.'))
+                .catch(() => {
+                  setTimingOverride(event.id, null);
+                  result.refetch();
+                  showToast({ message: 'The move could not be undone.' });
+                });
+            },
+          });
+        } catch {
+          setTimingOverride(event.id, null);
+          showToast({ message: 'The event move could not be saved.' });
+        }
+      };
+      void persist();
+    },
+    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
+  );
 
   return (
     <div className={styles.workspace}>
@@ -379,7 +626,7 @@ export function CalendarView() {
           onNext={() => setSelectedDateKey(shiftDateKey(selectedDateKey, mode, 1, timeZone))}
           onCreateEvent={() => {
             if (!result.calendars.some((calendar) => !calendar.isReadOnly)) {
-              setToast('Create or connect a writable calendar first.');
+              setToast({ message: 'Create or connect a writable calendar first.' });
               return;
             }
             rememberOpeningControl();
@@ -435,16 +682,23 @@ export function CalendarView() {
             <div
               key={mode}
               className={`${styles.calendarViewTransition} ${
-                transitionDirection === 'in'
+                transitionState?.direction === 'in'
                   ? styles.viewTransitionZoomIn
-                  : transitionDirection === 'out'
+                  : transitionState?.direction === 'out'
                     ? styles.viewTransitionZoomOut
-                    : styles.viewTransitionFade
+                    : ''
               }`}
+              style={
+                transitionState
+                  ? {
+                      transformOrigin: `${transitionState.origin.x}% ${transitionState.origin.y}%`,
+                    }
+                  : undefined
+              }
             >
               {mode === 'month' ? (
                 <MonthView
-                  dateKeys={window.dateKeys}
+                  dateKeys={calendarWindow.dateKeys}
                   byDateKey={result.byDateKey}
                   selectedDateKey={selectedDateKey}
                   timeZone={timeZone}
@@ -456,7 +710,7 @@ export function CalendarView() {
                 />
               ) : (
                 <TimelineView
-                  dateKeys={window.dateKeys}
+                  dateKeys={calendarWindow.dateKeys}
                   byDateKey={result.byDateKey}
                   selectedDateKey={selectedDateKey}
                   timeZone={timeZone}
@@ -464,9 +718,13 @@ export function CalendarView() {
                   now={new Date()}
                   onSelectDate={setSelectedDateKey}
                   onSelectEvent={handleEventSelect}
+                  onResizeEvent={handleResizeEvent}
+                  onMoveEvent={handleMoveEvent}
+                  timingOverrides={timingOverrides}
                   onSelectSlot={handleSlotSelect}
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
+                  workingHours={result.workingHours}
                 />
               )}
             </div>
@@ -595,8 +853,22 @@ export function CalendarView() {
       ) : null}
 
       {toast ? (
-        <div className={styles.toast} role="status" aria-live="polite">
-          {toast}
+        <div
+          className={`${styles.toast} ${isToastExiting ? styles.toastExiting : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span className={styles.toastMessage} key={toast.message}>
+            {toast.message === 'Restoring event…' ? (
+              <span className={styles.toastSpinner} aria-hidden="true" />
+            ) : null}
+            <span>{toast.message}</span>
+          </span>
+          {toast.actionLabel && toast.onAction && !isToastExiting ? (
+            <button type="button" onClick={toast.onAction}>
+              {toast.actionLabel}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

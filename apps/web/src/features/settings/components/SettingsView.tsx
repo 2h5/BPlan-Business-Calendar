@@ -13,22 +13,10 @@ import type { CalendarViewMode } from '../../calendar/utils/calendar-window';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
 import { useTheme } from '../hooks/useTheme';
 import { callbackResultFromNavigationState, oauthCallbackMessage } from '../utils/oauth-callback';
+import { buildTimezoneOptions } from '../utils/timezone-options';
 import { minuteOfDayToTimeInput, timeInputToMinute } from '../utils/working-hours-time';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const TIME_ZONES = [
-  'UTC',
-  'America/Los_Angeles',
-  'America/Denver',
-  'America/Chicago',
-  'America/New_York',
-  'America/Sao_Paulo',
-  'Europe/London',
-  'Europe/Berlin',
-  'Asia/Kolkata',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
 
 export function SettingsView() {
   const { email } = useAuth();
@@ -38,7 +26,7 @@ export function SettingsView() {
   const navigate = useNavigate();
   const profile = useProfile();
   const update = useUpdateProfile();
-  const [draft, setDraft] = useState<Profile | null>(null);
+  const [draft, setDraft] = useState<Profile | null>(() => profile.data ?? null);
   const [message, setMessage] = useState<string | null>(null);
   const [integrationMessage, setIntegrationMessage] = useState<string | null>(null);
   const callbackResult = useMemo(
@@ -49,6 +37,15 @@ export function SettingsView() {
   useEffect(() => {
     if (profile.data) setDraft(profile.data);
   }, [profile.data]);
+
+  const timeZoneOptions = useMemo(
+    () =>
+      buildTimezoneOptions({
+        currentTimezone: draft?.timezone,
+        savedTimezone: profile.data?.timezone,
+      }),
+    [draft?.timezone, profile.data?.timezone],
+  );
 
   useEffect(() => {
     if (!callbackResult) return;
@@ -228,18 +225,12 @@ export function SettingsView() {
               </div>
               <div className={styles.formGrid}>
                 <Field label="Time zone">
-                  <input
-                    list="time-zones"
+                  <Select
                     value={draft.timezone}
-                    onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}
+                    options={timeZoneOptions}
+                    onChange={(value) => setDraft({ ...draft, timezone: value })}
+                    ariaLabel="Time zone"
                   />
-                  <datalist id="time-zones">
-                    {[draft.timezone, ...TIME_ZONES]
-                      .filter((v, i, a) => a.indexOf(v) === i)
-                      .map((zone) => (
-                        <option key={zone} value={zone} />
-                      ))}
-                  </datalist>
                 </Field>
                 <Field label="Week starts on">
                   <Select

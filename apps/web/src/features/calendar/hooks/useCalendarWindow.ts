@@ -1,4 +1,4 @@
-import type { Calendar, HourCycle } from '@cal/schemas';
+import type { Calendar, HourCycle, WorkingHours } from '@cal/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
@@ -22,6 +22,7 @@ interface CalendarWindowResult {
   timeZone: string;
   weekStartsOn: number;
   hourCycle: HourCycle;
+  workingHours: WorkingHours;
   defaultEventMinutes: number;
   isLoading: boolean;
   isFetching: boolean;
@@ -86,6 +87,7 @@ export function useCalendarWindow(
     timeZone,
     weekStartsOn,
     hourCycle,
+    workingHours: profileQuery.data?.workingHours ?? [],
     defaultEventMinutes: profileQuery.data?.defaultEventMinutes ?? 60,
     isLoading: profileQuery.isLoading || calendarsQuery.isLoading || eventsQuery.isLoading,
     isFetching: eventsQuery.isFetching,

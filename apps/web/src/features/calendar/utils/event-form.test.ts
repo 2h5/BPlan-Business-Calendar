@@ -1,7 +1,7 @@
 import type { CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
-import { eventInputFromForm, eventToFormValues } from './event-form';
+import { eventInputFromForm, eventInputWithTiming, eventToFormValues } from './event-form';
 
 const EVENT: CalendarEvent = {
   id: 'a0000000-0000-0000-0000-000000000001',
@@ -132,5 +132,20 @@ describe('event editor conversion', () => {
     expect(() =>
       eventInputFromForm({ ...form, endTime: form.startTime }, 'America/New_York'),
     ).toThrow('end after');
+  });
+
+  it('changes only timing while preserving every editable event field', () => {
+    expect(eventInputWithTiming(EVENT, '2026-03-07T13:45:00.000Z', EVENT.endAt)).toEqual({
+      calendarId: EVENT.calendarId,
+      title: EVENT.title,
+      description: EVENT.description,
+      location: EVENT.location,
+      startAt: '2026-03-07T13:45:00.000Z',
+      endAt: EVENT.endAt,
+      allDay: EVENT.allDay,
+      timezone: EVENT.timezone,
+      recurrenceRule: EVENT.recurrenceRule,
+      alerts: EVENT.alerts,
+    });
   });
 });

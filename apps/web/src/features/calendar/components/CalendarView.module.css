@@ -575,40 +575,39 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  will-change: transform, opacity;
 }
 
 .viewTransitionZoomIn {
-  animation: viewZoomIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: viewZoomIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .viewTransitionZoomOut {
-  animation: viewZoomOut 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: viewZoomOut 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .viewTransitionFade {
-  animation: viewFade 180ms ease-out both;
+  animation: viewFade 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes viewZoomIn {
   from {
     opacity: 0;
-    transform: scale(1.02);
+    transform: scale(1.018);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
 @keyframes viewZoomOut {
   from {
     opacity: 0;
-    transform: scale(0.98);
+    transform: scale(0.982);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
@@ -618,14 +617,7 @@
   }
   to {
     opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .viewTransitionZoomIn,
-  .viewTransitionZoomOut,
-  .viewTransitionFade {
-    animation: none;
+    transform: none;
   }
 }
 
@@ -811,8 +803,9 @@
   color: var(--color-text-primary);
   text-align: left;
   transition:
-    filter var(--transition-fast),
-    transform var(--transition-fast);
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
 .allDayColumn .timelineEvent {
@@ -822,13 +815,332 @@
   height: 24px;
 }
 
-.timelineEvent:hover,
+.timelineEvent:hover {
+  background: color-mix(in srgb, var(--event-color) 26%, var(--color-bg-surface));
+  border-color: color-mix(in srgb, var(--event-color) 50%, transparent);
+}
+
 .monthEvent:hover {
-  filter: brightness(1.16);
+  background: color-mix(in srgb, var(--event-color) 22%, transparent);
+  color: var(--color-text-primary);
 }
 
 .timelineEvent:active {
-  transform: translateY(1px);
+  opacity: 0.92;
+}
+
+.timelineEventMovable {
+  cursor: grab;
+}
+
+.timelineEventResizing,
+.timelineEventResizing:active {
+  z-index: 5;
+  background: color-mix(in srgb, var(--event-color) 24%, var(--color-bg-surface));
+  border-color: color-mix(in srgb, var(--event-color) 60%, transparent);
+  transform: none;
+  transition:
+    top 110ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 110ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timelineEventMoving,
+.timelineEventMoving:active {
+  z-index: 5;
+  background: color-mix(in srgb, var(--event-color) 24%, var(--color-bg-surface));
+  border-color: color-mix(in srgb, var(--event-color) 60%, transparent);
+  cursor: grabbing;
+  box-shadow: var(--shadow-md);
+  transition:
+    top 110ms cubic-bezier(0.16, 1, 0.3, 1),
+    left 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timelineEventResizingShort,
+.timelineEventMovingShort {
+  justify-content: center;
+  padding-block: 2px;
+}
+
+.timelineEventMagnetized {
+  border-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent),
+    var(--shadow-md);
+}
+
+.timelineEventConflicted {
+  border-color: color-mix(in srgb, var(--color-warning) 75%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-bg-surface));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-warning) 50%, transparent),
+    var(--shadow-md);
+}
+
+.timelineEventConflicted.timelineEventMagnetized {
+  border-color: color-mix(in srgb, var(--color-warning) 85%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-warning) 70%, transparent),
+    var(--shadow-md);
+}
+
+.timelineEventSettled {
+  animation: timeline-settle 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: center center;
+}
+
+@keyframes timeline-settle {
+  0% {
+    transform: scale(0.985);
+    box-shadow: var(--shadow-sm);
+  }
+  50% {
+    transform: scale(1.008);
+    box-shadow: var(--shadow-md);
+  }
+  100% {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.timelineEventSnapLeft {
+  animation: event-snap-from-left 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: left center;
+}
+
+.timelineEventSnapRight {
+  animation: event-snap-from-right 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: right center;
+}
+
+@keyframes event-snap-from-left {
+  0% {
+    transform: translateX(-35%) scale(0.98);
+    opacity: 0.85;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes event-snap-from-right {
+  0% {
+    transform: translateX(35%) scale(0.98);
+    opacity: 0.85;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.timelineEventGhost {
+  position: absolute;
+  border-radius: 5px;
+  border: 1px dashed color-mix(in srgb, var(--event-color, var(--color-accent)) 36%, transparent);
+  border-left: 3px dashed
+    color-mix(in srgb, var(--event-color, var(--color-accent)) 55%, transparent);
+  background: color-mix(in srgb, var(--event-color, var(--color-accent)) 6%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  box-sizing: border-box;
+  animation: timeline-ghost-fade-in 120ms ease-out;
+}
+
+@keyframes timeline-ghost-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.timelineEventGhostExiting {
+  animation: timeline-ghost-fade-out 140ms ease-out forwards;
+}
+
+@keyframes timeline-ghost-fade-out {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.timelineMagneticGuide {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--color-accent);
+  z-index: 7;
+  pointer-events: none;
+}
+
+.timelineMagneticGuide::before {
+  position: absolute;
+  top: -2.5px;
+  left: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-accent) 60%, transparent);
+  content: '';
+}
+
+.timelineResizeHandle {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  left: 0;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.timelineResizeHandle::after {
+  position: absolute;
+  right: 22%;
+  left: 22%;
+  height: 1px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--event-color) 72%, transparent);
+  content: '';
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.timelineResizeHandle:hover::after,
+.timelineEventResizing .timelineResizeHandle::after {
+  opacity: 0.8;
+}
+
+.timelineResizeHandleTop {
+  top: 0;
+}
+
+.timelineResizeHandleTop::after {
+  top: 1px;
+}
+
+.timelineResizeHandleBottom {
+  bottom: 0;
+}
+
+.timelineResizeHandleBottom::after {
+  bottom: 1px;
+}
+
+.timelineResizeFeedback,
+.timelineMoveFeedback {
+  position: absolute;
+  z-index: 1;
+  left: 7px;
+  right: auto;
+  max-width: calc(100% - 12px);
+  width: max-content;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transform-origin: left center;
+  animation: feedback-pop-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    bottom 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    font-weight 140ms ease;
+}
+
+.timelineResizeFeedbackShort,
+.timelineMoveFeedbackShort {
+  bottom: calc(50% - 6px);
+  font-weight: var(--font-weight-semibold);
+}
+
+.timelineResizeFeedbackNormal,
+.timelineMoveFeedbackNormal {
+  bottom: 2px;
+}
+
+.timelineResizeSpan,
+.timelineMoveSpan {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timelineResizeDivider {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.timelineResizeDurationBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--event-color) 25%, transparent);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-semibold);
+  animation: duration-pill-pop 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timelineConflictBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-subtle);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, transparent);
+  color: var(--color-warning);
+  font-size: 0.5625rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+@keyframes feedback-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes duration-pill-pop {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
 }
 
 .timelineEventTitle {
@@ -839,6 +1151,55 @@
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.timelineEventTitleResizingShort,
+.timelineEventTitleMovingShort {
+  opacity: 0;
+  max-height: 0;
+  line-height: 0;
+  transform: translateY(-4px) scale(0.96);
+  transform-origin: left center;
+  pointer-events: none;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  transition:
+    opacity 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    line-height 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timelineEventTitleResizingNormal,
+.timelineEventTitleMovingNormal {
+  opacity: 1;
+  max-height: 20px;
+  line-height: 1.2;
+  transform: none;
+  transform-origin: left center;
+  overflow: hidden;
+  animation: resize-title-pop-in 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    opacity 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+    line-height 170ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes resize-title-pop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.96);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(1px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .timelineEventTime {
@@ -985,6 +1346,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .monthEvent span {
@@ -1586,6 +1950,98 @@
   box-shadow: var(--shadow-md);
   color: var(--color-success);
   font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  animation: toast-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom right;
+}
+
+.toastExiting {
+  animation: toast-exit 180ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  pointer-events: none;
+}
+
+@keyframes toast-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes toast-exit {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+}
+
+.toastMessage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  animation: toast-text-pop 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toast-text-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toastSpinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid color-mix(in srgb, var(--color-success) 30%, transparent);
+  border-top-color: var(--color-success);
+  border-radius: 50%;
+  animation: toast-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.toast button {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform 80ms ease;
+}
+
+.toast button:hover {
+  background: color-mix(in srgb, var(--color-success) 22%, transparent);
+  border-color: var(--color-success);
+}
+
+.toast button:active {
+  transform: scale(0.94);
 }
 
 .detailsHeader {
@@ -1938,6 +2394,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .calendarViewTransition,
+  .viewTransitionZoomIn,
+  .viewTransitionZoomOut,
+  .viewTransitionFade,
   .eventEditor,
   .eventEditorClosing,
   .detailsBackdrop,
@@ -1947,9 +2407,32 @@
   .monthEventDraftEntering,
   .monthEventDraftClosing,
   .draftTimelineEventBubbleEnter,
-  .draftTimelineEventBubbleExit {
+  .draftTimelineEventBubbleExit,
+  .timelineResizeFeedback,
+  .timelineResizeFeedbackShort,
+  .timelineResizeFeedbackNormal,
+  .timelineResizeDurationBadge,
+  .timelineMoveFeedback,
+  .timelineMoveFeedbackShort,
+  .timelineMoveFeedbackNormal,
+  .timelineEventMoving,
+  .timelineEventResizing,
+  .timelineEventGhost,
+  .timelineEventGhostExiting,
+  .timelineEventTitleResizingShort,
+  .timelineEventTitleResizingNormal,
+  .timelineEventTitleMovingShort,
+  .timelineEventTitleMovingNormal,
+  .timelineEventSettled,
+  .timelineEventSnapLeft,
+  .timelineEventSnapRight,
+  .toast,
+  .toastExiting,
+  .toastMessage,
+  .toastSpinner {
     animation: none !important;
     animation-duration: 1ms !important;
+    transition: none !important;
     transform: none !important;
   }
 }
@@ -2057,26 +2540,26 @@
 @keyframes weekly-bubble-enter {
   0% {
     opacity: 0;
-    transform: scaleY(0) scaleX(0.92);
+    transform: scaleY(0);
   }
   65% {
     opacity: 1;
-    transform: scaleY(1.04) scaleX(1.01);
+    transform: scaleY(1.03);
   }
   100% {
     opacity: 1;
-    transform: scaleY(1) scaleX(1);
+    transform: none;
   }
 }
 
 @keyframes weekly-bubble-exit {
   0% {
     opacity: 1;
-    transform: scaleY(1) scaleX(1);
+    transform: none;
   }
   100% {
     opacity: 0;
-    transform: scaleY(0) scaleX(0.92);
+    transform: scaleY(0);
   }
 }
 
