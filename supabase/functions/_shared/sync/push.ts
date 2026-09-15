@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { EdgeError } from '../errors/index.ts';
 import type { ProviderAccountRow } from '../providers/accounts.ts';
 import { providerFor } from '../providers/registry.ts';
-import type { NormalisedEvent, ProviderContext, ProviderEventInput } from '../providers/types.ts';
+import type {
+  CalendarProvider,
+  NormalisedEvent,
+  ProviderContext,
+  ProviderEventInput,
+} from '../providers/types.ts';
 
 /**
  * Outward writes.
@@ -68,14 +73,29 @@ export async function pushEvent(
   account: ProviderAccountRow,
   ctx: ProviderContext,
   request: PushRequest,
+  providerOverride?: CalendarProvider,
 ): Promise<PushResult> {
   switch (request.operation) {
     case 'create':
-      return await createOutward(admin, account, ctx, request.calendarId, request.draft);
+      return await createOutward(
+        admin,
+        account,
+        ctx,
+        request.calendarId,
+        request.draft,
+        providerOverride,
+      );
     case 'update':
-      return await updateOutward(admin, account, ctx, request.eventId, request.draft);
+      return await updateOutward(
+        admin,
+        account,
+        ctx,
+        request.eventId,
+        request.draft,
+        providerOverride,
+      );
     case 'delete':
-      return await deleteOutward(admin, account, ctx, request.eventId);
+      return await deleteOutward(admin, account, ctx, request.eventId, providerOverride);
   }
 }
 
@@ -85,6 +105,7 @@ async function createOutward(
   ctx: ProviderContext,
   calendarId: string,
   draft: EventDraft,
+  providerOverride?: CalendarProvider,
 ): Promise<PushResult> {
   const providerCalendarId = await resolveWritableCalendar(
     admin,
@@ -94,7 +115,7 @@ async function createOutward(
   );
 
   // Provider first. Nothing is written locally until this returns.
-  const created = await providerFor(account.provider).createEvent(
+  const created = await (providerOverride ?? providerFor(account.provider)).createEvent(
     ctx,
     providerCalendarId,
     toProviderInput(draft),
@@ -125,6 +146,7 @@ async function updateOutward(
   ctx: ProviderContext,
   eventId: string,
   draft: EventDraft,
+  providerOverride?: CalendarProvider,
 ): Promise<PushResult> {
   const event = await loadEvent(admin, eventId, account.user_id, account.id);
   if (!event.provider_event_id) {
@@ -139,7 +161,7 @@ async function updateOutward(
   );
 
   try {
-    const updated = await providerFor(account.provider).updateEvent(
+    const updated = await (providerOverride ?? providerFor(account.provider)).updateEvent(
       ctx,
       providerCalendarId,
       event.provider_event_id,
@@ -174,6 +196,7 @@ async function deleteOutward(
   account: ProviderAccountRow,
   ctx: ProviderContext,
   eventId: string,
+  providerOverride?: CalendarProvider,
 ): Promise<PushResult> {
   const event = await loadEvent(admin, eventId, account.user_id, account.id);
 
@@ -186,7 +209,7 @@ async function deleteOutward(
     );
 
     try {
-      await providerFor(account.provider).deleteEvent(
+      await (providerOverride ?? providerFor(account.provider)).deleteEvent(
         ctx,
         providerCalendarId,
         event.provider_event_id,

@@ -5,6 +5,14 @@ import { authFor, isSupportedProvider, providerFor } from './registry.ts';
 import { watchRegistrationFromState, type StoredWatchState } from './watch.ts';
 import type { WatchRegistration } from './types.ts';
 
+/** Optional effect overrides used only by hermetic disconnect lifecycle tests. */
+export interface ProviderDisconnectDeps {
+  loadAccount?: typeof loadAccount;
+  resolveContext?: typeof resolveContext;
+  providerFor?: typeof providerFor;
+  authFor?: typeof authFor;
+}
+
 /**
  * Releasing a provider grant.
  *
@@ -19,10 +27,11 @@ import type { WatchRegistration } from './types.ts';
 export async function releaseProviderGrant(
   admin: SupabaseClient,
   providerAccountId: string,
+  deps: ProviderDisconnectDeps = {},
 ): Promise<void> {
-  let account;
+  let account: ProviderAccountRow;
   try {
-    account = await loadAccount(admin, providerAccountId);
+    account = await (deps.loadAccount ?? loadAccount)(admin, providerAccountId);
   } catch {
     return;
   }
@@ -35,10 +44,10 @@ export async function releaseProviderGrant(
 
   // Provider watches need a live access token, so they are stopped before the
   // grant is revoked — after revocation there is no way to reach them at all.
-  await stopChannels(admin, account);
+  await stopChannels(admin, account, deps);
 
   if (typeof refreshToken === 'string' && refreshToken) {
-    await authFor(account.provider).revoke(refreshToken);
+    await (deps.authFor ?? authFor)(account.provider).revoke(refreshToken);
   }
 
   const { error } = await admin.rpc('delete_provider_secret', { p_account_id: providerAccountId });
@@ -47,7 +56,11 @@ export async function releaseProviderGrant(
   }
 }
 
-async function stopChannels(admin: SupabaseClient, account: ProviderAccountRow): Promise<void> {
+async function stopChannels(
+  admin: SupabaseClient,
+  account: ProviderAccountRow,
+  deps: ProviderDisconnectDeps,
+): Promise<void> {
   const { data: states } = await admin
     .from('calendar_sync_states')
     .select(
@@ -81,8 +94,8 @@ async function stopChannels(admin: SupabaseClient, account: ProviderAccountRow):
   if (registrations.length === 0) return;
 
   try {
-    const ctx = await resolveContext(admin, account);
-    const adapter = providerFor(account.provider);
+    const ctx = await (deps.resolveContext ?? resolveContext)(admin, account);
+    const adapter = (deps.providerFor ?? providerFor)(account.provider);
 
     for (const registration of registrations) {
       try {

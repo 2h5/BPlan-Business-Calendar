@@ -151,3 +151,64 @@ Deno.test('acknowledges malformed or empty notification bodies', async () => {
   );
   assertEquals((await handleMicrosoftWebhook(request({ value: [] }))).status, 202);
 });
+
+Deno.test('replayed Graph deliveries converge through stable queue idempotency keys', async () => {
+  const jobs: Array<Record<string, unknown>> = [];
+  const seenKeys = new Set<string>();
+  const responseBody = {
+    value: [
+      {
+        subscriptionId: 'subscription-1',
+        clientState: 'client-state',
+        lifecycleEvent: 'subscriptionRemoved',
+      },
+    ],
+  };
+  const deps = {
+    lookupAccounts: async () => [account],
+    enqueue: async (job: Record<string, unknown>) => {
+      const key = String(job.idempotencyKey);
+      if (seenKeys.has(key)) return null;
+      seenKeys.add(key);
+      jobs.push(job);
+      return 'job-id';
+    },
+    now: () => new Date('2026-01-01T00:00:00Z'),
+  };
+
+  await handleMicrosoftWebhook(request(responseBody), deps);
+  await handleMicrosoftWebhook(request(responseBody), deps);
+
+  assertEquals(
+    jobs.map((job) => job.kind),
+    ['account.sync', 'watch.renew'],
+  );
+  assertEquals(new Set(jobs.map((job) => job.idempotencyKey)).size, 2);
+});
+
+Deno.test('Graph lookup failures and unsupported methods never enqueue provider work', async () => {
+  let enqueueCalls = 0;
+  const response = await handleMicrosoftWebhook(
+    request({ value: [{ subscriptionId: 'subscription-1', clientState: 'client-state' }] }),
+    {
+      lookupAccounts: async () => {
+        throw new Error('database unavailable');
+      },
+      enqueue: async (_job) => {
+        enqueueCalls += 1;
+        return 'job-id';
+      },
+    },
+  );
+
+  assertEquals(response.status, 202);
+  assertEquals(enqueueCalls, 0);
+  assertEquals(
+    (
+      await handleMicrosoftWebhook(
+        new Request('https://project.example.com/webhook-microsoft', { method: 'GET' }),
+      )
+    ).status,
+    405,
+  );
+});

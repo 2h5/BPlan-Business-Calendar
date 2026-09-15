@@ -6,9 +6,9 @@ import { googleApiErrorSchema } from './schemas.ts';
  *
  * Every caller goes through here so that three things are guaranteed: a
  * provider status code is translated into one of our stable error codes exactly
- * once, a rate limit is retried rather than surfaced as a sync failure, and a
- * provider response body is never attached to an error that could reach the
- * client.
+ * once, replay-safe rate limits can be retried rather than surfaced as a sync
+ * failure, and a provider response body is never attached to an error that
+ * could reach the client.
  */
 
 export interface GoogleRequest {
@@ -18,45 +18,80 @@ export interface GoogleRequest {
   body?: unknown;
   /** Sent as `If-Match` so a concurrent provider edit is a 412, not a clobber. */
   etag?: string | null;
+  /** The request context keeps a 410 cursor signal from leaking into writes. */
+  operation: GoogleRequestOperation;
+  /** Opt in only when repeating the request cannot create a duplicate effect. */
+  replaySafe?: boolean;
 }
+
+export type GoogleRequestOperation = 'calendar' | 'sync' | 'event' | 'watch';
+
+export interface GoogleClientDeps {
+  fetch?: typeof fetch;
+  now?: () => number;
+  sleep?: (milliseconds: number) => Promise<void>;
+  random?: () => number;
+}
+
+export type GoogleFetch = (request: GoogleRequest) => Promise<unknown>;
 
 const MAX_ATTEMPTS = 3;
 
-export async function googleFetch(request: GoogleRequest): Promise<unknown> {
-  const response = await sendWithRetry(request);
+/** Create an authenticated Google transport with deterministic retry seams. */
+export function createGoogleClient(deps: GoogleClientDeps = {}): GoogleFetch {
+  const fetcher = deps.fetch ?? fetch;
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? defaultSleep;
+  const random = deps.random ?? Math.random;
 
-  if (response.status === 204 || response.status === 205) return null;
+  return async (request) => {
+    const response = await sendWithRetry(request, fetcher, sleep, now, random);
 
-  const text = await response.text();
-  if (!text) return null;
+    if (response.status === 204 || response.status === 205) return null;
 
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new EdgeError('UNKNOWN', 'Google returned a response we could not read.', 502);
-  }
+    const text = await response.text();
+    if (!text) return null;
+
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new EdgeError('UNKNOWN', 'Google returned a response we could not read.', 502);
+    }
+  };
 }
 
-async function sendWithRetry(request: GoogleRequest): Promise<Response> {
+/** The production transport; response bodies remain unknown to this layer. */
+export const googleFetch: GoogleFetch = createGoogleClient();
+
+async function sendWithRetry(
+  request: GoogleRequest,
+  fetcher: typeof fetch,
+  sleep: (milliseconds: number) => Promise<void>,
+  now: () => number,
+  random: () => number,
+): Promise<Response> {
   let lastError: EdgeError | null = null;
+  const method = request.method ?? 'GET';
+  const replaySafe = request.replaySafe ?? method === 'GET';
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let response: Response;
 
     try {
-      response = await fetch(request.url, {
-        method: request.method ?? 'GET',
+      response = await fetcher(request.url, {
+        method,
         headers: buildHeaders(request),
         body: request.body === undefined ? undefined : JSON.stringify(request.body),
       });
     } catch (cause) {
-      // A transport failure is worth one more try; it is usually a cold socket.
+      // A replay-safe transport failure is worth one more try; it is usually a
+      // cold socket. Never repeat an unsafe write without an idempotency key.
       lastError = new EdgeError('NETWORK_UNAVAILABLE', 'Could not reach Google.', 503);
       console.error(
         JSON.stringify({ code: 'NETWORK_UNAVAILABLE', attempt, detail: String(cause) }),
       );
-      if (attempt === MAX_ATTEMPTS) throw lastError;
-      await backoff(attempt, null);
+      if (!replaySafe || attempt === MAX_ATTEMPTS) throw lastError;
+      await backoff(attempt, null, now, random, sleep);
       continue;
     }
 
@@ -69,19 +104,19 @@ async function sendWithRetry(request: GoogleRequest): Promise<Response> {
 
     if (response.status === 429 || (response.status === 403 && isRateLimit(detail))) {
       lastError = new EdgeError('PROVIDER_RATE_LIMITED', 'Google is rate limiting us.', 429);
-      if (attempt === MAX_ATTEMPTS) throw lastError;
-      await backoff(attempt, response.headers.get('Retry-After'));
+      if (!replaySafe || attempt === MAX_ATTEMPTS) throw lastError;
+      await backoff(attempt, response.headers.get('Retry-After'), now, random, sleep);
       continue;
     }
 
     if (response.status >= 500) {
       lastError = new EdgeError('UNKNOWN', 'Google is unavailable.', 502);
-      if (attempt === MAX_ATTEMPTS) throw lastError;
-      await backoff(attempt, null);
+      if (!replaySafe || attempt === MAX_ATTEMPTS) throw lastError;
+      await backoff(attempt, null, now, random, sleep);
       continue;
     }
 
-    throw translate(response.status, detail);
+    throw translate(response.status, detail, request.operation);
   }
 
   throw lastError ?? new EdgeError('UNKNOWN', 'Google request failed.', 502);
@@ -104,7 +139,11 @@ function buildHeaders(request: GoogleRequest): HeadersInit {
  * and the caller must respond by discarding the cursor and doing a full
  * resync rather than by retrying.
  */
-function translate(status: number, reason: string | null): EdgeError {
+function translate(
+  status: number,
+  reason: string | null,
+  operation: GoogleRequestOperation,
+): EdgeError {
   switch (status) {
     case 401:
       return new EdgeError('PROVIDER_AUTH_EXPIRED', 'Reconnect your Google account.', 401);
@@ -116,7 +155,9 @@ function translate(status: number, reason: string | null): EdgeError {
     case 412:
       return new EdgeError('EVENT_PROVIDER_CONFLICT', 'That event changed in Google.', 409);
     case 410:
-      return new EdgeError('PROVIDER_SYNC_CURSOR_INVALID', 'The sync cursor expired.', 410);
+      return operation === 'sync'
+        ? new EdgeError('PROVIDER_SYNC_CURSOR_INVALID', 'The sync cursor expired.', 410)
+        : new EdgeError('UNKNOWN', 'Google rejected the request.', 502);
     default:
       // The reason string is a Google enum ("notFound", "rateLimitExceeded"),
       // never user content, so it is safe to log — but it is not returned.
@@ -144,13 +185,35 @@ function isRateLimit(reason: string | null): boolean {
   );
 }
 
-async function backoff(attempt: number, retryAfter: string | null): Promise<void> {
-  const hinted = retryAfter ? Number(retryAfter) * 1000 : NaN;
+async function backoff(
+  attempt: number,
+  retryAfter: string | null,
+  now: () => number,
+  random: () => number,
+  sleep: (milliseconds: number) => Promise<void>,
+): Promise<void> {
+  const hinted = retryAfter === null ? null : parseRetryAfter(retryAfter, now());
   // Jitter matters here: several calendars for one account tend to fail
   // together, and un-jittered backoff would have them all retry in lockstep.
-  const delay = Number.isFinite(hinted)
-    ? Math.min(hinted, 8_000)
-    : 2 ** attempt * 250 + Math.random() * 250;
+  const delay =
+    hinted !== null ? Math.min(hinted, 8_000) : 2 ** (attempt - 1) * 250 + random() * 250;
 
-  await new Promise((resolve) => setTimeout(resolve, delay));
+  await sleep(delay);
+}
+
+/** Retry-After is either delta-seconds or an HTTP-date. */
+function parseRetryAfter(value: string, now: number): number | null {
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    return Number.isFinite(seconds) ? seconds * 1000 : null;
+  }
+
+  if (!/[A-Za-z]/.test(trimmed)) return null;
+  const timestamp = Date.parse(trimmed);
+  return Number.isFinite(timestamp) ? Math.max(timestamp - now, 0) : null;
+}
+
+async function defaultSleep(milliseconds: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

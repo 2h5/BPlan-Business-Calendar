@@ -4,6 +4,46 @@ Status: **Google and Microsoft provider paths are implemented behind this
 contract; live Microsoft verification remains.** The live source of truth for
 the interface is `supabase/functions/_shared/providers/types.ts`.
 
+## Hermetic provider lifecycle harness
+
+The provider lifecycle suite is intentionally local and default-deny. The
+scripted transport in `supabase/functions/_shared/test-support/` records every
+request and fails on any URL that was not explicitly scripted. It composes the
+real Google and Microsoft clients and adapters, so the tests exercise the
+provider-specific wire formats without credentials, provider availability, or
+network access. The same support folder also contains a small scripted
+`CalendarProvider` and an in-memory PostgREST double for provider-neutral
+engine, worker, push, upsert, watch, and disconnect scenarios.
+
+From `supabase/functions`, run the complete hermetic suite with:
+
+```bash
+deno task check
+deno task test
+```
+
+The focused lifecycle command is:
+
+```bash
+deno test --allow-env _shared/providers/google/auth.test.ts _shared/providers/google/client.test.ts _shared/providers/provider-lifecycle.test.ts _shared/sync/lifecycle.test.ts webhook-google/handler.test.ts webhook-microsoft/handler.test.ts
+```
+
+The suite covers paginated calendar discovery and sync, normalized timed,
+all-day, recurring, changed, and deleted events, provider-specific cursor
+invalidation, safe retry/backoff and malformed responses, provider-first CRUD,
+Google calendar channels, Microsoft account subscriptions and renewal, replay
+and idempotency behavior, webhook proof validation, sync-engine cursor
+fallback/persistence, worker account fencing, and best-effort disconnect
+teardown. Tests use dummy ids, tokens, and secrets only.
+
+This is regression evidence for BPlan’s implementation, not evidence that a
+live provider account or deployment is currently configured correctly. Separate
+future verification is still needed for real OAuth consent and redirect
+configuration, provider-issued token behavior, deployed callback reachability,
+Google/Graph notification delivery and expiry, production secret/permission
+configuration, and live reconciliation behavior. None of those checks are
+required to run this suite.
+
 ## Provider adapter
 
 Google- and Microsoft-specific code lives only behind this interface, in

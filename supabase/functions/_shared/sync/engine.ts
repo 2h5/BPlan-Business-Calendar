@@ -3,7 +3,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { EdgeError } from '../errors/index.ts';
 import { markAccount, touchSynced, type ProviderAccountRow } from '../providers/accounts.ts';
 import { providerFor } from '../providers/registry.ts';
-import type { ProviderContext, SyncResult, WatchRegistration } from '../providers/types.ts';
+import type {
+  CalendarProvider,
+  ProviderContext,
+  ProviderKind,
+  SyncResult,
+  SyncWindow,
+  WatchRegistration,
+} from '../providers/types.ts';
 import { watchRegistrationFromState, watchRegistrationIsHealthy } from '../providers/watch.ts';
 
 import { applyProviderEvents } from './upsert.ts';
@@ -42,6 +49,14 @@ export interface SyncOutcome {
 export interface EnsureWatchOptions {
   /** Replace an existing account-scoped registration even when it is healthy. */
   force?: boolean;
+}
+
+/** Optional effects for hermetic lifecycle tests; production uses defaults. */
+export interface SyncEngineDeps {
+  provider?: CalendarProvider;
+  now?: () => Date;
+  initialSyncWindow?: () => SyncWindow;
+  webhookUrl?: (provider: ProviderKind) => string;
 }
 
 const SYNC_STATE_COLUMNS =
@@ -92,25 +107,34 @@ export async function syncCalendar(
   account: ProviderAccountRow,
   ctx: ProviderContext,
   state: SyncStateRow,
+  deps: SyncEngineDeps = {},
 ): Promise<SyncOutcome> {
   if (!state.calendar_id) {
     throw new EdgeError('NOT_FOUND', 'That calendar is not imported.', 404);
   }
 
-  const provider = providerFor(account.provider);
+  const provider = deps.provider ?? providerFor(account.provider);
   const canIncrement = Boolean(state.sync_cursor) && !state.needs_full_resync;
 
   let mode: 'initial' | 'incremental' = canIncrement ? 'incremental' : 'initial';
   let result: SyncResult = canIncrement
     ? await provider.incrementalSync(ctx, state.provider_calendar_id, state.sync_cursor as string)
-    : await provider.initialSync(ctx, state.provider_calendar_id, initialSyncWindow());
+    : await provider.initialSync(
+        ctx,
+        state.provider_calendar_id,
+        deps.initialSyncWindow?.() ?? initialSyncWindow(),
+      );
 
   if (result.cursorInvalid) {
     console.warn(
       JSON.stringify({ code: 'PROVIDER_SYNC_CURSOR_INVALID', calendarId: state.calendar_id }),
     );
     mode = 'initial';
-    result = await provider.initialSync(ctx, state.provider_calendar_id, initialSyncWindow());
+    result = await provider.initialSync(
+      ctx,
+      state.provider_calendar_id,
+      deps.initialSyncWindow?.() ?? initialSyncWindow(),
+    );
   }
 
   const outcome = await applyProviderEvents(
@@ -124,7 +148,7 @@ export async function syncCalendar(
     account.provider,
   );
 
-  const now = new Date().toISOString();
+  const now = (deps.now ?? (() => new Date()))().toISOString();
   const { error: stateError } = await admin
     .from('calendar_sync_states')
     .update({
@@ -194,14 +218,15 @@ export async function ensureWatch(
   ctx: ProviderContext,
   state: SyncStateRow,
   options: EnsureWatchOptions = {},
+  deps: SyncEngineDeps = {},
 ): Promise<boolean> {
-  const provider = providerFor(account.provider);
+  const provider = deps.provider ?? providerFor(account.provider);
 
   if (provider.watchScope === 'account') {
-    return ensureAccountWatch(admin, account, ctx, options);
+    return ensureAccountWatch(admin, account, ctx, options, deps);
   }
 
-  return ensureCalendarWatch(admin, account, ctx, state);
+  return ensureCalendarWatch(admin, account, ctx, state, deps);
 }
 
 /**
@@ -215,14 +240,15 @@ export async function ensureAccountWatch(
   account: ProviderAccountRow,
   ctx: ProviderContext,
   options: EnsureWatchOptions = {},
+  deps: SyncEngineDeps = {},
 ): Promise<boolean> {
-  const provider = providerFor(account.provider);
+  const provider = deps.provider ?? providerFor(account.provider);
   if (provider.watchScope !== 'account') {
     throw new EdgeError('VALIDATION_FAILED', 'This provider uses calendar watches.', 400);
   }
 
   try {
-    const now = new Date();
+    const now = (deps.now ?? (() => new Date()))();
     const previousRegistration = watchRegistrationFromState(account, now.toISOString());
 
     if (!options.force && watchRegistrationIsHealthy(previousRegistration, now)) {
@@ -250,7 +276,7 @@ export async function ensureAccountWatch(
     const registration = await provider.watch(
       ctx,
       { scope: 'account' },
-      webhookUrlFor(account.provider),
+      deps.webhookUrl?.(account.provider) ?? webhookUrlFor(account.provider),
     );
 
     try {
@@ -300,8 +326,9 @@ async function ensureCalendarWatch(
   account: ProviderAccountRow,
   ctx: ProviderContext,
   state: SyncStateRow,
+  deps: SyncEngineDeps = {},
 ): Promise<boolean> {
-  const provider = providerFor(account.provider);
+  const provider = deps.provider ?? providerFor(account.provider);
   if (provider.watchScope !== 'calendar') {
     throw new EdgeError('VALIDATION_FAILED', 'This provider uses account watches.', 400);
   }
@@ -309,7 +336,8 @@ async function ensureCalendarWatch(
   try {
     // Stop the previous provider watch first, or it may keep delivering to a
     // registration whose id we have already replaced.
-    const previousRegistration = watchRegistrationFromState(state, new Date().toISOString());
+    const now = (deps.now ?? (() => new Date()))();
+    const previousRegistration = watchRegistrationFromState(state, now.toISOString());
     if (previousRegistration) {
       await provider.unwatch(ctx, previousRegistration);
     }
@@ -317,7 +345,7 @@ async function ensureCalendarWatch(
     const registration = await provider.watch(
       ctx,
       { scope: 'calendar', providerCalendarId: state.provider_calendar_id },
-      webhookUrlFor(account.provider),
+      deps.webhookUrl?.(account.provider) ?? webhookUrlFor(account.provider),
     );
 
     try {

@@ -83,17 +83,27 @@ async function runJob(
 
   const account = await loadAccount(admin, job.provider_account_id);
 
+  // The queue row crossed a JSON/RPC boundary, so do not assume its owner is
+  // still consistent with the provider account. This fence keeps a stale or
+  // malformed job from operating a different user's connection.
+  if (job.user_id !== account.user_id) {
+    throw new EdgeError('NOT_AUTHORIZED', 'That sync task belongs to another user.', 403);
+  }
+
   // A revoked connection cannot be repaired by retrying. Fail fast so the job
   // exhausts its attempts quickly and the user sees a reconnect prompt.
   if (account.status === 'revoked') {
     throw new EdgeError('PROVIDER_AUTH_EXPIRED', 'That connection was revoked.', 401);
   }
 
-  let ctx = contexts.get(account.id);
-  if (!ctx) {
-    ctx = await resolveContext(admin, account);
-    contexts.set(account.id, ctx);
-  }
+  const resolveJobContext = async (): Promise<ProviderContext> => {
+    const cached = contexts.get(account.id);
+    if (cached) return cached;
+
+    const resolved = await resolveContext(admin, account);
+    contexts.set(account.id, resolved);
+    return resolved;
+  };
 
   switch (job.kind) {
     case JOB_KINDS.calendarInitialSync:
@@ -103,6 +113,7 @@ async function runJob(
         calendarIdFromPayload(job.payload),
         account.id,
       );
+      const ctx = await resolveJobContext();
       try {
         await syncCalendar(admin, account, ctx, state);
       } catch (error) {
@@ -117,21 +128,25 @@ async function runJob(
 
     case JOB_KINDS.watchRenew: {
       const target = parseWatchRenewPayload(job.payload);
-      const renewed =
-        target.scope === 'account'
-          ? await ensureAccountWatch(admin, account, ctx, { force: true })
-          : await ensureWatch(
-              admin,
-              account,
-              ctx,
-              await requireStateForCalendar(admin, target.calendarId, account.id),
-              { force: true },
-            );
+      const state =
+        target.scope === 'calendar'
+          ? await requireStateForCalendar(admin, target.calendarId, account.id)
+          : null;
+      const ctx = await resolveJobContext();
+      let renewed: boolean;
+      if (target.scope === 'account') {
+        renewed = await ensureAccountWatch(admin, account, ctx, { force: true });
+      } else if (state) {
+        renewed = await ensureWatch(admin, account, ctx, state, { force: true });
+      } else {
+        throw new EdgeError('NOT_FOUND', 'That calendar is no longer imported.', 404);
+      }
       if (!renewed) throw new EdgeError('UNKNOWN', 'Could not renew the change channel.', 502);
       return;
     }
 
     case JOB_KINDS.accountSync: {
+      const ctx = await resolveJobContext();
       // Reconciliation: every imported calendar on the account, in one job, so
       // a missed notification anywhere is caught by a single daily schedule.
       const { data: calendars, error } = await admin
@@ -163,6 +178,7 @@ async function runJob(
     }
 
     case JOB_KINDS.eventPush: {
+      const ctx = await resolveJobContext();
       // The payload was validated when it was enqueued, but it has been through
       // jsonb since — so it is external input again by the time it gets here.
       await pushEvent(admin, account, ctx, parsePushPayload(job.payload));

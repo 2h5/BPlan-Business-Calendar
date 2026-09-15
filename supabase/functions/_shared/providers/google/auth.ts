@@ -26,94 +26,122 @@ import {
  * `oauth_states` and checked before the code is ever exchanged.
  */
 
-export const googleAuth: ProviderAuth = {
-  kind: 'google',
+export interface GoogleAuthDeps {
+  fetch?: typeof fetch;
+  now?: () => number;
+  clientId?: string;
+  clientSecret?: string;
+}
 
-  authorizationUrl({ state, codeChallenge, redirectUri }) {
-    const params = new URLSearchParams({
-      client_id: googleClientId(),
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: GOOGLE_SCOPES.join(' '),
-      state,
-      code_challenge: codeChallenge,
-      code_challenge_method: 'S256',
-      // Without both of these Google returns a refresh token on the first
-      // consent only — so a user who reconnects would silently get an
-      // access-token-only grant that dies in an hour.
-      access_type: 'offline',
-      prompt: 'consent',
-      include_granted_scopes: 'true',
-    });
+/** Create Google OAuth handling with injectable effects for hermetic tests. */
+export function createGoogleAuth(deps: GoogleAuthDeps = {}): ProviderAuth {
+  const fetcher = deps.fetch ?? fetch;
+  const now = deps.now ?? (() => Date.now());
+  const clientId = () => deps.clientId ?? googleClientId();
+  const clientSecret = () => deps.clientSecret ?? googleClientSecret();
 
-    return `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
-  },
+  return {
+    kind: 'google',
 
-  async exchangeCode({ code, codeVerifier, redirectUri }) {
-    const token = await postToken({
-      grant_type: 'authorization_code',
-      code,
-      code_verifier: codeVerifier,
-      redirect_uri: redirectUri,
-    });
-
-    if (!token.refreshToken) {
-      // Without a refresh token the connection would work for an hour and then
-      // fail in a way that looks like a sync bug. Refuse it at the source.
-      throw new EdgeError(
-        'PROVIDER_AUTH_EXPIRED',
-        'Google did not grant offline access. Try connecting again.',
-        400,
-      );
-    }
-
-    return token;
-  },
-
-  refresh(refreshToken) {
-    return postToken({ grant_type: 'refresh_token', refresh_token: refreshToken });
-  },
-
-  async identify(accessToken) {
-    const response = await fetch(GOOGLE_USERINFO_ENDPOINT, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) {
-      throw new EdgeError('PROVIDER_AUTH_EXPIRED', 'Could not read the Google account.', 401);
-    }
-
-    const parsed = googleUserInfoSchema.safeParse(await response.json());
-    if (!parsed.success) {
-      throw new EdgeError('UNKNOWN', 'Google returned an unexpected profile.', 502);
-    }
-
-    return { providerUserId: parsed.data.sub, email: parsed.data.email ?? null };
-  },
-
-  async revoke(token) {
-    // Best effort by design: a token Google has already forgotten returns 400,
-    // and that must not stop us from deleting our own record of it.
-    try {
-      await fetch(GOOGLE_REVOKE_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ token }).toString(),
+    authorizationUrl({ state, codeChallenge, redirectUri }) {
+      const params = new URLSearchParams({
+        client_id: clientId(),
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: GOOGLE_SCOPES.join(' '),
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        // Without both of these Google returns a refresh token on the first
+        // consent only — so a user who reconnects would silently get an
+        // access-token-only grant that dies in an hour.
+        access_type: 'offline',
+        prompt: 'consent',
+        include_granted_scopes: 'true',
       });
-    } catch (cause) {
-      console.error(JSON.stringify({ code: 'GOOGLE_REVOKE_FAILED', detail: String(cause) }));
-    }
-  },
-};
 
-async function postToken(fields: Record<string, string>): Promise<TokenSet> {
-  const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+      return `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
+    },
+
+    async exchangeCode({ code, codeVerifier, redirectUri }) {
+      const token = await postToken(fetcher, now, clientId(), clientSecret(), {
+        grant_type: 'authorization_code',
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: redirectUri,
+      });
+
+      if (!token.refreshToken) {
+        // Without a refresh token the connection would work for an hour and then
+        // fail in a way that looks like a sync bug. Refuse it at the source.
+        throw new EdgeError(
+          'PROVIDER_AUTH_EXPIRED',
+          'Google did not grant offline access. Try connecting again.',
+          400,
+        );
+      }
+
+      return token;
+    },
+
+    refresh(refreshToken) {
+      return postToken(fetcher, now, clientId(), clientSecret(), {
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      });
+    },
+
+    async identify(accessToken) {
+      const response = await fetcher(GOOGLE_USERINFO_ENDPOINT, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) {
+        throw new EdgeError('PROVIDER_AUTH_EXPIRED', 'Could not read the Google account.', 401);
+      }
+
+      const parsed = googleUserInfoSchema.safeParse(
+        await safeJson(response, 'Google returned an unexpected profile.'),
+      );
+      if (!parsed.success) {
+        throw new EdgeError('UNKNOWN', 'Google returned an unexpected profile.', 502);
+      }
+
+      return { providerUserId: parsed.data.sub, email: parsed.data.email ?? null };
+    },
+
+    async revoke(token) {
+      // Best effort by design: a token Google has already forgotten returns 400,
+      // and that must not stop us from deleting our own record of it.
+      try {
+        await fetcher(GOOGLE_REVOKE_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ token }).toString(),
+        });
+      } catch (cause) {
+        console.error(JSON.stringify({ code: 'GOOGLE_REVOKE_FAILED', detail: String(cause) }));
+      }
+    },
+  };
+}
+
+export const googleAuth: ProviderAuth = createGoogleAuth();
+
+async function postToken(
+  fetcher: typeof fetch,
+  now: () => number,
+  clientId: string,
+  clientSecret: string,
+  fields: Record<string, string>,
+): Promise<TokenSet> {
+  const response = await fetcher(GOOGLE_TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       ...fields,
-      client_id: googleClientId(),
-      client_secret: googleClientSecret(),
+      client_id: clientId,
+      client_secret: clientSecret,
     }).toString(),
   });
 
@@ -130,7 +158,9 @@ async function postToken(fields: Record<string, string>): Promise<TokenSet> {
     );
   }
 
-  const parsed = googleTokenResponseSchema.safeParse(await response.json());
+  const parsed = googleTokenResponseSchema.safeParse(
+    await safeJson(response, 'Google returned an unexpected token response.'),
+  );
   if (!parsed.success) {
     throw new EdgeError('UNKNOWN', 'Google returned an unexpected token response.', 502);
   }
@@ -141,7 +171,7 @@ async function postToken(fields: Record<string, string>): Promise<TokenSet> {
     accessToken: access_token,
     refreshToken: refresh_token ?? null,
     // 60s of slack so a token cannot expire mid-request.
-    expiresAt: new Date(Date.now() + (expires_in - 60) * 1000).toISOString(),
+    expiresAt: new Date(now() + Math.max(expires_in - 60, 0) * 1000).toISOString(),
     scopes: scope ? scope.split(' ') : [],
   };
 }
@@ -153,5 +183,13 @@ async function safeReason(response: Response): Promise<string | null> {
     return parsed.success ? (parsed.data.error ?? null) : null;
   } catch {
     return null;
+  }
+}
+
+async function safeJson(response: Response, message: string): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    throw new EdgeError('UNKNOWN', message, 502);
   }
 }
