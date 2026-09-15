@@ -547,6 +547,19 @@ describe('resolveEffectiveWorkingHours', () => {
 
     expect(result).toEqual(WORK_WEEK);
   });
+
+  it('opens a working day when an exact start is outside working hours', () => {
+    const result = resolveEffectiveWorkingHours({
+      workingHours: WORK_WEEK,
+      dateIntent: { type: 'weekday', weekday: 'friday', modifier: 'none' },
+      windowStart: new Date('2026-09-11T04:00:00.000Z'),
+      windowEnd: new Date('2026-09-12T04:00:00.000Z'),
+      timeZone: ZONE,
+      exactStartMinute: 20 * 60,
+    });
+
+    expect(result).toContainEqual({ weekday: 5, startMinute: 8 * 60, endMinute: 22 * 60 });
+  });
 });
 
 describe('resolveIntentDateWindow: week_of', () => {

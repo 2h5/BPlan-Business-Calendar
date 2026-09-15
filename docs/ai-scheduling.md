@@ -41,6 +41,13 @@ The Find Time box accepts human language (e.g. `"meeting with Andrew lasting 15m
 9. **Ad-Hoc Confirmation**: On confirmation, `confirm_ai_schedule_suggestion` creates the internal event, populating `location` and `description` from the persisted request row.
 10. **Pro UI Teaser**: For users without an active Pro entitlement, `FindTimeBox` renders a locked teaser card linking directly to `/subscription` with a disabled input, avoiding broken 402/403 submissions while preserving confirmation cards and banners.
 
+The deterministic scheduling test harness also exercises these guarantees with
+a fixed seed across representative timezones, working-hour shapes, duration
+ranges, busy intervals, recurrence exceptions, and DST transitions. A
+nonexistent exact local time fails closed; an ambiguous local time resolves to
+the established earlier instant; and ordinary candidate progression follows
+local wall-clock grid labels rather than fixed UTC-minute steps.
+
 ### Ad-hoc requests
 
 A request targets an existing task, a raw natural language text string, or an explicit ad-hoc title + duration. `aiScheduleRequestSchema` enforces exactly one mode, and `ai_schedule_requests` mirrors it with a check constraint: `task_id` is nullable, and an ad-hoc row carries `raw_text` (cleared post-parse), `ad_hoc_title`, `ad_hoc_duration_minutes`, `ad_hoc_location`, `ad_hoc_description`, and `parsed_intent`.

@@ -43,6 +43,29 @@ export interface AiIntentProvider {
   parseSchedulingIntent(input: AiIntentInput): Promise<AiIntentResult>;
 }
 
+const INTENT_KEYS = [
+  'title',
+  'duration',
+  'date',
+  'time',
+  'location',
+  'description',
+  'requiresClarification',
+  'clarificationQuestion',
+] as const;
+const DURATION_KEYS = ['type', 'minutes', 'minMinutes', 'maxMinutes'] as const;
+const DATE_KEYS = ['type', 'weekday', 'modifier', 'preference', 'date'] as const;
+const TIME_KEYS = [
+  'type',
+  'hour',
+  'minute',
+  'startHour',
+  'startMinute',
+  'endHour',
+  'endMinute',
+  'preference',
+] as const;
+
 /**
  * Strict JSON schema for OpenAI Responses API Structured Outputs.
  * In strict mode:
@@ -264,14 +287,33 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
   }
 
   const raw = rawOutput as Record<string, unknown>;
+  rejectUnexpectedKeys(raw, INTENT_KEYS, 'intent');
+  for (const key of INTENT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) {
+      throw new EdgeError('AI_INVALID_OUTPUT', `The AI intent is missing ${key}.`, 502);
+    }
+  }
+  if (typeof raw.title !== 'string') {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Intent title must be a string.', 502);
+  }
+  if (typeof raw.requiresClarification !== 'boolean') {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Clarification flag must be boolean.', 502);
+  }
+  for (const key of ['location', 'description', 'clarificationQuestion'] as const) {
+    const value = raw[key];
+    if (value !== null && typeof value !== 'string') {
+      throw new EdgeError('AI_INVALID_OUTPUT', `${key} must be a string or null.`, 502);
+    }
+  }
 
   // Convert and strictly validate duration
   let duration: SchedulingIntent['duration'] = null;
-  if (raw.duration !== null && raw.duration !== undefined) {
-    if (typeof raw.duration !== 'object') {
-      throw new EdgeError('AI_INVALID_OUTPUT', 'Duration intent must be an object or null.', 502);
-    }
-    const d = raw.duration as Record<string, unknown>;
+  if (raw.duration !== null) {
+    const d = requireRecord(raw.duration, 'Duration intent');
+    rejectUnexpectedKeys(d, DURATION_KEYS, 'duration');
+    validateOptionalInteger(d, 'minutes', 5, 720);
+    validateOptionalInteger(d, 'minMinutes', 5, 720);
+    validateOptionalInteger(d, 'maxMinutes', 5, 720);
     if (d.type === 'exact') {
       if (
         typeof d.minutes !== 'number' ||
@@ -328,10 +370,25 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
 
   // Convert and strictly validate date
   let date: SchedulingIntent['date'];
-  if (!raw.date || typeof raw.date !== 'object') {
-    throw new EdgeError('AI_INVALID_OUTPUT', 'Date intent must be a valid object.', 502);
+  const d = requireRecord(raw.date, 'Date intent');
+  rejectUnexpectedKeys(d, DATE_KEYS, 'date');
+  validateOptionalEnum(d, 'weekday', [
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday',
+  ]);
+  validateOptionalEnum(d, 'modifier', ['this', 'next', 'none']);
+  validateOptionalEnum(d, 'preference', ['early', 'middle', 'late', 'any']);
+  if (d.date !== null && d.date !== undefined && typeof d.date !== 'string') {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Date value must be a string or null.', 502);
   }
-  const d = raw.date as Record<string, unknown>;
+  if (typeof d.date === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Date value must use YYYY-MM-DD format.', 502);
+  }
   const rawPreference =
     typeof d.preference === 'string' && ['early', 'middle', 'late', 'any'].includes(d.preference)
       ? (d.preference as 'early' | 'middle' | 'late' | 'any')
@@ -411,10 +468,19 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
 
   // Convert and strictly validate time
   let time: SchedulingIntent['time'];
-  if (!raw.time || typeof raw.time !== 'object') {
-    throw new EdgeError('AI_INVALID_OUTPUT', 'Time intent must be a valid object.', 502);
+  const t = requireRecord(raw.time, 'Time intent');
+  rejectUnexpectedKeys(t, TIME_KEYS, 'time');
+  for (const key of [
+    'hour',
+    'minute',
+    'startHour',
+    'startMinute',
+    'endHour',
+    'endMinute',
+  ] as const) {
+    validateOptionalInteger(t, key, 0, key.includes('Hour') ? 23 : 59);
   }
-  const t = raw.time as Record<string, unknown>;
+  validateOptionalEnum(t, 'preference', ['morning', 'afternoon', 'evening']);
   const isValidHour = (h: unknown): h is number =>
     typeof h === 'number' && Number.isInteger(h) && h >= 0 && h <= 23;
   const isValidMinute = (m: unknown): m is number =>
@@ -502,7 +568,7 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  const requiresClarification = Boolean(raw.requiresClarification);
+  const requiresClarification = raw.requiresClarification;
   const clarificationQuestion =
     typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
       ? raw.clarificationQuestion.trim()
@@ -538,4 +604,56 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
   }
 
   return parsed.data;
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `${label} must be a valid object.`, 502);
+  }
+  return value as Record<string, unknown>;
+}
+
+function rejectUnexpectedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+): void {
+  const allowedKeys = new Set(allowed);
+  const unexpected = Object.keys(value).find((key) => !allowedKeys.has(key));
+  if (unexpected) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `The AI returned an unexpected ${label} field.`, 502);
+  }
+}
+
+function validateOptionalInteger(
+  value: Record<string, unknown>,
+  key: string,
+  min: number,
+  max: number,
+): void {
+  const candidate = value[key];
+  const upperBound = key.toLowerCase().endsWith('hour') ? 23 : max;
+  if (
+    candidate !== null &&
+    candidate !== undefined &&
+    (typeof candidate !== 'number' ||
+      !Number.isInteger(candidate) ||
+      candidate < min ||
+      candidate > upperBound)
+  ) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is out of range.`, 502);
+  }
+}
+
+function validateOptionalEnum(
+  value: Record<string, unknown>,
+  key: string,
+  allowed: readonly string[],
+): void {
+  const candidate = value[key];
+  if (candidate !== null && candidate !== undefined) {
+    if (typeof candidate !== 'string' || !allowed.includes(candidate)) {
+      throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is invalid.`, 502);
+    }
+  }
 }

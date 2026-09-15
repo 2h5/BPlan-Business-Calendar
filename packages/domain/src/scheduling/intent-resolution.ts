@@ -509,6 +509,8 @@ export interface EffectiveWorkingHoursInput {
   /** Explicit local-minute bounds the user named, if any. */
   earliestMinute?: number;
   latestMinute?: number;
+  /** An exact local start, which may intentionally be outside work hours. */
+  exactStartMinute?: number;
 }
 
 /**
@@ -553,7 +555,9 @@ export function resolveEffectiveWorkingHours(input: EffectiveWorkingHoursInput):
 
     // A working day, but the hour they named falls outside the working band —
     // "Friday at 8pm" is personal time on a day they happen to work.
-    if (namesHourOutside(configured, input.earliestMinute, input.latestMinute)) {
+    if (
+      namesHourOutside(configured, input.earliestMinute, input.latestMinute, input.exactStartMinute)
+    ) {
       extra.push({
         weekday,
         startMinute: PERSONAL_DAY_START_MINUTE,
@@ -588,8 +592,21 @@ function namesHourOutside(
   configured: WorkingHours,
   earliestMinute: number | undefined,
   latestMinute: number | undefined,
+  exactStartMinute: number | undefined,
 ): boolean {
-  if (earliestMinute === undefined && latestMinute === undefined) return false;
+  if (
+    earliestMinute === undefined &&
+    latestMinute === undefined &&
+    exactStartMinute === undefined
+  ) {
+    return false;
+  }
+
+  if (exactStartMinute !== undefined) {
+    return !configured.some(
+      (window) => window.startMinute <= exactStartMinute && exactStartMinute < window.endMinute,
+    );
+  }
 
   const from = earliestMinute ?? 0;
   const to = latestMinute ?? 24 * 60;

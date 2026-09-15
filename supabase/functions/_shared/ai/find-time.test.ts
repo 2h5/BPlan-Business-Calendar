@@ -435,6 +435,30 @@ Deno.test(
   },
 );
 
+Deno.test('uses an exact out-of-hours local start when the named day is explicit', async () => {
+  const result = await prepareDeterministicFindTime(
+    {
+      userId: USER_ID,
+      request: {
+        title: 'Late meeting',
+        durationMinutes: 30,
+        windowStart: '2026-09-04T04:00:00.000Z',
+        windowEnd: '2026-09-05T04:00:00.000Z',
+        exactStartMinute: 20 * 60,
+      },
+      dateIntent: { type: 'weekday', weekday: 'friday', modifier: 'none' },
+      now: new Date('2026-09-03T12:00:00.000Z'),
+    },
+    dataSource(),
+    candidateId,
+  );
+
+  assertEquals(
+    result.candidates.map((candidate) => candidate.startAt),
+    ['2026-09-05T00:00:00.000Z'],
+  );
+});
+
 Deno.test(
   'rejects a missing default internal calendar and malformed profile constraints',
   async () => {

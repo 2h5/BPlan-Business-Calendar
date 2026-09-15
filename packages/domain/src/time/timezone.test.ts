@@ -11,6 +11,7 @@ import {
 } from './timezone';
 
 const NY = 'America/New_York';
+const BERLIN = 'Europe/Berlin';
 
 describe('getOffsetMinutes', () => {
   it('reports standard and daylight offsets for New York', () => {
@@ -61,6 +62,25 @@ describe('zonedWallClockToUtc', () => {
     // 01:30 on 2026-11-01 happens twice; the first is 05:30Z (EDT).
     const instant = zonedWallClockToUtc({ year: 2026, month: 11, day: 1, hour: 1, minute: 30 }, NY);
     expect(instant.toISOString()).toBe('2026-11-01T05:30:00.000Z');
+  });
+
+  it('applies the same spring-gap policy in a positive-offset DST timezone', () => {
+    // 02:30 on 2026-03-29 never happens in Berlin; shift forward to 03:30.
+    const instant = zonedWallClockToUtc(
+      { year: 2026, month: 3, day: 29, hour: 2, minute: 30 },
+      BERLIN,
+    );
+    expect(instant.toISOString()).toBe('2026-03-29T01:30:00.000Z');
+    expect(getZonedParts(instant, BERLIN)).toMatchObject({ hour: 3, minute: 30 });
+  });
+
+  it('chooses the earlier occurrence for a positive-offset fall-back timezone', () => {
+    // 02:30 on 2026-10-25 happens twice in Berlin; the first is 00:30Z (CEST).
+    const instant = zonedWallClockToUtc(
+      { year: 2026, month: 10, day: 25, hour: 2, minute: 30 },
+      BERLIN,
+    );
+    expect(instant.toISOString()).toBe('2026-10-25T00:30:00.000Z');
   });
 });
 

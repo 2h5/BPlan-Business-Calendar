@@ -235,3 +235,41 @@ Deno.test('validateAiSchedulingIntent: parses relative_week and weekend with pre
     preference: 'late',
   });
 });
+
+Deno.test(
+  'validateAiSchedulingIntent: rejects schema-invalid fields instead of dropping them',
+  () => {
+    const valid = () => ({
+      title: 'Meeting',
+      duration: null,
+      date: { type: 'unconstrained' },
+      time: { type: 'unconstrained' },
+      location: null,
+      description: null,
+      requiresClarification: false,
+      clarificationQuestion: null,
+    });
+
+    const missingDuration: Record<string, unknown> = valid();
+    delete missingDuration.duration;
+
+    const invalidValues: unknown[] = [
+      { ...valid(), requestId: 'not-a-request-field' },
+      { ...valid(), duration: undefined },
+      missingDuration,
+      { ...valid(), requiresClarification: 'false' },
+      { ...valid(), location: 123 },
+      { ...valid(), date: { type: 'unconstrained', date: '2026-03-08T07:30:00Z' } },
+      { ...valid(), time: { type: 'unconstrained', hour: 24 } },
+      {
+        ...valid(),
+        date: { type: 'weekday', weekday: 'friday', modifier: 'later' },
+      },
+    ];
+
+    for (const value of invalidValues) {
+      const error = assertThrows(() => validateAiSchedulingIntent(value), EdgeError);
+      assertEquals(error.code, 'AI_INVALID_OUTPUT');
+    }
+  },
+);

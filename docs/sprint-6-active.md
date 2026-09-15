@@ -5,6 +5,25 @@ SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
 IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
 EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
 
+### Deterministic scheduling adversarial hardening — 2026-09-15
+
+Added a bounded, fixed-seed generated test matrix for availability and intent
+resolution across the supported timezones, DST transitions, local grids,
+working-hour shapes, duration ranges, and busy-interval boundary cases. Added
+recurrence expansion and confirmation race/staleness regressions, plus mocked
+model-output fail-closed cases. The test-only model fixtures make no network
+requests and require no `OPENAI_API_KEY`.
+
+The matrix exposed and fixed positive-offset spring-gap conversion, DST local
+grid drift, exact-time sliding through nonexistent wall-clock labels, and an
+exact out-of-hours request remaining fenced to configured work hours. The
+deterministic engine remains the availability authority; no live model
+evaluation was run.
+
+Automated verification for this slice passed: `pnpm verify`, the 265-test
+`@cal/domain` suite, `deno task check`, and the 236-test Supabase Functions
+suite. No SQL or migration files changed.
+
 ### Natural-Language Scheduling Intent Layer (Luna) Hardening — 2026-09-10
 
 Implemented and hardened the AI-first natural-language intent layer for Web Find Time using Luna (`gpt-5.6-luna`), strictly preserving the deterministic scheduling engine as the sole availability authority:

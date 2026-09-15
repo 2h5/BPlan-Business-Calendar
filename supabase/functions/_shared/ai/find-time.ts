@@ -173,6 +173,7 @@ export async function prepareDeterministicFindTime(
             timeZone: profile.timezone,
             earliestMinute: input.request.earliestMinute,
             latestMinute: input.request.latestMinute,
+            exactStartMinute: input.request.exactStartMinute,
           })
         : profile.workingHours),
     timezone: profile.timezone,

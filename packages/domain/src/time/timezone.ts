@@ -28,6 +28,7 @@ const WEEKDAY_INDEX: Record<string, number> = {
 };
 
 const formatterCache = new Map<string, Intl.DateTimeFormat>();
+const HOUR_MS = 60 * 60_000;
 
 function formatterFor(timeZone: string): Intl.DateTimeFormat {
   const cached = formatterCache.get(timeZone);
@@ -109,18 +110,73 @@ export function zonedWallClockToUtc(
     parts.millisecond ?? 0,
   );
 
-  // First guess using the offset that applies at the naive instant, then
-  // re-resolve once because the offset itself may differ at the corrected time.
-  const firstOffset = getOffsetMinutes(new Date(naive), timeZone);
-  const firstGuess = naive - firstOffset * 60_000;
-  const secondOffset = getOffsetMinutes(new Date(firstGuess), timeZone);
-  if (secondOffset === firstOffset) return new Date(firstGuess);
+  // The offset at the naive instant is not enough around a transition. For
+  // example, Berlin's 02:30 spring gap is represented by a naive UTC instant
+  // that is already on the daylight side, while New York's equivalent naive
+  // instant is still on standard time. Probe on both sides so the same policy
+  // works for positive and negative offsets.
+  const offsets = new Set([
+    getOffsetMinutes(new Date(naive - 4 * HOUR_MS), timeZone),
+    getOffsetMinutes(new Date(naive), timeZone),
+    getOffsetMinutes(new Date(naive + 4 * HOUR_MS), timeZone),
+  ]);
+  const candidates = [...offsets].map((offset) => new Date(naive - offset * 60_000));
+  const normalized = new Date(naive);
 
-  const secondGuess = naive - secondOffset * 60_000;
-  // If the second guess round-trips, the wall-clock time is unambiguous there.
-  return getOffsetMinutes(new Date(secondGuess), timeZone) === secondOffset
-    ? new Date(secondGuess)
-    : new Date(firstGuess);
+  const exactMatches = candidates.filter((candidate) =>
+    sameWallClock(candidate, normalized, timeZone),
+  );
+  if (exactMatches.length > 0) {
+    // A fall-back label has two valid instants. The earlier one is the stable
+    // choice shared by the scheduling engine and confirmation predicate.
+    return new Date(Math.min(...exactMatches.map((candidate) => candidate.getTime())));
+  }
+
+  // A spring-forward label has no exact instant. Choose the first candidate
+  // whose round-tripped wall clock is later than the requested label; this is
+  // the documented "shift forward by the gap" policy.
+  const laterMatches = candidates
+    .map((candidate) => ({
+      candidate,
+      wallClock: wallClockAsUtc(candidate, timeZone),
+    }))
+    .filter(({ wallClock }) => wallClock > naive)
+    .sort(
+      (left, right) =>
+        left.wallClock - right.wallClock || left.candidate.getTime() - right.candidate.getTime(),
+    );
+  if (laterMatches[0]) return laterMatches[0].candidate;
+
+  // This fallback is only reachable for an unusual historical zone rule not
+  // represented by the probes above. Preserve deterministic behavior rather
+  // than returning an arbitrary candidate.
+  return candidates.sort((left, right) => left.getTime() - right.getTime())[0] ?? new Date(naive);
+}
+
+function sameWallClock(instant: Date, expected: Date, timeZone: string): boolean {
+  const actual = getZonedParts(instant, timeZone);
+  return (
+    actual.year === expected.getUTCFullYear() &&
+    actual.month === expected.getUTCMonth() + 1 &&
+    actual.day === expected.getUTCDate() &&
+    actual.hour === expected.getUTCHours() &&
+    actual.minute === expected.getUTCMinutes() &&
+    actual.second === expected.getUTCSeconds() &&
+    instant.getUTCMilliseconds() === expected.getUTCMilliseconds()
+  );
+}
+
+function wallClockAsUtc(instant: Date, timeZone: string): number {
+  const parts = getZonedParts(instant, timeZone);
+  return Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+    instant.getUTCMilliseconds(),
+  );
 }
 
 /** Minutes elapsed since local midnight in `timeZone`. */

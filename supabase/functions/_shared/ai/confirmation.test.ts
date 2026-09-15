@@ -866,3 +866,105 @@ Deno.test(
     );
   },
 );
+
+Deno.test('rejects a proposal whose start has elapsed before confirmation', async () => {
+  await expectCode(
+    confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({ now: () => new Date('2026-08-31T14:00:00.000Z') }),
+    ),
+    'AI_PROPOSAL_STALE',
+  );
+});
+
+Deno.test('rejects candidate timestamp and duration tampering', async () => {
+  for (const override of [
+    { startAt: '2026-08-31T13:05:00.000Z', endAt: '2026-08-31T14:05:00.000Z' },
+    { startAt: '2026-08-31T13:00:00.000Z', endAt: '2026-08-31T14:15:00.000Z' },
+  ]) {
+    await expectCode(
+      confirmAiScheduleSuggestion(
+        { userId: USER_ID, suggestionId: SUGGESTION_ID },
+        deps({
+          repository: repository({ loadSuggestion: () => Promise.resolve(persisted(override)) }),
+        }),
+      ),
+      'AI_PROPOSAL_STALE',
+    );
+  }
+});
+
+Deno.test('accepts a candidate that only touches a prior event boundary', async () => {
+  let confirmCalls = 0;
+  const result = await confirmAiScheduleSuggestion(
+    { userId: USER_ID, suggestionId: SUGGESTION_ID },
+    deps({
+      dataSource: source({
+        loadEvents: () =>
+          Promise.resolve([
+            {
+              calendarId: CALENDAR_ID,
+              startAt: '2026-08-31T12:00:00.000Z',
+              endAt: '2026-08-31T13:00:00.000Z',
+              timezone: 'America/New_York',
+              status: 'confirmed',
+              recurrenceRule: null,
+              sourceType: 'internal',
+              providerEventId: null,
+              recurringEventId: null,
+              recurrenceOriginalStartAt: null,
+            },
+          ]),
+      }),
+      repository: repository({
+        confirmSuggestion: () => {
+          confirmCalls += 1;
+          return Promise.resolve({ status: 'accepted' as const, eventId: EVENT_ID });
+        },
+      }),
+    }),
+  );
+
+  assertEquals(result.status, 'accepted');
+  assertEquals(confirmCalls, 1);
+});
+
+Deno.test('rejects a recurring conflict introduced by a moved exception', async () => {
+  await expectCode(
+    confirmAiScheduleSuggestion(
+      { userId: USER_ID, suggestionId: SUGGESTION_ID },
+      deps({
+        dataSource: source({
+          loadEvents: () =>
+            Promise.resolve([
+              {
+                calendarId: CALENDAR_ID,
+                startAt: '2026-08-24T13:00:00.000Z',
+                endAt: '2026-08-24T14:00:00.000Z',
+                timezone: 'America/New_York',
+                status: 'confirmed',
+                recurrenceRule: 'FREQ=WEEKLY;BYDAY=MO',
+                sourceType: 'google',
+                providerEventId: 'series-moved',
+                recurringEventId: null,
+                recurrenceOriginalStartAt: null,
+              },
+              {
+                calendarId: CALENDAR_ID,
+                startAt: '2026-08-31T13:30:00.000Z',
+                endAt: '2026-08-31T14:30:00.000Z',
+                timezone: 'America/New_York',
+                status: 'confirmed',
+                recurrenceRule: null,
+                sourceType: 'google',
+                providerEventId: 'series-moved-instance',
+                recurringEventId: 'series-moved',
+                recurrenceOriginalStartAt: '2026-08-31T13:00:00.000Z',
+              },
+            ]),
+        }),
+      }),
+    ),
+    'AI_PROPOSAL_STALE',
+  );
+});

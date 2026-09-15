@@ -172,7 +172,6 @@ export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[
     constraints.allowedDurationsMinutes && constraints.allowedDurationsMinutes.length > 0
       ? [...new Set(constraints.allowedDurationsMinutes)]
       : [constraints.durationMinutes];
-  const step = constraints.granularityMinutes * MINUTE_MS;
   const free = findFreeIntervals(input);
 
   const slots: CandidateSlot[] = [];
@@ -181,6 +180,12 @@ export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[
       constraints.exactStartMinute === undefined
         ? undefined
         : exactStartForLocalDate(interval, constraints.exactStartMinute, constraints.timezone);
+
+    // A requested exact local time can fall inside a spring-forward gap. The
+    // timezone helper has a general-purpose shift-forward policy, but an
+    // exact scheduling request must fail closed instead of silently moving to
+    // a different wall-clock label.
+    if (exactStart === null) continue;
 
     for (const durationMinutes of durations) {
       const duration = durationMinutes * MINUTE_MS;
@@ -203,7 +208,7 @@ export function generateCandidateSlots(input: AvailabilityInput): CandidateSlot[
           constraints.timezone,
         );
         start + duration <= interval.end;
-        start += step
+        start = advanceOnLocalGrid(start, constraints.granularityMinutes, constraints.timezone)
       ) {
         if (start < interval.start) continue;
         slots.push({
@@ -226,9 +231,9 @@ function exactStartForLocalDate(
   interval: Interval,
   exactStartMinute: number,
   timeZone: string,
-): number {
+): number | null {
   const parts = getZonedParts(new Date(interval.start), timeZone);
-  return zonedWallClockToUtc(
+  const start = zonedWallClockToUtc(
     {
       year: parts.year,
       month: parts.month,
@@ -237,7 +242,18 @@ function exactStartForLocalDate(
       minute: exactStartMinute % 60,
     },
     timeZone,
-  ).getTime();
+  );
+  const resolvedParts = getZonedParts(start, timeZone);
+  if (
+    resolvedParts.year !== parts.year ||
+    resolvedParts.month !== parts.month ||
+    resolvedParts.day !== parts.day ||
+    resolvedParts.hour !== Math.floor(exactStartMinute / 60) ||
+    resolvedParts.minute !== exactStartMinute % 60
+  ) {
+    return null;
+  }
+  return start.getTime();
 }
 
 /** Round an instant up to the next local `granularity`-minute boundary. */
@@ -249,6 +265,46 @@ function alignToGrid(instant: number, granularityMinutes: number, timeZone: stri
   const elapsedMs = (remainder * 60 + parts.second) * 1000 + ms;
   return instant + (granularityMinutes * MINUTE_MS - elapsedMs);
 }
+
+/** Advance to the next valid local-clock grid point, skipping DST gaps. */
+function advanceOnLocalGrid(instant: number, granularityMinutes: number, timeZone: string): number {
+  let current: LocalClockParts = getZonedParts(new Date(instant), timeZone);
+  for (let guard = 0; guard < 300; guard += 1) {
+    const next = nextLocalGridParts(current, granularityMinutes);
+    const candidate = zonedWallClockToUtc(next, timeZone);
+    const resolved = getZonedParts(candidate, timeZone);
+    const isExactWallClock =
+      resolved.year === next.year &&
+      resolved.month === next.month &&
+      resolved.day === next.day &&
+      resolved.hour === next.hour &&
+      resolved.minute === next.minute;
+    if (isExactWallClock && candidate.getTime() > instant) return candidate.getTime();
+    current = next;
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+function nextLocalGridParts(current: LocalClockParts, granularityMinutes: number): LocalClockParts {
+  const nextMinute =
+    current.minute + granularityMinutes < 60 ? current.minute + granularityMinutes : 0;
+  const nextHour = current.minute + granularityMinutes < 60 ? current.hour : current.hour + 1;
+  const normalized = new Date(
+    Date.UTC(current.year, current.month - 1, current.day, nextHour, nextMinute),
+  );
+  return {
+    year: normalized.getUTCFullYear(),
+    month: normalized.getUTCMonth() + 1,
+    day: normalized.getUTCDate(),
+    hour: normalized.getUTCHours(),
+    minute: normalized.getUTCMinutes(),
+  };
+}
+
+type LocalClockParts = Pick<
+  ReturnType<typeof getZonedParts>,
+  'year' | 'month' | 'day' | 'hour' | 'minute'
+>;
 
 /**
  * A cheap, explainable ordering used when the AI tier is unavailable — and as

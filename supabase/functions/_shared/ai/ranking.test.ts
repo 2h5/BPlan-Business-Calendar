@@ -88,6 +88,7 @@ Deno.test('accepts only known unique candidate ids with a valid contiguous ranki
 Deno.test('rejects unknown, duplicate, malformed, and timestamp-bearing model output', () => {
   const input = buildAiRankingInput(deterministicResult());
   const firstId = input.candidates[0]?.id;
+  const tooManyCandidates = buildAiRankingInput(deterministicResult(6)).candidates;
 
   const invalidValues = [
     { suggestions: [{ slotId: 'invented_slot', rank: 1, score: 1, reason: 'Invented.' }] },
@@ -120,6 +121,19 @@ Deno.test('rejects unknown, duplicate, malformed, and timestamp-bearing model ou
           startAt: '2026-09-01T13:00:00.000Z',
         },
       ],
+    },
+    { suggestions: [] },
+    {
+      suggestions: tooManyCandidates.map((candidate, index) => ({
+        slotId: candidate.id,
+        rank: index + 1,
+        score: 1 - index / 10,
+        reason: 'Too many suggestions.',
+      })),
+    },
+    {
+      requestId: 'wrong-request',
+      suggestions: [{ slotId: firstId, rank: 1, score: 1, reason: 'Wrong envelope.' }],
     },
   ];
 
