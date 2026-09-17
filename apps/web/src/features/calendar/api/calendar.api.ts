@@ -19,7 +19,7 @@ import { toAppError } from '../../../lib/errors/app-error';
 import { supabase } from '../../../lib/supabase/client';
 
 export const EVENT_COLUMNS =
-  'id, user_id, calendar_id, title, description, location, start_at, end_at, all_day, ' +
+  'id, user_id, calendar_id, title, description, location, color, start_at, end_at, all_day, ' +
   'timezone, status, recurrence_rule, alerts, source_type, provider_event_id, provider_etag, ' +
   'recurring_event_id, recurrence_original_start_at, provider_updated_at, sync_status, ' +
   'created_at, updated_at';
@@ -136,6 +136,7 @@ export async function createEvent(input: CreateEventInput, userId: string): Prom
       title: parsed.title,
       description: parsed.description ?? null,
       location: parsed.location ?? null,
+      color: parsed.color ?? null,
       start_at: parsed.startAt,
       end_at: parsed.endAt,
       all_day: parsed.allDay,
@@ -157,6 +158,7 @@ export async function updateEvent(input: UpdateEventInput): Promise<CalendarEven
   if (patch.title !== undefined) payload.title = patch.title;
   if (patch.description !== undefined) payload.description = patch.description;
   if (patch.location !== undefined) payload.location = patch.location;
+  if (patch.color !== undefined) payload.color = patch.color;
   if (patch.startAt !== undefined) payload.start_at = patch.startAt;
   if (patch.endAt !== undefined) payload.end_at = patch.endAt;
   if (patch.allDay !== undefined) payload.all_day = patch.allDay;

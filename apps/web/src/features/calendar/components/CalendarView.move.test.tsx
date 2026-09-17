@@ -25,6 +25,7 @@ const event: CalendarEvent = {
   title: 'Team Sync',
   description: 'Weekly team meeting',
   location: 'Room 101',
+  color: null,
   startAt: '2026-09-15T14:00:00.000Z',
   endAt: '2026-09-15T15:00:00.000Z',
   allDay: false,

@@ -1,15 +1,17 @@
 import { addZonedDays, toZonedDateKey } from '@cal/domain';
-import { ErrorState, IconButton, LoadingState, SegmentedControl, Text, useTheme } from '@cal/ui';
+import { ErrorState, IconButton, LoadingState, SegmentedControl, useTheme } from '@cal/ui';
 import { ScrollView, View } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 
 import { type CalendarViewMode, useCalendarViewStore } from '../../../store/calendar-view.store';
 import { useEventEditorStore } from '../../../store/event-editor.store';
 import { AgendaList } from '../components/agenda-view/AgendaList';
+import { CalendarHeading } from '../components/CalendarHeading';
 import { DayTimeline } from '../components/day-view/DayTimeline';
-import { MonthGrid } from '../components/month-view/MonthGrid';
+import { MonthPager } from '../components/month-view/MonthPager';
 import { WeekGrid } from '../components/week-view/WeekGrid';
 import { useCalendarWindow } from '../hooks/useCalendarWindow';
-import { dateKeyToInstant } from '../utils/window';
+import { dateKeyToInstant, monthIndexOf } from '../utils/window';
 
 const MODES: { value: CalendarViewMode; label: string }[] = [
   { value: 'day', label: 'Day' },
@@ -17,6 +19,13 @@ const MODES: { value: CalendarViewMode; label: string }[] = [
   { value: 'month', label: 'Month' },
   { value: 'agenda', label: 'Agenda' },
 ];
+
+/**
+ * How wide a span each view covers. A switch rolls the title the way the view
+ * opened out — widening rolls down, narrowing rolls up — which gives the change
+ * the same vocabulary as stepping through time, where later rolls down.
+ */
+const MODE_RANK: Record<CalendarViewMode, number> = { day: 0, week: 1, month: 2, agenda: 3 };
 
 const MONTHS = [
   'January',
@@ -47,6 +56,10 @@ export function CalendarScreen() {
   const selectedDateKey = useCalendarViewStore((state) => state.selectedDateKey);
   const setSelectedDateKey = useCalendarViewStore((state) => state.setSelectedDateKey);
 
+  // Which way the title rolls on the next date change: +1 later, -1 earlier.
+  // Set by each step before it changes the date — see CalendarHeading.
+  const rollDirection = useSharedValue(1);
+
   const openEvent = useEventEditorStore((state) => state.openEvent);
   const openNewEvent = useEventEditorStore((state) => state.openNew);
 
@@ -58,7 +71,8 @@ export function CalendarScreen() {
   const [year, month] = selectedDateKey.split('-').map(Number);
 
   /** Step by one view's worth: a day, a week, or a month. */
-  const shift = (direction: 1 | -1) => {
+  const shift = (direction: number) => {
+    rollDirection.value = direction < 0 ? -1 : 1;
     const days = mode === 'day' ? 1 : mode === 'week' ? 7 : mode === 'agenda' ? 28 : 0;
 
     if (days > 0) {
@@ -80,20 +94,46 @@ export function CalendarScreen() {
     );
   };
 
-  const goToToday = () => setSelectedDateKey(toZonedDateKey(now, timeZone));
+  /** Select a date directly, rolling the title towards it. */
+  const selectDate = (dateKey: string) => {
+    rollDirection.value = dateKey < selectedDateKey ? -1 : 1;
+    setSelectedDateKey(dateKey);
+  };
 
-  const heading =
+  const goToToday = () => {
+    const todayKey = toZonedDateKey(now, timeZone);
+    // Date keys sort as dates, so this says whether today lies later or earlier.
+    rollDirection.value = todayKey < selectedDateKey ? -1 : 1;
+    setSelectedDateKey(todayKey);
+  };
+
+  /** Switch view, rolling the title the way the span changes. */
+  const changeMode = (next: CalendarViewMode) => {
+    rollDirection.value = MODE_RANK[next] < MODE_RANK[mode] ? -1 : 1;
+    setMode(next);
+  };
+
+  // The title rolls piece by piece, so only what changed moves: stepping a day
+  // rolls the number, and the month — or the year — turns over only when it
+  // too changes. A week step inside one month leaves the title still.
+  //
+  // Switching view reads as the same motion for free: day shows the date where
+  // every other view shows the year, so day to week rolls that one piece and
+  // holds the month steady. Agenda carries the same two pieces as week and
+  // month rather than one joined string, so moving between those three leaves
+  // a title that has not changed alone instead of rolling it in place.
+  const monthName = MONTHS[(month ?? 1) - 1] ?? '';
+  const headingSegments =
     mode === 'day'
-      ? `${MONTHS[(month ?? 1) - 1]} ${Number(selectedDateKey.split('-')[2])}`
-      : `${MONTHS[(month ?? 1) - 1]} ${year}`;
+      ? [monthName, String(Number(selectedDateKey.split('-')[2]))]
+      : [monthName, String(year)];
 
   return (
     <View style={{ flex: 1, gap: theme.spacing.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Text variant="title3" numberOfLines={1}>
-            {heading}
-          </Text>
+          {/* Deliberately not keyed on `mode`: see CalendarHeading. */}
+          <CalendarHeading segments={headingSegments} direction={rollDirection} />
         </View>
 
         <IconButton name="chevron-back" accessibilityLabel="Previous" onPress={() => shift(-1)} />
@@ -108,7 +148,7 @@ export function CalendarScreen() {
         />
       </View>
 
-      <SegmentedControl options={MODES} value={mode} onChange={setMode} />
+      <SegmentedControl options={MODES} value={mode} onChange={changeMode} />
 
       {isLoading ? (
         <LoadingState label="Loading your calendar" />
@@ -121,8 +161,8 @@ export function CalendarScreen() {
       ) : mode === 'day' ? (
         <DayTimeline
           dateKey={selectedDateKey}
-          dayStart={anchor}
-          occurrences={byDateKey.get(selectedDateKey) ?? []}
+          byDateKey={byDateKey}
+          onChangeDay={shift}
           timeZone={timeZone}
           hourCycle={hourCycle}
           now={now}
@@ -131,31 +171,33 @@ export function CalendarScreen() {
         />
       ) : mode === 'week' ? (
         <WeekGrid
-          dateKeys={window.dateKeys}
+          weekStartsOn={weekStartsOn}
+          onChangeWeek={shift}
           byDateKey={byDateKey}
           timeZone={timeZone}
           hourCycle={hourCycle}
           now={now}
           selectedDateKey={selectedDateKey}
-          onSelectDate={setSelectedDateKey}
+          onSelectDate={selectDate}
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
         />
       ) : mode === 'month' ? (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <MonthGrid
-            dateKeys={window.dateKeys}
-            byDateKey={byDateKey}
-            focusedMonth={month ?? 1}
-            timeZone={timeZone}
-            now={now}
-            selectedDateKey={selectedDateKey}
-            weekStartsOn={weekStartsOn}
-            onSelectDate={(dateKey) => {
-              setSelectedDateKey(dateKey);
-              setMode('day');
-            }}
-          />
-        </ScrollView>
+        // Swiping drags the neighbouring months into view; the grid sizes its
+        // rows to the height left, so it fills the screen instead of scrolling.
+        <MonthPager
+          monthIndex={monthIndexOf(selectedDateKey)}
+          onChangeMonth={shift}
+          byDateKey={byDateKey}
+          timeZone={timeZone}
+          now={now}
+          selectedDateKey={selectedDateKey}
+          weekStartsOn={weekStartsOn}
+          onSelectDate={(dateKey) => {
+            setSelectedDateKey(dateKey);
+            setMode('day');
+          }}
+          onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
+        />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}

@@ -18,6 +18,8 @@ import { useAuth, useAuthActions } from '../../auth';
 import { useConnections } from '../../integrations/hooks/useIntegrations';
 import { NotificationSettingsCard } from '../../notifications';
 import { AppearanceCard } from '../components/AppearanceCard';
+import { CalendarsCard } from '../components/CalendarsCard';
+import { PlanCard } from '../components/PlanCard';
 import {
   PlanningPreferencesSheet,
   type PlanningPreference,
@@ -61,6 +63,8 @@ export function SettingsScreen() {
         </View>
       </Card>
 
+      <PlanCard />
+
       <Card eyebrow="Planning" padded={false}>
         <ListRow
           title="Time zone"
@@ -98,6 +102,8 @@ export function SettingsScreen() {
           onPress={() => setPreference('defaultTaskMinutes')}
         />
       </Card>
+
+      <CalendarsCard />
 
       <AppearanceCard />
 

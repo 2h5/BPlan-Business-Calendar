@@ -30,6 +30,7 @@ describe('calendar API contracts', () => {
       title: 'Moved occurrence',
       description: null,
       location: null,
+      color: null,
       start_at: '2026-09-08T15:00:00.000Z',
       end_at: '2026-09-08T16:00:00.000Z',
       all_day: false,

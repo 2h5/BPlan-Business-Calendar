@@ -288,6 +288,8 @@ function toRow(
     title: event.title,
     description: event.description,
     location: event.location,
+    // Colour is an app-only display override. Provider writes must not replace
+    // the local preference when their response is mirrored back.
     start_at: event.startAt,
     end_at: event.endAt,
     all_day: event.allDay,

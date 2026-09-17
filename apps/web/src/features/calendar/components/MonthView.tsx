@@ -1,4 +1,4 @@
-import { toZonedDateKey } from '@cal/domain';
+import { resolveEventColor, toZonedDateKey } from '@cal/domain';
 
 import styles from './CalendarView.module.css';
 import type { AnchorRect } from './QuickCreatePopover';
@@ -92,7 +92,11 @@ export function MonthView({
                       className={styles.monthEvent}
                       style={
                         {
-                          '--event-color': occurrence.calendar?.color ?? 'var(--color-accent)',
+                          '--event-color': resolveEventColor(
+                            occurrence.event.color,
+                            occurrence.calendar?.color,
+                            'var(--color-accent)',
+                          ),
                         } as React.CSSProperties
                       }
                       onClick={(e) => {

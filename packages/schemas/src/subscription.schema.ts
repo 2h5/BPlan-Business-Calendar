@@ -66,7 +66,14 @@ export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export const subscriptionSchema = z.object({
   entitlement: z.string(),
   status: subscriptionStatusSchema,
-  expiresAt: z.string().datetime().nullable(),
+  /**
+   * Offsets are allowed because this value arrives from PostgREST, which
+   * renders `timestamptz` as `2027-09-14T10:36:12.032003+00:00` rather than
+   * with a `Z`. Bare `.datetime()` rejects that, which only bites when the
+   * column is non-null — that is, only for a subscription that is actually
+   * live — and took the whole plan card down with it.
+   */
+  expiresAt: z.string().datetime({ offset: true }).nullable(),
 });
 
 export type Subscription = z.infer<typeof subscriptionSchema>;

@@ -1,9 +1,10 @@
-import { formatTimeOfDay } from '@cal/domain';
+import { formatTimeOfDay, resolveEventColor } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
 import { Pressable, View } from 'react-native';
 
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import { withAlpha } from '../utils/color';
 
 export interface EventChipProps {
   occurrence: EventOccurrence;
@@ -29,7 +30,11 @@ export function EventChip({
   compact = false,
 }: EventChipProps) {
   const theme = useTheme();
-  const color = occurrence.calendar?.color ?? theme.colors.accent;
+  const color = resolveEventColor(
+    occurrence.event.color,
+    occurrence.calendar?.color,
+    theme.colors.accent,
+  );
   const cancelled = occurrence.event.status === 'cancelled';
 
   return (
@@ -85,23 +90,4 @@ export function EventChip({
       </View>
     </Pressable>
   );
-}
-
-/** Hex → rgba, so a calendar colour can tint a surface at low opacity. */
-function withAlpha(hex: string, alpha: number): string {
-  const normalized = hex.replace('#', '');
-  const full =
-    normalized.length === 3
-      ? normalized
-          .split('')
-          .map((char) => char + char)
-          .join('')
-      : normalized;
-
-  const red = parseInt(full.slice(0, 2), 16);
-  const green = parseInt(full.slice(2, 4), 16);
-  const blue = parseInt(full.slice(4, 6), 16);
-
-  if (Number.isNaN(red) || Number.isNaN(green) || Number.isNaN(blue)) return hex;
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }

@@ -1,4 +1,4 @@
-import { formatDuration, formatTimeOfDay, getZonedParts } from '@cal/domain';
+import { formatDuration, formatTimeOfDay, getZonedParts, resolveEventColor } from '@cal/domain';
 import { ErrorState, LoadingState, useTheme } from '@cal/ui';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
@@ -102,8 +102,6 @@ export function TodayScreen() {
     <View style={{ gap: theme.spacing.lg }}>
       <TodayHero
         dateLabel={dateLabel}
-        clockLabel={formatTimeOfDay(now, timeZone, hourCycle)}
-        timeZone={timeZone}
         greeting={greeting}
         subtitle={
           timed.length > 0 || relevantCount > 0
@@ -112,7 +110,7 @@ export function TodayScreen() {
         }
         onNewTask={() => openQuickAdd('task')}
         onNewEvent={() => openNewEvent(summary.dayStart)}
-        onSearch={() => router.push('/(tabs)/search')}
+        onSearch={() => router.push('/search')}
       />
 
       <FindTimeBox timeZone={timeZone} />
@@ -134,7 +132,11 @@ export function TodayScreen() {
                 )}${next.event.location ? ` · ${next.event.location}` : ''}`
               : 'Schedule is open for deep work'
           }
-          metaDotColor={next ? (next.calendar?.color ?? theme.colors.accent) : undefined}
+          metaDotColor={
+            next
+              ? resolveEventColor(next.event.color, next.calendar?.color, theme.colors.accent)
+              : undefined
+          }
           onPress={next ? () => openEvent(next.event.id) : undefined}
         />
 

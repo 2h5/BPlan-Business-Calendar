@@ -42,6 +42,7 @@ function createMockOccurrence(
     title,
     description: null,
     location: null,
+    color: null,
     startAt: startIso,
     endAt: endIso,
     timezone: 'UTC',

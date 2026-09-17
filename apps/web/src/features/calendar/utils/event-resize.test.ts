@@ -34,6 +34,7 @@ const event: CalendarEvent = {
   title: 'Planning',
   description: 'Notes',
   location: 'Room 2',
+  color: null,
   startAt: '2026-09-15T18:00:00.000Z',
   endAt: '2026-09-15T19:00:00.000Z',
   allDay: false,

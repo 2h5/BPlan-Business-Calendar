@@ -3,6 +3,7 @@ import {
   layoutOverlappingEvents,
   MIN_VISUAL_MINUTES,
   minuteOfDay,
+  resolveEventColor,
   toZonedDateKey,
 } from '@cal/domain';
 import type { HourCycle, WorkingHours } from '@cal/schemas';
@@ -145,7 +146,11 @@ export function EventButton({
   isSettled,
   snapDirection,
 }: EventButtonProps) {
-  const color = occurrence.calendar?.color ?? 'var(--color-accent)';
+  const color = resolveEventColor(
+    occurrence.event.color,
+    occurrence.calendar?.color,
+    'var(--color-accent)',
+  );
   const isResizing = Boolean(resizePreview);
   const isMoving = Boolean(movePreview);
   const isPreviewing = isResizing || isMoving;
@@ -298,7 +303,11 @@ export function OriginGhost({
   isWeek,
   isExiting,
 }: OriginGhostProps) {
-  const color = occurrence.calendar?.color ?? 'var(--color-accent)';
+  const color = resolveEventColor(
+    occurrence.event.color,
+    occurrence.calendar?.color,
+    'var(--color-accent)',
+  );
   return (
     <div
       data-testid="timeline-origin-ghost"

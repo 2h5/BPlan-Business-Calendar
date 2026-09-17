@@ -2,8 +2,9 @@ import { Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { FindTimeLoading } from './FindTimeLoading';
 import type { FindTimeReadback, FindTimeSuggestion } from '../api/find-time.api';
 import { useConfirmSlot } from '../hooks/useConfirmSlot';
 import { useFindTime } from '../hooks/useFindTime';
@@ -135,6 +136,10 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
         </Text>
       ) : null}
 
+      {/* Three placeholders in the shape of the answer, so the wait explains
+          itself rather than leaving the box looking inert. */}
+      {findTime.isPending ? <FindTimeLoading /> : null}
+
       {/* Readback: the user must be able to see the window we actually searched,
           especially when they said something as broad as "next week". */}
       {findTime.readback && findTime.proposal && !confirmation ? (
@@ -183,14 +188,13 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
 
       {findTime.proposal && !confirmation ? (
         <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="caption" color="tertiary" uppercase>
-            Best times
-          </Text>
+          <ResultsHeading />
           {findTime.proposal.suggestions.map((suggestion) => (
             <SlotRow
               key={suggestion.id}
               suggestion={suggestion}
               timeZone={timeZone}
+              isTopPick={suggestion.rank === 1}
               isBooking={confirmSlot.confirmingSuggestionId === suggestion.id}
               disabled={confirmSlot.confirmingSuggestionId !== null}
               onPress={() => handleSelect(suggestion)}
@@ -263,46 +267,133 @@ function ReadbackChips({ readback }: { readback: FindTimeReadback }) {
   );
 }
 
+/**
+ * What the list is, and what it is ordered by — the same claim the web page
+ * makes above its results. The conflict-free badge is not decoration: the slots
+ * were verified against real availability, and saying so is the difference
+ * between a suggestion and a guess.
+ *
+ * Stacked rather than the web's single row: the heading and the badge alone
+ * already fill the width of a phone.
+ */
+function ResultsHeading() {
+  const theme = useTheme();
+
+  return (
+    <View style={{ gap: theme.spacing.xs }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: theme.spacing.sm,
+        }}
+      >
+        <Text variant="caption" uppercase>
+          Verified open slots
+        </Text>
+
+        <View
+          style={{
+            paddingVertical: 2,
+            paddingHorizontal: 7,
+            borderRadius: theme.radius.pill,
+            backgroundColor: theme.colors.successSubtle,
+          }}
+        >
+          <Text variant="caption" color="success">
+            ✦ Guaranteed Conflict-Free
+          </Text>
+        </View>
+      </View>
+
+      <Text variant="footnote" color="tertiary">
+        Ranked by optimal availability
+      </Text>
+    </View>
+  );
+}
+
 interface SlotRowProps {
   suggestion: FindTimeSuggestion;
   timeZone: string;
+  /** Rank 1 — carried as the web's accent-tinted card, badge and tag. */
+  isTopPick: boolean;
   isBooking: boolean;
   disabled: boolean;
   onPress: () => void;
 }
 
-function SlotRow({ suggestion, timeZone, isBooking, disabled, onPress }: SlotRowProps) {
+function SlotRow({ suggestion, timeZone, isTopPick, isBooking, disabled, onPress }: SlotRowProps) {
   const theme = useTheme();
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Schedule ${formatSlot(suggestion.startAt, suggestion.endAt, timeZone)}. ${suggestion.reason}`}
+      accessibilityLabel={`Schedule ${formatSlot(suggestion.startAt, suggestion.endAt, timeZone)}.${
+        isTopPick ? ' Recommended.' : ''
+      } ${suggestion.reason}`}
       accessibilityState={{ disabled, busy: isBooking }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
         gap: theme.spacing.sm,
-        padding: theme.spacing.md,
-        borderRadius: theme.radius.sm,
+        paddingVertical: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        borderRadius: theme.radius.lg,
         borderWidth: theme.borderWidth.hairline,
-        borderColor: pressed ? theme.colors.accent : theme.colors.borderSubtle,
-        backgroundColor: theme.colors.inputBackground,
+        borderColor: pressed || isTopPick ? theme.colors.accentSubtle : theme.colors.border,
+        backgroundColor: theme.colors.surfaceRaised,
+        overflow: 'hidden',
         opacity: disabled && !isBooking ? 0.6 : 1,
       })}
     >
+      {/* The top pick's wash is translucent, so it is layered over the card's
+          own colour rather than replacing it — otherwise the card would lose
+          the lift that separates it from the box behind. */}
+      {isTopPick ? (
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, { backgroundColor: theme.colors.accentMuted }]}
+        />
+      ) : null}
+
+      {/* The web tags the recommendation beside the time; at this width that
+          line is already spoken for, so it sits above the row instead. */}
+      {isTopPick ? (
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            paddingVertical: 1,
+            paddingHorizontal: 7,
+            borderRadius: theme.radius.sm,
+            backgroundColor: theme.colors.accentSubtle,
+          }}
+        >
+          <Text variant="caption" color="accent">
+            ✦ Recommended
+          </Text>
+        </View>
+      ) : null}
+
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
         <View
           style={{
-            width: 24,
-            height: 24,
+            width: 26,
+            height: 26,
             alignItems: 'center',
             justifyContent: 'center',
-            borderRadius: theme.radius.sm,
-            backgroundColor: theme.colors.surfaceElevated,
+            borderRadius: theme.radius.pill,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor: isTopPick ? theme.colors.accentSubtle : theme.colors.border,
+            backgroundColor: isTopPick ? theme.colors.accent : theme.colors.surface,
           }}
         >
-          <Text variant="footnote" color="tertiary" style={{ fontWeight: '600' }}>
+          <Text
+            variant="caption"
+            color={isTopPick ? 'onAccent' : 'secondary'}
+            style={{ letterSpacing: 0 }}
+          >
             {suggestion.rank}
           </Text>
         </View>
@@ -319,9 +410,37 @@ function SlotRow({ suggestion, timeZone, isBooking, disabled, onPress }: SlotRow
           </Text>
         </View>
 
-        <Text variant="footnote" color="accent" style={{ flexShrink: 0, fontWeight: '600' }}>
-          {isBooking ? 'Booking…' : 'Schedule'}
-        </Text>
+        {/* Drawn as a button but not one: the whole row is the tap target, and
+            two nested targets would only make the smaller one harder to hit. */}
+        <View
+          pointerEvents="none"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            height: 32,
+            paddingHorizontal: theme.spacing.md,
+            borderRadius: theme.radius.md,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor: isTopPick ? theme.colors.accentSubtle : theme.colors.border,
+            backgroundColor: isTopPick ? theme.colors.accentSubtle : theme.colors.surface,
+          }}
+        >
+          <Text
+            variant="caption"
+            color={isTopPick ? 'accent' : 'primary'}
+            style={{ letterSpacing: 0 }}
+          >
+            {isBooking ? 'Booking…' : 'Schedule'}
+          </Text>
+          {isBooking ? null : (
+            <Ionicons
+              name="arrow-forward"
+              size={12}
+              color={isTopPick ? theme.colors.accent : theme.colors.textPrimary}
+            />
+          )}
+        </View>
       </View>
 
       {/* The reason spans the full row so it never has to be truncated. */}

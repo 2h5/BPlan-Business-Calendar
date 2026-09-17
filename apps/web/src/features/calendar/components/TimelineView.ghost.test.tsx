@@ -50,6 +50,7 @@ const makeEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
   createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z',
   ...overrides,
+  color: overrides.color ?? null,
 });
 
 describe('Phase 3.2 � Origin Ghost Indicator', () => {

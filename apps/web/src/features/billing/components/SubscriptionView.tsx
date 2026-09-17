@@ -15,6 +15,7 @@ import {
   calculateBillingIntervalSavings,
   FREE_PLAN,
   getSubscriptionStatusInfo,
+  PLAN_COMPARISON,
   PRO_PLAN,
 } from '../utils/subscription-display';
 
@@ -398,82 +399,23 @@ export function SubscriptionView() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className={styles.tableColFeature}>Day, Week, &amp; Month calendar views</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>Deterministic conflict detection engine</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>Task management, priority, &amp; tags</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>Google &amp; Apple calendar 2-way sync</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>
-                  Find Time with AI (natural language scheduling)
-                </td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkNo}>—</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓ Included</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>AI candidate ranking &amp; explanations</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkNo}>—</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓ Included</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>1-click suggested slot booking</td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkNo}>—</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>✓ Included</span>
-                </td>
-              </tr>
-              <tr>
-                <td className={styles.tableColFeature}>
-                  Upcoming intelligent buffer &amp; auto-rules
-                </td>
-                <td className={styles.tableColFree}>
-                  <span className={styles.checkNo}>—</span>
-                </td>
-                <td className={styles.tableColPro}>
-                  <span className={styles.checkYes}>Early Access</span>
-                </td>
-              </tr>
+              {PLAN_COMPARISON.map((row) => (
+                <tr key={row.id}>
+                  <td className={styles.tableColFeature}>{row.capability}</td>
+                  <td className={styles.tableColFree}>
+                    {row.inFree ? (
+                      <span className={styles.checkYes}>✓</span>
+                    ) : (
+                      <span className={styles.checkNo}>—</span>
+                    )}
+                  </td>
+                  <td className={styles.tableColPro}>
+                    <span className={styles.checkYes}>
+                      {row.proLabel ? `✓ ${row.proLabel}` : '✓'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

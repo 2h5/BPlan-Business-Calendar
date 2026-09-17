@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppSheets } from '../src/components/app-shell/AppSheets';
 import { TaskEditorHost } from '../src/components/app-shell/TaskEditorHost';
 import { AuthProvider, useAuth } from '../src/features/auth';
+import { ProUpgradeModal } from '../src/features/billing/components/ProUpgradeModal';
 import { ReminderSync } from '../src/features/notifications';
 import { AppearanceProvider } from '../src/features/settings/appearance/AppearanceProvider';
 import { ErrorBoundary } from '../src/lib/errors/ErrorBoundary';
@@ -63,6 +64,18 @@ function RootStack() {
         name="settings/integrations"
         options={{ headerShown: true, title: 'Connections', animation: 'default' }}
       />
+      {/* Search opens over whichever tab you were on, so it is a stack screen
+          rather than a hidden tab — a hidden tab is not a navigable route. */}
+      <Stack.Screen
+        name="search"
+        options={{
+          headerShown: true,
+          title: 'Search',
+          // Without this the back button reads "(tabs)" — the route group's name.
+          headerBackTitle: 'Back',
+          animation: 'default',
+        }}
+      />
     </Stack>
   );
 }
@@ -77,6 +90,7 @@ function AuthenticatedOverlays() {
       <AppSheets />
       <TaskEditorHost />
       <ReminderSync />
+      <ProUpgradeModal />
     </>
   );
 }

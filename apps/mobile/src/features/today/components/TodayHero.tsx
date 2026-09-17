@@ -5,9 +5,6 @@ import { Pressable, View } from 'react-native';
 export interface TodayHeroProps {
   /** e.g. "Wednesday, September 9, 2026". */
   dateLabel: string;
-  /** e.g. "9:43 PM". */
-  clockLabel: string;
-  timeZone: string;
   /** e.g. "Good evening, Dev". */
   greeting: string;
   subtitle: string;
@@ -23,8 +20,6 @@ export interface TodayHeroProps {
  */
 export function TodayHero({
   dateLabel,
-  clockLabel,
-  timeZone,
   greeting,
   subtitle,
   onNewTask,
@@ -43,24 +38,14 @@ export function TodayHero({
       }}
     >
       <View style={{ gap: theme.spacing.xs }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: theme.spacing.sm,
-          }}
+        <Text
+          variant="caption"
+          uppercase
+          numberOfLines={1}
+          style={{ color: theme.colors.accent, letterSpacing: 0.9 }}
         >
-          <Text
-            variant="caption"
-            uppercase
-            numberOfLines={1}
-            style={{ color: theme.colors.accent, letterSpacing: 0.9, flexShrink: 1 }}
-          >
-            {dateLabel}
-          </Text>
-          <LiveClockChip clockLabel={clockLabel} timeZone={timeZone} />
-        </View>
+          {dateLabel}
+        </Text>
 
         <Text variant="display">{greeting}</Text>
         <Text variant="subhead" color="secondary" style={{ fontWeight: '400' }}>
@@ -89,41 +74,6 @@ export function TodayHero({
           <Ionicons name="search" size={17} color={theme.colors.textSecondary} />
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-/**
- * The web shows a pulsing dot to say the clock is live. A phone's clock is
- * always live and the animation would run forever behind the tab bar, so the
- * dot is present but static.
- */
-function LiveClockChip({ clockLabel, timeZone }: { clockLabel: string; timeZone: string }) {
-  const theme = useTheme();
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingVertical: 2,
-        paddingHorizontal: theme.spacing.sm,
-        borderRadius: theme.radius.sm,
-        borderWidth: theme.borderWidth.hairline,
-        borderColor: theme.colors.borderSubtle,
-        backgroundColor: theme.colors.surfaceElevated,
-      }}
-    >
-      <View
-        style={{ width: 6, height: 6, borderRadius: 2, backgroundColor: theme.colors.success }}
-      />
-      <Text variant="mono" color="secondary" style={{ fontSize: 12 }}>
-        {clockLabel}
-      </Text>
-      <Text variant="mono" color="tertiary" style={{ fontSize: 11 }} numberOfLines={1}>
-        {timeZone}
-      </Text>
     </View>
   );
 }

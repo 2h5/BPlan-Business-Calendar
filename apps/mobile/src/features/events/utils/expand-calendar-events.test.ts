@@ -14,6 +14,7 @@ function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     title: 'Planning',
     description: null,
     location: null,
+    color: null,
     startAt: '2026-03-10T09:00:00.000Z',
     endAt: '2026-03-10T10:00:00.000Z',
     allDay: false,

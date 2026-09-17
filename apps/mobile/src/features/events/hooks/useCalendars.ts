@@ -1,4 +1,4 @@
-import type { CreateCalendarInput } from '@cal/schemas';
+import type { CreateCalendarInput, UpdateCalendarInput } from '@cal/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../../../lib/query/query-client';
@@ -7,6 +7,7 @@ import {
   createCalendar,
   deleteCalendar,
   fetchCalendars,
+  updateCalendar,
   updateCalendarVisibility,
 } from '../api/events.api';
 
@@ -37,6 +38,20 @@ export function useCreateCalendar() {
     mutationFn: (input: CreateCalendarInput) => createCalendar(input, userId),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.calendars.all() });
+    },
+  });
+}
+
+export function useUpdateCalendar() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateCalendarInput }) =>
+      updateCalendar(id, input),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.calendars.all() });
+      // A recoloured calendar changes how its events are drawn.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events.all() });
     },
   });
 }

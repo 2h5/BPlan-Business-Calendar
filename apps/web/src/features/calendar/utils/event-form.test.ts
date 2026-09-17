@@ -10,6 +10,7 @@ const EVENT: CalendarEvent = {
   title: 'Planning session',
   description: null,
   location: null,
+  color: null,
   startAt: '2026-03-07T14:00:00.000Z',
   endAt: '2026-03-07T15:00:00.000Z',
   allDay: false,

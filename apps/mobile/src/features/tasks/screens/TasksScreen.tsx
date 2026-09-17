@@ -1,4 +1,5 @@
-import { Card, Chip, EmptyState, ErrorState, LoadingState, Text, useTheme } from '@cal/ui';
+import { Button, Card, Chip, EmptyState, ErrorState, LoadingState, Text, useTheme } from '@cal/ui';
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
@@ -55,13 +56,23 @@ export function TasksScreen() {
 
   return (
     <View style={{ gap: theme.spacing.xl }}>
-      <View style={{ gap: theme.spacing.xxs }}>
-        <Text variant="title1">Tasks</Text>
-        <Text variant="callout" color="secondary">
-          {openCount === 0
-            ? 'Nothing outstanding'
-            : `${openCount} open ${openCount === 1 ? 'task' : 'tasks'}`}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        <View style={{ flex: 1, gap: theme.spacing.xxs }}>
+          <Text variant="title1">Tasks</Text>
+          <Text variant="callout" color="secondary">
+            {openCount === 0
+              ? 'Nothing outstanding'
+              : `${openCount} open ${openCount === 1 ? 'task' : 'tasks'}`}
+          </Text>
+        </View>
+
+        {/* Captures into whichever list is filtered, so adding a task from a
+            list does not silently drop it in the inbox. */}
+        <Button
+          label="New Task"
+          leadingIcon={<Ionicons name="add" size={16} color={theme.colors.onAccent} />}
+          onPress={() => openNew(listFilter ?? null)}
+        />
       </View>
 
       {(lists ?? []).length > 0 ? (

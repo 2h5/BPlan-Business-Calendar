@@ -30,6 +30,7 @@ function event(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     title: 'Morning focus',
     description: null,
     location: null,
+    color: null,
     startAt: '2026-09-01T13:00:00.000Z',
     endAt: '2026-09-01T14:00:00.000Z',
     allDay: false,

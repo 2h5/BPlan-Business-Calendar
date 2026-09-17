@@ -1,4 +1,4 @@
-import { formatDuration, formatTimeOfDay } from '@cal/domain';
+import { formatDuration, formatTimeOfDay, resolveEventColor } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
@@ -73,7 +73,11 @@ export function TodayTimeline({
                     width: 6,
                     height: 6,
                     borderRadius: 2,
-                    backgroundColor: item.calendar?.color ?? theme.colors.accent,
+                    backgroundColor: resolveEventColor(
+                      item.event.color,
+                      item.calendar?.color,
+                      theme.colors.accent,
+                    ),
                   }}
                 />
                 <Text variant="footnote" numberOfLines={1}>
@@ -121,7 +125,7 @@ function TimelineEntry({ item, isLast, timeZone, hourCycle, now, onPress }: Time
   const nowMs = now.getTime();
   const isCurrent = nowMs >= item.start && nowMs < item.end;
   const isPast = nowMs >= item.end;
-  const tint = item.calendar?.color ?? theme.colors.accent;
+  const tint = resolveEventColor(item.event.color, item.calendar?.color, theme.colors.accent);
 
   const startLabel = formatTimeOfDay(new Date(item.start), timeZone, hourCycle);
   const endLabel = formatTimeOfDay(new Date(item.end), timeZone, hourCycle);

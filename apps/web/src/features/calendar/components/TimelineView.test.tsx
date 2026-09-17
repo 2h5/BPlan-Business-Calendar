@@ -57,6 +57,7 @@ const makeEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   ...overrides,
+  color: overrides.color ?? null,
 });
 
 describe('TimelineView grid layout and all-day handling', () => {
@@ -287,6 +288,30 @@ describe('TimelineView resize affordances', () => {
     expect(html).toContain('data-resize-edge="end"');
     expect(html).toContain('<button');
     expect(html).toContain('Planning session');
+  });
+
+  it('uses an event colour override instead of its calendar colour', () => {
+    const event = makeEvent({ color: '#F6938A' });
+    const occurrence: EventOccurrence = {
+      key: 'event-colour-override',
+      occurrenceIndex: 0,
+      start: Date.parse(event.startAt),
+      end: Date.parse(event.endAt),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <EventButton
+        occurrence={occurrence}
+        timeZone={timeZone}
+        hourCycle="h12"
+        compact={false}
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(html).toContain('--event-color:#F6938A');
   });
 
   it('does not expose resize handles for read-only or generated recurring events', () => {

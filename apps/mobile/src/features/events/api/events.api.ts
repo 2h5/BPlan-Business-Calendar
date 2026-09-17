@@ -3,10 +3,12 @@ import {
   type CalendarEvent,
   type CreateCalendarInput,
   type CreateEventInput,
+  type UpdateCalendarInput,
   type UpdateEventInput,
   calendarSchema,
   createCalendarSchema,
   createEventSchema,
+  updateCalendarSchema,
   eventSchema,
   updateEventSchema,
 } from '@cal/schemas';
@@ -25,7 +27,7 @@ import { supabase } from '../../../lib/supabase/client';
  */
 
 const EVENT_COLUMNS =
-  'id, user_id, calendar_id, title, description, location, start_at, end_at, all_day, ' +
+  'id, user_id, calendar_id, title, description, location, color, start_at, end_at, all_day, ' +
   'timezone, status, recurrence_rule, alerts, source_type, provider_event_id, provider_etag, ' +
   'recurring_event_id, recurrence_original_start_at, provider_updated_at, sync_status, ' +
   'created_at, updated_at';
@@ -38,6 +40,7 @@ const eventRowSchema = z
     title: z.string(),
     description: z.string().nullable(),
     location: z.string().nullable(),
+    color: z.string().nullable(),
     start_at: z.string(),
     end_at: z.string(),
     all_day: z.boolean(),
@@ -62,6 +65,7 @@ const eventRowSchema = z
     title: row.title,
     description: row.description,
     location: row.location,
+    color: row.color,
     startAt: row.start_at,
     endAt: row.end_at,
     allDay: row.all_day,
@@ -149,6 +153,20 @@ export async function createCalendar(
   return calendarRowSchema.parse(data);
 }
 
+/** Rename or recolour a calendar. Only the fields given are written. */
+export async function updateCalendar(id: string, input: UpdateCalendarInput): Promise<void> {
+  const parsed = updateCalendarSchema.parse(input);
+
+  const patch: TablesUpdate<'calendars'> = {};
+  if (parsed.name !== undefined) patch.name = parsed.name;
+  if (parsed.color !== undefined) patch.color = parsed.color;
+  if (parsed.isVisible !== undefined) patch.is_visible = parsed.isVisible;
+  if (parsed.isDefault !== undefined) patch.is_default = parsed.isDefault;
+
+  const { error } = await supabase.from('calendars').update(patch).eq('id', id);
+  if (error) throw toAppError(error);
+}
+
 export async function updateCalendarVisibility(id: string, isVisible: boolean): Promise<void> {
   const { error } = await supabase.from('calendars').update({ is_visible: isVisible }).eq('id', id);
   if (error) throw toAppError(error);
@@ -223,6 +241,7 @@ export async function createEvent(input: CreateEventInput, userId: string): Prom
       title: parsed.title,
       description: parsed.description ?? null,
       location: parsed.location ?? null,
+      color: parsed.color ?? null,
       start_at: parsed.startAt,
       end_at: parsed.endAt,
       all_day: parsed.allDay,
@@ -246,6 +265,7 @@ export async function updateEvent(input: UpdateEventInput): Promise<CalendarEven
   if (patch.title !== undefined) payload.title = patch.title;
   if (patch.description !== undefined) payload.description = patch.description;
   if (patch.location !== undefined) payload.location = patch.location;
+  if (patch.color !== undefined) payload.color = patch.color;
   if (patch.startAt !== undefined) payload.start_at = patch.startAt;
   if (patch.endAt !== undefined) payload.end_at = patch.endAt;
   if (patch.allDay !== undefined) payload.all_day = patch.allDay;

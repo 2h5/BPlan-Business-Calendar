@@ -1,4 +1,10 @@
-import { formatDueDate, formatTimeOfDay, getZonedParts, zonedWallClockToUtc } from '@cal/domain';
+import {
+  CALENDAR_COLORS as EVENT_COLORS,
+  formatDueDate,
+  formatTimeOfDay,
+  getZonedParts,
+  zonedWallClockToUtc,
+} from '@cal/domain';
 import {
   BottomSheet,
   Button,
@@ -10,7 +16,7 @@ import {
   useTheme,
 } from '@cal/ui';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 
 import { RecurrenceField } from './RecurrenceField';
 import { useProfile, useUserTimeZone } from '../../settings/hooks/useProfile';
@@ -39,6 +45,8 @@ interface FormState {
   location: string;
   description: string;
   calendarId: string | null;
+  /** NULL inherits the calendar's colour. */
+  color: string | null;
   start: Date;
   end: Date;
   allDay: boolean;
@@ -83,6 +91,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
         location: '',
         description: '',
         calendarId: defaultCalendarId,
+        color: null,
         start,
         end: new Date(start.getTime() + defaultDurationMinutes * 60_000),
         allDay: false,
@@ -99,6 +108,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
         location: existing.location ?? '',
         description: existing.description ?? '',
         calendarId: existing.calendarId,
+        color: existing.color,
         start: new Date(existing.startAt),
         end: new Date(existing.endAt),
         allDay: existing.allDay,
@@ -113,7 +123,17 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
 
   const isEditing = eventId !== null;
   const isSaving = createEvent.isPending || updateEvent.isPending;
-  const isReadOnly = calendars?.find((c) => c.id === form.calendarId)?.isReadOnly ?? false;
+  const selectedCalendar = calendars?.find((c) => c.id === form.calendarId);
+  const isReadOnly = selectedCalendar?.isReadOnly ?? false;
+  const inheritedColor = selectedCalendar?.color;
+
+  // An event may hold a colour that is no longer in the palette — one set before
+  // the palette changed, or by another client. Showing it as an extra swatch
+  // keeps the current colour visible and selectable instead of silently absent.
+  const swatches =
+    form.color && !EVENT_COLORS.some((option) => option.value === form.color)
+      ? [...EVENT_COLORS, { label: 'Current', value: form.color }]
+      : EVENT_COLORS;
 
   const patch = (next: Partial<FormState>) =>
     setForm((previous) => (previous ? { ...previous, ...next } : previous));
@@ -152,6 +172,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
       title,
       description: form.description.trim() || null,
       location: form.location.trim() || null,
+      color: form.color,
       startAt: form.start.toISOString(),
       endAt: form.end.toISOString(),
       allDay: form.allDay,
@@ -315,6 +336,57 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
                 onPress={() => patch({ calendarId: calendar.id })}
               />
             ))}
+          </View>
+        </View>
+
+        <View style={{ gap: theme.spacing.sm }}>
+          <Text variant="subhead" color="secondary">
+            Colour
+          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+            }}
+          >
+            {/* "Inherit" is the default rather than a colour of its own, so the
+                event keeps following its calendar unless asked not to. */}
+            <Chip
+              label="Inherit"
+              color={inheritedColor}
+              selected={form.color === null}
+              onPress={() => patch({ color: null })}
+            />
+
+            {swatches.map((option) => {
+              const isSelected = form.color === option.value;
+              // Read into a local: Reanimated's dev Babel plugin flags any
+              // `x.value` inside an inline style as a shared-value misuse, and
+              // `option.value` here is only a hex string.
+              const swatch = option.value;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  accessibilityRole="button"
+                  accessibilityLabel={option.label}
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => patch({ color: option.value })}
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 15,
+                    backgroundColor: swatch,
+                    // The ring is drawn inside a same-coloured halo so selection
+                    // reads without the swatch changing size and reflowing.
+                    borderWidth: theme.borderWidth.thick,
+                    borderColor: isSelected ? theme.colors.textPrimary : 'transparent',
+                  }}
+                />
+              );
+            })}
           </View>
         </View>
 

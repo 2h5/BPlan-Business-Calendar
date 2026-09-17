@@ -1,4 +1,4 @@
-import { formatTimeOfDay, toZonedDateKey } from '@cal/domain';
+import { formatTimeOfDay, resolveEventColor, toZonedDateKey } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 import { Card, Divider, EmptyState, ListRow, Text, useTheme } from '@cal/ui';
 import { Fragment } from 'react';
@@ -94,7 +94,11 @@ export function AgendaList({
                         ? 'All day'
                         : formatTimeOfDay(new Date(occurrence.start), timeZone, hourCycle)
                     }
-                    accentColor={occurrence.calendar?.color}
+                    accentColor={resolveEventColor(
+                      occurrence.event.color,
+                      occurrence.calendar?.color,
+                      theme.colors.accent,
+                    )}
                     onPress={() => onPressOccurrence(occurrence)}
                   />
                 </Fragment>

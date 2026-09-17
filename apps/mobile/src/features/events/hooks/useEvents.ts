@@ -83,6 +83,19 @@ function toDraft(input: CreateEventInput): ProviderEventDraft {
   };
 }
 
+/**
+ * Event colour is an app-only display preference. Provider writes deliberately
+ * omit it, so persist the preference after the provider has accepted the event
+ * and the local mirror has an id.
+ */
+async function persistLocalColor(
+  eventId: string | null,
+  color: string | null | undefined,
+): Promise<void> {
+  if (!eventId || color === undefined) return;
+  await updateEvent({ id: eventId, color });
+}
+
 export function useCreateEvent() {
   const userId = useRequiredUserId();
   const invalidate = useInvalidateEvents();
@@ -93,11 +106,12 @@ export function useCreateEvent() {
       const calendar = calendarFor(input.calendarId);
 
       if (calendar && calendar.sourceType !== 'internal') {
-        await writeProviderEvent({
+        const result = await writeProviderEvent({
           operation: 'create',
           calendarId: input.calendarId,
           draft: toDraft(input),
         });
+        await persistLocalColor(result.eventId, input.color);
         return;
       }
 
@@ -125,11 +139,12 @@ export function useUpdateEvent() {
       const calendar = calendarFor(input.calendarId);
 
       if (calendar && calendar.sourceType !== 'internal') {
-        await writeProviderEvent({
+        const result = await writeProviderEvent({
           operation: 'update',
           eventId: input.id,
           draft: toDraft(input),
         });
+        await persistLocalColor(result.eventId, input.color);
         return;
       }
 

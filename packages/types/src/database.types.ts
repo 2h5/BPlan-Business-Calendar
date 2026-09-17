@@ -374,6 +374,7 @@ export type Database = {
           alerts: number[]
           all_day: boolean
           calendar_id: string
+          color: string | null
           created_at: string
           description: string | null
           end_at: string
@@ -399,6 +400,7 @@ export type Database = {
           alerts?: number[]
           all_day?: boolean
           calendar_id: string
+          color?: string | null
           created_at?: string
           description?: string | null
           end_at: string
@@ -424,6 +426,7 @@ export type Database = {
           alerts?: number[]
           all_day?: boolean
           calendar_id?: string
+          color?: string | null
           created_at?: string
           description?: string | null
           end_at?: string

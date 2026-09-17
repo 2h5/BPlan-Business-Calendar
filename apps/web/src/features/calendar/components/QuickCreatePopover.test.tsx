@@ -146,6 +146,7 @@ describe('QuickCreatePopover', () => {
         title: 'Team Standup',
         description: 'Daily sync',
         location: 'Room 101',
+        color: null,
         allDay: false,
         startAt: '2026-09-15T14:00:00Z',
         endAt: '2026-09-15T15:00:00Z',
