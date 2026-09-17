@@ -60,6 +60,33 @@ function addMinutesToTime(time: string, minutes: number): string {
   return `${pad(newHour)}:${pad(newMin)}`;
 }
 
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!year || !month || !day) return dateStr;
+  const date = new Date(year, month - 1, day, 12, 0, 0);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function formatTimeDisplay(timeStr: string): string {
+  if (!timeStr) return '';
+  const [hStr, mStr] = timeStr.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  const period = h >= 12 ? 'pm' : 'am';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')}${period}`;
+}
+
 export function QuickCreatePopover({
   isOpen,
   anchorRect,
@@ -143,6 +170,65 @@ export function QuickCreatePopover({
 
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const taskDateInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDateClick = () => {
+    try {
+      dateInputRef.current?.showPicker();
+    } catch {
+      dateInputRef.current?.focus();
+    }
+  };
+
+  const handleTaskDateClick = () => {
+    try {
+      taskDateInputRef.current?.showPicker();
+    } catch {
+      taskDateInputRef.current?.focus();
+    }
+  };
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    setStartTime(newStartTime);
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const startMin = (sh ?? 0) * 60 + (sm ?? 0);
+    const endMin = (eh ?? 0) * 60 + (em ?? 0);
+    const diff = endMin - startMin;
+    const duration = diff > 0 ? diff : defaultDurationMinutes;
+    setEndTime(addMinutesToTime(newStartTime, duration));
+  };
+
+  const timeOptions = useMemo(() => {
+    const options: Array<{ value: string; label: string }> = [];
+    for (let h = 0; h < 24; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        const val = `${pad(h)}:${pad(m)}`;
+        options.push({
+          value: val,
+          label: formatTimeDisplay(val),
+        });
+      }
+    }
+    return options;
+  }, []);
+
+  const startTimeOptions = useMemo(() => {
+    if (startTime && !timeOptions.some((o) => o.value === startTime)) {
+      const custom = { value: startTime, label: formatTimeDisplay(startTime) };
+      return [...timeOptions, custom].sort((a, b) => a.value.localeCompare(b.value));
+    }
+    return timeOptions;
+  }, [startTime, timeOptions]);
+
+  const endTimeOptions = useMemo(() => {
+    if (endTime && !timeOptions.some((o) => o.value === endTime)) {
+      const custom = { value: endTime, label: formatTimeDisplay(endTime) };
+      return [...timeOptions, custom].sort((a, b) => a.value.localeCompare(b.value));
+    }
+    return timeOptions;
+  }, [endTime, timeOptions]);
 
   // Sync state whenever opening with new initial coordinates, slot, or event
   useEffect(() => {
@@ -236,7 +322,7 @@ export function QuickCreatePopover({
   const updatePosition = useCallback(() => {
     if (!isOpen) return;
 
-    const popoverWidth = popoverRef.current ? popoverRef.current.offsetWidth : 380;
+    const popoverWidth = popoverRef.current ? popoverRef.current.offsetWidth : 440;
     const popoverHeight = popoverRef.current ? popoverRef.current.offsetHeight : 440;
 
     const result = calculatePopoverPosition({
@@ -566,19 +652,22 @@ export function QuickCreatePopover({
         </header>
 
         <form className={styles.form} onSubmit={handleSubmit}>
-          <div className={styles.titleInputWrapper}>
-            <input
-              ref={titleInputRef}
-              type="text"
-              className={styles.titleInput}
-              placeholder={mode === 'event' ? 'Add title' : 'What needs doing?'}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={handleTitleKeyDown}
-              disabled={isSaving}
-              aria-label="Title"
-              required
-            />
+          <div className={styles.titleRow}>
+            <span className={styles.fieldIconPlaceholder} aria-hidden="true" />
+            <div className={styles.titleInputWrapper}>
+              <input
+                ref={titleInputRef}
+                type="text"
+                className={styles.titleInput}
+                placeholder={mode === 'event' ? 'Add title' : 'What needs doing?'}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                disabled={isSaving}
+                aria-label="Title"
+                required
+              />
+            </div>
           </div>
 
           {errorMessage && (
@@ -603,8 +692,8 @@ export function QuickCreatePopover({
           {mode === 'event' ? (
             <>
               {/* Event Date & Time */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
+              <div className={styles.fieldRowTopAligned}>
+                <span className={styles.fieldIconTop} aria-hidden="true">
                   <svg
                     width="15"
                     height="15"
@@ -618,39 +707,73 @@ export function QuickCreatePopover({
                   </svg>
                 </span>
 
-                <div className={styles.timeRangeGroup}>
-                  <div className={styles.timeInputs}>
-                    <input
-                      type="date"
-                      className={styles.dateInput}
-                      value={startDate}
-                      onChange={(e) => {
-                        setStartDate(e.target.value);
-                        if (endDate < e.target.value) setEndDate(e.target.value);
+                <div className={styles.dateTimeContainer}>
+                  <div className={styles.dateTimeRow}>
+                    <div
+                      className={styles.dateBoxWrapper}
+                      onClick={handleDateClick}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          handleDateClick();
+                        }
                       }}
-                      aria-label="Start date"
-                    />
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Date: ${formatDateDisplay(startDate)}`}
+                    >
+                      <span className={styles.dateText}>{formatDateDisplay(startDate)}</span>
+                      <input
+                        ref={dateInputRef}
+                        type="date"
+                        className={styles.hiddenNativeInput}
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          if (endDate < e.target.value) setEndDate(e.target.value);
+                        }}
+                        aria-label="Start date"
+                        tabIndex={-1}
+                      />
+                    </div>
 
                     {!allDay ? (
                       <>
-                        <input
-                          type="time"
-                          className={styles.timeInput}
-                          value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
-                          aria-label="Start time"
-                        />
+                        <div className={styles.timeBoxWrapper}>
+                          <select
+                            className={styles.timeSelect}
+                            value={startTime}
+                            onChange={(e) => handleStartTimeChange(e.target.value)}
+                            aria-label="Start time"
+                          >
+                            {startTimeOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
                         <span className={styles.timeSeparator}>–</span>
-                        <input
-                          type="time"
-                          className={styles.timeInput}
-                          value={endTime}
-                          onChange={(e) => setEndTime(e.target.value)}
-                          aria-label="End time"
-                        />
+
+                        <div className={styles.timeBoxWrapper}>
+                          <select
+                            className={styles.timeSelect}
+                            value={endTime}
+                            onChange={(e) => setEndTime(e.target.value)}
+                            aria-label="End time"
+                          >
+                            {endTimeOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </>
                     ) : null}
+                  </div>
 
+                  <div className={styles.allDayRow}>
                     <label className={styles.allDayCheckbox}>
                       <input
                         type="checkbox"
@@ -665,7 +788,11 @@ export function QuickCreatePopover({
 
               {/* Calendar Selector */}
               <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
+                <span
+                  className={styles.fieldIcon}
+                  aria-hidden="true"
+                  style={{ color: selectedCalendar?.color ?? undefined }}
+                >
                   <svg
                     width="15"
                     height="15"
@@ -681,27 +808,19 @@ export function QuickCreatePopover({
                   </svg>
                 </span>
 
-                <div className={styles.calendarPickerWrapper}>
-                  <span
-                    className={styles.calendarColorDot}
-                    style={{
-                      backgroundColor: selectedCalendar?.color ?? 'var(--color-accent)',
-                    }}
-                    aria-hidden="true"
+                <div className={styles.calendarSelect}>
+                  <Select
+                    id="quick-create-calendar"
+                    value={calendarId || defaultCalendar?.id || ''}
+                    options={writableCals.map((cal) => ({
+                      value: cal.id,
+                      label: cal.name,
+                      color: cal.color,
+                    }))}
+                    onChange={(val) => setCalendarId(val)}
+                    size="sm"
+                    ariaLabel="Choose calendar"
                   />
-                  <div className={styles.calendarSelect}>
-                    <Select
-                      id="quick-create-calendar"
-                      value={calendarId || defaultCalendar?.id || ''}
-                      options={writableCals.map((cal) => ({
-                        value: cal.id,
-                        label: cal.name,
-                      }))}
-                      onChange={(val) => setCalendarId(val)}
-                      size="sm"
-                      ariaLabel="Choose calendar"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -759,8 +878,8 @@ export function QuickCreatePopover({
           ) : (
             <>
               {/* Task Mode Details */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
+              <div className={styles.fieldRowTopAligned}>
+                <span className={styles.fieldIconTop} aria-hidden="true">
                   <svg
                     width="15"
                     height="15"
@@ -774,26 +893,51 @@ export function QuickCreatePopover({
                   </svg>
                 </span>
 
-                <div className={styles.timeRangeGroup}>
-                  <div className={styles.timeInputs}>
-                    <input
-                      type="date"
-                      className={styles.dateInput}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      aria-label="Due date"
-                    />
+                <div className={styles.dateTimeContainer}>
+                  <div className={styles.dateTimeRow}>
+                    <div
+                      className={styles.dateBoxWrapper}
+                      onClick={handleTaskDateClick}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          handleTaskDateClick();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Due date: ${formatDateDisplay(startDate)}`}
+                    >
+                      <span className={styles.dateText}>{formatDateDisplay(startDate)}</span>
+                      <input
+                        ref={taskDateInputRef}
+                        type="date"
+                        className={styles.hiddenNativeInput}
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        aria-label="Due date"
+                        tabIndex={-1}
+                      />
+                    </div>
 
                     {taskHasTime ? (
-                      <input
-                        type="time"
-                        className={styles.timeInput}
-                        value={startTime}
-                        onChange={(e) => setStartTime(e.target.value)}
-                        aria-label="Due time"
-                      />
+                      <div className={styles.timeBoxWrapper}>
+                        <select
+                          className={styles.timeSelect}
+                          value={startTime}
+                          onChange={(e) => setStartTime(e.target.value)}
+                          aria-label="Due time"
+                        >
+                          {startTimeOptions.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     ) : null}
+                  </div>
 
+                  <div className={styles.allDayRow}>
                     <label className={styles.allDayCheckbox}>
                       <input
                         type="checkbox"
@@ -809,7 +953,15 @@ export function QuickCreatePopover({
               {/* Task List Selector */}
               {taskLists && taskLists.length > 0 && (
                 <div className={styles.fieldRow}>
-                  <span className={styles.fieldIcon} aria-hidden="true">
+                  <span
+                    className={styles.fieldIcon}
+                    aria-hidden="true"
+                    style={{
+                      color:
+                        taskLists.find((l) => l.id === (selectedListId || taskLists[0]?.id))
+                          ?.color ?? undefined,
+                    }}
+                  >
                     <svg
                       width="15"
                       height="15"
@@ -834,6 +986,7 @@ export function QuickCreatePopover({
                       options={taskLists.map((list) => ({
                         value: list.id,
                         label: list.name,
+                        color: list.color,
                       }))}
                       onChange={(val) => setSelectedListId(val)}
                       size="sm"

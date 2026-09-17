@@ -112,6 +112,19 @@ describe('QuickCreatePopover', () => {
     // Start and end time inputs should not be present when allDay is true
     expect(html).not.toContain('aria-label="Start time"');
     expect(html).not.toContain('aria-label="End time"');
+    // But day is still displayed
+    expect(html).toContain('Tuesday, September 15');
+  });
+
+  it('renders Google Calendar style formatted date and times on one row', () => {
+    const html = renderToStaticMarkup(<QuickCreatePopover {...defaultProps} />);
+
+    // Day and then date format: "Tuesday, September 15"
+    expect(html).toContain('Tuesday, September 15');
+    // Times formatted without leading zero, lowercase am/pm: "10:00am", "11:00am"
+    expect(html).toContain('10:00am');
+    expect(html).toContain('11:00am');
+    expect(html).toContain('–');
   });
 
   it('disables save button when isSaving is true', () => {

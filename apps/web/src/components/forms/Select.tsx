@@ -5,6 +5,7 @@ import styles from './Select.module.css';
 export interface SelectOption {
   value: string;
   label: string;
+  color?: string;
   disabled?: boolean;
 }
 
@@ -175,7 +176,16 @@ export function Select({
         onClick={() => (isOpen ? setIsOpen(false) : openMenu())}
         onKeyDown={handleKeyDown}
       >
-        <span className={styles.triggerValue}>{selectedOption?.label ?? value}</span>
+        <span className={styles.triggerValue}>
+          {selectedOption?.color && (
+            <span
+              className={styles.colorDot}
+              style={{ backgroundColor: selectedOption.color }}
+              aria-hidden="true"
+            />
+          )}
+          <span>{selectedOption?.label ?? value}</span>
+        </span>
         <svg
           className={styles.chevron}
           width="14"
@@ -214,7 +224,14 @@ export function Select({
                 onMouseEnter={() => setHighlightedIndex(index)}
                 onClick={() => chooseOption(option)}
               >
-                {option.label}
+                {option.color && (
+                  <span
+                    className={styles.colorDot}
+                    style={{ backgroundColor: option.color }}
+                    aria-hidden="true"
+                  />
+                )}
+                <span>{option.label}</span>
               </button>
             );
           })}
