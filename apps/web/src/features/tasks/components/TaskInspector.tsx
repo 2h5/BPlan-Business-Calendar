@@ -444,6 +444,7 @@ export function TaskInspector({
             </label>
             <Select
               id="task-priority"
+              className={styles.flatSelect}
               value={priority}
               options={(Object.keys(PRIORITY_LABELS) as TaskPriority[]).map((priorityOption) => ({
                 value: priorityOption,
@@ -460,6 +461,7 @@ export function TaskInspector({
             </label>
             <Select
               id="task-list"
+              className={styles.flatSelect}
               value={listId ?? ''}
               options={[
                 { value: '', label: 'Inbox (No List)' },

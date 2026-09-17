@@ -109,9 +109,10 @@ describe('QuickCreatePopover', () => {
     );
 
     expect(html).toContain('checked');
-    // Start and end time inputs should not be present when allDay is true
-    expect(html).not.toContain('aria-label="Start time"');
-    expect(html).not.toContain('aria-label="End time"');
+    // Time controls stay mounted for the exit animation but are hidden and non-interactive.
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toMatch(/aria-label="Start time"[^>]*disabled/);
+    expect(html).toMatch(/aria-label="End time"[^>]*disabled/);
     // But day is still displayed
     expect(html).toContain('Tuesday, September 15');
   });

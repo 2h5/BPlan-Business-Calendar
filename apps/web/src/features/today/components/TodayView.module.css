@@ -14,8 +14,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--space-6);
-  padding: var(--space-3) 0 var(--space-2);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--space-3) 0 0;
 }
 
 .heroMain {
@@ -352,6 +351,15 @@
 .bentoCardActive {
   border-color: rgba(97, 214, 162, 0.45);
   background: linear-gradient(180deg, var(--color-bg-surface) 0%, rgba(97, 214, 162, 0.03) 100%);
+}
+
+.bentoCardEmpty {
+  justify-content: flex-start;
+  gap: var(--space-3);
+}
+
+.bentoCardEmpty .bentoCardHeader {
+  margin-bottom: 0;
 }
 
 .bentoCardHeader {
@@ -883,11 +891,9 @@
   grid-template-rows: 0fr;
   opacity: 0;
   visibility: hidden;
-  border-bottom: 1px solid transparent;
   transition:
     grid-template-rows 240ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 200ms ease,
-    border-color 200ms ease,
     visibility 0s linear 240ms;
 }
 
@@ -895,11 +901,9 @@
   grid-template-rows: 1fr;
   opacity: 1;
   visibility: visible;
-  border-bottom-color: var(--color-border-subtle);
   transition:
     grid-template-rows 240ms cubic-bezier(0.16, 1, 0.3, 1),
     opacity 200ms ease,
-    border-color 200ms ease,
     visibility 0s linear 0s;
 }
 
@@ -913,20 +917,21 @@
 }
 
 .quickAddBox {
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-surface-elevated);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: transparent;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .quickAddInput {
   width: 100%;
   height: var(--control-height-sm);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-input);
+  padding: 0;
+  border: none;
+  border-bottom: 2px solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-primary);
   font-size: var(--font-size-xs);
   outline: none;
@@ -936,8 +941,12 @@
 }
 
 .quickAddInput:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-focus-ring);
+  border-bottom-color: var(--color-accent);
+  box-shadow: none;
+}
+
+.quickAddInput:focus-visible {
+  outline: none;
 }
 
 .quickAddOptionsRow {
@@ -959,6 +968,27 @@
   width: auto;
   min-width: 140px;
   max-width: 190px;
+}
+
+.quickSelect button {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.quickSelect button:hover:not(:disabled) {
+  background: var(--color-hover);
+  border-color: transparent;
+}
+
+.quickSelect button:focus {
+  border-color: transparent;
+  border-bottom-color: var(--color-accent);
+  box-shadow: none;
+}
+
+.quickSelect button:focus-visible {
+  outline: none;
 }
 
 .quickAddActionButtons {
@@ -994,7 +1024,7 @@
   color: var(--color-on-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
 }

@@ -6,10 +6,10 @@
   min-width: var(--inspector-min-width);
   min-height: 0;
   flex: 0 0 auto;
-  border-left: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-surface);
+  background: var(--color-bg-surface-elevated);
   box-shadow: -12px 0 30px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   animation: inspector-enter 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -31,49 +31,17 @@
 }
 
 .inspectorInnerSwitch::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
-  opacity: 0;
-  z-index: 10;
-  pointer-events: none;
-  animation: task-switch-shimmer 400ms ease-out forwards;
+  display: none;
 }
 
 @keyframes task-switch-rise {
-  0% {
-    opacity: 0;
-    transform: translateY(26px) scale(0.96);
-    filter: blur(3px);
+  from {
+    opacity: 0.7;
+    transform: translateY(6px);
   }
-  65% {
-    opacity: 0.96;
-    transform: translateY(-1.5px) scale(1.003);
-    filter: blur(0);
-  }
-  100% {
+  to {
     opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
-
-@keyframes task-switch-shimmer {
-  0% {
-    opacity: 0;
-    transform: scaleX(0.3);
-  }
-  35% {
-    opacity: 0.9;
-    transform: scaleX(0.9);
-  }
-  100% {
-    opacity: 0;
-    transform: scaleX(1);
+    transform: none;
   }
 }
 
@@ -106,14 +74,13 @@
 }
 
 .header {
-  min-height: var(--header-height);
-  padding: var(--space-3) var(--space-5);
-  border-bottom: 1px solid var(--color-border-subtle);
+  min-height: 54px;
+  padding: var(--space-3) var(--space-4) var(--space-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  background: var(--color-bg-surface-raised);
+  background: transparent;
 }
 
 .headerCopy {
@@ -129,8 +96,7 @@
 }
 
 .headerSubtitle {
-  color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
+  display: none;
 }
 
 .headerActions,
@@ -206,11 +172,11 @@
 .body {
   min-height: 0;
   flex: 1;
-  padding: var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-4);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   scrollbar-gutter: stable;
 }
 
@@ -256,6 +222,7 @@
 .dateInput:hover,
 .timeInput:hover {
   border-color: var(--color-border-strong);
+  background: var(--color-bg-input);
 }
 
 .titleInput:focus,
@@ -263,19 +230,27 @@
 .dateInput:focus,
 .timeInput:focus {
   border-color: var(--color-accent);
+  background: var(--color-bg-input);
   box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.titleInput:focus-visible,
+.descriptionInput:focus-visible,
+.dateInput:focus-visible,
+.timeInput:focus-visible {
+  outline: none;
 }
 
 .titleInput {
   min-height: 44px;
-  padding: var(--space-2) var(--space-3);
+  padding: 0 var(--space-3);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.015em;
 }
 
 .descriptionInput {
-  min-height: 112px;
+  min-height: 96px;
   max-height: 320px;
   padding: var(--space-3);
   resize: vertical;
@@ -319,9 +294,56 @@
 
 .timeToggle input,
 .checkboxLabel input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: grid;
+  place-content: center;
   width: 16px;
   height: 16px;
-  accent-color: var(--color-accent);
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-on-accent);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.timeToggle input::before,
+.checkboxLabel input::before {
+  content: '';
+  width: 4px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-1px) rotate(45deg) scale(0);
+  transition: transform 120ms ease-out;
+}
+
+.timeToggle:hover input,
+.checkboxLabel:hover input {
+  border-color: var(--color-text-tertiary);
+  background: var(--color-hover);
+}
+
+.timeToggle input:checked,
+.checkboxLabel input:checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.timeToggle input:checked::before,
+.checkboxLabel input:checked::before {
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+
+.timeToggle input:focus-visible,
+.checkboxLabel input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .clearFieldBtn {
@@ -376,6 +398,26 @@
   color: var(--color-accent);
 }
 
+.flatSelect button {
+  border-color: var(--color-border);
+  background: var(--color-bg-input);
+  box-shadow: none;
+}
+
+.flatSelect button:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-hover);
+}
+
+.flatSelect button:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.flatSelect button:focus-visible {
+  outline: none;
+}
+
 .tagDot {
   width: 7px;
   height: 7px;
@@ -385,14 +427,14 @@
 .footer {
   position: sticky;
   bottom: calc(var(--space-5) * -1);
-  margin: var(--space-2) calc(var(--space-5) * -1) calc(var(--space-5) * -1);
-  padding: var(--space-3) var(--space-5);
-  border-top: 1px solid var(--color-border-subtle);
+  margin: var(--space-2) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
+  padding: var(--space-3) var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  background: var(--color-bg-surface-raised);
+  background: color-mix(in srgb, var(--color-bg-surface-elevated) 94%, transparent);
+  backdrop-filter: blur(10px);
 }
 
 .saveBtn,
@@ -421,12 +463,13 @@
 
 .cancelBtn {
   border: 1px solid var(--color-border);
-  background: transparent;
+  background: var(--color-bg-input);
   color: var(--color-text-secondary);
 }
 
 .cancelBtn:hover:not(:disabled) {
   border-color: var(--color-border-strong);
+  background: var(--color-hover);
   color: var(--color-text-primary);
 }
 

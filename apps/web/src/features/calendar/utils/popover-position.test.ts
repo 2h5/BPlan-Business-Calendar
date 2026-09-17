@@ -118,6 +118,81 @@ describe('calculatePopoverPosition', () => {
     expect(result.left).toBeGreaterThanOrEqual(viewportPadding);
   });
 
+  it('places the popover below a wide Day-view event when there is room', () => {
+    const anchorRect: AnchorRect = {
+      left: 180,
+      right: 1180,
+      top: 180,
+      bottom: 240,
+      width: 1000,
+      height: 60,
+    };
+
+    const result = calculatePopoverPosition({
+      anchorRect,
+      popoverWidth,
+      popoverHeight: 360,
+      viewportWidth: 1200,
+      viewportHeight: 800,
+      gap,
+      viewportPadding,
+    });
+
+    expect(result.placement).toBe('below');
+    expect(result.top).toBe(anchorRect.bottom + gap);
+    expect(result.arrowLeft).not.toBeNull();
+  });
+
+  it('flips the popover above a wide Day-view event near the viewport bottom', () => {
+    const anchorRect: AnchorRect = {
+      left: 180,
+      right: 1180,
+      top: 650,
+      bottom: 710,
+      width: 1000,
+      height: 60,
+    };
+
+    const result = calculatePopoverPosition({
+      anchorRect,
+      popoverWidth,
+      popoverHeight: 360,
+      viewportWidth: 1200,
+      viewportHeight: 800,
+      gap,
+      viewportPadding,
+    });
+
+    expect(result.placement).toBe('above');
+    expect(result.top).toBe(anchorRect.top - 360 - gap);
+    expect(result.arrowLeft).not.toBeNull();
+  });
+
+  it('uses the roomier vertical side when a wide event leaves no fully fitting side', () => {
+    const anchorRect: AnchorRect = {
+      left: 180,
+      right: 1180,
+      top: 430,
+      bottom: 490,
+      width: 1000,
+      height: 60,
+    };
+
+    const result = calculatePopoverPosition({
+      anchorRect,
+      popoverWidth,
+      popoverHeight: 440,
+      viewportWidth: 1200,
+      viewportHeight: 700,
+      gap,
+      viewportPadding,
+    });
+
+    expect(result.placement).toBe('above');
+    expect(result.maxHeight).toBe(406);
+    expect(result.top + result.maxHeight!).toBeLessThanOrEqual(anchorRect.top - gap);
+  });
+
   it('recalculates position accurately when switching between different date cells', () => {
     // First selected date (e.g. Sep 10, Thu)
     const date1Rect: AnchorRect = {

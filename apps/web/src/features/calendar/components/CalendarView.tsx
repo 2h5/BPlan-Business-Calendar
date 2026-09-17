@@ -27,7 +27,13 @@ import {
   setLastCalendarView,
 } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
-import { eventInputWithTiming, type EventFormValues } from '../utils/event-form';
+import {
+  eventInputFromForm,
+  eventInputWithTiming,
+  eventToFormValues,
+  type EventFormValues,
+} from '../utils/event-form';
+import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
 import {
   getTransitionOrigin,
   getViewTransitionDirection,
@@ -38,6 +44,39 @@ interface CalendarToast {
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+}
+
+function getNewEventAnchorRect(
+  dateKey: string,
+  startMinute: number,
+  endMinute: number,
+  mode: CalendarViewMode,
+): AnchorRect | null {
+  const dayElement = document.querySelector<HTMLElement>(`[data-date-key="${dateKey}"]`);
+  if (!dayElement) return null;
+  const rect = dayElement.getBoundingClientRect();
+  if (mode === 'month') {
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  const hourHeight = mode === 'week' ? 54 : 64;
+  const top = rect.top + (startMinute / 60) * hourHeight;
+  const height = Math.max(22, ((endMinute - startMinute) / 60) * hourHeight - 2);
+  return {
+    top,
+    bottom: top + height,
+    left: rect.left,
+    right: rect.right,
+    width: rect.width,
+    height,
+  };
 }
 
 function CalendarState({
@@ -166,36 +205,49 @@ export function CalendarView() {
     if (!hasRequestedNewEvent) return;
     if (result.isLoading) return;
 
+    // Treat route-driven creation as a one-shot intent. Leaving the flag in
+    // the URL causes a view change to close the composer and immediately open
+    // a new one when this effect reruns for the next calendar mode.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('newEvent');
+        next.delete('new');
+        return next;
+      },
+      { replace: true },
+    );
+
     if (result.calendars.some((calendar) => !calendar.isReadOnly)) {
       setIsEventEditorClosing(false);
       setSelectedOccurrence(null);
       setIsDraft(false);
 
-      const todayKey = toZonedDateKey(new Date(), timeZone);
-      const todayElement = document.querySelector(`[data-date-key="${todayKey}"]`);
-      let anchorRect: AnchorRect | null = null;
-      if (todayElement instanceof HTMLElement) {
-        const rect = todayElement.getBoundingClientRect();
-        anchorRect = {
-          top: rect.top,
-          bottom: rect.bottom,
-          left: rect.left,
-          right: rect.right,
-          width: rect.width,
-          height: rect.height,
-        };
-      }
+      const slot = getNewEventSlotDefaults(new Date(), timeZone, result.defaultEventMinutes);
+      setSelectedDateKey(slot.dateKey);
 
       setQuickCreateState({
         isOpen: true,
-        dateKey: todayKey,
+        dateKey: slot.dateKey,
+        startMinute: slot.startMinute,
+        endMinute: slot.endMinute,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
         allDay: false,
-        anchorRect,
+        anchorRect: getNewEventAnchorRect(slot.dateKey, slot.startMinute, slot.endMinute, mode),
       });
     } else {
       setToast({ message: 'Create or connect a writable calendar first.' });
     }
-  }, [hasRequestedNewEvent, result.isLoading, result.calendars, timeZone]);
+  }, [
+    hasRequestedNewEvent,
+    mode,
+    result.defaultEventMinutes,
+    result.isLoading,
+    result.calendars,
+    setSearchParams,
+    timeZone,
+  ]);
 
   const rememberOpeningControl = useCallback(() => {
     openingControlRef.current =
@@ -633,24 +685,16 @@ export function CalendarView() {
             setIsDraft(false);
             setSelectedOccurrence(null);
 
-            const todayKey = toZonedDateKey(new Date(), timeZone);
-            setSelectedDateKey(todayKey);
+            const slot = getNewEventSlotDefaults(new Date(), timeZone, result.defaultEventMinutes);
+            setSelectedDateKey(slot.dateKey);
 
-            // Locate today's square/column in the active calendar view to anchor popover to its left
-            const todayElement = document.querySelector(`[data-date-key="${todayKey}"]`);
-            let anchorRect: AnchorRect | null = null;
-
-            if (todayElement instanceof HTMLElement) {
-              const rect = todayElement.getBoundingClientRect();
-              anchorRect = {
-                top: rect.top,
-                bottom: rect.bottom,
-                left: rect.left,
-                right: rect.right,
-                width: rect.width,
-                height: rect.height,
-              };
-            } else {
+            let anchorRect = getNewEventAnchorRect(
+              slot.dateKey,
+              slot.startMinute,
+              slot.endMinute,
+              mode,
+            );
+            if (!anchorRect) {
               const buttonRect = openingControlRef.current?.getBoundingClientRect() ?? null;
               if (buttonRect) {
                 anchorRect = {
@@ -666,7 +710,11 @@ export function CalendarView() {
 
             setQuickCreateState({
               isOpen: true,
-              dateKey: todayKey,
+              dateKey: slot.dateKey,
+              startMinute: slot.startMinute,
+              endMinute: slot.endMinute,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
               allDay: false,
               anchorRect,
             });
@@ -773,7 +821,20 @@ export function CalendarView() {
         onDeleteEvent={async (event) => {
           await removeEvent.mutateAsync(event);
           setQuickCreateState((prev) => ({ ...prev, isOpen: false, editingOccurrence: null }));
-          showSuccess('Event deleted.');
+          showToast(
+            {
+              message: 'Event deleted.',
+              actionLabel: 'Undo',
+              onAction: () => {
+                showToast({ message: 'Restoring event…' });
+                void createEvent
+                  .mutateAsync(eventInputFromForm(eventToFormValues(event), event.timezone, event))
+                  .then(() => showSuccess('Event restored.'))
+                  .catch(() => showToast({ message: 'The event could not be restored.' }));
+              },
+            },
+            8000,
+          );
         }}
         onCreateTask={async (input) => {
           await createTaskMutation.mutateAsync(input);

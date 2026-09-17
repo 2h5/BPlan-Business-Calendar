@@ -12,6 +12,12 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
+import {
+  formatDurationBetweenTimes,
+  QuickCreateDatePicker,
+  QuickCreateTimePicker,
+  type TimePickerOption,
+} from './QuickCreatePickers';
 import styles from './QuickCreatePopover.module.css';
 import { Select } from '../../../components/forms/Select';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
@@ -135,6 +141,7 @@ export function QuickCreatePopover({
   const [location, setLocation] = useState(() => initialFormValues?.location ?? '');
   const [description, setDescription] = useState(() => initialFormValues?.description ?? '');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // Task specific state
   const { data: taskLists } = useTaskLists();
@@ -170,24 +177,6 @@ export function QuickCreatePopover({
 
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const taskDateInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDateClick = () => {
-    try {
-      dateInputRef.current?.showPicker();
-    } catch {
-      dateInputRef.current?.focus();
-    }
-  };
-
-  const handleTaskDateClick = () => {
-    try {
-      taskDateInputRef.current?.showPicker();
-    } catch {
-      taskDateInputRef.current?.focus();
-    }
-  };
 
   const handleStartTimeChange = (newStartTime: string) => {
     setStartTime(newStartTime);
@@ -230,6 +219,17 @@ export function QuickCreatePopover({
     return timeOptions;
   }, [endTime, timeOptions]);
 
+  const endTimePickerOptions = useMemo<TimePickerOption[]>(
+    () =>
+      endTimeOptions
+        .map((option) => ({
+          ...option,
+          detail: formatDurationBetweenTimes(startTime, option.value),
+        }))
+        .filter((option) => option.detail || option.value === endTime),
+    [endTime, endTimeOptions, startTime],
+  );
+
   // Sync state whenever opening with new initial coordinates, slot, or event
   useEffect(() => {
     if (isOpen) {
@@ -261,6 +261,7 @@ export function QuickCreatePopover({
         }
       }
       setErrorMessage(null);
+      setIsDeleteConfirmOpen(false);
       if (taskLists && taskLists.length > 0 && !selectedListId && taskLists[0]) {
         setSelectedListId(taskLists[0].id);
       }
@@ -281,6 +282,7 @@ export function QuickCreatePopover({
 
   const handleDelete = async () => {
     if (!editingOccurrence || !onDeleteEvent || isSaving) return;
+    setIsDeleteConfirmOpen(false);
     try {
       await onDeleteEvent(editingOccurrence.event);
       onClose();
@@ -313,10 +315,14 @@ export function QuickCreatePopover({
     style: React.CSSProperties;
     placement: PopoverPlacement;
     arrowTop: number | null;
+    arrowLeft: number | null;
+    maxHeight: number | null;
   }>({
     style: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
     placement: 'center',
     arrowTop: null,
+    arrowLeft: null,
+    maxHeight: null,
   });
 
   const updatePosition = useCallback(() => {
@@ -325,8 +331,40 @@ export function QuickCreatePopover({
     const popoverWidth = popoverRef.current ? popoverRef.current.offsetWidth : 440;
     const popoverHeight = popoverRef.current ? popoverRef.current.offsetHeight : 440;
 
+    let currentAnchorRect = anchorRect;
+    if (editingOccurrence) {
+      const eventElements = document.querySelectorAll<HTMLElement>('[data-occurrence-key]');
+      const eventElement = Array.from(eventElements).find(
+        (element) => element.dataset.occurrenceKey === editingOccurrence.key,
+      );
+      if (eventElement) {
+        const rect = eventElement.getBoundingClientRect();
+        currentAnchorRect = {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+      }
+    } else {
+      const draftElement = document.querySelector<HTMLElement>('[data-quick-create-draft="true"]');
+      if (draftElement) {
+        const rect = draftElement.getBoundingClientRect();
+        currentAnchorRect = {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+      }
+    }
+
     const result = calculatePopoverPosition({
-      anchorRect,
+      anchorRect: currentAnchorRect,
       popoverWidth,
       popoverHeight,
       viewportWidth: window.innerWidth,
@@ -339,6 +377,8 @@ export function QuickCreatePopover({
         style: {},
         placement: 'bottom',
         arrowTop: null,
+        arrowLeft: null,
+        maxHeight: null,
       });
       return;
     }
@@ -347,11 +387,14 @@ export function QuickCreatePopover({
       style: {
         top: `${result.top}px`,
         left: `${result.left}px`,
+        maxHeight: result.maxHeight === null ? undefined : `${result.maxHeight}px`,
       },
       placement: result.placement,
       arrowTop: result.arrowTop,
+      arrowLeft: result.arrowLeft,
+      maxHeight: result.maxHeight,
     });
-  }, [anchorRect, isOpen]);
+  }, [anchorRect, editingOccurrence, isOpen]);
 
   useLayoutEffect(() => {
     updatePosition();
@@ -389,6 +432,11 @@ export function QuickCreatePopover({
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape' && !isSaving) {
         e.stopPropagation();
+        if (isDeleteConfirmOpen) {
+          e.preventDefault();
+          setIsDeleteConfirmOpen(false);
+          return;
+        }
         handleRequestClose();
       }
 
@@ -411,7 +459,7 @@ export function QuickCreatePopover({
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, isSaving, handleRequestClose]);
+  }, [isDeleteConfirmOpen, isOpen, isSaving, handleRequestClose]);
 
   if (!isOpen) return null;
 
@@ -564,6 +612,20 @@ export function QuickCreatePopover({
             aria-hidden="true"
           />
         )}
+        {coords.arrowLeft !== null && coords.placement === 'below' && (
+          <div
+            className={`${styles.arrow} ${styles.arrowTop}`}
+            style={{ left: `${coords.arrowLeft}px` }}
+            aria-hidden="true"
+          />
+        )}
+        {coords.arrowLeft !== null && coords.placement === 'above' && (
+          <div
+            className={`${styles.arrow} ${styles.arrowBottom}`}
+            style={{ left: `${coords.arrowLeft}px` }}
+            aria-hidden="true"
+          />
+        )}
 
         <header className={styles.header}>
           {editingOccurrence ? (
@@ -599,31 +661,62 @@ export function QuickCreatePopover({
 
           <div className={styles.headerRight}>
             {editingOccurrence && onDeleteEvent && !isReadOnly && (
-              <button
-                type="button"
-                className={styles.deleteButton}
-                onClick={handleDelete}
-                aria-label="Delete event"
-                title="Delete event"
-                disabled={isSaving}
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              <div className={styles.deleteControl}>
+                <button
+                  type="button"
+                  className={styles.deleteButton}
+                  onClick={() => setIsDeleteConfirmOpen((current) => !current)}
+                  aria-label="Delete event"
+                  aria-expanded={isDeleteConfirmOpen}
+                  aria-controls="quick-create-delete-confirm"
+                  title="Delete event"
+                  disabled={isSaving}
                 >
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-              </button>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+
+                {isDeleteConfirmOpen ? (
+                  <div
+                    id="quick-create-delete-confirm"
+                    className={styles.deleteConfirm}
+                    role="alertdialog"
+                    aria-label="Confirm event deletion"
+                  >
+                    <span>Delete this event?</span>
+                    <div className={styles.deleteConfirmActions}>
+                      <button
+                        type="button"
+                        className={styles.deleteCancelButton}
+                        onClick={() => setIsDeleteConfirmOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.deleteConfirmButton}
+                        onClick={() => void handleDelete()}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             )}
 
             <button
@@ -709,68 +802,43 @@ export function QuickCreatePopover({
 
                 <div className={styles.dateTimeContainer}>
                   <div className={styles.dateTimeRow}>
-                    <div
-                      className={styles.dateBoxWrapper}
-                      onClick={handleDateClick}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          handleDateClick();
-                        }
+                    <QuickCreateDatePicker
+                      value={startDate}
+                      displayValue={formatDateDisplay(startDate)}
+                      onChange={(value) => {
+                        setStartDate(value);
+                        if (endDate < value) setEndDate(value);
                       }}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Date: ${formatDateDisplay(startDate)}`}
+                      ariaLabel={`Date: ${formatDateDisplay(startDate)}`}
+                    />
+
+                    <div
+                      className={`${styles.timeRange} ${allDay ? styles.timeRangeHidden : ''}`}
+                      aria-hidden={allDay}
                     >
-                      <span className={styles.dateText}>{formatDateDisplay(startDate)}</span>
-                      <input
-                        ref={dateInputRef}
-                        type="date"
-                        className={styles.hiddenNativeInput}
-                        value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value);
-                          if (endDate < e.target.value) setEndDate(e.target.value);
-                        }}
-                        aria-label="Start date"
-                        tabIndex={-1}
-                      />
+                      <div className={styles.timeBoxWrapper}>
+                        <QuickCreateTimePicker
+                          value={startTime}
+                          options={startTimeOptions}
+                          onChange={handleStartTimeChange}
+                          ariaLabel="Start time"
+                          disabled={allDay}
+                        />
+                      </div>
+
+                      <span className={styles.timeSeparator}>–</span>
+
+                      <div className={styles.timeBoxWrapper}>
+                        <QuickCreateTimePicker
+                          value={endTime}
+                          options={endTimePickerOptions}
+                          onChange={setEndTime}
+                          ariaLabel="End time"
+                          disabled={allDay}
+                          menuWidth={188}
+                        />
+                      </div>
                     </div>
-
-                    {!allDay ? (
-                      <>
-                        <div className={styles.timeBoxWrapper}>
-                          <select
-                            className={styles.timeSelect}
-                            value={startTime}
-                            onChange={(e) => handleStartTimeChange(e.target.value)}
-                            aria-label="Start time"
-                          >
-                            {startTimeOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <span className={styles.timeSeparator}>–</span>
-
-                        <div className={styles.timeBoxWrapper}>
-                          <select
-                            className={styles.timeSelect}
-                            value={endTime}
-                            onChange={(e) => setEndTime(e.target.value)}
-                            aria-label="End time"
-                          >
-                            {endTimeOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </>
-                    ) : null}
                   </div>
 
                   <div className={styles.allDayRow}>
@@ -895,44 +963,21 @@ export function QuickCreatePopover({
 
                 <div className={styles.dateTimeContainer}>
                   <div className={styles.dateTimeRow}>
-                    <div
-                      className={styles.dateBoxWrapper}
-                      onClick={handleTaskDateClick}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          handleTaskDateClick();
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Due date: ${formatDateDisplay(startDate)}`}
-                    >
-                      <span className={styles.dateText}>{formatDateDisplay(startDate)}</span>
-                      <input
-                        ref={taskDateInputRef}
-                        type="date"
-                        className={styles.hiddenNativeInput}
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        aria-label="Due date"
-                        tabIndex={-1}
-                      />
-                    </div>
+                    <QuickCreateDatePicker
+                      value={startDate}
+                      displayValue={formatDateDisplay(startDate)}
+                      onChange={setStartDate}
+                      ariaLabel={`Due date: ${formatDateDisplay(startDate)}`}
+                    />
 
                     {taskHasTime ? (
                       <div className={styles.timeBoxWrapper}>
-                        <select
-                          className={styles.timeSelect}
+                        <QuickCreateTimePicker
                           value={startTime}
-                          onChange={(e) => setStartTime(e.target.value)}
-                          aria-label="Due time"
-                        >
-                          {startTimeOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                          options={startTimeOptions}
+                          onChange={setStartTime}
+                          ariaLabel="Due time"
+                        />
                       </div>
                     ) : null}
                   </div>

@@ -371,6 +371,7 @@ export function TimelineView({
   workingHours,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initialScrollKeyRef = useRef<string | null>(null);
   const isWeek = dateKeys.length > 1;
   const hourHeight = isWeek ? 54 : 64;
   const todayKey = toZonedDateKey(now, timeZone);
@@ -1291,6 +1292,10 @@ export function TimelineView({
   }, []);
 
   useEffect(() => {
+    const scrollKey = `${dateKeys.join('|')}::${hourHeight}::${timeZone}::${todayKey}`;
+    if (initialScrollKeyRef.current === scrollKey) return;
+    initialScrollKeyRef.current = scrollKey;
+
     const initialHour =
       todayKey && dateKeys.includes(todayKey)
         ? Math.max(0, minuteOfDay(now, timeZone) / 60 - 2)
@@ -1538,6 +1543,7 @@ export function TimelineView({
                   draftEvent.endMinute !== undefined &&
                   !dragSelection && (
                     <div
+                      data-quick-create-draft="true"
                       className={`${styles.draftTimelineEvent} ${
                         draftEvent.isClosing
                           ? styles.draftTimelineEventBubbleExit

@@ -376,7 +376,9 @@ export function TodayView() {
       <section className={styles.bentoGrid} aria-label="Day Overview">
         {/* Card 1: Up Next / In Progress */}
         <div
-          className={`${styles.bentoCard} ${nextStatus?.isActive ? styles.bentoCardActive : ''}`}
+          className={`${styles.bentoCard} ${
+            nextStatus?.isActive ? styles.bentoCardActive : ''
+          } ${!today.next ? styles.bentoCardEmpty : ''}`}
           onClick={() => {
             if (today.next) {
               navigate(`/calendar?date=${today.todayKey}&event=${today.next.event.id}`);

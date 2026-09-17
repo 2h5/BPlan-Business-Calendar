@@ -7,7 +7,7 @@ export interface AnchorRect {
   bottom: number;
 }
 
-export type PopoverPlacement = 'right' | 'left' | 'center' | 'bottom';
+export type PopoverPlacement = 'right' | 'left' | 'above' | 'below' | 'center' | 'bottom';
 
 export interface PopoverPositionOptions {
   anchorRect: AnchorRect | null;
@@ -25,6 +25,8 @@ export interface PopoverPositionResult {
   left: number;
   placement: PopoverPlacement;
   arrowTop: number | null;
+  arrowLeft: number | null;
+  maxHeight: number | null;
 }
 
 /**
@@ -68,6 +70,8 @@ export function calculatePopoverPosition(options: PopoverPositionOptions): Popov
       left: 0,
       placement: 'bottom',
       arrowTop: null,
+      arrowLeft: null,
+      maxHeight: null,
     };
   }
 
@@ -78,6 +82,8 @@ export function calculatePopoverPosition(options: PopoverPositionOptions): Popov
       left: Math.round(Math.max(viewportPadding, (viewportWidth - popoverWidth) / 2)),
       placement: 'center',
       arrowTop: null,
+      arrowLeft: null,
+      maxHeight: null,
     };
   }
 
@@ -86,6 +92,42 @@ export function calculatePopoverPosition(options: PopoverPositionOptions): Popov
   // The selected cell is an exclusion zone whenever either adjacent placement is possible.
   const canFitLeft = anchorRect.left - popoverWidth - gap >= viewportPadding;
   const canFitRight = anchorRect.right + popoverWidth + gap <= viewportWidth - viewportPadding;
+
+  // Wide Day-view events leave no meaningful side for the card. Keep the event visible and
+  // preserve its time relationship by placing the card below it, or above when space requires.
+  if (!canFitLeft && !canFitRight && anchorRect.width >= popoverWidth) {
+    const canFitBelow = anchorRect.bottom + gap + popoverHeight <= viewportHeight - viewportPadding;
+    const canFitAbove = anchorRect.top - gap - popoverHeight >= viewportPadding;
+    const spaceBelow = viewportHeight - viewportPadding - anchorRect.bottom - gap;
+    const spaceAbove = anchorRect.top - viewportPadding - gap;
+    const placement: 'above' | 'below' = canFitBelow
+      ? 'below'
+      : canFitAbove
+        ? 'above'
+        : spaceBelow >= spaceAbove
+          ? 'below'
+          : 'above';
+    const availableHeight = Math.max(0, placement === 'below' ? spaceBelow : spaceAbove);
+    const displayedHeight = Math.min(popoverHeight, availableHeight);
+    const preferredTop =
+      placement === 'below' ? anchorRect.bottom + gap : anchorRect.top - displayedHeight - gap;
+    const maxTop = Math.max(viewportPadding, viewportHeight - popoverHeight - viewportPadding);
+    const top = Math.max(viewportPadding, Math.min(maxTop, preferredTop));
+    const preferredLeft = anchorRect.left + (anchorRect.width - popoverWidth) / 2;
+    const maxLeft = Math.max(viewportPadding, viewportWidth - popoverWidth - viewportPadding);
+    const left = Math.max(viewportPadding, Math.min(maxLeft, preferredLeft));
+    const anchorTargetX = anchorRect.left + anchorRect.width / 2;
+    const arrowLeft = Math.max(16, Math.min(popoverWidth - 26, anchorTargetX - left - 5));
+
+    return {
+      top: Math.round(top),
+      left: Math.round(left),
+      placement,
+      arrowTop: null,
+      arrowLeft: Math.round(arrowLeft),
+      maxHeight: Math.floor(availableHeight),
+    };
+  }
 
   let placement: 'right' | 'left';
   let left: number;
@@ -138,5 +180,7 @@ export function calculatePopoverPosition(options: PopoverPositionOptions): Popov
     left: Math.round(left),
     placement,
     arrowTop,
+    arrowLeft: null,
+    maxHeight: null,
   };
 }
