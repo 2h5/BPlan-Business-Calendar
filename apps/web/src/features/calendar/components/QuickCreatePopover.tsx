@@ -918,8 +918,8 @@ export function QuickCreatePopover({
               </div>
 
               {/* Description (always opened by default) */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
+              <div className={styles.fieldRowTopAligned}>
+                <span className={styles.fieldIconTop} aria-hidden="true">
                   <svg
                     width="15"
                     height="15"
@@ -1072,8 +1072,8 @@ export function QuickCreatePopover({
               </div>
 
               {/* Task Description (always opened by default) */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
+              <div className={styles.fieldRowTopAligned}>
+                <span className={styles.fieldIconTop} aria-hidden="true">
                   <svg
                     width="15"
                     height="15"

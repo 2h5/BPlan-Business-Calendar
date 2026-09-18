@@ -152,6 +152,7 @@
 .legalLinks {
   width: min(100%, 760px);
   margin-top: var(--space-3);
+  align-self: center;
   color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
   text-align: center;

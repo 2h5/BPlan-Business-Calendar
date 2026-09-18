@@ -20,7 +20,7 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 
 export function SettingsView() {
   const { email } = useAuth();
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [defaultCalendarView, setDefaultCalendarView] = useCalendarViewPreference();
   const location = useLocation();
   const navigate = useNavigate();
@@ -197,13 +197,6 @@ export function SettingsView() {
                   </div>
                 </div>
               </button>
-            </div>
-            <div className={styles.themeStatusRow}>
-              <span>
-                Currently active:{' '}
-                <strong>{resolvedTheme === 'dark' ? 'Dark' : 'Light'} theme</strong>
-                {theme === 'auto' ? ' (synchronized with system)' : ''}
-              </span>
             </div>
           </section>
 
@@ -458,8 +451,9 @@ export function SettingsView() {
           <BillingSection />
 
           <ConnectionsSection notice={integrationMessage} />
+
+          <AccountPanel fullName={draft.fullName} />
         </div>
-        <AccountPanel fullName={draft.fullName} />
       </div>
     </div>
   );
