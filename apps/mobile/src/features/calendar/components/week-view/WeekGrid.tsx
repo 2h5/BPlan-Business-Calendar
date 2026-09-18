@@ -1,15 +1,20 @@
-import { layoutOverlappingEvents, MIN_VISUAL_MINUTES, toZonedDateKey } from '@cal/domain';
+import {
+  isOccurrenceMovable,
+  layoutOverlappingEvents,
+  MIN_VISUAL_MINUTES,
+  toZonedDateKey,
+} from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
-import { useMemo } from 'react';
-import { ScrollView, View, type ViewStyle } from 'react-native';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { useMemo, useRef, useState } from 'react';
+import { View, type ViewStyle } from 'react-native';
+import { GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 import { usePageSwipe } from '../../hooks/usePageSwipe';
 import { dateKeyToInstant, weekDateKeys, weekdayOf, weekIndexOf } from '../../utils/window';
-import { EventChip } from '../EventChip';
+import { DraggableEventChip, type EventMove } from '../DraggableEventChip';
 
 const HOUR_HEIGHT = 44;
 const GUTTER_WIDTH = 44;
@@ -25,6 +30,8 @@ export interface WeekGridProps {
   onPressOccurrence: (occurrence: EventOccurrence) => void;
   /** Called once a swipe has finished, with how many weeks it moved. */
   onChangeWeek: (delta: number) => void;
+  /** Re-time an event dragged to another hour or day. Resolves once it settles. */
+  onMoveOccurrence: (move: EventMove) => Promise<void>;
 }
 
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -51,12 +58,22 @@ export function WeekGrid({
   onSelectDate,
   onPressOccurrence,
   onChangeWeek,
+  onMoveOccurrence,
 }: WeekGridProps) {
   const theme = useTheme();
   const todayKey = toZonedDateKey(now, timeZone);
+  const scrollRef = useRef<ScrollView>(null);
 
   const weekIndex = weekIndexOf(selectedDateKey, timeZone, weekStartsOn);
   const { pan, stripStyle, width, slot, onLayout } = usePageSwipe(weekIndex, onChangeWeek);
+  // A dragged event steps between days by whole columns, so it needs the width
+  // of one. Zero until the strip has been measured, which pins the drag
+  // vertical for that first frame rather than letting it jump a random day.
+  const columnWidth = width > 0 ? width / 7 : 0;
+  // Columns are siblings, so a chip dragged towards Friday would otherwise pass
+  // *under* the grid lines of every column it crosses. Raising the column it
+  // came from carries the chip over them.
+  const [draggingColumn, setDraggingColumn] = useState<number | null>(null);
 
   const pages = useMemo(
     () =>
@@ -145,7 +162,7 @@ export function WeekGrid({
     );
   };
 
-  const renderDayColumn = (dateKey: string) => {
+  const renderDayColumn = (dateKey: string, columnIndex: number) => {
     const dayStartMs = dateKeyToInstant(dateKey, timeZone).getTime();
     const timed = (byDateKey.get(dateKey) ?? []).filter((o) => !o.event.allDay);
 
@@ -161,7 +178,12 @@ export function WeekGrid({
     return (
       <View
         key={dateKey}
-        style={{ flex: 1, borderLeftWidth: 1, borderLeftColor: theme.colors.gridLine }}
+        style={{
+          flex: 1,
+          borderLeftWidth: 1,
+          borderLeftColor: theme.colors.gridLine,
+          zIndex: draggingColumn === columnIndex ? 1 : 0,
+        }}
       >
         {Array.from({ length: 24 }, (_, hour) => (
           <View
@@ -181,13 +203,22 @@ export function WeekGrid({
               ((placed.interval.end - placed.interval.start) / 3_600_000) * HOUR_HEIGHT;
 
             return (
-              <EventChip
+              <DraggableEventChip
                 key={placed.item.key}
                 occurrence={placed.item}
+                dateKey={dateKey}
                 timeZone={timeZone}
                 hourCycle={hourCycle}
                 compact
+                hourHeight={HOUR_HEIGHT}
+                columnWidth={columnWidth}
+                columnIndex={columnIndex}
+                columnCount={7}
+                movable={isOccurrenceMovable(placed.item, dateKey, timeZone)}
+                blocking={[scrollRef, pan]}
                 onPress={() => onPressOccurrence(placed.item)}
+                onMove={onMoveOccurrence}
+                onDragChange={(dragging) => setDraggingColumn(dragging ? columnIndex : null)}
                 layout={{
                   top,
                   height: Math.max(height - 1, 14),
@@ -219,6 +250,7 @@ export function WeekGrid({
         </View>
 
         <ScrollView
+          ref={scrollRef}
           showsVerticalScrollIndicator={false}
           contentOffset={{ x: 0, y: HOUR_HEIGHT * 7 }}
         >

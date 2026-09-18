@@ -47,6 +47,8 @@ export const queryKeys = {
 
   events: {
     all: () => ['events'] as const,
+    /** Prefix matching every cached window, for patching them all at once. */
+    windows: () => ['events', 'window'] as const,
     window: (startIso: string, endIso: string) => ['events', 'window', startIso, endIso] as const,
     detail: (id: string) => ['events', 'detail', id] as const,
   },

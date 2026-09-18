@@ -7,7 +7,10 @@ import { MonthGrid, type MonthGridProps } from './MonthGrid';
 import { usePageSwipe } from '../../hooks/usePageSwipe';
 import { monthGridKeys, monthOfIndex } from '../../utils/window';
 
-export interface MonthPagerProps extends Omit<MonthGridProps, 'dateKeys' | 'focusedMonth'> {
+export interface MonthPagerProps extends Omit<
+  MonthGridProps,
+  'dateKeys' | 'focusedMonth' | 'pagerGesture'
+> {
   /** Months since year 0 of the month in focus — see `monthIndexOf`. */
   monthIndex: number;
   /** Called once a page turn has finished, with how many months it moved. */
@@ -49,7 +52,14 @@ export function MonthPager({ monthIndex, onChangeMonth, ...gridProps }: MonthPag
                     width,
                   }}
                 >
-                  <MonthGrid {...gridProps} dateKeys={page.dateKeys} focusedMonth={page.month} />
+                  <MonthGrid
+                    {...gridProps}
+                    dateKeys={page.dateKeys}
+                    focusedMonth={page.month}
+                    // Handed down so a bar being dragged across dates stands the
+                    // page turn down rather than doing both at once.
+                    pagerGesture={pan}
+                  />
                 </View>
               ))
             : null}

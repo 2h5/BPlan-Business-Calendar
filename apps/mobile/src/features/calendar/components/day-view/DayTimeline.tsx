@@ -1,4 +1,5 @@
 import {
+  isOccurrenceMovable,
   layoutOverlappingEvents,
   MIN_VISUAL_MINUTES,
   minuteOfDay,
@@ -7,13 +8,14 @@ import {
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
 import { useEffect, useMemo, useRef } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 import { usePageSwipe } from '../../hooks/usePageSwipe';
 import { dateKeyToInstant, dayIndexOf, shiftDateKey, weekdayOf } from '../../utils/window';
+import { DraggableEventChip, type EventMove } from '../DraggableEventChip';
 import { EventChip } from '../EventChip';
 
 export const HOUR_HEIGHT = 56;
@@ -39,6 +41,8 @@ export interface DayTimelineProps {
   onPressSlot?: (start: Date) => void;
   /** Called once a swipe has finished, with how many days it moved. */
   onChangeDay: (delta: number) => void;
+  /** Re-time an event dragged to another hour. Resolves once it settles. */
+  onMoveOccurrence: (move: EventMove) => Promise<void>;
 }
 
 interface DayPage {
@@ -70,6 +74,7 @@ export function DayTimeline({
   onPressOccurrence,
   onPressSlot,
   onChangeDay,
+  onMoveOccurrence,
 }: DayTimelineProps) {
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
@@ -198,13 +203,23 @@ export function DayTimeline({
               ((placed.interval.end - placed.interval.start) / 3_600_000) * HOUR_HEIGHT;
 
             return (
-              <EventChip
+              <DraggableEventChip
                 key={placed.item.key}
                 occurrence={placed.item}
+                dateKey={page.dateKey}
                 timeZone={timeZone}
                 hourCycle={hourCycle}
                 compact={height < 34}
+                hourHeight={HOUR_HEIGHT}
+                // One day is on screen, so a drag here only changes the hour;
+                // reaching another day is what the swipe is for.
+                columnWidth={0}
+                columnIndex={0}
+                columnCount={1}
+                movable={isOccurrenceMovable(placed.item, page.dateKey, timeZone)}
+                blocking={[scrollRef, pan]}
                 onPress={() => onPressOccurrence(placed.item)}
+                onMove={onMoveOccurrence}
                 layout={{
                   top,
                   height: Math.max(height - 2, 18),

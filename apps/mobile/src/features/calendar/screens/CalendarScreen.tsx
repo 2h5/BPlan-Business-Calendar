@@ -11,6 +11,8 @@ import { DayTimeline } from '../components/day-view/DayTimeline';
 import { MonthPager } from '../components/month-view/MonthPager';
 import { WeekGrid } from '../components/week-view/WeekGrid';
 import { useCalendarWindow } from '../hooks/useCalendarWindow';
+import { useMoveOccurrence, useMoveOccurrenceByDays } from '../hooks/useMoveOccurrence';
+import { formatDayShiftTarget } from '../utils/format';
 import { dateKeyToInstant, monthIndexOf } from '../utils/window';
 
 const MODES: { value: CalendarViewMode; label: string }[] = [
@@ -65,6 +67,11 @@ export function CalendarScreen() {
 
   const { window, byDateKey, timeZone, hourCycle, weekStartsOn, isLoading, isError, refetch } =
     useCalendarWindow();
+
+  // Dragging an event re-times it in place; the editor is for everything else
+  // about it. The hour grids move it to a time, the month grid to a date.
+  const moveOccurrence = useMoveOccurrence(timeZone);
+  const moveOccurrenceByDays = useMoveOccurrenceByDays(timeZone);
 
   const now = new Date();
   const anchor = dateKeyToInstant(selectedDateKey, timeZone);
@@ -168,6 +175,7 @@ export function CalendarScreen() {
           now={now}
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
           onPressSlot={(start) => openNewEvent(start)}
+          onMoveOccurrence={moveOccurrence}
         />
       ) : mode === 'week' ? (
         <WeekGrid
@@ -180,6 +188,7 @@ export function CalendarScreen() {
           selectedDateKey={selectedDateKey}
           onSelectDate={selectDate}
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
+          onMoveOccurrence={moveOccurrence}
         />
       ) : mode === 'month' ? (
         // Swiping drags the neighbouring months into view; the grid sizes its
@@ -197,6 +206,10 @@ export function CalendarScreen() {
             setMode('day');
           }}
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
+          onMoveOccurrence={moveOccurrenceByDays}
+          formatDayTarget={(occurrence, dayDelta) =>
+            formatDayShiftTarget(occurrence.start, dayDelta, timeZone)
+          }
         />
       ) : (
         <ScrollView

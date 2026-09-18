@@ -1,10 +1,11 @@
-import { layoutMonthWeek, resolveEventColor, toZonedDateKey } from '@cal/domain';
+import { isOccurrenceMovableByDay, layoutMonthWeek, toZonedDateKey } from '@cal/domain';
 import { Text, useTheme } from '@cal/ui';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import type { GestureType } from 'react-native-gesture-handler';
 
+import { DraggableEventBar, type EventDayMove } from './DraggableEventBar';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import { withAlpha } from '../../utils/color';
 
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const COLUMNS = 7;
@@ -16,8 +17,6 @@ const BAR_GAP = 2;
 /** Height of the date-number block each week reserves above its bars. */
 const NUMBER_BLOCK = 28;
 const OVERFLOW_HEIGHT = 13;
-/** Event titles on the bars — below caption size, so more of each title fits. */
-const BAR_FONT_SIZE = 10;
 
 export interface MonthGridProps {
   /** 42 date keys: six whole weeks. */
@@ -31,6 +30,12 @@ export interface MonthGridProps {
   weekStartsOn: number;
   onSelectDate: (dateKey: string) => void;
   onPressOccurrence: (occurrence: EventOccurrence) => void;
+  /** Re-date an event dragged to another cell. Resolves once it settles. */
+  onMoveOccurrence: (move: EventDayMove) => Promise<void>;
+  /** The month pager's gesture, so a drag is not also a page turn. */
+  pagerGesture?: GestureType;
+  /** Turns a day delta into the date label shown under a dragged bar. */
+  formatDayTarget: (occurrence: EventOccurrence, dayDelta: number) => string;
 }
 
 /**
@@ -51,6 +56,9 @@ export function MonthGrid({
   weekStartsOn,
   onSelectDate,
   onPressOccurrence,
+  onMoveOccurrence,
+  pagerGesture,
+  formatDayTarget,
 }: MonthGridProps) {
   const theme = useTheme();
   const todayKey = toZonedDateKey(now, timeZone);
@@ -63,8 +71,15 @@ export function MonthGrid({
   // Height available to the six week rows, measured rather than assumed: the
   // grid fills whatever the screen leaves it, so a taller phone shows more
   // events per day instead of leaving a gap under the last week.
-  const [bodyHeight, setBodyHeight] = useState(0);
-  const rowHeight = bodyHeight > 0 ? bodyHeight / WEEKS : 0;
+  const [body, setBody] = useState({ width: 0, height: 0 });
+  const rowHeight = body.height > 0 ? body.height / WEEKS : 0;
+  // A dragged bar steps between dates by whole cells, so it needs one cell's
+  // width. Zero until the grid is measured, which pins the drag for that first
+  // frame rather than letting it jump to an arbitrary date.
+  const columnWidth = body.width > 0 ? body.width / COLUMNS : 0;
+  // Week rows are siblings, so a bar dragged down the grid would otherwise pass
+  // *under* the rows it crosses. Raising the row it came from carries it over.
+  const [draggingWeek, setDraggingWeek] = useState<number | null>(null);
 
   /** Lanes that fit in a row, given how much of it the bars may use. */
   const lanesThatFit = (reservedForOverflow: number) =>
@@ -152,13 +167,18 @@ export function MonthGrid({
 
       <View
         style={{ flex: 1 }}
-        onLayout={(event) => setBodyHeight(event.nativeEvent.layout.height)}
+        onLayout={(event) =>
+          setBody({
+            width: event.nativeEvent.layout.width,
+            height: event.nativeEvent.layout.height,
+          })
+        }
       >
         {weeks.map(({ weekKeys, segments, overflowByColumn }, week) => {
           if (weekKeys.length === 0) return null;
 
           return (
-            <View key={week} style={{ height: rowHeight }}>
+            <View key={week} style={{ height: rowHeight, zIndex: draggingWeek === week ? 1 : 0 }}>
               <View style={{ flexDirection: 'row' }}>
                 {weekKeys.map((dateKey) => {
                   const day = Number(dateKey.split('-')[2]);
@@ -224,75 +244,34 @@ export function MonthGrid({
                 }}
               >
                 {segments.map(
-                  ({ item, startColumn, endColumn, lane, continuesBefore, continuesAfter }) => {
-                    const color = resolveEventColor(
-                      item.event.color,
-                      item.calendar?.color,
-                      theme.colors.accent,
-                    );
-                    const cancelled = item.event.status === 'cancelled';
-                    const startRadius = continuesBefore ? 0 : theme.radius.sm;
-                    const endRadius = continuesAfter ? 0 : theme.radius.sm;
-
-                    return (
-                      <Pressable
-                        key={item.key}
-                        accessibilityRole="button"
-                        accessibilityLabel={item.event.title}
-                        onPress={() => onPressOccurrence(item)}
-                        style={({ pressed }) => ({
-                          position: 'absolute',
-                          top: lane * (BAR_HEIGHT + BAR_GAP),
-                          height: BAR_HEIGHT,
-                          left: `${(startColumn / COLUMNS) * 100}%`,
-                          width: `${((endColumn - startColumn + 1) / COLUMNS) * 100}%`,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          overflow: 'hidden',
-                          marginHorizontal: 1,
-                          borderTopLeftRadius: startRadius,
-                          borderBottomLeftRadius: startRadius,
-                          borderTopRightRadius: endRadius,
-                          borderBottomRightRadius: endRadius,
-                          backgroundColor: pressed
-                            ? theme.colors.surfacePressed
-                            : withAlpha(color, 0.22),
-                          opacity: cancelled ? 0.5 : 1,
-                        })}
-                      >
-                        {/* The leading cap is the same colour signal the timeline
-                          chips use — omitted when the bar is a continuation. */}
-                        {!continuesBefore ? (
-                          <View
-                            style={{ width: 2, alignSelf: 'stretch', backgroundColor: color }}
-                          />
-                        ) : null}
-
-                        <Text
-                          variant="caption"
-                          numberOfLines={1}
-                          style={{
-                            flex: 1,
-                            // Smaller and untracked than a caption, so a day's
-                            // narrow bar shows enough of a title to recognise it
-                            // ("Labor Day", "Paid Holida…") rather than a stub.
-                            fontSize: BAR_FONT_SIZE,
-                            lineHeight: BAR_FONT_SIZE + 2,
-                            fontWeight: '500',
-                            letterSpacing: 0,
-                            // The tail is where the text is cut off, so it needs
-                            // barely any padding of its own.
-                            paddingLeft: 3,
-                            paddingRight: 1,
-                            color: theme.colors.textPrimary,
-                            textDecorationLine: cancelled ? 'line-through' : 'none',
-                          }}
-                        >
-                          {item.event.title}
-                        </Text>
-                      </Pressable>
-                    );
-                  },
+                  ({ item, startColumn, endColumn, lane, continuesBefore, continuesAfter }) => (
+                    <DraggableEventBar
+                      key={item.key}
+                      occurrence={item}
+                      continuesBefore={continuesBefore}
+                      continuesAfter={continuesAfter}
+                      weekIndex={week}
+                      weekCount={WEEKS}
+                      startColumn={startColumn}
+                      columnCount={COLUMNS}
+                      columnWidth={columnWidth}
+                      rowHeight={rowHeight}
+                      // A bar carried over from an earlier week is a clipped
+                      // tail, not the event: drag it from the week it starts in.
+                      movable={isOccurrenceMovableByDay(item) && !continuesBefore}
+                      blocking={pagerGesture ? [pagerGesture] : undefined}
+                      formatTarget={(dayDelta) => formatDayTarget(item, dayDelta)}
+                      onPress={() => onPressOccurrence(item)}
+                      onMove={onMoveOccurrence}
+                      onDragChange={(dragging) => setDraggingWeek(dragging ? week : null)}
+                      layout={{
+                        top: lane * (BAR_HEIGHT + BAR_GAP),
+                        height: BAR_HEIGHT,
+                        left: `${(startColumn / COLUMNS) * 100}%`,
+                        width: `${((endColumn - startColumn + 1) / COLUMNS) * 100}%`,
+                      }}
+                    />
+                  ),
                 )}
 
                 {overflowByColumn.map((count, column) =>
