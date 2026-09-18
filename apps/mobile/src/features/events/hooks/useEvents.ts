@@ -1,4 +1,4 @@
-import type { Calendar, CreateEventInput } from '@cal/schemas';
+import type { Calendar, CalendarEvent, CreateEventInput } from '@cal/schemas';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 
@@ -151,6 +151,90 @@ export function useUpdateEvent() {
       const event = await updateEvent(input);
       queryClient.setQueryData(queryKeys.events.detail(event.id), event);
     },
+    onSettled: () => void invalidate(),
+  });
+}
+
+export interface MoveEventPayload {
+  event: CalendarEvent;
+  /** The dragged-to time, as UTC ISO strings. */
+  startAt: string;
+  endAt: string;
+}
+
+/**
+ * Re-time one event, as a drag on the calendar does.
+ *
+ * Distinct from `useUpdateEvent` in two ways. It carries only the times, since
+ * a drag changes nothing else and the editor — the only holder of the whole
+ * event — is not open. And it writes to the cache first: a drag ends with the
+ * chip already under the finger, so waiting for the round trip would snap it
+ * back to the old time for as long as the network took, which reads as the
+ * drag having failed.
+ */
+export function useMoveEvent() {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateEvents();
+  const calendarFor = useCalendarSourceLookup();
+
+  return useMutation({
+    mutationFn: async ({ event, startAt, endAt }: MoveEventPayload) => {
+      const calendar = calendarFor(event.calendarId);
+
+      if (calendar && calendar.sourceType !== 'internal') {
+        // The provider owns its events: send the whole event with the new
+        // times rather than a patch, per `docs/architecture.md` § Decision A.
+        await writeProviderEvent({
+          operation: 'update',
+          eventId: event.id,
+          draft: {
+            title: event.title,
+            description: event.description,
+            location: event.location,
+            startAt,
+            endAt,
+            allDay: event.allDay,
+            timezone: event.timezone,
+            recurrenceRule: event.recurrenceRule,
+            alerts: event.alerts,
+          },
+        });
+        return;
+      }
+
+      await updateEvent({ id: event.id, startAt, endAt });
+    },
+
+    onMutate: async ({ event, startAt, endAt }) => {
+      // An in-flight window fetch would otherwise land after this and put the
+      // event back at its old time.
+      await queryClient.cancelQueries({ queryKey: queryKeys.events.all() });
+
+      const windows = queryClient.getQueriesData<CalendarEvent[]>({
+        queryKey: queryKeys.events.windows(),
+      });
+      const detail = queryClient.getQueryData<CalendarEvent>(queryKeys.events.detail(event.id));
+
+      const moved = { ...event, startAt, endAt };
+      queryClient.setQueriesData<CalendarEvent[]>(
+        { queryKey: queryKeys.events.windows() },
+        (rows) => rows?.map((row) => (row.id === event.id ? { ...row, startAt, endAt } : row)),
+      );
+      if (detail) queryClient.setQueryData(queryKeys.events.detail(event.id), moved);
+
+      return { windows, detail, eventId: event.id };
+    },
+
+    onError: (_error, _payload, context) => {
+      // Put every window back exactly as it was, so a failed move does not
+      // leave the calendar showing a time the server never accepted.
+      for (const [key, rows] of context?.windows ?? []) queryClient.setQueryData(key, rows);
+      if (context?.detail) {
+        queryClient.setQueryData(queryKeys.events.detail(context.eventId), context.detail);
+      }
+    },
+
+    onSuccess: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
     onSettled: () => void invalidate(),
   });
 }
