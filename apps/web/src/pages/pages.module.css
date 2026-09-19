@@ -252,6 +252,18 @@
   }
 }
 
+@keyframes homepage-login-enter {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .calendarPreview {
   width: 100%;
   aspect-ratio: 1.76 / 1;
@@ -547,6 +559,7 @@
   align-items: center;
   gap: clamp(0.75rem, 1.35vh, 1rem);
   padding-top: clamp(2.5rem, 5vh, 4rem);
+  animation: homepage-login-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) 110ms both;
 }
 
 .providerStrip {
@@ -868,6 +881,7 @@
 @media (prefers-reduced-motion: reduce) {
   .loginBrand,
   .loginHero,
+  .loginPanel,
   .calendarStage {
     animation: none;
   }
