@@ -11,6 +11,12 @@ importers:
       '@eslint/js':
         specifier: ^9.12.0
         version: 9.39.5
+      '@revenuecat/cli':
+        specifier: 0.1.1
+        version: 0.1.1
+      '@supabase/supabase-js':
+        specifier: ^2.45.4
+        version: 2.112.4
       eslint:
         specifier: ^9.12.0
         version: 9.39.5
@@ -26,6 +32,9 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^5.0.0
         version: 5.2.0(eslint@9.39.5)
+      playwright-core:
+        specifier: 1.55.0
+        version: 1.55.0
       prettier:
         specifier: ^3.3.3
         version: 3.9.6
@@ -38,6 +47,9 @@ importers:
       vitest:
         specifier: ^2.1.2
         version: 2.1.9(@types/node@26.4.0)(lightningcss@1.33.0)(terser@5.51.2)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
 
   apps/mobile:
     dependencies:
@@ -1735,6 +1747,41 @@ packages:
 
   '@react-navigation/routers@7.6.4':
     resolution: {integrity: sha512-GI7eJm8/KsZUQaYcXvEExikKurRZRgEsSzyZ7faENfi65yqJBCXjDMwyN1pF6pNW1MoLH1ErDwDivFxY6BzD3w==}
+
+  '@revenuecat/cli-darwin-arm64@0.1.1':
+    resolution: {integrity: sha512-bgeGJ8yCuXIJTNB7arNY8oB8taHrRWYvkJuqjtpJ9oTtiu6TVTUCqv5cqA/CGsfMB3CmGvF3AwZc47nVJbs2pQ==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@revenuecat/cli-darwin-x64@0.1.1':
+    resolution: {integrity: sha512-7ozxwagKCR6X+oqHN98VQYzRcSROmOhiUekfX4bXW8o2c1jawanxHmP/JXozM+PbQiaw+3wewOCS3FUeJjaAbg==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@revenuecat/cli-linux-arm64@0.1.1':
+    resolution: {integrity: sha512-HJxou+reGfmk6rvU3tXszAwkIOUAMaFolrqwg57gnDKKrwrNn8PaYgtyuK/tlSxInTpVg/PK93yohkqlyFBlpQ==}
+    cpu: [arm64]
+    os: [linux]
+
+  '@revenuecat/cli-linux-x64@0.1.1':
+    resolution: {integrity: sha512-B6YPA+ykwoixiw0MCNMv70T7QGl9kgBXdGm8lgliUbR3ChFBwbcWG496s0pjrEg/Z+B8eYefe/lnnSlN5YUNrg==}
+    cpu: [x64]
+    os: [linux]
+
+  '@revenuecat/cli-win32-arm64@0.1.1':
+    resolution: {integrity: sha512-QuVAIG68nZyBuBVuPj1oLUGr0FD3FwNqvqVNZ6tonTRrD1aXVQP00sU0RvXdLfS5KnSsh90gkf4CvydSh48bjw==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@revenuecat/cli-win32-x64@0.1.1':
+    resolution: {integrity: sha512-YOW73/aQlfuyk/xcreIjgPazQKjY1WueJJARd8rgR1XtOWpBCF5ljqmyG0TKDhJrCaUgHT4QlzPxtq2A8kEpcA==}
+    cpu: [x64]
+    os: [win32]
+
+  '@revenuecat/cli@0.1.1':
+    resolution: {integrity: sha512-ECA1FHDspQ8SAcV3ganwX+U73vXBljyFICPKXBrW9CsB0H4rMJdGSqcuwoQ1VPMZvOqWFIUF0rKdPOBEhirUqg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -4015,6 +4062,11 @@ packages:
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
     engines: {node: '>= 6'}
+
+  playwright-core@1.55.0:
+    resolution: {integrity: sha512-GvZs4vU3U5ro2nZpeiwyb0zuFaqb9sUiAJuyrWpcGouD8y9/HLgGbNRjIph7zU9D3hnPaisMl9zG9CgFi/biIg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   plist@3.1.1:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
@@ -6758,6 +6810,33 @@ snapshots:
   '@react-navigation/routers@7.6.4':
     dependencies:
       nanoid: 3.3.18
+
+  '@revenuecat/cli-darwin-arm64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli-darwin-x64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli-linux-arm64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli-linux-x64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli-win32-arm64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli-win32-x64@0.1.1':
+    optional: true
+
+  '@revenuecat/cli@0.1.1':
+    optionalDependencies:
+      '@revenuecat/cli-darwin-arm64': 0.1.1
+      '@revenuecat/cli-darwin-x64': 0.1.1
+      '@revenuecat/cli-linux-arm64': 0.1.1
+      '@revenuecat/cli-linux-x64': 0.1.1
+      '@revenuecat/cli-win32-arm64': 0.1.1
+      '@revenuecat/cli-win32-x64': 0.1.1
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 
@@ -9520,6 +9599,8 @@ snapshots:
   picomatch@4.0.7: {}
 
   pirates@4.0.7: {}
+
+  playwright-core@1.55.0: {}
 
   plist@3.1.1:
     dependencies:

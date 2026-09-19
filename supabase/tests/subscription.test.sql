@@ -5,7 +5,7 @@
 
 begin;
 create extension if not exists pgtap;
-select plan(16);
+select plan(23);
 
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
 values
@@ -37,6 +37,59 @@ select is(
 
 select has_column('public', 'subscriptions', 'last_event_at',
   'subscriptions carries an ordering high-water mark');
+
+select ok(
+  (select relrowsecurity from pg_class
+   where oid = 'public.subscriptions'::regclass),
+  'subscriptions keeps row level security enabled'
+);
+
+select is(
+  (select count(*)::int from pg_policies
+   where schemaname = 'public' and tablename = 'subscriptions'),
+  1,
+  'subscriptions keeps exactly its existing client-read policy'
+);
+
+select ok(
+  exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'subscriptions'
+      and cmd = 'SELECT'
+      and roles = array['authenticated']::name[]
+  ),
+  'the subscription policy remains an authenticated SELECT policy'
+);
+
+select ok(
+  has_table_privilege('service_role', 'public.subscriptions', 'SELECT'),
+  'service_role can read the subscription mirror'
+);
+
+select is(
+  (select cardinality(statements) from supabase_migrations.schema_migrations
+   where version = '20260918000001'),
+  1,
+  'the billing read grant migration contains one statement'
+);
+
+select ok(
+  (select lower(statements[1]) ~
+      'grant[[:space:]]+select[[:space:]]+on[[:space:]]+table[[:space:]]+public\.subscriptions[[:space:]]+to[[:space:]]+service_role'
+    and lower(statements[1]) !~
+      'grant[[:space:]]+.*(insert|update|delete|truncate|references|trigger)'
+    and lower(statements[1]) !~
+      'grant[[:space:]]+.*(anon|authenticated)'
+   from supabase_migrations.schema_migrations
+   where version = '20260918000001'),
+  'the migration grants only SELECT to service_role'
+);
+
+select ok(
+  has_table_privilege('authenticated', 'public.subscriptions', 'SELECT'),
+  'authenticated retains its existing subscription read privilege'
+);
 
 -- ---------------------------------------------------------------------------
 -- Applying events

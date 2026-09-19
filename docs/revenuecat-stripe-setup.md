@@ -1,19 +1,31 @@
 # RevenueCat + Stripe Web Billing Setup
 
-Status: **Sandbox catalog, hosted checkout, webhook, and identified web billing
-integration are configured; provisional legal pages are published. Final legal
-documents and production billing remain intentionally blocked.**
+Status: **Sandbox catalog, hosted checkout, webhook, identified web billing
+integration, and the real monthly sandbox billing chain are verified. Annual
+support is implemented, but the single annual sandbox attempt produced active
+Pro state without exact annual product provenance; read-only catalog
+reconciliation is blocked by current RevenueCat permissions. Provisional legal
+pages are published. Final legal documents and production billing remain
+intentionally blocked.**
 
-Last verified: **2026-09-09**
+Last verified: **2026-09-19**
 
-## Pause checkpoint — 2026-09-09
+## Pause checkpoint — 2026-09-19
 
-Billing work is intentionally paused before the real sandbox purchase test.
-The web app currently has a billing section inside Settings, not a standalone
-purchase page. The RevenueCat sandbox catalog, hosted link, webhook, and
-identified web billing seam are configured, and the webhook TEST event has
-returned 2xx without granting access. No monthly or annual sandbox purchase
-has yet been completed.
+Billing work is intentionally paused after exactly one separately authorized
+annual sandbox purchase attempt. Do not run another purchase.
+The web app has a billing section inside Settings and a dedicated
+subscription/upgrade page. The RevenueCat sandbox catalog, hosted link,
+webhook, and identified web billing seam are configured. The first real monthly sandbox
+purchase ultimately converged through RevenueCat, the webhook, Supabase mirror,
+subscription ledger, and server authorization after read-only reconciliation
+handled browser ambiguity. The purchase was never retried. The annual identity
+passed its free baseline, then the annual attempt produced active Pro evidence,
+but plan-scoped assertions failed with `REVENUECAT_EXPECTED_PLAN_MISSING` for
+both annual and monthly. The observed product is unexpected, and live catalog
+reads currently return `CLI_AUTHORIZATION`; exact annual provenance is therefore
+unresolved. Do not reuse, reset, cancel, delete, refund, or repair either test
+identity.
 
 Cloudflare Pages remains configured for manual deployment with sandbox billing;
 automatic deployments remain disabled. The latest web billing changes and ACL
@@ -25,6 +37,12 @@ This runbook records the current billing decision and the steps needed to take
 BPlan: Business Calendar from the Stripe sandbox to a tested production web
 checkout. It intentionally contains no passwords, API keys, webhook secrets,
 or provider refresh tokens.
+
+The automation implementation roadmap is in
+[`docs/revenuecat-automation-plan.md`](revenuecat-automation-plan.md). This
+runbook remains the provider/dashboard setup reference; the automation plan
+tracks command boundaries, credentials, tests, lifecycle checks, and live-versus
+local evidence.
 
 ## Billing decision
 
@@ -43,18 +61,22 @@ gateway. Apple and Google products are not needed for this web-only path.
 
 ## Accounts and dashboard configuration
 
-These identifiers are safe project references, not secrets.
+These values are documented project references, not secrets. The RevenueCat
+project ID below is historical runbook evidence only and is **UNVERIFIED FOR
+LIVE V2 USE**. Live automation must discover the canonical project ID from the
+provider by exact project name; it must not use this value as a provider
+target.
 
-| Item                          | Current value                                   |
-| ----------------------------- | ----------------------------------------------- |
-| RevenueCat project            | `BPlan: Business Calendar`                      |
-| RevenueCat project ID         | `d455e7e9`                                      |
-| Stripe account                | `BPlan: Business Calendar sandbox`              |
-| Stripe account ID             | `acct_1UDZowDPPGgNSwlS`                         |
-| RevenueCat Billing web config | `BPlan: Business Calendar (RevenueCat Billing)` |
-| Web config ID                 | `app48a77253da`                                 |
-| Default currency              | USD                                             |
-| RevenueCat support email      | `info.bplanai@gmail.com`                        |
+| Item                                                                          | Current value                                   |
+| ----------------------------------------------------------------------------- | ----------------------------------------------- |
+| RevenueCat project                                                            | `BPlan: Business Calendar`                      |
+| Documented RevenueCat runbook project ID (historical; unverified for live v2) | `d455e7e9`                                      |
+| Stripe account                                                                | `BPlan: Business Calendar sandbox`              |
+| Stripe account ID                                                             | `acct_1UDZowDPPGgNSwlS`                         |
+| RevenueCat Billing web config                                                 | `BPlan: Business Calendar (RevenueCat Billing)` |
+| Web config ID                                                                 | `app48a77253da`                                 |
+| Default currency                                                              | USD                                             |
+| RevenueCat support email                                                      | `info.bplanai@gmail.com`                        |
 
 The Stripe sandbox is linked to the RevenueCat project. Production Stripe must
 be configured separately before customer purchases are enabled.
@@ -233,7 +255,7 @@ RevenueCat's purchase-link documentation requires a Terms & Conditions URL and
 allows the default package-selection page to use the products in the selected
 offering.
 
-### 4. Copy and test the purchase URL — pending real sandbox purchase
+### 4. Copy and test the purchase URL — annual provenance unresolved
 
 After the purchase link is saved:
 
@@ -284,10 +306,11 @@ The web app's Settings billing section now reads the safe subscription projectio
 through a user-scoped TanStack Query API/hook, opens an identified hosted sandbox
 checkout link, and offers an explicit access-status refresh after checkout. The
 checkout URL uses the signed-in Supabase auth UUID as the RevenueCat App User ID.
-This is a billing seam for testing, not a standalone purchase page or completed
-customer purchase experience. Checkout is disabled by default and production is
-blocked unless seller-identity and final-document confirmations plus public Terms
-and Privacy URLs are present.
+The dedicated subscription/upgrade page uses the same guarded billing feature
+boundary. This remains a sandbox/testing purchase experience, not a
+production-ready checkout. Checkout is disabled by default and production is
+blocked unless seller-identity and final-document confirmations plus public
+Terms and Privacy URLs are present.
 
 The implementation also:
 
@@ -306,12 +329,19 @@ the database function `has_active_entitlement()`.
 
 ## Sandbox acceptance test
 
+This is a future separately authorized acceptance checklist, not permission to
+repeat the annual attempt documented in the pause checkpoint. No additional
+purchase is authorized while exact RevenueCat annual product provenance is
+unresolved.
+
 Run this test after the purchase link and webhook are deployed:
 
-1. Sign in to the web app with a real test account.
+1. Sign in to the web app with a separately provisioned clean annual test
+   account.
 2. Open the sandbox checkout URL using that account's Supabase UUID.
-3. Purchase the monthly plan with a Stripe test card.
-4. Confirm RevenueCat records the customer and `pro` entitlement.
+3. Purchase the annual plan with the approved Stripe sandbox fixture.
+4. Confirm RevenueCat records the customer and `pro` entitlement for the
+   annual product.
 5. Confirm the RevenueCat webhook returns 2xx.
 6. Confirm one `subscriptions` row exists for the test user's UUID with:
    - `provider = revenuecat`
@@ -321,7 +351,6 @@ Run this test after the purchase link and webhook are deployed:
 8. Cancel the subscription in the Stripe sandbox.
 9. Confirm access remains active until the paid period ends.
 10. Confirm expiration changes the mirrored entitlement to expired.
-11. Repeat the test with the annual plan.
 
 Also verify duplicate webhook delivery does not create duplicate subscription
 rows or change the result incorrectly.
@@ -360,11 +389,11 @@ latest documentation-checkpoint CI result is reported with the final handoff.
 - [x] Hosted Supabase webhook deployed
 - [x] RevenueCat webhook secret stored server-side
 - [x] RevenueCat webhook configured and TEST event returns 2xx
-- [ ] Monthly sandbox purchase verified at $4.99
-- [ ] Annual sandbox purchase verified at $49.99
-- [ ] Entitlement mirror verified for a real Supabase user UUID
+- [x] Monthly sandbox purchase verified through the full authority chain
+- [ ] Annual sandbox purchase verified through the full authority chain
+- [x] Entitlement mirror verified for a real Supabase user UUID
 - [x] Web subscription read/checkout guard wired to the `pro` entitlement
-- [ ] Web Find Time proposal/confirmation UI wired to the `pro` entitlement
+- [x] Web Find Time proposal/confirmation UI wired to the `pro` entitlement
 - [ ] Mobile RevenueCat purchase/restore flow wired to the `pro` entitlement
 - [ ] Cancellation and expiration behavior verified
 - [ ] Production Stripe account connected

@@ -303,11 +303,15 @@ Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI
 - **Tests / Verification:** TBD
 - **Pushed SHA:** `85c96ed`
 - **CI:** Not rechecked for this documentation update
-- **Blockers:** Live AI model evaluation, production model selection, real
-  purchase E2E, production billing/legal completion, and production hardening
-- **Next Action:** Complete the live model-selection and real purchase-E2E gates;
-  keep production checkout disabled until seller identity and final legal
-  documents are confirmed
+- **Blockers:** Live AI model evaluation, production model selection, exact
+  annual RevenueCat product provenance, billing lifecycle verification,
+  production billing/legal completion, and production hardening. The monthly
+  sandbox authority chain is proven live; the single annual attempt remains
+  unresolved and must not be retried.
+- **Next Action:** Reconcile the annual product/catalog evidence with read-only
+  RevenueCat access, then continue the live-model and lifecycle gates. Keep
+  production checkout disabled until seller identity and final legal documents
+  are confirmed.
 
 ---
 

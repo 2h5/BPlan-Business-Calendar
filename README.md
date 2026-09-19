@@ -12,76 +12,138 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ---
 
-## Project checkpoint — 2026-09-09
+## Project checkpoint — 2026-09-19
 
 ```text
 CORE PRODUCT
-├─ Mobile core ..................... COMPLETE
-├─ Web core / Phases 0–6 ........... COMPLETE + HARDENED
-├─ Google Calendar integration ..... IMPLEMENTED / major flows verified
-└─ Microsoft integration ........... IMPLEMENTED / live lifecycle gaps remain
+├─ Mobile core ........................ COMPLETE
+├─ Mobile Find Time UX ................ IN PROGRESS / AWAITING PUSHED CHECKPOINT
+├─ Web core / Phases 0–6 .............. COMPLETE + HARDENED
+├─ Web Find Time UX .................... COMPLETE / PROPOSE + CONFIRM
+├─ Google Calendar integration ........ IMPLEMENTED / MAJOR LIVE FLOWS VERIFIED
+└─ Microsoft integration .............. IMPLEMENTED / LIVE LIFECYCLE GAPS REMAIN
 
-AI / PRO
-├─ Find Time backend ................ COMPLETE + HARDENED
-├─ Find Time web UX ................. IMPLEMENTED / PROPOSE + CONFIRM
-├─ Production model selection ...... PENDING EVALUATION
-├─ RevenueCat backend ............... IMPLEMENTED
-├─ Subscription / upgrade page ..... IMPLEMENTED
-├─ Web sandbox billing seam ........ CONFIGURED
-├─ Development rate-limit overrides . CONFIGURED
-└─ Real purchase E2E ................ PENDING
+AI / SCHEDULING
+├─ Deterministic availability engine .. COMPLETE + HARDENED
+├─ Natural-language intent layer ...... COMPLETE + HARDENED
+├─ Find Time backend ................... COMPLETE + HARDENED
+├─ Proposal persistence/ranking ........ COMPLETE + HARDENED
+├─ Confirmation/revalidation ........... COMPLETE + HARDENED
+├─ Live model evaluation ............... PENDING
+└─ Production model selection .......... PENDING EVALUATION
 
-RELEASE
-├─ Hosted Supabase project .......... CREATED / schema wired
-├─ Production billing ............... INTENTIONALLY DISABLED
-├─ Seller / final legal docs ....... TBD
-└─ Production release hardening .... PENDING
+BILLING / PRO
+├─ RevenueCat webhook + mirror ......... IMPLEMENTED
+├─ Server-side Pro authorization ....... IMPLEMENTED
+├─ Subscription / upgrade page ......... IMPLEMENTED
+├─ Web sandbox checkout ................ CONFIGURED
+├─ Monthly sandbox purchase E2E ........ PROVEN LIVE
+├─ Browser ambiguity reconciliation .... IMPLEMENTED + VERIFIED
+├─ Annual sandbox runner ............... IMPLEMENTED
+├─ Annual live verification ............ BLOCKED / PRODUCT PROVENANCE UNRESOLVED
+├─ Billing lifecycle automation ........ PENDING
+└─ Production billing .................. INTENTIONALLY DISABLED
+
+RELEASE / EXTERNAL
+├─ Hosted Supabase project ............. CREATED / SCHEMA WIRED
+├─ Google live integration ............. MAJOR FLOWS VERIFIED
+├─ Microsoft live lifecycle matrix ..... PENDING
+├─ Seller / final legal docs ........... TBD
+├─ Production Stripe / RevenueCat ...... PENDING
+├─ Live AI E2E ......................... PENDING
+└─ Production release hardening ........ PENDING
 
 CURRENT STATE
-└─ Core web product + Find Time UX are functional; live AI and billing E2E are next.
+├─ Core mobile/web product and Find Time backend/web UX are implemented.
+├─ Monthly web billing is proven end to end.
+└─ Remaining work is concentrated in mobile Find Time finalization, live AI
+   evaluation, annual RevenueCat catalog reconciliation, lifecycle verification,
+   and release hardening.
 ```
-
-The earlier billing implementation checkpoint `673eb12` is green in [GitHub CI run #67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054); this documentation checkpoint is maintained on `main`.
 
 ## Current status
 
-**Sprint 6 — AI Pro / Find Time: Phases 1–4 implemented and hardened (deterministic preparation, provider abstraction, proposal generation, and safe confirmation/revalidation); the web Find Time proposal/confirmation UX, dedicated subscription page, RevenueCat hosted sandbox checkout, webhook, guarded web billing seam, and provisional legal-page scaffolding are in the repository. Server-side development rate-limit overrides are also configured. Live model evaluation, production model selection, and real purchase E2E remain pending; production checkout remains disabled pending the seller identity and final legal documents.** Sprints 0 through 4 are
-complete/implemented. Sprint 5's Microsoft
-implementation is complete in code with external lifecycle/device verification
-still tracked separately. The web client has completed Web Phases 0–6 plus
-hardening; its BPlan rebrand/UI polish and Find Time proposal/confirmation
-experience are implemented. Live AI and billing acceptance work remain
-pending.
+### AI / Find Time
 
-Google live OAuth, calendar import, initial/incremental sync, and
-provider-first create/update/delete were verified in Sprint 4. Microsoft OAuth,
-calendar listing/import, and initial/incremental delta sync have live evidence;
-real provider CRUD, webhook delivery/renewal/teardown, and device/deep-link
-verification remain open in the Sprint 5 tracker.
+The deterministic availability engine remains authoritative. The hardened
+natural-language intent layer interprets the request, and AI may rank and
+explain only valid slots generated by that engine. Proposals, model telemetry,
+and intent telemetry are persisted through server-owned paths. Confirmation
+revalidates current availability, rejects stale or conflicting proposals, and
+is idempotent.
 
-There are two current source-of-truth handoffs: [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
-for mobile/AI work and [`docs/web-active.md`](docs/web-active.md) for the web
-client. The Sprint 3 and Sprint 4 trackers are closed historical records; the
-Sprint 5 tracker retains Microsoft external-verification evidence.
+The web Find Time propose/confirm experience is implemented. Live model
+evaluation and production model selection remain pending. Mobile Find Time is
+being completed on a separate collaborator track and remains **IN PROGRESS /
+AWAITING PUSHED CHECKPOINT** until that track records an actual pushed
+checkpoint; code presence alone is not treated as completion evidence.
 
-| Area                                                                          | State                                                                                                                                                                                    |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Monorepo, TypeScript strict, ESLint, Prettier, CI                             | Implemented; verification is environment-dependent                                                                                                                                       |
-| Design tokens + UI primitives (`@cal/ui`)                                     | Done                                                                                                                                                                                     |
-| Database schema, RLS, pgTAP tests                                             | Done                                                                                                                                                                                     |
-| Auth (email, Apple), session, account deletion                                | Done                                                                                                                                                                                     |
-| Deterministic availability engine (`@cal/domain`)                             | Done, unit-tested                                                                                                                                                                        |
-| Task inbox, editor, completion, snooze, delete                                | Done — Sprint 1                                                                                                                                                                          |
-| Quick Add (task lane)                                                         | Done — Sprint 1                                                                                                                                                                          |
-| Local task reminders + notification actions                                   | Done — Sprint 1                                                                                                                                                                          |
-| Calendar views, event CRUD, recurrence, alerts, calendar colors               | Done — Sprint 2                                                                                                                                                                          |
-| Today dashboard, merged timeline, overdue/unscheduled work, free-time summary | Done — Sprint 3                                                                                                                                                                          |
-| Search across event/task titles, notes, and locations                         | Done — Sprint 3                                                                                                                                                                          |
-| Settings planning preferences                                                 | Done — Sprint 3                                                                                                                                                                          |
-| Google OAuth, calendar import, two-way sync, webhooks, retry                  | Done — Sprint 4; live major flows verified; webhook/device gaps remain                                                                                                                   |
-| Microsoft / Outlook sync                                                      | Done in code — Sprint 5; live verification pending                                                                                                                                       |
-| AI Find Time, RevenueCat                                                      | AI Phases 1–4 hardened; web proposal/confirmation UX and subscription page implemented; hosted sandbox/webhook foundation configured; live model selection and real purchase E2E pending |
-| Web client                                                                    | Web Phases 0–6 + hardening done; BPlan UI polish and Find Time proposal/confirmation UX implemented; production hardening pending                                                        |
+### Calendar integrations
+
+- **Google:** implemented, with live evidence for OAuth, calendar
+  listing/import, initial and incremental sync, and the major provider-first
+  create/update/delete flows.
+- **Microsoft:** implemented in code, with live evidence for OAuth, calendar
+  listing/import, and initial/incremental delta sync. Provider CRUD,
+  Outlook-side changes, Graph subscription/webhook lifecycle,
+  renewal/teardown, reauthentication where applicable, and device/deep-link
+  verification remain pending.
+
+### RevenueCat / Pro
+
+The repository implements the RevenueCat webhook, replay/order-safe
+subscription processing, the user-readable subscription mirror, the
+server-only event ledger, `has_active_entitlement(..., 'pro')`, guarded web
+checkout, the subscription/upgrade UI, sandbox automation, plan-scoped
+read-only assertions, one-shot purchase automation, and authority
+reconciliation for ambiguous browser results.
+
+The monthly sandbox path is **PROVEN LIVE**:
+
+```text
+RevenueCat hosted checkout
+  -> RevenueCat subscription + Pro entitlement
+  -> RevenueCat webhook
+  -> Supabase subscription mirror
+  -> subscription ledger
+  -> server-side Pro authorization
+```
+
+For annual billing, the runner is implemented and exactly one attempt occurred.
+It produced active Pro evidence, but the exact annual-product provenance remains
+unresolved. Both monthly and annual plan-scoped assertions fail because the
+observed active product does not match either expected repository product, and
+catalog inspection is blocked by current RevenueCat read-only permissions. The
+annual result is therefore neither declared successful nor failed, and no
+retry is authorized. Billing lifecycle automation remains pending. Production
+billing remains intentionally disabled.
+
+Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
+for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
+client, and [`docs/revenuecat-automation-plan.md`](docs/revenuecat-automation-plan.md)
+for billing automation. The Sprint 3 and Sprint 4 trackers are closed
+historical records; the Sprint 5 tracker retains Microsoft
+external-verification evidence.
+
+| Area                              | Current state                                    |
+| --------------------------------- | ------------------------------------------------ |
+| Mobile core                       | Complete                                         |
+| Web core                          | Phases 0–6 complete and hardened                 |
+| Tasks/reminders/notifications     | Complete                                         |
+| Calendar CRUD/recurrence          | Complete                                         |
+| Google Calendar                   | Implemented; major live flows verified           |
+| Microsoft Calendar                | Implemented; live lifecycle verification pending |
+| Deterministic scheduling          | Complete and hardened                            |
+| Natural-language scheduling       | Complete and hardened                            |
+| Find Time backend                 | Complete and hardened                            |
+| Find Time web UX                  | Complete; propose + confirm                      |
+| Find Time mobile UX               | In progress; awaiting pushed checkpoint          |
+| RevenueCat backend/webhook/mirror | Implemented                                      |
+| Monthly billing E2E               | Proven live                                      |
+| Annual billing E2E                | Blocked; exact product provenance unresolved     |
+| Live AI evaluation                | Pending                                          |
+| Production billing                | Intentionally disabled                           |
+| Production release hardening      | Pending                                          |
 
 ---
 

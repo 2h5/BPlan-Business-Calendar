@@ -2,8 +2,12 @@
 
 Status: PHASES 1–4 IMPLEMENTED, HARDENED, VERIFIED, AND PUSHED; PHASE 5
 SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
-IMPLEMENTED END TO END (PROPOSE + CONFIRM) — STILL PAUSED BEFORE LIVE MODEL
-EVALUATION AND SANDBOX PURCHASE E2E (2026-09-09)
+IMPLEMENTED END TO END (PROPOSE + CONFIRM). Billing automation Phases 2B2,
+3A, 3B1, and 3B2 are complete, including the proven real monthly sandbox
+purchase chain. Phase 3C annual support is implemented, but live annual
+verification is blocked on exact RevenueCat product/catalog reconciliation;
+production billing remains disabled. Mobile Find Time remains in progress on a
+separate collaborator track and is awaiting a pushed completion checkpoint.
 
 ### Deterministic scheduling adversarial hardening — 2026-09-15
 
@@ -1035,9 +1039,11 @@ earlier recurrence checkpoint `682d1d5f8f91e001d93e11a746fec06ab2596957`)
 # Phase 5 — RevenueCat
 
 Status: **PARTIALLY IMPLEMENTED — server webhook/mirror foundation, guarded web
-billing seam, and sandbox dashboard setup are present; the standalone purchase
-page, real purchase E2E, customer billing-management URL, mobile SDK, and
-purchase/restore remain pending (2026-09-09).**
+billing seam, subscription/upgrade page, sandbox dashboard setup, and the real
+monthly billing automation chain are present; the annual one-shot runner is
+implemented, but exact annual product provenance remains unresolved. The
+customer billing-management URL, mobile SDK, and purchase/restore remain
+pending.**
 
 The server implementation landed in `5e1e01d`; the web billing and provisional
 legal-page scaffolding are tracked in
@@ -1093,20 +1099,74 @@ future work.
 
 ### Current pause boundary
 
-- The web app has a billing section inside Settings; it does not have a
-  standalone purchase page.
-- The web billing code is a sandbox/testing seam, not a finished customer
-  purchase experience. A RevenueCat TEST webhook has returned 2xx, but no real
-  monthly or annual sandbox purchase has been completed.
+- The web app has both the Settings billing section and a dedicated
+  subscription/upgrade page.
+- The guarded web billing code remains a sandbox/testing path, not a
+  production-ready customer purchase experience. The first real monthly
+  sandbox purchase has completed
+  and converged through RevenueCat, webhook, Supabase mirror, subscription
+  ledger, and server authorization after read-only reconciliation of browser
+  ambiguity. The purchase was never retried. One annual sandbox purchase was
+  attempted, produced active Pro state, and remains unresolved because exact
+  annual product provenance did not match the repository contract. No retry is
+  authorized.
 - The only currently scoped Pro capability is Find Time with AI. The broader AI
   feature ideas in the product plan are not launch commitments.
-- The AI backend exists, but no web or mobile client currently invokes the
-  proposal/confirmation endpoints. The live model comparison and production
-  model choice remain pending.
+- The web client invokes the proposal/confirmation endpoints. Mobile Find Time
+  remains in progress on a separate collaborator track and is awaiting a pushed
+  completion checkpoint. The live model comparison and production model choice
+  remain pending.
 - Seller identity and final legal documents remain a production billing gate,
   but they do not block future sandbox or UI implementation.
 
 Record every manual external step explicitly so implementation status and live-verification status remain separate.
+
+### Billing automation Batch 1 / Phase 2A — 2026-09-18
+
+Status: **OFFLINE CLI BOUNDARY COMPLETE; NO LIVE BILLING CHECKS RUN**.
+
+The RevenueCat automation track now has a source-of-truth roadmap in
+[`docs/revenuecat-automation-plan.md`](revenuecat-automation-plan.md) and an
+offline `pnpm billing:preflight` foundation with static sandbox contract,
+redacted configuration loading, deterministic tests, explicit
+`offline`/`live-readonly` mode semantics, a CLI-first provider decision, and an
+injected/fake-runner-only read-only CLI boundary. Phase 2A does not install or
+execute RevenueCat CLI, contact RevenueCat or hosted Supabase, or verify a
+purchase, customer, entitlement mirror, lifecycle, webhook delivery, or
+production billing. The runbook project ID remains unverified for live API v2
+use. The provider setup runbook remains the external setup reference.
+
+### Billing automation Phase 2B1 — 2026-09-18
+
+Status: **READ-ONLY ASSERTION CODE COMPLETE AND OFFLINE-TESTED; NO LIVE USER
+ASSERTION RUN**.
+
+The repository now pins official `@revenuecat/cli@0.1.1` and provides
+`pnpm billing:assert-user -- --user <uuid> [--expect active-pro|free]`. The
+command is sandbox-only, requires explicit `live-readonly` mode and separate
+RevenueCat/Supabase tooling credentials, discovers the provider project rather
+than trusting the historical runbook ID, and compares reduced RevenueCat state
+with the `subscriptions` mirror, server-only `subscription_events` ledger, and
+`has_active_entitlement(user_id, 'pro')`. Automated tests use injected CLI and
+Supabase transports only. Local unauthenticated CLI version/command/schema
+metadata was inspected, but no authenticated RevenueCat command or hosted
+Supabase query ran. This dated checkpoint preceded the completed monthly
+sandbox chain and the later Phase 3C implementation; their current results are
+recorded below. Production remains disabled.
+
+### Billing automation Phases 2B2–3B2 — 2026-09-18
+
+Status: **COMPLETE FOR THE REAL MONTHLY SANDBOX CHAIN; THIS DATED CHECKPOINT
+PRECEDED PHASE 3C**.
+
+Phase 2B2, Phase 3A, Phase 3B1, and Phase 3B2 are complete. The first real
+monthly sandbox purchase ultimately proved the RevenueCat monthly subscription
+and Pro entitlement, webhook delivery, Supabase mirror, subscription ledger,
+and server authorization. The browser reported an ambiguous post-submit state,
+so the existing read-only authority reconciliation resolved the outcome. The
+purchase was not retried. Production remains disabled. The later Phase 3C
+implementation and single unresolved annual attempt are recorded in the current
+handoff below.
 
 ## Exit criteria
 
@@ -1133,7 +1193,7 @@ manual step and has not been run after that checkpoint.
 
 # Phase 6 — Mobile Find Time UX
 
-Status: NOT STARTED
+Status: IN PROGRESS / AWAITING PUSHED CHECKPOINT
 
 Goal: expose the complete feature through the existing feature-first mobile architecture.
 
@@ -1219,7 +1279,8 @@ Keep AI branding/subscription treatment consistent with the design system.
 
 Checkpoint SHA:
 
-`TBD`
+`TBD` — do not declare this phase complete until the separate collaborator
+track records its pushed completion checkpoint.
 
 ---
 
@@ -2372,14 +2433,49 @@ The next implementer must:
 
 # Current Handoff
 
+## Billing pause checkpoint — 2026-09-19
+
+1. **What definitely works:** the sandbox-only billing runner, free-baseline
+   guard, one-shot browser submission, redacted reporting, authority polling,
+   and shared monthly/annual plan-scoped assertion path are implemented and
+   offline-verified. `billing:assert-user` supports exact monthly and annual
+   product checks.
+2. **What is proven live:** the real monthly sandbox path converged through
+   RevenueCat, webhook delivery, Supabase mirror, subscription ledger, and
+   server authorization. The browser ambiguity was resolved read-only and the
+   monthly purchase was never retried.
+3. **What remains unresolved:** exactly one annual sandbox attempt produced
+   active Pro evidence, but both annual and monthly plan-scoped assertions
+   failed with `REVENUECAT_EXPECTED_PLAN_MISSING`. The observed active product
+   is unexpected. Read-only RevenueCat catalog inspection is also blocked by
+   `CLI_AUTHORIZATION`, so the live package/product relationship is not yet
+   proven.
+4. **Why we are stopping:** the annual result cannot be classified as an
+   exact annual purchase until the live catalog and unexpected product
+   evidence are reconciled. No safe evidence supports a code or provider
+   mutation.
+5. **What must not be retried:** do not run another purchase, retry the annual
+   checkout, or reuse/reset/cancel/delete/refund either billing test identity.
+6. **Exact next billing task:** obtain sufficient read-only RevenueCat catalog
+   access, inspect `bplan_web`, `$rc_monthly`, `$rc_annual`, and their product
+   relationships, then determine whether the discrepancy belongs in the
+   assertion code or RevenueCat configuration.
+7. **Later phases:** cancellation, expiration, renewal, replay/order checks,
+   lifecycle automation, manually triggered CI, and final adversarial/documentation
+   closeout remain later work.
+8. **Production/manual blockers:** production billing remains disabled pending
+   seller identity, final legal documents, production Stripe/RevenueCat setup,
+   and explicit human approval. Mobile RevenueCat purchase/restore and live AI
+   model evaluation/model selection remain separate future work.
+
 Current phase:
 
 `Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
-foundation. The web Find Time proposal/confirmation UX and dedicated
-subscription page are implemented. Live model evaluation, production model
-selection, and real sandbox purchase E2E remain pending. The independent web
-track has completed Web Phases 0–6 plus hardening; production web hardening
-remains pending.`
+foundation. Billing automation Phases 2B2, 3A, 3B1, and 3B2 are complete for
+the real monthly sandbox chain. Phase 3C implementation is complete, but its
+annual live acceptance remains blocked on exact RevenueCat product/catalog
+reconciliation. The independent web track has completed Web Phases 0–6 plus
+hardening; production web hardening remains pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2424,18 +2520,20 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current blocker:
 
-`The product Pro scope and AI model choice are not final. Live Luna/Terra
-evaluation still needs an authorized server-side OpenAI key and explicit cost
-authorization. The web Find Time experience and subscription page now exist,
-but real RevenueCat purchase E2E remains pending and production billing stays
+`The annual sandbox attempt produced active Pro evidence backed by an unexpected
+RevenueCat product, while exact plan-scoped assertions fail with
+REVENUECAT_EXPECTED_PLAN_MISSING. Read-only live catalog inspection is blocked
+by CLI_AUTHORIZATION. Live Luna/Terra evaluation still needs an authorized
+server-side OpenAI key and explicit cost authorization. Production billing stays
 disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Do not expand billing or AI scope while paused. When resumed, authorize the
-live model evaluation and select the production model; then run the RevenueCat
-sandbox purchase acceptance test. Preserve deterministic candidate membership
-as the sole availability authority.`
+`Do not run another purchase. Obtain read-only RevenueCat catalog access,
+inspect the live bplan_web package/product relationships, and reconcile the
+unexpected active product against the repository contract before deciding
+whether any code or provider change is warranted. Preserve deterministic
+candidate membership as the sole availability authority.`
 
 Current Sprint 6 verification evidence:
 

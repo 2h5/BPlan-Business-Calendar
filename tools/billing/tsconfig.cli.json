@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "allowImportingTsExtensions": false,
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": []
+  },
+  "include": [
+    "checkout-ready-cli.ts",
+    "checkout-ready-command.ts",
+    "checkout-ready.ts",
+    "checkout-probe-browser.ts",
+    "checkout-probe-cli.ts",
+    "checkout-probe-command.ts",
+    "checkout-probe.ts",
+    "assert-user-cli.ts",
+    "assert-user-command.ts",
+    "assert-user.ts",
+    "assertion-types.ts",
+    "cli.ts",
+    "command.ts",
+    "config.ts",
+    "contract.ts",
+    "node-shims.d.ts",
+    "preflight.ts",
+    "playwright-checkout-probe.ts",
+    "playwright-sandbox-purchase.ts",
+    "report.ts",
+    "revenuecat-assertions.ts",
+    "revenuecat-cli.ts",
+    "supabase-assertions.ts",
+    "sandbox-payment-fixture.ts",
+    "sandbox-purchase-browser.ts",
+    "sandbox-purchase-cli.ts",
+    "sandbox-purchase-command.ts",
+    "sandbox-purchase.ts"
+  ]
+}
