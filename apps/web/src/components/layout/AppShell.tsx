@@ -165,11 +165,20 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const contentAreaRef = useRef<HTMLElement>(null);
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const prevPathRef = useRef<string>(location.pathname);
   const isInitialMount = useRef(true);
   const [metrics, setMetrics] = useState<{ top: number; height: number } | null>(null);
   const [mode, setMode] = useState<'sliding' | 'entering' | 'exiting' | 'hidden'>('hidden');
+
+  useLayoutEffect(() => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    contentArea.scrollTop = 0;
+    contentArea.scrollLeft = 0;
+  }, [location.pathname]);
 
   useLayoutEffect(() => {
     const prevPath = prevPathRef.current;
@@ -367,6 +376,7 @@ export function AppShell() {
       {/* Main Content Area */}
       <div className={styles.mainContent}>
         <main
+          ref={contentAreaRef}
           className={
             location.pathname === '/tasks' || location.pathname === '/calendar'
               ? styles.contentAreaFull

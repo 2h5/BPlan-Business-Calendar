@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import styles from './SubscriptionView.module.css';
 import { env } from '../../../lib/env';
@@ -122,76 +121,12 @@ export function SubscriptionView() {
     <div className={styles.container}>
       {/* Page Header */}
       <header className={styles.header}>
-        <Link to="/settings" className={styles.backLink}>
-          <ArrowLeftIcon />
-          <span>Back to Settings</span>
-        </Link>
-        <h1 className={styles.title}>Plans &amp; Subscription</h1>
+        <span className={styles.eyebrow}>Plans &amp; billing</span>
+        <h1 className={styles.title}>Compare plans</h1>
         <p className={styles.subtitle}>
-          Choose the plan that fits your workflow. Upgrade to BPlan Pro to unlock intelligent
-          AI-assisted meeting scheduling and eliminate calendar coordination friction.
+          Compare Free and Pro to find the right fit for your workflow.
         </p>
       </header>
-
-      {/* Live User Subscription Status Banner */}
-      <section className={styles.statusBanner} aria-label="Current subscription status">
-        <div className={styles.statusMain}>
-          <span
-            className={`${styles.statusIndicator} ${
-              statusInfo.badgeVariant === 'success'
-                ? styles.statusIndicatorSuccess
-                : statusInfo.badgeVariant === 'warning'
-                  ? styles.statusIndicatorWarning
-                  : statusInfo.badgeVariant === 'danger'
-                    ? styles.statusIndicatorDanger
-                    : styles.statusIndicatorNeutral
-            }`}
-            aria-hidden="true"
-          />
-          <div className={styles.statusText}>
-            <div className={styles.statusTitleRow}>
-              <span className={styles.statusTitle}>{statusInfo.label}</span>
-              <span
-                className={`${styles.statusBadge} ${
-                  statusInfo.badgeVariant === 'success'
-                    ? styles.badgeSuccess
-                    : statusInfo.badgeVariant === 'warning'
-                      ? styles.badgeWarning
-                      : statusInfo.badgeVariant === 'danger'
-                        ? styles.badgeDanger
-                        : styles.badgeNeutral
-                }`}
-              >
-                {statusInfo.state.toUpperCase()}
-              </span>
-            </div>
-            <span className={styles.statusDescription}>{statusInfo.description}</span>
-          </div>
-        </div>
-
-        <div className={styles.statusActions}>
-          {env.revenueCatBillingManagementUrl && isProActive && (
-            <a
-              href={env.revenueCatBillingManagementUrl}
-              target="_blank"
-              rel="noreferrer"
-              referrerPolicy="no-referrer"
-              className={styles.manageLink}
-            >
-              Manage billing
-            </a>
-          )}
-          <button
-            type="button"
-            className={styles.refreshButton}
-            onClick={() => void subscription.refetch()}
-            disabled={subscription.isFetching}
-          >
-            <RefreshIcon />
-            <span>{subscription.isFetching ? 'Refreshing…' : 'Refresh access status'}</span>
-          </button>
-        </div>
-      </section>
 
       {/* Billing Interval Switcher */}
       <div className={styles.intervalPicker} role="radiogroup" aria-label="Billing frequency">
@@ -457,25 +392,6 @@ function availabilityMessage(availability: CheckoutAvailability): string {
   }
 }
 
-function ArrowLeftIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="19" y1="12" x2="5" y2="12" />
-      <polyline points="12 19 5 12 12 5" />
-    </svg>
-  );
-}
-
 function CheckIcon() {
   return (
     <svg
@@ -497,26 +413,6 @@ function StarIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2l2.85 7.15L22 12l-7.15 2.85L12 22l-2.85-7.15L2 12l7.15-2.85L12 2z" />
-    </svg>
-  );
-}
-
-function RefreshIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="23 4 23 10 17 10" />
-      <polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
   );
 }
