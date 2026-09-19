@@ -422,12 +422,12 @@
   overflow: hidden;
 }
 .themePreviewSystem {
-  background: linear-gradient(135deg, #101319 50%, #f4f6f8 50%);
+  background: linear-gradient(135deg, #101319 50%, #f3f7fc 50%);
   color: #f3f5f8;
 }
 .themePreviewLight {
-  background: #f4f6f8;
-  color: #171b23;
+  background: #f3f7fc;
+  color: #0b1433;
 }
 .themePreviewDark {
   background: #101319;

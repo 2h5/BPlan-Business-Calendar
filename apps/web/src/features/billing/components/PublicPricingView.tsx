@@ -117,7 +117,9 @@ export function PublicPricingView() {
             <h2>{FREE_PLAN.name}</h2>
             <p className={styles.tagline}>{FREE_PLAN.tagline}</p>
             <p className={styles.price}>
-              <span className={styles.currency}>$</span>0 <small>/ forever</small>
+              <span className={styles.currency}>$</span>
+              <span className={styles.priceAmount}>0</span>
+              <small>/ forever</small>
             </p>
           </div>
           <ul className={styles.features}>
@@ -139,7 +141,9 @@ export function PublicPricingView() {
             <p className={styles.tagline}>{PRO_PLAN.tagline}</p>
             <p className={styles.price} aria-live="polite">
               <span className={styles.currency}>$</span>
-              <RollingPrice value={displayedPrice.toFixed(2)} numericValue={displayedPrice} />{' '}
+              <span className={styles.priceAmount}>
+                <RollingPrice value={displayedPrice.toFixed(2)} numericValue={displayedPrice} />
+              </span>
               <small key={interval} className={styles.priceInterval}>
                 / {interval === 'annual' ? 'year' : 'month'}
               </small>

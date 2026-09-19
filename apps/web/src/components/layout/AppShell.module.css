@@ -3,7 +3,7 @@
   height: 100dvh;
   min-height: 100dvh;
   overflow: hidden;
-  background: var(--color-bg-app);
+  background: var(--background-app-canvas);
 }
 
 .sidebar {

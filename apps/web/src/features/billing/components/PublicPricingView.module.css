@@ -166,22 +166,33 @@
 
 .price {
   margin-top: 1rem;
-  color: #07102f;
-  font-size: 2.4rem;
-  font-weight: 760;
-  letter-spacing: -0.045em;
-  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
 }
 
 .currency {
-  margin-right: 0.08em;
-  font-size: 0.72em;
-  vertical-align: 0.12em;
+  color: #07102f;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.priceAmount {
+  display: inline-flex;
+  align-items: baseline;
+  color: #07102f;
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
 .price small {
   color: #73809c;
-  font-size: 0.42em;
+  margin-left: var(--space-2);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   letter-spacing: 0;
 }
