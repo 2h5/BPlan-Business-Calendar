@@ -119,55 +119,74 @@ export function SubscriptionView() {
 
   return (
     <div className={styles.container}>
-      {/* Page Header */}
-      <header className={styles.header}>
-        <span className={styles.eyebrow}>Plans &amp; billing</span>
-        <h1 className={styles.title}>Compare plans</h1>
-        <p className={styles.subtitle}>
-          Compare Free and Pro to find the right fit for your workflow.
-        </p>
-      </header>
+      <section className={styles.heroBanner} aria-labelledby="plans-heading">
+        <header className={styles.header}>
+          <span className={styles.eyebrow}>Plan today. A brighter tomorrow.</span>
+          <h1 id="plans-heading" className={styles.title}>
+            Choose a plan that keeps you <span>on schedule.</span>
+          </h1>
+          <p className={styles.subtitle}>
+            Start with the essentials, then unlock smarter scheduling when your workflow is ready.
+          </p>
+          <ul className={styles.heroProof} aria-label="Every plan includes">
+            <li>
+              <CheckIcon /> Calendar planning
+            </li>
+            <li>
+              <CheckIcon /> Task organization
+            </li>
+            <li>
+              <CheckIcon /> Secure access
+            </li>
+          </ul>
+        </header>
 
-      {/* Billing Interval Switcher */}
-      <div className={styles.intervalPicker} role="radiogroup" aria-label="Billing frequency">
-        <div className={styles.toggleContainer} data-ready={bubbleStyle !== null}>
-          {bubbleStyle && (
-            <span
-              className={styles.toggleBubble}
-              style={{
-                transform: `translateX(${bubbleStyle.left}px)`,
-                width: `${bubbleStyle.width}px`,
-              }}
-              aria-hidden="true"
-            />
-          )}
-          <button
-            ref={monthlyBtnRef}
-            type="button"
-            role="radio"
-            aria-checked={interval === 'monthly'}
-            className={`${styles.toggleOption} ${
-              interval === 'monthly' ? styles.toggleOptionActive : ''
-            }`}
-            onClick={() => setInterval('monthly')}
-          >
-            Monthly billing
-          </button>
-          <button
-            ref={annualBtnRef}
-            type="button"
-            role="radio"
-            aria-checked={interval === 'annual'}
-            className={`${styles.toggleOption} ${
-              interval === 'annual' ? styles.toggleOptionActive : ''
-            }`}
-            onClick={() => setInterval('annual')}
-          >
-            <span>Annual billing</span>
-            <span className={styles.savingsPill}>Save {savings.savingsPercentage}%</span>
-          </button>
+        <div className={styles.heroControlCard}>
+          <span className={styles.heroControlEyebrow}>Simple billing</span>
+          <h2>Choose your rhythm</h2>
+          <p>See Pro pricing monthly or annually. Your current access stays visible below.</p>
+
+          <div className={styles.intervalPicker} role="radiogroup" aria-label="Billing frequency">
+            <div className={styles.toggleContainer} data-ready={bubbleStyle !== null}>
+              {bubbleStyle && (
+                <span
+                  className={styles.toggleBubble}
+                  style={{
+                    transform: `translateX(${bubbleStyle.left}px)`,
+                    width: `${bubbleStyle.width}px`,
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              <button
+                ref={monthlyBtnRef}
+                type="button"
+                role="radio"
+                aria-checked={interval === 'monthly'}
+                className={`${styles.toggleOption} ${
+                  interval === 'monthly' ? styles.toggleOptionActive : ''
+                }`}
+                onClick={() => setInterval('monthly')}
+              >
+                Monthly
+              </button>
+              <button
+                ref={annualBtnRef}
+                type="button"
+                role="radio"
+                aria-checked={interval === 'annual'}
+                className={`${styles.toggleOption} ${
+                  interval === 'annual' ? styles.toggleOptionActive : ''
+                }`}
+                onClick={() => setInterval('annual')}
+              >
+                <span>Annual</span>
+                <span className={styles.savingsPill}>Save {savings.savingsPercentage}%</span>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Comparison Cards Grid */}
       <div className={styles.cardsGrid}>

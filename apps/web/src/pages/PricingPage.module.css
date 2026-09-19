@@ -1,0 +1,95 @@
+.page {
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 31%, rgba(194, 220, 255, 0.34), transparent 30%),
+    radial-gradient(circle at 12% 64%, rgba(219, 235, 255, 0.5), transparent 28%),
+    radial-gradient(circle at 91% 22%, rgba(218, 235, 255, 0.52), transparent 30%),
+    linear-gradient(135deg, #fbfdff 0%, #f7faff 52%, #fcfeff 100%);
+  color: #0b1433;
+  isolation: isolate;
+}
+
+.page::before {
+  position: absolute;
+  z-index: 0;
+  width: 760px;
+  height: 760px;
+  top: 210px;
+  left: 50%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(177, 211, 255, 0.2), transparent 68%);
+  content: '';
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.leftShapes,
+.rightShapes,
+.leftShapes::before,
+.leftShapes::after,
+.rightShapes::before,
+.rightShapes::after {
+  position: absolute;
+  z-index: 0;
+  border: 1px solid rgba(126, 176, 244, 0.16);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(160, 199, 250, 0.2), rgba(236, 245, 255, 0.05));
+  content: '';
+  pointer-events: none;
+}
+
+.leftShapes {
+  width: 150px;
+  height: 420px;
+  top: 180px;
+  left: -78px;
+  transform: rotate(43deg);
+}
+
+.leftShapes::before {
+  width: 120px;
+  height: 330px;
+  top: 210px;
+  left: 130px;
+}
+
+.leftShapes::after {
+  width: 70px;
+  height: 230px;
+  top: 590px;
+  left: 72px;
+  opacity: 0.62;
+}
+
+.rightShapes {
+  width: 160px;
+  height: 460px;
+  top: 280px;
+  right: -96px;
+  transform: rotate(43deg);
+}
+
+.rightShapes::before {
+  width: 104px;
+  height: 310px;
+  right: 120px;
+  bottom: -220px;
+  opacity: 0.6;
+}
+
+.rightShapes::after {
+  width: 88px;
+  height: 270px;
+  right: -10px;
+  bottom: -530px;
+  opacity: 0.42;
+}
+
+@media (max-width: 760px) {
+  .leftShapes,
+  .rightShapes {
+    opacity: 0.45;
+  }
+}
