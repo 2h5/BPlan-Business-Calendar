@@ -7,10 +7,25 @@ export interface LiquidGlassCloseButtonProps {
   onPress: () => void;
 }
 
+function canUseGlassEffect(): boolean {
+  if (Platform.OS !== 'ios') {
+    return false;
+  }
+
+  try {
+    return isGlassEffectAPIAvailable();
+  } catch {
+    // Expo Go and development builds created before expo-glass-effect was
+    // installed do not include ExpoGlassEffect. Keep the paywall dismissible
+    // until the native app is rebuilt with the module linked.
+    return false;
+  }
+}
+
 /** Native iOS 26 liquid glass with a surfaced fallback for older systems. */
 export function LiquidGlassCloseButton({ onPress }: LiquidGlassCloseButtonProps) {
   const theme = useTheme();
-  const supportsGlass = Platform.OS === 'ios' && isGlassEffectAPIAvailable();
+  const supportsGlass = canUseGlassEffect();
 
   return (
     <Pressable
