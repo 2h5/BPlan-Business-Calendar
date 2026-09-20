@@ -32,7 +32,7 @@ export function resolveThemeMode(
 }
 
 export const THEME_MODE_LABEL: Record<ThemeMode, string> = {
-  auto: 'System default',
+  auto: 'System',
   light: 'Light mode',
   dark: 'Dark mode',
 };

@@ -1,6 +1,6 @@
 import type { Calendar } from '@cal/schemas';
 import { Card, Checkbox, Divider, ListRow, Text, useTheme } from '@cal/ui';
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { CalendarEditorSheet } from './CalendarEditorSheet';
@@ -33,6 +33,10 @@ export function CalendarsCard() {
 
   /** The calendar being edited, or 'new' while creating one. */
   const [editing, setEditing] = useState<Calendar | 'new' | null>(null);
+  const retainedEditing = useRef<Calendar | 'new' | null>(editing);
+
+  if (editing) retainedEditing.current = editing;
+  const activeEditing = editing ?? retainedEditing.current;
 
   const confirmDelete = (calendar: Calendar) =>
     Alert.alert(
@@ -91,17 +95,15 @@ export function CalendarsCard() {
         </Text>
       </View>
 
-      {/* Mounted only while in use. The sheet's create hook demands a signed-in
-          user as it renders, and on a cold start this screen can render before
-          the session has been restored — which would throw before anyone has
-          touched anything. */}
-      {editing !== null ? (
+      {/* Mount after first use, then retain the editor so its close animation
+          can finish before the screen eventually unmounts it. */}
+      {activeEditing !== null ? (
         <CalendarEditorSheet
-          visible
-          calendar={editing === 'new' ? null : editing}
+          visible={editing !== null}
+          calendar={activeEditing === 'new' ? null : activeEditing}
           onClose={() => setEditing(null)}
           // The default calendar has to stay: new events need somewhere to land.
-          onDelete={editing !== 'new' && !editing.isDefault ? confirmDelete : undefined}
+          onDelete={activeEditing !== 'new' && !activeEditing.isDefault ? confirmDelete : undefined}
         />
       ) : null}
     </>
