@@ -79,11 +79,44 @@ export function TaskListPane({
   const renderSection = (title: string, tasks: TaskWithTags[], isOverdue = false) => {
     if (tasks.length === 0) return null;
 
+    const sectionTone = isOverdue
+      ? styles.sectionOverdue
+      : title === 'Due Today'
+        ? styles.sectionToday
+        : title === 'No Due Date'
+          ? styles.sectionSomeday
+          : title.startsWith('Completed')
+            ? styles.sectionCompleted
+            : styles.sectionUpcoming;
+
+    const sectionIcon = isOverdue ? (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    ) : title === 'Due Today' ? (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="16" rx="2" />
+        <path d="M16 3v4M8 3v4M3 10h18" />
+      </svg>
+    ) : title.startsWith('Completed') ? (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="m8 12 2.5 2.5L16 9" />
+      </svg>
+    ) : (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 3h9l4 4v14H6z" />
+        <path d="M14 3v5h5" />
+      </svg>
+    );
+
     return (
-      <div className={styles.section} key={title}>
+      <section className={`${styles.section} ${sectionTone}`} key={title}>
         <div className={styles.sectionHeader}>
-          <span className={`${styles.sectionTitle} ${isOverdue ? styles.sectionTitleOverdue : ''}`}>
-            {title}
+          <span className={styles.sectionTitle}>
+            <span className={styles.sectionIcon}>{sectionIcon}</span>
+            <span>{title}</span>
           </span>
           <span className={styles.sectionCount}>{tasks.length}</span>
         </div>
@@ -103,7 +136,7 @@ export function TaskListPane({
             />
           ))}
         </div>
-      </div>
+      </section>
     );
   };
 
@@ -142,24 +175,7 @@ export function TaskListPane({
         );
       }
 
-      return (
-        <div className={styles.sectionItems}>
-          {buckets.allCompleted.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              isSelected={task.id === selectedTaskId}
-              lists={lists}
-              now={now}
-              timeZone={timeZone}
-              onSelect={onSelectTask}
-              onToggleComplete={onToggleComplete}
-              onSnooze={onSnooze}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      );
+      return renderSection('Completed', buckets.allCompleted);
     }
 
     if (activeTab === 'all') {
@@ -255,35 +271,10 @@ export function TaskListPane({
       }}
     >
       <div className={styles.header}>
-        <div className={styles.toolbar}>
-          <div className={styles.filterTabs}>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'inbox' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('inbox')}
-              aria-pressed={activeTab === 'inbox'}
-            >
-              <span>Inbox</span>
-              <span className={styles.tabCount}>{openCount}</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'all' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('all')}
-              aria-pressed={activeTab === 'all'}
-            >
-              <span>All</span>
-              <span className={styles.tabCount}>{allTasks.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('completed')}
-              aria-pressed={activeTab === 'completed'}
-            >
-              <span>Done</span>
-              <span className={styles.tabCount}>{completedCount}</span>
-            </button>
+        <div className={styles.titleRow}>
+          <div>
+            <h1 className={styles.pageTitle}>Tasks</h1>
+            <p className={styles.pageSubtitle}>Stay organized and get more done.</p>
           </div>
 
           <div className={styles.headerActions}>
@@ -317,7 +308,39 @@ export function TaskListPane({
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              <span>New</span>
+              <span>New task</span>
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.toolbar}>
+          <div className={styles.filterTabs}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${activeTab === 'inbox' ? styles.tabBtnActive : ''}`}
+              onClick={() => onTabChange('inbox')}
+              aria-pressed={activeTab === 'inbox'}
+            >
+              <span>Inbox</span>
+              <span className={styles.tabCount}>{openCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${activeTab === 'all' ? styles.tabBtnActive : ''}`}
+              onClick={() => onTabChange('all')}
+              aria-pressed={activeTab === 'all'}
+            >
+              <span>All</span>
+              <span className={styles.tabCount}>{allTasks.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
+              onClick={() => onTabChange('completed')}
+              aria-pressed={activeTab === 'completed'}
+            >
+              <span>Done</span>
+              <span className={styles.tabCount}>{completedCount}</span>
             </button>
           </div>
         </div>
@@ -361,7 +384,20 @@ export function TaskListPane({
         )}
       </div>
 
-      <div className={styles.listScroll}>{renderContent()}</div>
+      <div className={styles.listScroll}>
+        {renderContent()}
+        {!isLoading && !isError && activeTab === 'inbox' && openCount > 0 && (
+          <div className={styles.caughtUpFooter}>
+            <span className={styles.caughtUpIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="m7 12 3 3 7-7" />
+              </svg>
+            </span>
+            <strong>All caught up?</strong>
+            <span>Add a new task, or tackle what&apos;s on your list.</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

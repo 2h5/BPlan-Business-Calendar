@@ -1,7 +1,7 @@
 .row {
   position: relative;
   min-height: 58px;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  padding: 10px var(--space-4);
   border-bottom: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
@@ -137,6 +137,10 @@
   background: var(--color-selected);
 }
 
+.row:focus-within {
+  z-index: 2;
+}
+
 .rowCompleted {
   opacity: 0.7;
 }
@@ -147,12 +151,12 @@
 }
 
 .checkboxBtn {
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   flex: 0 0 auto;
   border: 1.5px solid var(--color-border-strong);
-  border-radius: var(--radius-full);
+  border-radius: 5px;
   display: grid;
   place-items: center;
   color: var(--color-on-accent);
@@ -292,6 +296,7 @@
 }
 
 .actions {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -325,6 +330,40 @@
 
 .actionBtnDanger:hover {
   background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+.actionsMenu {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 176px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-surface-raised);
+  box-shadow: var(--shadow-md);
+}
+
+.actionsMenu button {
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.actionsMenu button:hover,
+.actionsMenu button:focus-visible {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.actionsMenu .dangerMenuItem {
   color: var(--color-danger);
 }
 
