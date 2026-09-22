@@ -48,7 +48,10 @@ const subscriptionSchema = z.object({
   environment: identifierSchema,
   status: identifierSchema,
   gives_access: z.boolean(),
+  current_period_starts_at: epochMillisSchema.optional(),
   current_period_ends_at: nullableEpochMillisSchema,
+  ends_at: nullableEpochMillisSchema.optional(),
+  auto_renewal_status: identifierSchema.optional(),
   entitlements: entitlementListSchema,
 });
 
@@ -107,7 +110,10 @@ export interface RevenueCatSubscriptionEvidence {
   readonly environment: 'sandbox';
   readonly status: string;
   readonly givesAccess: boolean;
+  readonly currentPeriodStartsAt: number | null;
   readonly currentPeriodEndsAt: number | null;
+  readonly endsAt: number | null;
+  readonly autoRenewalStatus: string | null;
   readonly grantsPro: boolean;
 }
 
@@ -311,7 +317,10 @@ async function followSubscriptions(
       environment: 'sandbox',
       status: subscription.status,
       givesAccess: subscription.gives_access,
+      currentPeriodStartsAt: subscription.current_period_starts_at ?? null,
       currentPeriodEndsAt: subscription.current_period_ends_at,
+      endsAt: subscription.ends_at ?? null,
+      autoRenewalStatus: subscription.auto_renewal_status ?? null,
       grantsPro: grantsEntitlement(subscription.entitlements, proEntitlementId),
     });
   }

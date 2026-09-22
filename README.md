@@ -41,7 +41,7 @@ BILLING / PRO
 ├─ Browser ambiguity reconciliation .... IMPLEMENTED + VERIFIED
 ├─ Annual sandbox runner ............... IMPLEMENTED
 ├─ Annual live verification ............ PROVEN LIVE / PHASE 3C COMPLETE
-├─ Billing lifecycle automation ........ PENDING
+├─ Billing lifecycle verification ....... PHASE 4 COMPLETE
 └─ Production billing .................. INTENTIONALLY DISABLED
 
 RELEASE / EXTERNAL
@@ -57,7 +57,7 @@ CURRENT STATE
 ├─ Core mobile/web product and Find Time backend/web UX are implemented.
 ├─ Monthly and annual web sandbox billing are proven end to end.
 └─ Remaining work is concentrated in mobile Find Time finalization, live AI
-   evaluation, billing lifecycle verification,
+   evaluation, billing Phase 5 manual CI integration,
    and release hardening.
 ```
 
@@ -116,8 +116,12 @@ accelerated sandbox time. On 2026-09-22 a fresh free test identity made one
 annual purchase attempt. Browser submission was ambiguous, but read-only
 reconciliation and a separate corrected annual plan assertion passed RevenueCat
 Pro, the Supabase mirror and ledger, and server authorization. No retry occurred.
-Billing lifecycle automation remains pending. Production billing remains
-intentionally disabled.
+Billing Phase 4 is complete: live cancellation retained access through the
+paid period, expiration revoked Pro, and a fresh annual sandbox subscription
+renewed naturally into an extended active period across RevenueCat, the
+Supabase mirror and ledger, and server authorization. Replay and ordering
+behavior passed deterministic webhook and database tests. Phase 5 manual CI
+integration is next. Production billing remains intentionally disabled.
 
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
@@ -142,6 +146,7 @@ external-verification evidence.
 | RevenueCat backend/webhook/mirror | Implemented                                      |
 | Monthly billing E2E               | Proven live                                      |
 | Annual billing E2E                | Proven live; Phase 3C complete                   |
+| Billing lifecycle                 | Phase 4 complete; live renewal and expiry proven |
 | Live AI evaluation                | Pending                                          |
 | Production billing                | Intentionally disabled                           |
 | Production release hardening      | Pending                                          |

@@ -559,6 +559,47 @@ export function createRealRevenueCatCliRunner(
 
 const realRevenueCatCliRunner = createRealRevenueCatCliRunner();
 
+/** One explicit sandbox cancellation. Keep mutation outside the read-only operation union. */
+export async function cancelRevenueCatSandboxSubscriptionOnce(
+  projectId: RevenueCatProjectId,
+  subscriptionId: string,
+  options: RevenueCatCliRunOptions,
+): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: RevenueCatCliErrorInfo }> {
+  const project = validateIdentifier(projectId, 'projectId');
+  const subscription = validateIdentifier(subscriptionId, 'subscriptionId');
+  if (!project.ok) return project;
+  if (!subscription.ok) return subscription;
+  if (!options.apiKey?.trim())
+    return errorResult('CLI_API_KEY_MISSING', 'A RevenueCat API key is required.');
+  let result: RevenueCatCliProcessResult;
+  try {
+    result = await (options.runner ?? realRevenueCatCliRunner)({
+      argv: [
+        'subscriptions',
+        'cancel',
+        subscription.data,
+        '--yes',
+        ...MACHINE_FLAGS,
+        '--project-id',
+        project.data,
+      ],
+      env: buildRevenueCatChildEnvironment(options.apiKey, options.parentEnvironment),
+    });
+  } catch {
+    return errorResult('CLI_PROCESS_ERROR', 'RevenueCat CLI process failed.');
+  }
+  if (result.failure === 'timeout')
+    return errorResult('CLI_TIMEOUT', 'RevenueCat cancellation outcome is ambiguous.');
+  if (result.failure === 'output-limit')
+    return errorResult('CLI_OUTPUT_LIMIT', 'RevenueCat cancellation outcome is ambiguous.');
+  if (result.failure)
+    return errorResult('CLI_PROCESS_ERROR', 'RevenueCat cancellation outcome is ambiguous.');
+  if (result.exitCode === null)
+    return errorResult('CLI_UNEXPECTED_EXIT', 'RevenueCat cancellation outcome is ambiguous.');
+  if (result.exitCode !== 0) return { ok: false, error: mapExitCode(result.exitCode) };
+  return { ok: true };
+}
+
 function parseJsonOutput(
   operation: RevenueCatCliOperationKind,
   stdout: string,

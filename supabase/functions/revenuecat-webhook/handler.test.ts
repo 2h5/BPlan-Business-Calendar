@@ -164,6 +164,58 @@ Deno.test('a stale event is acknowledged but changes nothing', async () => {
   assertEquals(mirror.ledger[0]?.skippedReason, 'STALE_EVENT');
 });
 
+Deno.test(
+  'lifecycle delivery keeps paid time, deduplicates, and rejects stale expiration',
+  async () => {
+    let latest: ApplyEntitlementInput | undefined;
+    const ledger = new Map<string, LedgerEntry>();
+    const mirror: RevenueCatMirror = {
+      applyEntitlement(input) {
+        if (latest && input.eventAt <= latest.eventAt) return Promise.resolve(false);
+        latest = input;
+        return Promise.resolve(true);
+      },
+      recordEvent(entry) {
+        if (!ledger.has(entry.eventId)) ledger.set(entry.eventId, entry);
+        return Promise.resolve();
+      },
+    };
+    const deliver = async (id: string, type: string, minute: number, expiryMinute: number) => {
+      const response = await handleRevenueCatWebhook(
+        post(
+          event({
+            id,
+            type,
+            event_timestamp_ms: 1_760_000_000_000 + minute * 60_000,
+            expiration_at_ms: 1_760_000_000_000 + expiryMinute * 60_000,
+          }),
+        ),
+        { mirror, readSecret: () => SECRET },
+      );
+      return await response.json();
+    };
+    const authorizedAt = (minute: number) =>
+      latest?.status === 'active' &&
+      Date.parse(latest.expiresAt ?? '') > 1_760_000_000_000 + minute * 60_000;
+
+    assertEquals(await deliver('initial', 'INITIAL_PURCHASE', 0, 60), { result: 'APPLIED' });
+    assertEquals(authorizedAt(10), true);
+    assertEquals(await deliver('cancel', 'CANCELLATION', 20, 60), { result: 'APPLIED' });
+    assertEquals(authorizedAt(30), true);
+    assertEquals(await deliver('renew', 'RENEWAL', 60, 120), { result: 'APPLIED' });
+    assertEquals(authorizedAt(90), true);
+    assertEquals(await deliver('renew', 'RENEWAL', 60, 120), { result: 'STALE' });
+    assertEquals(ledger.size, 3);
+    assertEquals(ledger.get('renew')?.applied, true);
+    assertEquals(await deliver('old-expiry', 'EXPIRATION', 40, 60), { result: 'STALE' });
+    assertEquals(authorizedAt(90), true);
+    assertEquals(ledger.get('old-expiry')?.skippedReason, 'STALE_EVENT');
+    assertEquals(await deliver('expiry', 'EXPIRATION', 120, 120), { result: 'APPLIED' });
+    assertEquals(authorizedAt(121), false);
+    assertEquals(ledger.size, 5);
+  },
+);
+
 Deno.test('ignores an anonymous app_user_id without writing the mirror', async () => {
   const mirror = recorder();
   const response = await handleRevenueCatWebhook(

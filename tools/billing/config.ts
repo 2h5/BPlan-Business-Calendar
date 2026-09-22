@@ -6,7 +6,7 @@ import {
 } from './contract';
 
 export type BillingAutomationMode =
-  'offline' | 'live-readonly' | 'sandbox-checkout-probe' | 'sandbox-purchase';
+  'offline' | 'live-readonly' | 'sandbox-checkout-probe' | 'sandbox-purchase' | 'sandbox-cancel';
 export type BillingTargetEnvironment = 'sandbox' | 'production';
 
 export type EnvironmentRecord = Readonly<Record<string, string | undefined>>;
@@ -38,6 +38,7 @@ const MODES: readonly BillingAutomationMode[] = [
   'live-readonly',
   'sandbox-checkout-probe',
   'sandbox-purchase',
+  'sandbox-cancel',
 ];
 const TARGET_ENVIRONMENTS: readonly BillingTargetEnvironment[] = ['sandbox', 'production'];
 
@@ -64,7 +65,7 @@ export function loadBillingEnvironment(raw: EnvironmentRecord): BillingEnvironme
   const supabaseServiceRoleKey = optionalValue(raw.BILLING_SUPABASE_SERVICE_ROLE_KEY);
   const testUserId = optionalValue(raw.BILLING_TEST_USER_ID);
 
-  if (mode === 'live-readonly' || mode === 'sandbox-purchase') {
+  if (mode === 'live-readonly' || mode === 'sandbox-purchase' || mode === 'sandbox-cancel') {
     for (const variable of LIVE_READ_ONLY_REQUIRED_ENVIRONMENT_VARIABLES) {
       if (!optionalValue(raw[variable])) {
         issues.push({

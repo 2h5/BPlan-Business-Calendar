@@ -6,6 +6,12 @@ Phase 3C annual verification passed on 2026-09-22 through the corrected
 RevenueCat Product identity assertion. Provisional legal pages are published.
 Final legal documents and production billing remain intentionally blocked.**
 
+Billing automation Phase 4 is complete: cancellation retained access until
+expiry, expiration revoked Pro, and a separate fresh annual subscription
+renewed naturally with provider, mirror, ledger, and server authority aligned.
+Replay/order behavior passed deterministic webhook and database checks. Phase 5
+manual CI integration is next; production billing remains disabled.
+
 Last verified: **2026-09-22**
 
 ## Annual Phase 3C checkpoint — 2026-09-22
@@ -26,6 +32,38 @@ and server-side authorization. A separate annual plan-scoped read-only assertion
 also passed. No retry, provider configuration change, direct billing-row write,
 or manual grant occurred. **Phase 3C is complete.** Production billing remains
 disabled; lifecycle/cancellation/expiration verification is next.
+
+The Phase 4 annual lifecycle command is `pnpm billing:lifecycle:read-only`
+through `Invoke-Billing.ps1 -Mode live-readonly`. A separately authorized
+`sandbox-cancel` command guarded the same annual identity and submitted one
+successful cancellation on 2026-09-22. Read-only reconciliation proved
+`will_not_renew` while paid access, RevenueCat Pro, the Supabase mirror, and
+server authorization remained active. The ledger recorded `CANCELLATION`, and
+the paid-period end remained 06:17:52 UTC. After that boundary, RevenueCat
+reported `expired` with no access or Pro, the Supabase mirror was expired, the
+ledger recorded `EXPIRATION`, and server authorization was false. The read-only
+assertion now accepts the expected loss of the expired subscription's Pro
+attachment. Cancellation through expiration is proven live. No live renewal or
+duplicate/stale delivery was observed for this identity; production billing
+remains disabled.
+
+For a separately authorized natural-renewal test on a fresh annual identity,
+`pnpm billing:lifecycle:renewal` captures the initial paid period and checks
+the next period through the same read-only wrapper. It compares subscription
+identity, period extension, RevenueCat Pro, Supabase mirror and ledger, and
+server authorization. The command does not renew or change a subscription.
+
+**Natural renewal checkpoint, 2026-09-22:** a separate fresh Auth identity
+passed the free baseline and the live annual catalog mapping. One annual
+sandbox submit action had browser outcome `UNKNOWN`, but read-only authority
+reconciliation passed without retry. The original paid period was
+06:32:50–07:32:50 UTC. After natural renewal it advanced to
+07:32:50–08:32:50 UTC, still active and `will_renew`. RevenueCat Pro, the
+extended active Supabase mirror, applied `INITIAL_PURCHASE > RENEWAL` ledger,
+and server authorization agreed. The first observer stopped near the boundary
+with `RENEWAL_PROVIDER_STATE`; immediate read-only reconciliation passed, and bounded grace
+handling was added with offline tests. No natural duplicate or stale delivery
+was observed. Phase 4 is complete; production billing remains disabled.
 
 ## Historical pause checkpoint — 2026-09-19
 
@@ -412,7 +450,7 @@ latest documentation-checkpoint CI result is reported with the final handoff.
 - [x] Web subscription read/checkout guard wired to the `pro` entitlement
 - [x] Web Find Time proposal/confirmation UI wired to the `pro` entitlement
 - [ ] Mobile RevenueCat purchase/restore flow wired to the `pro` entitlement
-- [ ] Cancellation and expiration behavior verified
+- [x] Sandbox cancellation retains paid access and expiration revokes it
 - [ ] Production Stripe account connected
 - [ ] Production products/prices and purchase link verified
 - [ ] Production URL kept separate from the sandbox URL

@@ -2447,6 +2447,35 @@ write occurred. **Phase 3C is complete.** Production billing remains disabled.
 Phase 4 lifecycle, cancellation, renewal, expiration, and replay/order checks
 are the next billing phase.
 
+**Phase 4 cancellation checkpoint, 2026-09-22:** the guarded sandbox-only
+command submitted one successful cancellation of the existing annual identity
+after confirming its active, renewing RevenueCat/Supabase/server state. Immediate
+read-only reconciliation proved `will_not_renew` and retained paid access:
+RevenueCat Pro, the Supabase mirror, and server authorization remained active,
+and the ledger recorded `INITIAL_PURCHASE > CANCELLATION`. After the
+06:17:52 UTC paid-period boundary, RevenueCat reported `expired` and no access;
+Pro, the Supabase mirror, and server authorization were inactive, and the ledger
+recorded `EXPIRATION`. The read-only assertion was corrected for the expected
+loss of the expired subscription's Pro attachment. **Sandbox cancellation
+through expiration is proven live.** A live renewal, duplicate delivery, and
+stale delivery have not been observed for this identity and remain separate
+Phase 4 gaps. Production billing remains disabled.
+
+**Billing Phase 4 renewal and closeout checkpoint, 2026-09-22:** a separate
+fresh Auth identity passed all free-baseline layers and the live annual catalog
+mapping. Exactly one annual sandbox purchase was attempted; browser outcome
+was ambiguous but the active-Pro authority chain passed read-only with no retry.
+The initial paid period was 06:32:50–07:32:50 UTC. Natural renewal advanced the
+same customer's single annual subscription to 07:32:50–08:32:50 UTC, still
+active and `will_renew`, with RevenueCat Pro, an extended active mirror,
+`INITIAL_PURCHASE > RENEWAL` applied ledger, and server authorization true.
+The observer stopped near the boundary with `RENEWAL_PROVIDER_STATE`; immediate read-only
+reconciliation passed, and bounded grace was added to the offline-tested
+observer. No natural duplicate or stale delivery was seen. Webhook and local
+Postgres tests cover sequential replay and out-of-order protection.
+**Billing Phase 4 is complete.** Production billing remains disabled; Phase 5
+manual CI integration is next.
+
 ## Historical billing pause checkpoint — 2026-09-19
 
 1. **What definitely works:** the sandbox-only billing runner, free-baseline
@@ -2488,8 +2517,9 @@ Current phase:
 
 `Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
 foundation. Billing automation Phases 2B2, 3A, 3B1, 3B2, and 3C are complete;
-the monthly and annual sandbox chains are proven live. Billing lifecycle
-verification is next. The independent web track has completed Web Phases 0–6 plus
+the monthly and annual sandbox chains are proven live. Billing automation Phase 4
+lifecycle verification is complete; Phase 5 manual CI integration is next.
+The independent web track has completed Web Phases 0–6 plus
 hardening; production web hardening remains pending.`
 
 Latest verified Sprint 6 checkpoint:
@@ -2535,16 +2565,17 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current pending gates:
 
-`Annual Phase 3C is complete; billing lifecycle verification remains pending.
+`Annual Phase 3C and billing Phase 4 lifecycle are complete; Phase 5 manual CI
+integration remains pending.
 Live Luna/Terra evaluation still needs an authorized server-side OpenAI key and
 explicit cost authorization. Production billing stays
 disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Plan the separately authorized Phase 4 sandbox lifecycle checks for
-cancellation, renewal, expiration, and replay/order behavior. Preserve deterministic
-candidate membership as the sole availability authority.`
+`Plan billing automation Phase 5 manual CI integration with protected secrets
+and an explicit sandbox dispatch. Preserve deterministic candidate membership
+as the sole availability authority.`
 
 Current Sprint 6 verification evidence:
 

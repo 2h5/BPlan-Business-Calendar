@@ -5,7 +5,7 @@
 
 begin;
 create extension if not exists pgtap;
-select plan(23);
+select plan(26);
 
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
 values
@@ -137,6 +137,41 @@ select ok(
 select ok(
   public.has_active_entitlement('dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro'),
   'the paying user keeps access after the out-of-order delivery'
+);
+
+-- The webhook writes one ledger row per provider event ID. A duplicate delivery
+-- must retain the original applied result while a later stale event is audited.
+insert into public.subscription_events
+  (event_id, user_id, event_type, event_at, applied, skipped_reason, payload)
+values
+  ('renewal-event', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'RENEWAL',
+   '2026-10-01T00:00:00Z', true, null, '{}'::jsonb)
+on conflict (event_id) do nothing;
+insert into public.subscription_events
+  (event_id, user_id, event_type, event_at, applied, skipped_reason, payload)
+values
+  ('renewal-event', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'RENEWAL',
+   '2026-10-01T00:00:00Z', false, 'STALE_EVENT', '{}'::jsonb)
+on conflict (event_id) do nothing;
+insert into public.subscription_events
+  (event_id, user_id, event_type, event_at, applied, skipped_reason, payload)
+values
+  ('old-expiration', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'EXPIRATION',
+   '2026-09-10T00:00:00Z', false, 'STALE_EVENT', '{}'::jsonb);
+
+select is(
+  (select count(*)::int from public.subscription_events where event_id = 'renewal-event'),
+  1,
+  'a duplicate provider event ID produces one ledger row'
+);
+select ok(
+  (select applied from public.subscription_events where event_id = 'renewal-event'),
+  'a sequential replay keeps the original applied ledger result'
+);
+select is(
+  (select skipped_reason from public.subscription_events where event_id = 'old-expiration'),
+  'STALE_EVENT',
+  'an out-of-order expiration is audited as stale'
 );
 
 -- Cancellation keeps status active; only the clock ends access.

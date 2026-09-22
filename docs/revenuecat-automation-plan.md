@@ -15,7 +15,11 @@ passed a clean free baseline, selected `$rc_annual`, and converged across the
 correct annual Product, active Pro, the Supabase mirror, ledger, and server
 authorization. Its one browser submission was ambiguous and reconciled read-only;
 no retry occurred. No UUID, credential, purchase URL, provider payload, or payment data
-is recorded here. Production remains disabled. This document is the
+is recorded here. Phase 4 is complete: cancellation retained paid access,
+expiration revoked Pro, one fresh annual subscription renewed naturally into
+an extended active period, and replay/order behavior passed deterministic
+webhook and database tests. Phase 5 manual CI integration is next. Production
+remains disabled. This document is the
 implementation source of truth for the RevenueCat web-billing automation track.
 
 Audit baseline: `origin/main` at `15c3ea5a5975f647a2c116dbc5e31f41ec1645e3`
@@ -997,8 +1001,8 @@ commands`, and `rc schema`) were inspected without an API key; no
   passed RevenueCat active Pro and annual subscription evidence, the active
   Supabase mirror, coherent subscription ledger, and server authorization.
 - No second submit action or provider/database repair occurred. Production
-  billing remains disabled. Phase 4 lifecycle, cancellation, renewal, expiration,
-  and replay/order verification is the next billing phase.
+  billing remains disabled. Phase 4 lifecycle verification followed under
+  separate authorization.
 
 ### Phase 4 — cancellation/expiration/lifecycle automation
 
@@ -1014,6 +1018,91 @@ commands`, and `rc schema`) were inspected without an API key; no
 - Exit criteria: cancellation retains access through expiry, expiration revokes
   access, renewal restores/extends correctly, and replay/order behavior remains
   correct.
+
+#### Phase 4 implementation checkpoint — 2026-09-22
+
+**IMPLEMENTED / VERIFIED LOCALLY:** `billing:lifecycle:read-only` uses the
+existing secrets wrapper in `live-readonly` mode, requires an explicit sandbox
+test UUID, and follows the approved RevenueCat CLI and Supabase read adapters.
+It reconciles the annual Product store identifier, period and renewal state,
+RevenueCat Pro, the subscription mirror, ordered ledger, and server
+authorization. Its report contains no user, subscription, event, URL, or secret
+identifiers. It fails closed on missing period or renewal fields, conflicting
+authorities, and incoherent ledger state. Deterministic offline fixtures cover
+active, cancelled but active, renewed, expired, duplicate/stale delivery, and
+malformed state. The webhook sequence test and existing database tests exercise
+the underlying transition and ordering behavior. Normal `pnpm verify` remains
+offline.
+
+The read-only `billing:lifecycle:renewal` command captures an initial active,
+renewing annual snapshot, then observes through the first accelerated sandbox
+boundary with a bounded convergence window. It compares the exact project,
+customer, subscription, and Product resource across snapshots; requires an
+advanced paid period, active RevenueCat Pro, an extended active Supabase mirror,
+an applied `INITIAL_PURCHASE > RENEWAL` ledger, and server authorization. It
+uses the existing restricted wrapper in `live-readonly` mode and cannot submit
+a provider or database mutation. Offline fixtures reject identity, period,
+ledger, and authority drift.
+
+**READ-ONLY LIVE OBSERVATION at 2026-09-22 05:35 UTC:** the fresh annual test
+subscription was `active`, `gives_access=true`, `will_renew`, with paid period
+2026-09-22 05:17:52–06:17:52 UTC. RevenueCat Pro, the active Supabase mirror,
+the initial-purchase ledger entry, and server authorization agreed. No renewal
+or cancellation event had yet appeared. Sandbox annual periods are accelerated,
+so this observation is time-bound.
+
+**LIVE CANCELLATION CHECKPOINT — 2026-09-22:** the separately authorized
+`billing:lifecycle:cancel` command guarded the same annual sandbox identity,
+discovered the exact BPlan project, re-read its single active annual
+subscription, and submitted one `subscriptions cancel <id> --yes` operation.
+Two earlier, separately authorized submissions returned `CLI_AUTHORIZATION` and
+left the subscription renewing; this submission succeeded after the key's
+subscription write permission was updated. Immediate read-only reconciliation
+showed `will_not_renew` and `cancelled-active`: RevenueCat Pro, the Supabase
+mirror, and server authorization remained active, while the ledger recorded
+`INITIAL_PURCHASE > CANCELLATION`. The paid-period end remained
+2026-09-22 06:17:52 UTC. A read-only check shortly before that boundary still
+showed active access across all authorities.
+
+**LIVE EXPIRATION CHECKPOINT — 2026-09-22:** after the paid-period boundary,
+RevenueCat reported the annual subscription `expired`, with no access and no
+active Pro entitlement. The Supabase mirror was inactive/expired, the ledger
+recorded `INITIAL_PURCHASE > CANCELLATION > EXPIRATION`, and server-side
+authorization returned false. The read-only lifecycle assertion was corrected
+to allow an expired subscription to lose its Pro attachment while preserving
+the annual Product identity check; it then passed without provider or database
+repair. No renewal, skipped/stale, or duplicate ledger event was observed for
+this identity. **Cancellation through expiration is proven live.** A live
+renewal and naturally observed duplicate/out-of-order delivery remain Phase 4
+gaps; deterministic offline coverage remains in place. No purchase, refund,
+extension, direct billing-row write, or production action was performed in
+this lifecycle check.
+
+**LIVE NATURAL RENEWAL CHECKPOINT — 2026-09-22:** one newly provisioned Auth
+identity passed the complete free baseline. The exact BPlan sandbox catalog
+still mapped `bplan_web > $rc_annual > prod3c26a548d0 > bplan_pro_yearly`.
+One annual sandbox submit action was attempted. Browser submission was
+`UNKNOWN`, but read-only authority reconciliation and a separate annual
+plan-scoped assertion passed; no retry occurred. The initial subscription was
+active and `will_renew` for 06:32:50–07:32:50 UTC, with RevenueCat Pro, the
+active Supabase mirror, `INITIAL_PURCHASE`, and server authorization true.
+After the natural boundary, read-only checks found the same customer with one
+annual subscription active and `will_renew` for 07:32:50–08:32:50 UTC. Its
+Product remained `bplan_pro_yearly`; RevenueCat Pro, the extended active mirror,
+and server authorization remained active. The ledger had applied
+`INITIAL_PURCHASE > RENEWAL` for the same app user and Product. The first
+observer stopped near the boundary with `RENEWAL_PROVIDER_STATE`; immediate read-only
+reconciliation converged, and the observer's bounded boundary-grace handling
+was hardened and tested offline. No natural skipped, duplicate, or stale ledger
+delivery was observed for this identity.
+
+**PHASE 4 COMPLETE — PROVEN LIVE / DETERMINISTICALLY VERIFIED:** cancellation
+retained paid access through expiry, expiration revoked Pro, and natural
+renewal extended the paid period with active provider, mirror, ledger, and
+server authority. The webhook sequence tests and Postgres ordering/RLS tests
+verify sequential replay deduplication and stale/out-of-order protection;
+provider-side duplicate delivery was not manufactured or claimed live.
+Production billing remains disabled. Phase 5 manual CI integration is next.
 
 ### Phase 5 — manually triggered GitHub Actions integration
 
@@ -1101,11 +1190,13 @@ It does not include:
 - a production checkout flag, seller identity, legal approval, or live Stripe
   configuration change.
 
-Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, Phase 3B2, and Phase 3C
+Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, Phase 3B2, Phase 3C, and Phase 4
 are complete. The real monthly sandbox purchase proved RevenueCat, webhook,
 Supabase mirror, ledger, and server authorization convergence; browser
 ambiguity was handled by read-only reconciliation and the purchase was never
 retried. The fresh annual sandbox purchase passed the same active-Pro authority
 chain under the corrected Product identity assertion, with browser ambiguity
-resolved read-only and no retry. Phase 4 lifecycle verification is next;
-production billing remains disabled.
+resolved read-only and no retry. Phase 4 proved cancellation through expiry and
+natural annual renewal; deterministic webhook and database tests cover replay
+and ordering. Phase 5 manual CI integration is next; production billing remains
+disabled.
