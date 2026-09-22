@@ -12,7 +12,7 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ---
 
-## Project checkpoint — 2026-09-19
+## Project checkpoint — 2026-09-22
 
 ```text
 CORE PRODUCT
@@ -40,7 +40,7 @@ BILLING / PRO
 ├─ Monthly sandbox purchase E2E ........ PROVEN LIVE
 ├─ Browser ambiguity reconciliation .... IMPLEMENTED + VERIFIED
 ├─ Annual sandbox runner ............... IMPLEMENTED
-├─ Annual live verification ............ BLOCKED / PRODUCT PROVENANCE UNRESOLVED
+├─ Annual live verification ............ PROVEN LIVE / PHASE 3C COMPLETE
 ├─ Billing lifecycle automation ........ PENDING
 └─ Production billing .................. INTENTIONALLY DISABLED
 
@@ -55,9 +55,9 @@ RELEASE / EXTERNAL
 
 CURRENT STATE
 ├─ Core mobile/web product and Find Time backend/web UX are implemented.
-├─ Monthly web billing is proven end to end.
+├─ Monthly and annual web sandbox billing are proven end to end.
 └─ Remaining work is concentrated in mobile Find Time finalization, live AI
-   evaluation, annual RevenueCat catalog reconciliation, lifecycle verification,
+   evaluation, billing lifecycle verification,
    and release hardening.
 ```
 
@@ -109,14 +109,15 @@ RevenueCat hosted checkout
   -> server-side Pro authorization
 ```
 
-For annual billing, the runner is implemented and exactly one attempt occurred.
-It produced active Pro evidence, but the exact annual-product provenance remains
-unresolved. Both monthly and annual plan-scoped assertions fail because the
-observed active product does not match either expected repository product, and
-catalog inspection is blocked by current RevenueCat read-only permissions. The
-annual result is therefore neither declared successful nor failed, and no
-retry is authorized. Billing lifecycle automation remains pending. Production
-billing remains intentionally disabled.
+The annual sandbox chain is **PROVEN LIVE**. Read-only catalog access established
+that the original annual purchase used the intended RevenueCat Product; its
+direct Product-ID assertion was wrong, and that subscription later expired in
+accelerated sandbox time. On 2026-09-22 a fresh free test identity made one
+annual purchase attempt. Browser submission was ambiguous, but read-only
+reconciliation and a separate corrected annual plan assertion passed RevenueCat
+Pro, the Supabase mirror and ledger, and server authorization. No retry occurred.
+Billing lifecycle automation remains pending. Production billing remains
+intentionally disabled.
 
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
@@ -140,7 +141,7 @@ external-verification evidence.
 | Find Time mobile UX               | In progress; awaiting pushed checkpoint          |
 | RevenueCat backend/webhook/mirror | Implemented                                      |
 | Monthly billing E2E               | Proven live                                      |
-| Annual billing E2E                | Blocked; exact product provenance unresolved     |
+| Annual billing E2E                | Proven live; Phase 3C complete                   |
 | Live AI evaluation                | Pending                                          |
 | Production billing                | Intentionally disabled                           |
 | Production release hardening      | Pending                                          |

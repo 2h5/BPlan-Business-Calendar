@@ -254,16 +254,17 @@ function compareSnapshots(
       );
     }
     if (expectedPlan) {
-      const expectedProductId = BILLING_CONTRACT.products[expectedPlan].id;
+      const expectedStoreIdentifier = BILLING_CONTRACT.products[expectedPlan].id;
       const expectedPlanSupportsPro =
         provider.subscriptions.some(
-          (item) => item.grantsPro && item.givesAccess && item.productId === expectedProductId,
+          (item) =>
+            item.grantsPro && item.givesAccess && item.storeIdentifier === expectedStoreIdentifier,
         ) ||
         provider.purchases.some(
           (item) =>
             item.grantsPro &&
             item.status.toLowerCase() === 'owned' &&
-            item.productId === expectedProductId,
+            item.storeIdentifier === expectedStoreIdentifier,
         );
       if (!expectedPlanSupportsPro) {
         return assertionFailure(

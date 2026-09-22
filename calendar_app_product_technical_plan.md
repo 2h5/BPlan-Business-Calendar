@@ -30,9 +30,9 @@
   Find Time propose/confirm UX. The subscription/upgrade page and guarded
   sandbox checkout are implemented. The monthly RevenueCat sandbox chain is
   proven live from hosted checkout through server-side Pro authorization. The
-  annual runner is implemented, but the single annual attempt cannot be
-  classified while exact product provenance and catalog access remain
-  unresolved. Billing lifecycle automation remains pending, and production
+  annual sandbox chain is also proven live after the Product identity assertion
+  fix and a fresh 2026-09-22 annual run passed the complete active-Pro authority
+  chain. Billing lifecycle automation remains pending, and production
   billing remains intentionally disabled. See
   [`docs/web-active.md`](docs/web-active.md) and
   [`docs/revenuecat-stripe-setup.md`](docs/revenuecat-stripe-setup.md).
@@ -1861,15 +1861,15 @@ BILLING PARTIAL — MOBILE FIND TIME IN PROGRESS / AWAITING PUSHED CHECKPOINT**
 - Web Find Time UI — implemented; propose + confirm
 - RevenueCat server/web billing foundation — implemented; monthly sandbox E2E
   proven live
-- Annual RevenueCat runner — implemented; exact live product provenance blocked
+- Annual RevenueCat sandbox E2E — proven live; Phase 3C complete
 - Mobile RevenueCat purchase/restore — not started
 
 ### Deliverable
 
 A paid user can ask the server to find time and receive a persisted, confirmable
 proposal through the implemented web experience. The monthly sandbox billing
-chain is proven live. Live model evaluation, production model selection, mobile
-Find Time finalization, annual catalog/product reconciliation, lifecycle
+chain is proven live for monthly and annual plans. Live model evaluation,
+production model selection, mobile Find Time finalization, lifecycle
 verification, and production billing remain pending.
 
 ---
@@ -1884,8 +1884,8 @@ Supabase, schema, generated-type, and `@cal/domain` contracts with mobile. Web
 Phases 0–5 cover the authenticated shell, Tasks, Calendar, Today, Search,
 Settings, and hardening. Provider OAuth/discovery/import/sync-health work is
 complete. Find Time propose/confirm and the subscription/upgrade surface are
-implemented. Monthly sandbox billing is proven live; live model evaluation,
-annual billing provenance reconciliation, lifecycle verification, legal and
+implemented. Monthly and annual sandbox billing are proven live; live model
+evaluation, lifecycle verification, legal and
 production-billing gates, and production hardening remain. See
 [`docs/web-active.md`](docs/web-active.md).
 

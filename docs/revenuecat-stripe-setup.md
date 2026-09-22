@@ -1,19 +1,37 @@
 # RevenueCat + Stripe Web Billing Setup
 
 Status: **Sandbox catalog, hosted checkout, webhook, identified web billing
-integration, and the real monthly sandbox billing chain are verified. Annual
-support is implemented, but the single annual sandbox attempt produced active
-Pro state without exact annual product provenance; read-only catalog
-reconciliation is blocked by current RevenueCat permissions. Provisional legal
-pages are published. Final legal documents and production billing remain
-intentionally blocked.**
+integration, and the real monthly and annual sandbox billing chains are verified.
+Phase 3C annual verification passed on 2026-09-22 through the corrected
+RevenueCat Product identity assertion. Provisional legal pages are published.
+Final legal documents and production billing remain intentionally blocked.**
 
-Last verified: **2026-09-19**
+Last verified: **2026-09-22**
 
-## Pause checkpoint — 2026-09-19
+## Annual Phase 3C checkpoint — 2026-09-22
 
-Billing work is intentionally paused after exactly one separately authorized
-annual sandbox purchase attempt. Do not run another purchase.
+Read-only catalog access established that `bplan_web` / `$rc_annual` attaches
+RevenueCat Product `prod3c26a548d0`, whose `store_identifier` is
+`bplan_pro_yearly`. The September 19 annual purchase referenced that Product;
+its plan-scoped failure came from comparing the Product resource ID directly
+with the store identifier. That original purchase was not repeated. Its sandbox
+subscription subsequently renewed roughly hourly, then canceled and expired;
+the old identity is now inactive.
+
+A newly provisioned Supabase Auth test identity passed the complete free
+baseline. One fresh annual sandbox submit action was attempted. The browser
+reported submission `UNKNOWN`, while read-only reconciliation passed the active
+RevenueCat Pro entitlement and annual subscription, Supabase mirror and ledger,
+and server-side authorization. A separate annual plan-scoped read-only assertion
+also passed. No retry, provider configuration change, direct billing-row write,
+or manual grant occurred. **Phase 3C is complete.** Production billing remains
+disabled; lifecycle/cancellation/expiration verification is next.
+
+## Historical pause checkpoint — 2026-09-19
+
+At this checkpoint, billing work was paused after exactly one separately
+authorized annual sandbox purchase attempt. Another purchase was not authorized
+at that time.
 The web app has a billing section inside Settings and a dedicated
 subscription/upgrade page. The RevenueCat sandbox catalog, hosted link,
 webhook, and identified web billing seam are configured. The first real monthly sandbox
@@ -255,7 +273,7 @@ RevenueCat's purchase-link documentation requires a Terms & Conditions URL and
 allows the default package-selection page to use the products in the selected
 offering.
 
-### 4. Copy and test the purchase URL — annual provenance unresolved
+### 4. Copy and test the purchase URL — sandbox annual chain verified
 
 After the purchase link is saved:
 
@@ -329,10 +347,9 @@ the database function `has_active_entitlement()`.
 
 ## Sandbox acceptance test
 
-This is a future separately authorized acceptance checklist, not permission to
-repeat the annual attempt documented in the pause checkpoint. No additional
-purchase is authorized while exact RevenueCat annual product provenance is
-unresolved.
+The monthly and annual sandbox purchases have passed the complete authority
+chain. The checklist below remains a guide for future separately authorized
+reverification; it is not permission to repeat either purchase.
 
 Run this test after the purchase link and webhook are deployed:
 
@@ -390,7 +407,7 @@ latest documentation-checkpoint CI result is reported with the final handoff.
 - [x] RevenueCat webhook secret stored server-side
 - [x] RevenueCat webhook configured and TEST event returns 2xx
 - [x] Monthly sandbox purchase verified through the full authority chain
-- [ ] Annual sandbox purchase verified through the full authority chain
+- [x] Annual sandbox purchase verified through the full authority chain
 - [x] Entitlement mirror verified for a real Supabase user UUID
 - [x] Web subscription read/checkout guard wired to the `pro` entitlement
 - [x] Web Find Time proposal/confirmation UI wired to the `pro` entitlement

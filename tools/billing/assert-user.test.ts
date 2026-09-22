@@ -92,8 +92,10 @@ function customerProfile(
 function providerRunner(
   options: {
     customer?: unknown;
-    subscription?: unknown;
+    subscription?: unknown | ((id: string) => unknown);
     purchase?: unknown;
+    product?: unknown | ((id: string) => unknown);
+    productExitCode?: number;
     customerNotFound?: boolean;
     projects?: unknown;
   } = {},
@@ -117,9 +119,27 @@ function providerRunner(
       }
       payload = options.customer ?? customerProfile();
     } else if (command === 'subscriptions show') {
-      payload = options.subscription ?? { data: subscription(), schema_version: 1 };
+      payload =
+        typeof options.subscription === 'function'
+          ? options.subscription(invocation.argv[2] ?? '')
+          : (options.subscription ?? { data: subscription(), schema_version: 1 });
     } else if (command === 'purchases show') {
       payload = options.purchase ?? { data: purchase(), schema_version: 1 };
+    } else if (command === 'products show') {
+      if (options.productExitCode !== undefined) {
+        return { exitCode: options.productExitCode, stdout: '', stderr: 'redacted' };
+      }
+      const id = invocation.argv[2];
+      payload =
+        typeof options.product === 'function'
+          ? options.product(id ?? '')
+          : (options.product ?? {
+              data: {
+                id,
+                object: 'product',
+                store_identifier: id === 'prod_lifetime' ? 'lifetime' : 'bplan_pro_monthly',
+              },
+            });
     } else {
       throw new Error(`Unexpected fake command ${command}`);
     }
@@ -150,6 +170,7 @@ function activeProvider(overrides: Partial<RevenueCatUserSnapshot> = {}): Revenu
       {
         id: 'sub_1',
         productId: 'prod_monthly',
+        storeIdentifier: 'bplan_pro_monthly',
         store: 'rc_billing',
         environment: 'sandbox',
         status: 'active',
@@ -321,6 +342,7 @@ describe('RevenueCat user assertion adapter', () => {
       'entitlements list',
       'customers show',
       'subscriptions show',
+      'products show',
     ]);
   });
 
@@ -366,6 +388,76 @@ describe('RevenueCat user assertion adapter', () => {
     expect(result).toMatchObject({
       ok: true,
       data: { purchases: [{ status: 'owned', grantsPro: true, environment: 'sandbox' }] },
+    });
+  });
+
+  it('resolves an internal annual Product ID to its canonical store identifier', async () => {
+    const annual = subscription({ product_id: 'prod_annual' });
+    const fake = providerAdapter({
+      customer: customerProfile({ subscriptions: [annual] }),
+      subscription: { data: annual },
+      product: {
+        data: { id: 'prod_annual', object: 'product', store_identifier: 'bplan_pro_yearly' },
+      },
+    });
+    const result = await fake.adapter.readUser(USER_ID);
+    expect(result).toMatchObject({
+      ok: true,
+      data: { subscriptions: [{ productId: 'prod_annual', storeIdentifier: 'bplan_pro_yearly' }] },
+    });
+    expect(fake.invocations.filter((item) => item.argv[0] === 'products')).toHaveLength(1);
+  });
+
+  it('fails closed for an unknown internal Product, malformed Product, or catalog authorization', async () => {
+    const unknown = await providerAdapter({ productExitCode: 5 }).adapter.readUser(USER_ID);
+    const malformed = await providerAdapter({
+      product: { data: { id: 'prod_monthly' } },
+    }).adapter.readUser(USER_ID);
+    const denied = await providerAdapter({ productExitCode: 4 }).adapter.readUser(USER_ID);
+    expect(unknown).toMatchObject({ ok: false, error: { code: 'CLI_RESOURCE_NOT_FOUND' } });
+    expect(malformed).toMatchObject({
+      ok: false,
+      error: { code: 'REVENUECAT_RESPONSE_MALFORMED' },
+    });
+    expect(denied).toMatchObject({ ok: false, error: { code: 'CLI_AUTHORIZATION' } });
+  });
+
+  it('rejects a Product response whose internal ID differs from the subscription reference', async () => {
+    const result = await providerAdapter({
+      product: {
+        data: { id: 'prod_other', object: 'product', store_identifier: 'bplan_pro_monthly' },
+      },
+    }).adapter.readUser(USER_ID);
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'REVENUECAT_RESPONSE_MALFORMED' },
+    });
+  });
+
+  it('deduplicates Product reads and rejects ambiguous canonical mappings', async () => {
+    const first = subscription({ id: 'sub_one', product_id: 'prod_one' });
+    const second = subscription({ id: 'sub_two', product_id: 'prod_one' });
+    const shared = providerAdapter({
+      customer: customerProfile({ subscriptions: [first, second] }),
+      subscription: (id: string) => ({ data: id === 'sub_one' ? first : second }),
+      product: {
+        data: { id: 'prod_one', object: 'product', store_identifier: 'bplan_pro_monthly' },
+      },
+    });
+    expect((await shared.adapter.readUser(USER_ID)).ok).toBe(true);
+    expect(shared.invocations.filter((item) => item.argv[0] === 'products')).toHaveLength(1);
+
+    const another = subscription({ id: 'sub_two', product_id: 'prod_two' });
+    const ambiguous = await providerAdapter({
+      customer: customerProfile({ subscriptions: [first, another] }),
+      subscription: (id: string) => ({ data: id === 'sub_one' ? first : another }),
+      product: (id: string) => ({
+        data: { id, object: 'product', store_identifier: 'bplan_pro_monthly' },
+      }),
+    }).adapter.readUser(USER_ID);
+    expect(ambiguous).toMatchObject({
+      ok: false,
+      error: { code: 'REVENUECAT_PRODUCT_MAPPING_AMBIGUOUS' },
     });
   });
 
@@ -430,7 +522,8 @@ describe('cross-layer billing consistency', () => {
         subscriptions: [
           {
             ...activeProvider().subscriptions[0]!,
-            productId: 'bplan_pro_monthly',
+            productId: 'prod_monthly',
+            storeIdentifier: 'bplan_pro_monthly',
           },
         ],
       }),
@@ -447,7 +540,8 @@ describe('cross-layer billing consistency', () => {
       subscriptions: [
         {
           ...activeProvider().subscriptions[0]!,
-          productId: 'bplan_pro_monthly',
+          productId: 'prod_monthly',
+          storeIdentifier: 'bplan_pro_monthly',
         },
       ],
     });
@@ -455,7 +549,8 @@ describe('cross-layer billing consistency', () => {
       subscriptions: [
         {
           ...activeProvider().subscriptions[0]!,
-          productId: 'bplan_pro_yearly',
+          productId: 'prod_annual',
+          storeIdentifier: 'bplan_pro_yearly',
         },
       ],
     });
@@ -490,6 +585,26 @@ describe('cross-layer billing consistency', () => {
       failure: { code: 'REVENUECAT_EXPECTED_PLAN_MISSING' },
     });
     expect(annualAsMonthly).toMatchObject({
+      ok: false,
+      failure: { code: 'REVENUECAT_EXPECTED_PLAN_MISSING' },
+    });
+  });
+
+  it('rejects a correct internal Product ID with an unexpected store identifier', async () => {
+    const report = await runWithSnapshots(
+      activeProvider({
+        subscriptions: [
+          {
+            ...activeProvider().subscriptions[0]!,
+            productId: 'prod_annual',
+            storeIdentifier: 'unexpected_annual',
+          },
+        ],
+      }),
+      activeSupabase(),
+      ['--user', USER_ID, '--expect', 'active-pro', '--plan', 'annual'],
+    );
+    expect(report).toMatchObject({
       ok: false,
       failure: { code: 'REVENUECAT_EXPECTED_PLAN_MISSING' },
     });

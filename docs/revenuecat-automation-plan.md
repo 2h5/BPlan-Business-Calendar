@@ -10,10 +10,11 @@ Phase 3B2 is complete: the first real monthly sandbox purchase ultimately
 proved the RevenueCat monthly subscription and Pro entitlement, webhook,
 Supabase mirror, subscription ledger, and server authorization chain. A browser
 ambiguity was resolved by read-only authority reconciliation; the purchase was
-never retried. Phase 3C implementation is complete, but the exactly-one annual
-sandbox attempt produced active Pro evidence without matching either expected
-plan product. Exact annual provenance is blocked on read-only RevenueCat catalog
-access. No UUID, credential, purchase URL, provider payload, or payment data
+never retried. Phase 3C is complete: the 2026-09-22 fresh annual sandbox run
+passed a clean free baseline, selected `$rc_annual`, and converged across the
+correct annual Product, active Pro, the Supabase mirror, ledger, and server
+authorization. Its one browser submission was ambiguous and reconciled read-only;
+no retry occurred. No UUID, credential, purchase URL, provider payload, or payment data
 is recorded here. Production remains disabled. This document is the
 implementation source of truth for the RevenueCat web-billing automation track.
 
@@ -72,7 +73,7 @@ The current repository already has a substantial billing foundation:
 | RevenueCat webhook         | `supabase/functions/revenuecat-webhook/` validates the shared secret, parses webhook payloads with Zod, ignores anonymous/non-UUID users safely, handles entitlement events, and delegates ordering/idempotency to the database mirror. `supabase/config.toml` disables JWT verification for this secret-authenticated function. | Handler behavior is covered by focused Deno tests. The setup runbook records that the hosted TEST webhook returned 2xx; Batch 1 does not repeat that live check.                                                                                                                         |
 | Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `apply_revenuecat_event` is an atomic, order-aware, replay-safe write boundary.                                                                                                                                   | Local migration/pgTAP coverage and webhook tests exist. The first real monthly purchase also proved the hosted mirror and ledger through read-only authority reconciliation.                                                                                                             |
 | Server authorization       | `public.has_active_entitlement(user_id, 'pro')` is the server authority. The `ai-find-time` Edge Function calls it through the service-role client; client RevenueCat/UI state is not trusted.                                                                                                                                   | The first real monthly purchase proved server authorization converged with the RevenueCat and Supabase authorities.                                                                                                                                                                      |
-| Web billing seam           | `apps/web/src/features/billing/api/billing.api.ts` reads the `pro` projection through TanStack Query. `BillingSection` and `SubscriptionView` expose status, guarded hosted checkout, refresh, and comparison UI.                                                                                                                | Web unit tests cover UUID and production/sandbox guards. The first real monthly browser checkout passed; the one annual attempt reached active Pro state but exact product provenance remains unresolved.                                                                                |
+| Web billing seam           | `apps/web/src/features/billing/api/billing.api.ts` reads the `pro` projection through TanStack Query. `BillingSection` and `SubscriptionView` expose status, guarded hosted checkout, refresh, and comparison UI.                                                                                                                | Web unit tests cover UUID and production/sandbox guards. Monthly and annual sandbox purchases passed the complete authority chain; annual was re-proven on 2026-09-22 after correcting the Product identity assertion.                                                                   |
 | Production safety          | Web checkout defaults to `disabled`; production requires explicit seller-identity and final-legal-document flags plus public Terms/Privacy URLs. The runbook keeps seller identity and final legal approval unresolved.                                                                                                          | Static guards are tested. No production setting is changed by this automation track.                                                                                                                                                                                                     |
 
 ### Documented external configuration versus evidence
@@ -110,13 +111,21 @@ The following distinction is intentional:
   retried.
 - Live/manual verification completed for the annual attempt on 2026-09-19: a
   clean annual test identity passed its free baseline and exactly one annual
-  sandbox submission produced active Pro evidence. Exact annual product
-  provenance remains unresolved because plan-scoped assertions failed with
-  `REVENUECAT_EXPECTED_PLAN_MISSING` and catalog reads returned
-  `CLI_AUTHORIZATION`. Cancellation through expiry, expiration, and renewal
-  behavior remain pending.
+  sandbox submission produced active Pro evidence. At that checkpoint,
+  plan-scoped assertions failed with `REVENUECAT_EXPECTED_PLAN_MISSING` and
+  catalog reads returned `CLI_AUTHORIZATION`. Later read-only catalog access
+  proved that purchase referenced the intended annual Product. By 2026-09-22,
+  its accelerated sandbox subscription had renewed, then canceled and expired.
+- **PROVEN LIVE on 2026-09-22:** a new Supabase Auth test identity passed every
+  free-baseline authority layer. The annual checkout selected `$rc_annual` and
+  the live `bplan_web` catalog attached RevenueCat Product `prod3c26a548d0`
+  with `store_identifier` `bplan_pro_yearly`. One sandbox submit action was
+  attempted. Browser submission was `UNKNOWN`, but read-only reconciliation
+  and one subsequent annual plan-scoped assertion passed active RevenueCat Pro,
+  annual subscription evidence, the Supabase mirror, coherent event ledger,
+  and server-side `has_active_entitlement`. No retry occurred. Phase 3C is complete.
 
-The monthly result does not authorize another purchase or production billing.
+The completed sandbox evidence does not authorize another purchase or production billing.
 Production remains disabled.
 
 ### Official provider/tooling audit
@@ -307,11 +316,18 @@ pnpm billing:assert-user -- --expect active-pro --plan monthly|annual
 invalid, duplicate, or free-expectation plan arguments fail with the stable
 categories `PLAN_MISSING`, `PLAN_INVALID`, `PLAN_DUPLICATE`, and
 `PLAN_NOT_ALLOWED_FOR_FREE`. A plan-scoped active-Pro assertion reuses the
-existing exact product comparison and requires `bplan_pro_monthly` for monthly
-or `bplan_pro_yearly` for annual. The implementation checkpoint is
+Product-resource resolution and requires store identifier `bplan_pro_monthly`
+for monthly or `bplan_pro_yearly` for annual. The original implementation checkpoint is
 `18ff339288fb7163244c1dc45a92790af6f864f2`; focused tests (29),
 `pnpm billing:test` (136), billing typecheck/build, `pnpm verify`, and
 `git diff --check` passed there.
+
+The corrected assertion preserves subscription/purchase `product_id` as the
+RevenueCat Product resource ID, reads each distinct Product with the approved
+read-only `products show` operation, validates its ID and `store_identifier`,
+and compares that store identifier with the selected plan. Missing, malformed,
+unauthorized, or ambiguous Product mappings fail closed. Offline verification
+does not require provider credentials.
 
 The final command should compare:
 
@@ -967,29 +983,22 @@ commands`, and `rc schema`) were inspected without an API key; no
   assertions requiring `bplan_pro_yearly`, shared bounded reconciliation,
   redacted reporting, and offline regression coverage.
 - Excluded: production, lifecycle mutation, and direct mirror repair.
-- Status: **IMPLEMENTATION COMPLETE; LIVE ANNUAL VERIFICATION BLOCKED.** The
-  annual runner uses the shared one-shot state machine and the clean annual
-  identity passed its free baseline. Exactly one annual sandbox purchase was
-  attempted. RevenueCat now shows active Pro-supporting evidence, but both
-  `--expect active-pro --plan annual` and the monthly plan-scoped assertion
-  fail with `REVENUECAT_EXPECTED_PLAN_MISSING` because the observed product is
-  unexpected rather than either repository product.
-- The Supabase mirror, subscription ledger, and server authorization were not
-  used to declare Phase 3C complete because exact annual RevenueCat product
-  provenance failed first.
-- The live RevenueCat catalog could not be read with the current read-only key;
-  offerings/packages/products operations return `CLI_AUTHORIZATION`. The
-  repository contract still expects `$rc_monthly` → `bplan_pro_monthly`,
-  `$rc_annual` → `bplan_pro_yearly`, and entitlement `pro`. Offline checkout
-  construction selects `$rc_annual` for annual. No root cause is chosen until
-  the live catalog relationship and unexpected product evidence are reconciled.
-- No retry has occurred and no retry is authorized. Do not cancel, reset,
-  delete, refund, repair, or manually grant state to either test identity.
-- Exit criteria: obtain sufficient read-only RevenueCat catalog access, inspect
-  the live `bplan_web` package/product relationships, reconcile the unexpected
-  product, and then determine whether the fix belongs in assertion code or
-  provider configuration. Only after that review may a separately authorized
-  next step be considered.
+- Status: **COMPLETE — PROVEN LIVE on 2026-09-22.** Read-only catalog inspection
+  established `$rc_annual` → RevenueCat Product `prod3c26a548d0` →
+  `bplan_pro_yearly`; `$rc_monthly` resolves to `bplan_pro_monthly`. RevenueCat
+  subscription `product_id` is the internal Product resource ID, so the prior
+  direct comparison with the store identifier was wrong. The original annual
+  purchase was historically the correct product, then expired after accelerated
+  sandbox renewals, cancellation, and expiration.
+- A fresh Auth test identity passed every free-baseline layer. Exactly one new
+  annual sandbox submit action was attempted through the shared one-shot flow.
+  Browser submission was `UNKNOWN`; read-only authority reconciliation returned
+  `PASS` without retry. The subsequent `active-pro --plan annual` assertion
+  passed RevenueCat active Pro and annual subscription evidence, the active
+  Supabase mirror, coherent subscription ledger, and server authorization.
+- No second submit action or provider/database repair occurred. Production
+  billing remains disabled. Phase 4 lifecycle, cancellation, renewal, expiration,
+  and replay/order verification is the next billing phase.
 
 ### Phase 4 — cancellation/expiration/lifecycle automation
 
@@ -1092,11 +1101,11 @@ It does not include:
 - a production checkout flag, seller identity, legal approval, or live Stripe
   configuration change.
 
-Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, and Phase 3B2
+Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, Phase 3B2, and Phase 3C
 are complete. The real monthly sandbox purchase proved RevenueCat, webhook,
 Supabase mirror, ledger, and server authorization convergence; browser
 ambiguity was handled by read-only reconciliation and the purchase was never
-retried. Phase 3C implementation is complete, but annual live acceptance is
-blocked on exact RevenueCat product/catalog reconciliation after its single
-authorized attempt. No production target, direct mirror write, silent repair,
-or additional purchase is part of the current implementation task.
+retried. The fresh annual sandbox purchase passed the same active-Pro authority
+chain under the corrected Product identity assertion, with browser ambiguity
+resolved read-only and no retry. Phase 4 lifecycle verification is next;
+production billing remains disabled.

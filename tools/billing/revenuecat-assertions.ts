@@ -90,10 +90,19 @@ const customerProfileEnvelopeSchema = z.object({
 
 const subscriptionEnvelopeSchema = z.object({ data: subscriptionSchema });
 const purchaseEnvelopeSchema = z.object({ data: purchaseSchema });
+const productEnvelopeSchema = z.object({
+  data: z.object({
+    id: identifierSchema,
+    object: z.literal('product'),
+    store_identifier: identifierSchema,
+  }),
+});
 
 export interface RevenueCatSubscriptionEvidence {
   readonly id: string;
+  /** RevenueCat Product resource ID, as returned by subscription.product_id. */
   readonly productId: string | null;
+  readonly storeIdentifier: string | null;
   readonly store: string;
   readonly environment: 'sandbox';
   readonly status: string;
@@ -104,7 +113,9 @@ export interface RevenueCatSubscriptionEvidence {
 
 export interface RevenueCatPurchaseEvidence {
   readonly id: string;
+  /** RevenueCat Product resource ID, as returned by purchase.product_id. */
   readonly productId: string;
+  readonly storeIdentifier: string;
   readonly store: string;
   readonly environment: 'sandbox';
   readonly status: string;
@@ -295,6 +306,7 @@ async function followSubscriptions(
     evidence.push({
       id: subscription.id,
       productId: subscription.product_id,
+      storeIdentifier: null,
       store: subscription.store,
       environment: 'sandbox',
       status: subscription.status,
@@ -346,6 +358,7 @@ async function followPurchases(
     evidence.push({
       id: purchase.id,
       productId: purchase.product_id,
+      storeIdentifier: '',
       store: purchase.store,
       environment: 'sandbox',
       status: purchase.status,
@@ -354,6 +367,56 @@ async function followPurchases(
     });
   }
   return { ok: true, data: evidence };
+}
+
+async function resolveProducts(
+  projectId: RevenueCatProjectId,
+  subscriptions: readonly RevenueCatSubscriptionEvidence[],
+  purchases: readonly RevenueCatPurchaseEvidence[],
+  options: RevenueCatAssertionAdapterOptions,
+): Promise<
+  BillingAssertionResult<{
+    subscriptions: readonly RevenueCatSubscriptionEvidence[];
+    purchases: readonly RevenueCatPurchaseEvidence[];
+  }>
+> {
+  const ids = new Set<string>();
+  for (const item of subscriptions) if (item.productId !== null) ids.add(item.productId);
+  for (const item of purchases) ids.add(item.productId);
+  const storeById = new Map<string, string>();
+  const idByStore = new Map<string, string>();
+  for (const productId of ids) {
+    const result = await readCli({ kind: 'products-show', projectId, productId }, options);
+    if (!result.ok) return cliFailure('REVENUECAT_SUBSCRIPTION', result.error);
+    const parsed = productEnvelopeSchema.safeParse(result.data);
+    if (!parsed.success || parsed.data.data.id !== productId) {
+      return malformed('REVENUECAT_SUBSCRIPTION', 'product');
+    }
+    const storeIdentifier = parsed.data.data.store_identifier;
+    const existingId = idByStore.get(storeIdentifier);
+    if (existingId !== undefined && existingId !== productId) {
+      return assertionFailure(
+        'REVENUECAT_SUBSCRIPTION',
+        'REVENUECAT_PRODUCT_MAPPING_AMBIGUOUS',
+        'RevenueCat returned multiple Product resources for one store identifier.',
+      );
+    }
+    storeById.set(productId, storeIdentifier);
+    idByStore.set(storeIdentifier, productId);
+  }
+  return {
+    ok: true,
+    data: {
+      subscriptions: subscriptions.map((item) => ({
+        ...item,
+        storeIdentifier: item.productId === null ? null : (storeById.get(item.productId) ?? null),
+      })),
+      purchases: purchases.map((item) => ({
+        ...item,
+        storeIdentifier: storeById.get(item.productId) ?? '',
+      })),
+    },
+  };
 }
 
 export function createRevenueCatAssertionAdapter(
@@ -443,6 +506,13 @@ export function createRevenueCatAssertionAdapter(
         options,
       );
       if (!purchases.ok) return purchases;
+      const products = await resolveProducts(
+        projectId,
+        subscriptions.data,
+        purchases.data,
+        options,
+      );
+      if (!products.ok) return products;
 
       const nowMillis = (options.now ?? (() => new Date()))().getTime();
       const activePro = profile.customer.active_entitlements.items.some(
@@ -458,8 +528,8 @@ export function createRevenueCatAssertionAdapter(
           customerExists: true,
           customerId: profile.customer.id,
           activePro,
-          subscriptions: subscriptions.data,
-          purchases: purchases.data,
+          subscriptions: products.data.subscriptions,
+          purchases: products.data.purchases,
         },
       };
     },

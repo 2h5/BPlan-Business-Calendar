@@ -3,9 +3,9 @@
 Status: PHASES 1–4 IMPLEMENTED, HARDENED, VERIFIED, AND PUSHED; PHASE 5
 SERVER/WEB BILLING FOUNDATION PARTIALLY IMPLEMENTED; WEB FIND TIME BOX
 IMPLEMENTED END TO END (PROPOSE + CONFIRM). Billing automation Phases 2B2,
-3A, 3B1, and 3B2 are complete, including the proven real monthly sandbox
-purchase chain. Phase 3C annual support is implemented, but live annual
-verification is blocked on exact RevenueCat product/catalog reconciliation;
+3A, 3B1, 3B2, and 3C are complete, including proven real monthly and annual
+sandbox purchase chains. The annual Product identity assertion was corrected
+and the full active-Pro authority chain passed on 2026-09-22;
 production billing remains disabled. Mobile Find Time remains in progress on a
 separate collaborator track and is awaiting a pushed completion checkpoint.
 
@@ -1040,8 +1040,7 @@ earlier recurrence checkpoint `682d1d5f8f91e001d93e11a746fec06ab2596957`)
 
 Status: **PARTIALLY IMPLEMENTED — server webhook/mirror foundation, guarded web
 billing seam, subscription/upgrade page, sandbox dashboard setup, and the real
-monthly billing automation chain are present; the annual one-shot runner is
-implemented, but exact annual product provenance remains unresolved. The
+monthly and annual billing automation chains are proven in sandbox. The
 customer billing-management URL, mobile SDK, and purchase/restore remain
 pending.**
 
@@ -1106,10 +1105,10 @@ future work.
   sandbox purchase has completed
   and converged through RevenueCat, webhook, Supabase mirror, subscription
   ledger, and server authorization after read-only reconciliation of browser
-  ambiguity. The purchase was never retried. One annual sandbox purchase was
-  attempted, produced active Pro state, and remains unresolved because exact
-  annual product provenance did not match the repository contract. No retry is
-  authorized.
+  ambiguity. The purchase was never retried. The original annual purchase was
+  later proven to reference the correct Product and expired under accelerated
+  sandbox time. A fresh annual sandbox purchase passed the corrected plan-scoped
+  assertion and complete authority chain on 2026-09-22, without retry.
 - The only currently scoped Pro capability is Find Time with AI. The broader AI
   feature ideas in the product plan are not launch commitments.
 - The web client invokes the proposal/confirmation endpoints. Mobile Find Time
@@ -2433,7 +2432,22 @@ The next implementer must:
 
 # Current Handoff
 
-## Billing pause checkpoint — 2026-09-19
+## Billing Phase 3C completion — 2026-09-22
+
+**PROVEN LIVE:** read-only catalog inspection resolved `$rc_annual` through its
+RevenueCat Product resource ID to `bplan_pro_yearly`. The prior annual purchase
+had referenced that Product; the old direct-ID assertion was wrong. Its
+subscription later renewed roughly hourly, canceled, and expired in accelerated
+sandbox time. A fresh Auth test user passed every free-baseline layer, and one
+annual submit action was attempted. Browser submission remained `UNKNOWN`, but
+read-only reconciliation and one separate `active-pro --plan annual` assertion
+passed RevenueCat Pro and annual product evidence, the active Supabase mirror,
+coherent ledger, and server-side authorization. No retry or direct billing-state
+write occurred. **Phase 3C is complete.** Production billing remains disabled.
+Phase 4 lifecycle, cancellation, renewal, expiration, and replay/order checks
+are the next billing phase.
+
+## Historical billing pause checkpoint — 2026-09-19
 
 1. **What definitely works:** the sandbox-only billing runner, free-baseline
    guard, one-shot browser submission, redacted reporting, authority polling,
@@ -2468,13 +2482,14 @@ The next implementer must:
    and explicit human approval. Mobile RevenueCat purchase/restore and live AI
    model evaluation/model selection remain separate future work.
 
+## Current Sprint 6 state
+
 Current phase:
 
 `Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
-foundation. Billing automation Phases 2B2, 3A, 3B1, and 3B2 are complete for
-the real monthly sandbox chain. Phase 3C implementation is complete, but its
-annual live acceptance remains blocked on exact RevenueCat product/catalog
-reconciliation. The independent web track has completed Web Phases 0–6 plus
+foundation. Billing automation Phases 2B2, 3A, 3B1, 3B2, and 3C are complete;
+the monthly and annual sandbox chains are proven live. Billing lifecycle
+verification is next. The independent web track has completed Web Phases 0–6 plus
 hardening; production web hardening remains pending.`
 
 Latest verified Sprint 6 checkpoint:
@@ -2518,21 +2533,17 @@ Phase 4 review-hardening checkpoint:
 `222e7652ec948c63172728a478c36acde5b52096` (review hardening; CI #32) followed
 by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33 green)
 
-Current blocker:
+Current pending gates:
 
-`The annual sandbox attempt produced active Pro evidence backed by an unexpected
-RevenueCat product, while exact plan-scoped assertions fail with
-REVENUECAT_EXPECTED_PLAN_MISSING. Read-only live catalog inspection is blocked
-by CLI_AUTHORIZATION. Live Luna/Terra evaluation still needs an authorized
-server-side OpenAI key and explicit cost authorization. Production billing stays
+`Annual Phase 3C is complete; billing lifecycle verification remains pending.
+Live Luna/Terra evaluation still needs an authorized server-side OpenAI key and
+explicit cost authorization. Production billing stays
 disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Do not run another purchase. Obtain read-only RevenueCat catalog access,
-inspect the live bplan_web package/product relationships, and reconcile the
-unexpected active product against the repository contract before deciding
-whether any code or provider change is warranted. Preserve deterministic
+`Plan the separately authorized Phase 4 sandbox lifecycle checks for
+cancellation, renewal, expiration, and replay/order behavior. Preserve deterministic
 candidate membership as the sole availability authority.`
 
 Current Sprint 6 verification evidence:
