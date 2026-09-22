@@ -1,0 +1,169 @@
+name: RevenueCat sandbox billing
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Billing operation to run
+        required: true
+        type: choice
+        options:
+          - preflight
+          - monthly-assertion
+          - annual-assertion
+          - lifecycle-read-only
+          - annual-renewal-read-only
+          - sandbox-purchase
+        default: preflight
+      purchase_plan:
+        description: Plan for the explicitly selected sandbox purchase
+        required: true
+        type: choice
+        options: [monthly, annual]
+        default: monthly
+      confirm_sandbox_purchase:
+        description: Confirm one sandbox purchase attempt for a dedicated free test user
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: revenuecat-sandbox-billing
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify selected sandbox billing operation
+    runs-on: ubuntu-24.04
+    environment:
+      name: billing-sandbox
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate selected inputs
+        shell: bash
+        env:
+          BILLING_OPERATION: ${{ inputs.operation }}
+          BILLING_PURCHASE_PLAN: ${{ inputs.purchase_plan }}
+          BILLING_PURCHASE_CONFIRMED: ${{ inputs.confirm_sandbox_purchase }}
+        run: |
+          case "$BILLING_OPERATION" in
+            preflight|monthly-assertion|annual-assertion|lifecycle-read-only|annual-renewal-read-only|sandbox-purchase) ;;
+            *) echo "::error::Unsupported billing operation."; exit 1 ;;
+          esac
+          case "$BILLING_PURCHASE_PLAN" in
+            monthly|annual) ;;
+            *) echo "::error::Unsupported sandbox purchase plan."; exit 1 ;;
+          esac
+          case "$BILLING_PURCHASE_CONFIRMED" in
+            true|false) ;;
+            *) echo "::error::Invalid purchase confirmation input."; exit 1 ;;
+          esac
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.6
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Billing typecheck
+        run: pnpm billing:typecheck
+
+      - name: Billing build
+        run: pnpm billing:build
+
+      - name: Offline billing preflight
+        if: ${{ inputs.operation == 'preflight' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: offline
+        run: pnpm billing:preflight
+
+      - name: Require explicit purchase confirmation
+        if: ${{ inputs.operation == 'sandbox-purchase' && inputs.confirm_sandbox_purchase != true }}
+        run: |
+          echo "::error::Select sandbox-purchase and confirm_sandbox_purchase to authorize a sandbox purchase attempt."
+          exit 1
+
+      - name: Monthly read-only assertion
+        if: ${{ inputs.operation == 'monthly-assertion' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_MONTHLY_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:assert-user -- --expect active-pro --plan monthly
+
+      - name: Annual read-only assertion
+        if: ${{ inputs.operation == 'annual-assertion' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_ANNUAL_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:assert-user -- --expect active-pro --plan annual
+
+      - name: Annual lifecycle read-only assertion
+        if: ${{ inputs.operation == 'lifecycle-read-only' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_LIFECYCLE_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:lifecycle:read-only
+
+      - name: Annual natural renewal read-only observation
+        if: ${{ inputs.operation == 'annual-renewal-read-only' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_RENEWAL_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:lifecycle:renewal
+
+      - name: Locate preinstalled Chrome for sandbox purchase
+        id: chrome
+        if: ${{ inputs.operation == 'sandbox-purchase' && inputs.confirm_sandbox_purchase == true }}
+        shell: bash
+        run: |
+          if command -v google-chrome >/dev/null 2>&1; then
+            chrome_path="$(command -v google-chrome)"
+          elif command -v google-chrome-stable >/dev/null 2>&1; then
+            chrome_path="$(command -v google-chrome-stable)"
+          else
+            echo "::error::Chrome is unavailable on this runner; no purchase was attempted."
+            exit 1
+          fi
+          printf 'path=%s\n' "$chrome_path" >> "$GITHUB_OUTPUT"
+
+      - name: Explicit sandbox purchase
+        if: ${{ inputs.operation == 'sandbox-purchase' && inputs.confirm_sandbox_purchase == true }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: sandbox-purchase
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_PURCHASE_TEST_USER_ID }}
+          BILLING_REVENUECAT_SANDBOX_PURCHASE_URL: ${{ secrets.BILLING_REVENUECAT_SANDBOX_PURCHASE_URL }}
+          BILLING_PLAYWRIGHT_EXECUTABLE_PATH: ${{ steps.chrome.outputs.path }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+          BILLING_PURCHASE_PLAN: ${{ inputs.purchase_plan }}
+        run: pnpm billing:e2e:sandbox -- --plan "$BILLING_PURCHASE_PLAN"

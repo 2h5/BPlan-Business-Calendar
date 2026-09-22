@@ -2515,12 +2515,11 @@ manual CI integration is next.
 
 Current phase:
 
-`Sprint 6 is paused after Phase 4 and the partial Phase 5 server/web billing
-foundation. Billing automation Phases 2B2, 3A, 3B1, 3B2, and 3C are complete;
-the monthly and annual sandbox chains are proven live. Billing automation Phase 4
-lifecycle verification is complete; Phase 5 manual CI integration is next.
-The independent web track has completed Web Phases 0–6 plus
-hardening; production web hardening remains pending.`
+`Billing automation Phase 4 lifecycle verification is complete. Phase 5 manual
+CI workflow code is implemented and statically verified on its feature branch;
+protected GitHub Environment setup and a separately authorized live dispatch
+remain pending. The monthly and annual sandbox chains are proven live.
+Production billing and production web hardening remain pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2565,17 +2564,19 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current pending gates:
 
-`Annual Phase 3C and billing Phase 4 lifecycle are complete; Phase 5 manual CI
-integration remains pending.
+`Annual Phase 3C and billing Phase 4 lifecycle are complete. Phase 5 manual CI
+workflow code is implemented and offline-tested; protected Environment setup
+and a live dispatch remain pending.
 Live Luna/Terra evaluation still needs an authorized server-side OpenAI key and
 explicit cost authorization. Production billing stays
 disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Plan billing automation Phase 5 manual CI integration with protected secrets
-and an explicit sandbox dispatch. Preserve deterministic candidate membership
-as the sole availability authority.`
+`Configure and protect the billing-sandbox GitHub Environment, add the named
+secrets, and merge the manual-only workflow to the default branch. Then choose
+one read-only sandbox operation for the first authorized dispatch. The optional
+sandbox purchase requires its explicit operation and confirmation inputs.`
 
 Current Sprint 6 verification evidence:
 
@@ -2595,3 +2596,22 @@ GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/
 passed both the static and hosted migrations/RLS/generated-types jobs for the
 earlier billing checkpoint. No newer CI result is claimed in this handoff; the
 local `pnpm verify` command remains environment-dependent.
+
+### Billing automation Phase 5 — 2026-09-22
+
+Status: **IMPLEMENTED / VERIFIED LOCALLY; NO LIVE DISPATCH**
+
+The manual-only workflow is at
+[.github/workflows/revenuecat-sandbox-billing.yml](../.github/workflows/revenuecat-sandbox-billing.yml)
+and defaults to offline preflight. It offers monthly/annual read-only
+assertions, annual lifecycle and renewal read-only observations, and a
+separately confirmed sandbox purchase. Production is not an input and the
+target is fixed to sandbox. The static workflow test checks the trigger,
+default, secret sources, production boundary, explicit mutation gate, and reuse
+of local package commands. Normal CI remains provider-independent.
+
+Before dispatch, create the protected billing-sandbox GitHub Environment,
+require an authorized reviewer, prevent self-review, disable administrator
+bypass, allow deployments from main only, configure the workflow's named
+Environment secrets, and ensure the workflow has reached the default branch.
+No live dispatch has been run.

@@ -9,8 +9,15 @@ Final legal documents and production billing remain intentionally blocked.**
 Billing automation Phase 4 is complete: cancellation retained access until
 expiry, expiration revoked Pro, and a separate fresh annual subscription
 renewed naturally with provider, mirror, ledger, and server authority aligned.
-Replay/order behavior passed deterministic webhook and database checks. Phase 5
-manual CI integration is next; production billing remains disabled.
+Replay/order behavior passed deterministic webhook and database checks.
+Production billing remains disabled.
+
+The Phase 5 manual GitHub Actions workflow is implemented and statically
+verified on its feature branch; no live dispatch has been run. It requires a
+protected billing-sandbox Environment and uses GitHub Environment secrets,
+not the local billing secrets file. See
+[the automation plan](revenuecat-automation-plan.md) for the operation list
+and exact setup gate. Production billing remains disabled.
 
 Last verified: **2026-09-22**
 

@@ -18,8 +18,9 @@ no retry occurred. No UUID, credential, purchase URL, provider payload, or payme
 is recorded here. Phase 4 is complete: cancellation retained paid access,
 expiration revoked Pro, one fresh annual subscription renewed naturally into
 an extended active period, and replay/order behavior passed deterministic
-webhook and database tests. Phase 5 manual CI integration is next. Production
-remains disabled. This document is the
+webhook and database tests. Phase 5 workflow code is implemented and offline-
+tested; protected GitHub Environment setup and a live dispatch remain pending.
+Production remains disabled. This document is the
 implementation source of truth for the RevenueCat web-billing automation track.
 
 Audit baseline: `origin/main` at `15c3ea5a5975f647a2c116dbc5e31f41ec1645e3`
@@ -1102,7 +1103,8 @@ renewal extended the paid period with active provider, mirror, ledger, and
 server authority. The webhook sequence tests and Postgres ordering/RLS tests
 verify sequential replay deduplication and stale/out-of-order protection;
 provider-side duplicate delivery was not manufactured or claimed live.
-Production billing remains disabled. Phase 5 manual CI integration is next.
+Production billing remains disabled. Phase 5 workflow code is implemented;
+protected Environment setup and live dispatch remain pending.
 
 ### Phase 5 — manually triggered GitHub Actions integration
 
@@ -1117,6 +1119,46 @@ Production billing remains disabled. Phase 5 manual CI integration is next.
   dispatch and secrets.
 - Exit criteria: a manual run can be audited from its report without exposing
   credentials and cannot target production.
+
+#### Phase 5 implementation checkpoint — 2026-09-22
+
+**IMPLEMENTED / VERIFIED LOCALLY; NO LIVE WORKFLOW DISPATCH:** the
+[manual workflow](../.github/workflows/revenuecat-sandbox-billing.yml) uses
+workflow_dispatch only, requires the protected billing-sandbox GitHub
+Environment, and defaults to an offline preflight. Read-only operation choices
+cover monthly and annual assertions, annual lifecycle state, and annual natural
+renewal observation. The only mutation choice is a sandbox purchase; it
+requires both selecting that operation and setting confirm_sandbox_purchase to
+true. Cancellation, refund, and extension are not workflow operations.
+
+The workflow pins Node.js 20.19.6 and pnpm 9.12.0, installs from the lockfile,
+then runs billing typecheck/build and only the selected operation. Its sandbox
+target is fixed in the job steps; there is no environment selector. Live
+commands receive credentials and dedicated test identities from
+billing-sandbox Environment secrets. The local external secret file at
+`Z:\Dev\Secrets\BCalAI\billing.env` is not used in CI. The optional purchase link is a secret and the purchase
+identity must be a dedicated, free sandbox user. No diagnostics artifact is
+uploaded.
+
+Before a first live run, an administrator must create the billing-sandbox
+Environment, require an authorized reviewer, prevent self-review, disable
+administrator bypass, and allow deployments from main only. Add these
+Environment secrets:
+
+- `REVENUECAT_API_KEY`
+- `BILLING_SUPABASE_URL`
+- `BILLING_SUPABASE_SERVICE_ROLE_KEY`
+- `BILLING_MONTHLY_TEST_USER_ID`
+- `BILLING_ANNUAL_TEST_USER_ID`
+- `BILLING_LIFECYCLE_TEST_USER_ID`
+- `BILLING_RENEWAL_TEST_USER_ID`
+- `BILLING_PURCHASE_TEST_USER_ID` (only if purchase is enabled)
+- `BILLING_REVENUECAT_SANDBOX_PURCHASE_URL` (only if purchase is enabled)
+
+Each operation uses its own dedicated test identity secret. The workflow must
+also be present on the repository's default branch before GitHub can dispatch
+it. Static tests prove its trigger/input/secret/mutation boundaries; no live
+dispatch or purchase has been run for this checkpoint.
 
 ### Phase 6 — adversarial hardening + documentation closeout
 
@@ -1191,12 +1233,12 @@ It does not include:
   configuration change.
 
 Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, Phase 3B2, Phase 3C, and Phase 4
-are complete. The real monthly sandbox purchase proved RevenueCat, webhook,
+are complete. Phase 5 workflow code is implemented and offline-tested; GitHub
+Environment setup and a live dispatch remain pending. The real monthly sandbox purchase proved RevenueCat, webhook,
 Supabase mirror, ledger, and server authorization convergence; browser
 ambiguity was handled by read-only reconciliation and the purchase was never
 retried. The fresh annual sandbox purchase passed the same active-Pro authority
 chain under the corrected Product identity assertion, with browser ambiguity
 resolved read-only and no retry. Phase 4 proved cancellation through expiry and
 natural annual renewal; deterministic webhook and database tests cover replay
-and ordering. Phase 5 manual CI integration is next; production billing remains
-disabled.
+and ordering. Production billing remains disabled.

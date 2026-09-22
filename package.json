@@ -22,7 +22,7 @@
     "billing:checkout-probe": "pnpm billing:build && node tools/billing/dist/checkout-probe-cli.js",
     "billing:e2e:sandbox": "pnpm billing:build && node tools/billing/dist/sandbox-purchase-cli.js",
     "billing:preflight": "pnpm billing:build && node tools/billing/dist/cli.js",
-    "billing:test": "vitest run tools/billing/preflight.test.ts tools/billing/revenuecat-cli.test.ts tools/billing/assert-user.test.ts tools/billing/supabase-assertions.test.ts tools/billing/checkout-ready.test.ts tools/billing/checkout-probe.test.ts tools/billing/sandbox-purchase.test.ts tools/billing/lifecycle.test.ts tools/billing/lifecycle-cancel.test.ts",
+    "billing:test": "vitest run tools/billing/preflight.test.ts tools/billing/revenuecat-cli.test.ts tools/billing/assert-user.test.ts tools/billing/supabase-assertions.test.ts tools/billing/checkout-ready.test.ts tools/billing/checkout-probe.test.ts tools/billing/sandbox-purchase.test.ts tools/billing/lifecycle.test.ts tools/billing/lifecycle-cancel.test.ts tools/billing/manual-ci-workflow.test.ts",
     "billing:typecheck": "tsc --noEmit -p tools/billing/tsconfig.json",
     "typecheck": "pnpm -r --if-present typecheck && pnpm billing:typecheck",
     "lint": "eslint .",
