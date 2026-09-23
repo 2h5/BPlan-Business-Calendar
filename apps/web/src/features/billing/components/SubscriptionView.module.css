@@ -20,8 +20,16 @@
   gap: clamp(3rem, 7vw, 6.5rem);
   overflow: hidden;
   background:
-    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 34%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-bg-surface) 93%, var(--color-accent) 7%), var(--color-bg-surface));
+    radial-gradient(
+      circle at 78% 18%,
+      color-mix(in srgb, var(--color-accent) 18%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-bg-surface) 93%, var(--color-accent) 7%),
+      var(--color-bg-surface)
+    );
   box-shadow: 0 24px 58px color-mix(in srgb, var(--color-accent) 10%, transparent);
   isolation: isolate;
 }
@@ -254,8 +262,16 @@
 .cardPro {
   border-color: color-mix(in srgb, var(--color-accent) 48%, transparent);
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-accent) 13%, transparent), transparent 31%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-surface)) 0%, var(--color-bg-surface) 38%);
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--color-accent) 13%, transparent),
+      transparent 31%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-surface)) 0%,
+      var(--color-bg-surface) 38%
+    );
   box-shadow: 0 22px 54px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
