@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { platform, tmpdir } from 'node:os';
+import { isAbsolute, relative } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { BILLING_CONTRACT, REVENUECAT_CLI_APPROVED_VERSION } from './contract';
@@ -68,6 +71,49 @@ describe('RevenueCat CLI boundary', () => {
 
     expect(result).toEqual({ ok: true, version: '0.1.1' });
     expect(fake.invocations[0]?.argv).toEqual(['version', '--json', '--no-input', '--no-color']);
+    const configDirectory = fake.invocations[0]?.env.RC_CONFIG_DIR;
+    expect(configDirectory).toBeDefined();
+    expect(configDirectory && isAbsolute(configDirectory)).toBe(true);
+    expect(configDirectory && existsSync(configDirectory)).toBe(false);
+  });
+
+  it('initializes the pinned CLI with an isolated config location and no home variables', async () => {
+    const bare = await createRealRevenueCatCliRunner()({
+      argv: ['version', '--json', '--no-input', '--no-color'],
+      env: {},
+    });
+    if (platform() === 'linux') expect(bare.exitCode).toBe(1);
+
+    const result = await checkRevenueCatCliVersion({ parentEnvironment: {} });
+    expect(result).toEqual({ ok: true, version: REVENUECAT_CLI_APPROVED_VERSION });
+    expect(JSON.stringify(result)).not.toContain('stderr');
+  });
+
+  it('keeps the config directory usable only for the child invocation', async () => {
+    let configDirectory = '';
+    const runner: RevenueCatCliRunner = async ({ argv, env }) => {
+      configDirectory = env.RC_CONFIG_DIR ?? '';
+      expect(argv).toEqual(['version', '--json', '--no-input', '--no-color']);
+      expect(existsSync(configDirectory)).toBe(true);
+      expect(env.RC_API_KEY).toBeUndefined();
+      expect(env.HOME).toBeUndefined();
+      expect(env.XDG_CONFIG_HOME).toBeUndefined();
+      return jsonOutput({ version: REVENUECAT_CLI_APPROVED_VERSION });
+    };
+
+    const result = await checkRevenueCatCliVersion({
+      runner,
+      parentEnvironment: {
+        RC_API_KEY: 'ambient-secret',
+        RC_CONFIG_DIR: '/ambient/revenuecat',
+        HOME: '/ambient/home',
+        XDG_CONFIG_HOME: '/ambient/config',
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(configDirectory).not.toBe('/ambient/revenuecat');
+    expect(existsSync(configDirectory)).toBe(false);
   });
 
   it('rejects older, newer, and malformed CLI versions', async () => {
@@ -167,7 +213,8 @@ describe('RevenueCat CLI boundary', () => {
     ]);
     expect(physicalArgv).not.toContain(API_KEY);
     expect(shell).toBe(false);
-    expect(childEnvironment).toEqual({ Path: 'C:\\Windows\\System32', RC_API_KEY: API_KEY });
+    expect(childEnvironment).toMatchObject({ Path: 'C:\\Windows\\System32', RC_API_KEY: API_KEY });
+    expect(childEnvironment?.RC_CONFIG_DIR).toBeDefined();
   });
 
   it('maps an unresolved pinned launcher to CLI_EXECUTABLE_NOT_FOUND', async () => {
@@ -279,6 +326,8 @@ describe('RevenueCat CLI boundary', () => {
           TMP: 'C:\\Tmp',
           TMPDIR: '/tmp/revenuecat',
           HOME: '/home/test-user',
+          XDG_CONFIG_HOME: '/home/test-user/.config',
+          RC_CONFIG_DIR: '/home/test-user/.config/revenuecat',
           USERPROFILE: 'C:\\Users\\test-user',
           HTTP_PROXY: 'http://proxy-user:proxy-secret@example.test',
           HTTPS_PROXY: 'https://proxy-user:proxy-secret@example.test',
@@ -321,6 +370,15 @@ describe('RevenueCat CLI boundary', () => {
     expect(invocation.argv).not.toContain(API_KEY);
     expect(invocation.argv).not.toContain('--yes');
     expect(invocation.env.RC_API_KEY).toBe(API_KEY);
+    const configDirectory = invocation.env.RC_CONFIG_DIR;
+    expect(configDirectory).toBeDefined();
+    if (!configDirectory) throw new Error('isolated config directory was not supplied');
+    expect(isAbsolute(configDirectory)).toBe(true);
+    expect(relative(tmpdir(), configDirectory)).toMatch(/^bcalai-revenuecat-/);
+    expect(existsSync(configDirectory)).toBe(false);
+    expect(configDirectory).not.toBe('/home/test-user/.config/revenuecat');
+    expect(invocation.env.HOME).toBeUndefined();
+    expect(invocation.env.XDG_CONFIG_HOME).toBeUndefined();
     expect(invocation.env.RC_PROJECT_ID).toBeUndefined();
     expect(invocation.env.RC_PROFILE).toBeUndefined();
     expect(invocation.env.REVENUECAT_API_KEY).toBeUndefined();
@@ -332,6 +390,7 @@ describe('RevenueCat CLI boundary', () => {
       TEMP: 'C:\\Temp',
       TMP: 'C:\\Tmp',
       TMPDIR: '/tmp/revenuecat',
+      RC_CONFIG_DIR: configDirectory,
       RC_API_KEY: API_KEY,
     });
   });
@@ -360,17 +419,17 @@ describe('RevenueCat CLI boundary', () => {
   });
 
   it('copies PATH case-insensitively without copying similarly named variables', () => {
-    const uppercasePath = buildRevenueCatChildEnvironment(undefined, {
+    const uppercasePath = buildRevenueCatChildEnvironment(undefined, '/isolated/config', {
       PATH: 'uppercase-path',
       PATH_SECRET: 'must-not-be-forwarded',
     });
-    const titleCasePath = buildRevenueCatChildEnvironment(undefined, {
+    const titleCasePath = buildRevenueCatChildEnvironment(undefined, '/isolated/config', {
       Path: 'title-case-path',
       PathToken: 'must-not-be-forwarded',
     });
 
-    expect(uppercasePath).toEqual({ PATH: 'uppercase-path' });
-    expect(titleCasePath).toEqual({ Path: 'title-case-path' });
+    expect(uppercasePath).toEqual({ PATH: 'uppercase-path', RC_CONFIG_DIR: '/isolated/config' });
+    expect(titleCasePath).toEqual({ Path: 'title-case-path', RC_CONFIG_DIR: '/isolated/config' });
   });
 
   it('uses the fixed read-only subprocess timeout', () => {

@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 import { BILLING_CONTRACT, REVENUECAT_CLI_APPROVED_VERSION } from './contract';
@@ -481,6 +484,7 @@ function copyEnvironmentVariableCaseInsensitively(
 /** Creates a minimal child environment without forwarding ambient application secrets. */
 export function buildRevenueCatChildEnvironment(
   apiKey: string | undefined,
+  configDirectory: string,
   parentEnvironment: Readonly<Record<string, string | undefined>> = process.env,
 ): Readonly<Record<string, string | undefined>> {
   const childEnvironment: Record<string, string | undefined> = {};
@@ -488,6 +492,7 @@ export function buildRevenueCatChildEnvironment(
     copyEnvironmentVariableCaseInsensitively(childEnvironment, parentEnvironment, approvedName);
   }
 
+  childEnvironment.RC_CONFIG_DIR = configDirectory;
   if (apiKey !== undefined) childEnvironment.RC_API_KEY = apiKey;
 
   return childEnvironment;
@@ -560,6 +565,24 @@ export function createRealRevenueCatCliRunner(
 
 const realRevenueCatCliRunner = createRealRevenueCatCliRunner();
 
+/** Give each CLI invocation its own empty config directory and remove it afterward. */
+async function runWithIsolatedConfig(
+  argv: readonly string[],
+  apiKey: string | undefined,
+  parentEnvironment: Readonly<Record<string, string | undefined>> | undefined,
+  runner: RevenueCatCliRunner,
+): Promise<RevenueCatCliProcessResult> {
+  const configDirectory = mkdtempSync(join(tmpdir(), 'bcalai-revenuecat-'));
+  try {
+    return await runner({
+      argv,
+      env: buildRevenueCatChildEnvironment(apiKey, configDirectory, parentEnvironment),
+    });
+  } finally {
+    rmSync(configDirectory, { recursive: true, force: true });
+  }
+}
+
 /** One explicit sandbox cancellation. Keep mutation outside the read-only operation union. */
 export async function cancelRevenueCatSandboxSubscriptionOnce(
   projectId: RevenueCatProjectId,
@@ -574,8 +597,8 @@ export async function cancelRevenueCatSandboxSubscriptionOnce(
     return errorResult('CLI_API_KEY_MISSING', 'A RevenueCat API key is required.');
   let result: RevenueCatCliProcessResult;
   try {
-    result = await (options.runner ?? realRevenueCatCliRunner)({
-      argv: [
+    result = await runWithIsolatedConfig(
+      [
         'subscriptions',
         'cancel',
         subscription.data,
@@ -584,8 +607,10 @@ export async function cancelRevenueCatSandboxSubscriptionOnce(
         '--project-id',
         project.data,
       ],
-      env: buildRevenueCatChildEnvironment(options.apiKey, options.parentEnvironment),
-    });
+      options.apiKey,
+      options.parentEnvironment,
+      options.runner ?? realRevenueCatCliRunner,
+    );
   } catch {
     return errorResult('CLI_PROCESS_ERROR', 'RevenueCat CLI process failed.');
   }
@@ -695,15 +720,16 @@ export async function runRevenueCatCli(
     });
   }
 
-  const invocation: RevenueCatCliInvocation = {
-    argv: argumentsResult.argv,
-    env: buildRevenueCatChildEnvironment(options.apiKey, options.parentEnvironment),
-  };
   const runner = options.runner ?? realRevenueCatCliRunner;
 
   let processResult: RevenueCatCliProcessResult;
   try {
-    processResult = await runner(invocation);
+    processResult = await runWithIsolatedConfig(
+      argumentsResult.argv,
+      options.apiKey,
+      options.parentEnvironment,
+      runner,
+    );
   } catch {
     return withOperation(operation.kind, {
       code: 'CLI_PROCESS_ERROR',
