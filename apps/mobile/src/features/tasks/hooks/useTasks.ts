@@ -1,9 +1,12 @@
-import type { CreateTaskInput, UpdateTaskInput } from '@cal/schemas';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type NextTaskDue, nextTaskDue } from '@cal/domain';
+import type { CreateTaskInput, Task, UpdateTaskInput } from '@cal/schemas';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { useCallback } from 'react';
 
 import { queryKeys } from '../../../lib/query/query-client';
 import { useAuth, useRequiredUserId } from '../../auth';
+import { useUserTimeZone } from '../../settings/hooks/useProfile';
 import {
   type TaskWithTags,
   createTask,
@@ -98,19 +101,66 @@ export function useUpdateTask() {
   });
 }
 
+/** Where a completed repeating task moves; null when it just completes. */
+function nextDueOf(task: Task, timeZone: string): NextTaskDue | null {
+  if (!task.recurrenceRule || !task.dueAt) return null;
+  return nextTaskDue(
+    {
+      dueAt: new Date(task.dueAt),
+      hasDueTime: task.hasDueTime,
+      recurrenceRule: task.recurrenceRule,
+      timeZone,
+    },
+    new Date(),
+  );
+}
+
+interface ToggleVariables {
+  id: string;
+  completed: boolean;
+  /**
+   * The optimistic move, resolved from the cache before the optimistic update
+   * rewrites the cached due date. `null` when the cached task does not repeat;
+   * `undefined` when it was not cached, as when a reminder's "Complete" action
+   * cold-starts the app. The request itself always re-reads a repeating task.
+   */
+  next?: NextTaskDue | null;
+}
+
 /**
  * Completion is the most-used action in the app, so it is fully optimistic:
  * the row updates and the haptic fires before the request is even sent.
+ *
+ * Completing a repeating task moves it to its next due date and leaves it
+ * open, rather than completing it — until its series runs out.
  */
 export function useToggleTaskComplete() {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateTasks();
+  const timeZone = useUserTimeZone();
 
-  return useMutation({
-    mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      setTaskCompleted(id, completed),
+  const mutation = useMutation({
+    mutationFn: async ({ id, completed, next }: ToggleVariables) => {
+      // A task the cache knows does not repeat completes directly. Anything
+      // that may repeat is re-read first: the move is worked out from the
+      // stored rule, never a cached copy that another device may have changed.
+      if (!completed || next === null) return setTaskCompleted(id, completed);
 
-    onMutate: async ({ id, completed }) => {
+      const stored = await fetchTask(id);
+      const advance = nextDueOf(stored, timeZone);
+      if (!advance) return setTaskCompleted(id, true);
+
+      return updateTask({
+        id,
+        dueAt: advance.dueAt.toISOString(),
+        // Only a COUNT changes the rule; otherwise leave the column untouched.
+        ...(advance.recurrenceRule !== stored.recurrenceRule
+          ? { recurrenceRule: advance.recurrenceRule }
+          : {}),
+      });
+    },
+
+    onMutate: async ({ id, completed, next }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all() });
 
       void Haptics.impactAsync(
@@ -121,19 +171,20 @@ export function useToggleTaskComplete() {
         queryKey: queryKeys.tasks.all(),
       });
 
+      const patch = (task: TaskWithTags): TaskWithTags =>
+        completed && next
+          ? { ...task, dueAt: next.dueAt.toISOString(), recurrenceRule: next.recurrenceRule }
+          : {
+              ...task,
+              status: completed ? 'completed' : 'open',
+              completedAt: completed ? new Date().toISOString() : null,
+            };
+
       for (const [key, tasks] of snapshots) {
         if (!Array.isArray(tasks)) continue;
         queryClient.setQueryData<TaskWithTags[]>(
           key,
-          tasks.map((task) =>
-            task.id === id
-              ? {
-                  ...task,
-                  status: completed ? 'completed' : 'open',
-                  completedAt: completed ? new Date().toISOString() : null,
-                }
-              : task,
-          ),
+          tasks.map((task) => (task.id === id ? patch(task) : task)),
         );
       }
 
@@ -149,6 +200,33 @@ export function useToggleTaskComplete() {
 
     onSettled: () => void invalidate(),
   });
+
+  const { mutate: mutateResolved } = mutation;
+  const mutate = useCallback(
+    ({ id, completed }: { id: string; completed: boolean }) => {
+      const cached = completed ? findCachedTask(queryClient, id) : null;
+      mutateResolved({
+        id,
+        completed,
+        next: completed ? (cached ? nextDueOf(cached, timeZone) : undefined) : null,
+      });
+    },
+    [mutateResolved, queryClient, timeZone],
+  );
+
+  return { ...mutation, mutate };
+}
+
+function findCachedTask(queryClient: QueryClient, id: string): TaskWithTags | null {
+  const collections = queryClient.getQueriesData<TaskWithTags[]>({
+    queryKey: queryKeys.tasks.all(),
+  });
+  for (const [, tasks] of collections) {
+    if (!Array.isArray(tasks)) continue;
+    const task = tasks.find((candidate) => candidate.id === id);
+    if (task) return task;
+  }
+  return null;
 }
 
 export function useDeleteTask() {

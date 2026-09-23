@@ -1,4 +1,11 @@
-import { PRIORITY_LABELS, describeTaskDue, formatDuration, isNotablePriority } from '@cal/domain';
+import {
+  PRIORITY_LABELS,
+  describeRRule,
+  describeTaskDue,
+  formatDuration,
+  isNotablePriority,
+  parseRRule,
+} from '@cal/domain';
 import type { HourCycle, Task, TaskPriority } from '@cal/schemas';
 import { Checkbox, Text, strikeThroughStyle, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +36,8 @@ export interface TaskRowProps {
  * estimate as small rectangular tags — so a task reads the same on both
  * surfaces. Where the web reveals snooze and delete on hover, which a touch
  * screen has no equivalent for, the row exposes them on swipe instead.
+ * Swiping the other way completes the task (or reopens a completed one) the
+ * moment the row settles open, so it takes one gesture, not a swipe and a tap.
  */
 export function TaskRow({
   task,
@@ -62,6 +71,19 @@ export function TaskRow({
         ? { fg: theme.colors.accent, bg: theme.colors.accentSubtle }
         : { fg: theme.colors.textSecondary, bg: theme.colors.surfaceElevated };
 
+  const renderLeftActions = () => (
+    <SwipeAction
+      icon={completed ? 'arrow-undo-outline' : 'checkmark-circle-outline'}
+      label={completed ? 'Reopen' : 'Done'}
+      background={theme.colors.successSubtle}
+      tint={theme.colors.success}
+      onPress={() => {
+        swipeableRef.current?.close();
+        onToggleComplete(!completed);
+      }}
+    />
+  );
+
   const renderRightActions = () => (
     <View style={{ flexDirection: 'row' }}>
       {onSnooze ? (
@@ -93,6 +115,7 @@ export function TaskRow({
 
   const showPriority = isNotablePriority(task.priority) && !completed;
   const showDue = due.tone !== 'none' && !completed;
+  const repeat = showDue && task.recurrenceRule ? parseRRule(task.recurrenceRule) : null;
   const showDuration = task.estimatedMinutes !== null && task.estimatedMinutes > 0;
   const hasBadges = Boolean(listName) || showPriority || showDue || showDuration;
 
@@ -100,9 +123,16 @@ export function TaskRow({
     <ReanimatedSwipeable
       ref={swipeableRef}
       friction={2}
+      leftThreshold={72}
       rightThreshold={40}
-      enabled={!!onSnooze || !!onDelete}
+      renderLeftActions={renderLeftActions}
       renderRightActions={onSnooze || onDelete ? renderRightActions : undefined}
+      onSwipeableOpen={(direction) => {
+        // Left actions open with a rightward swipe.
+        if (direction !== 'right') return;
+        swipeableRef.current?.close();
+        onToggleComplete(!completed);
+      }}
     >
       <Pressable
         accessibilityRole="button"
@@ -169,6 +199,15 @@ export function TaskRow({
 
               {showDue ? <Badge label={due.text} fg={dueTone.fg} bg={dueTone.bg} /> : null}
 
+              {repeat ? (
+                <Ionicons
+                  name="repeat"
+                  size={13}
+                  color={theme.colors.textTertiary}
+                  accessibilityLabel={`Repeats: ${describeRRule(repeat)}`}
+                />
+              ) : null}
+
               {showDuration ? (
                 <View style={[styles.listPill, { gap: 3 }]}>
                   <Ionicons name="time-outline" size={11} color={theme.colors.textTertiary} />
@@ -207,7 +246,7 @@ function SwipeAction({
   tint,
   onPress,
 }: {
-  icon: 'time-outline' | 'trash-outline';
+  icon: 'time-outline' | 'trash-outline' | 'checkmark-circle-outline' | 'arrow-undo-outline';
   label: string;
   background: string;
   tint: string;

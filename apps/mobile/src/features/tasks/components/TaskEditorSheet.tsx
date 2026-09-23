@@ -13,6 +13,7 @@ import { Alert, ScrollView, View } from 'react-native';
 import { DueDateField, type DueDateValue } from './DueDateField';
 import { DurationField } from './DurationField';
 import { ListPicker } from './ListPicker';
+import { RecurrenceField } from '../../events/components/RecurrenceField';
 import { useProfile, useUserTimeZone } from '../../settings/hooks/useProfile';
 import {
   useCreateTask,
@@ -45,6 +46,7 @@ interface FormState {
   priority: TaskPriority;
   due: DueDateValue;
   estimatedMinutes: number | null;
+  recurrenceRule: string | null;
 }
 
 const EMPTY_FORM: FormState = {
@@ -54,6 +56,7 @@ const EMPTY_FORM: FormState = {
   priority: 'normal',
   due: { dueAt: null, hasTime: false },
   estimatedMinutes: null,
+  recurrenceRule: null,
 };
 
 /**
@@ -101,6 +104,7 @@ export function TaskEditorSheet({
           hasTime: existing.hasDueTime,
         },
         estimatedMinutes: existing.estimatedMinutes,
+        recurrenceRule: existing.recurrenceRule,
       });
       setError(null);
     }
@@ -124,6 +128,8 @@ export function TaskEditorSheet({
       dueAt: form.due.dueAt?.toISOString() ?? null,
       hasDueTime: form.due.hasTime,
       estimatedMinutes: form.estimatedMinutes,
+      // A task repeats from its due date, so without one there is nothing to repeat.
+      recurrenceRule: form.due.dueAt ? form.recurrenceRule : null,
     } satisfies Partial<CreateTaskInput> & { title: string };
 
     try {
@@ -211,6 +217,14 @@ export function TaskEditorSheet({
           timeZone={timeZone}
           hourCycle={profile?.hourCycle ?? 'h23'}
         />
+
+        {form.due.dueAt ? (
+          <RecurrenceField
+            subject="task"
+            value={form.recurrenceRule}
+            onChange={(recurrenceRule) => setForm((previous) => ({ ...previous, recurrenceRule }))}
+          />
+        ) : null}
 
         <DurationField
           value={form.estimatedMinutes}
