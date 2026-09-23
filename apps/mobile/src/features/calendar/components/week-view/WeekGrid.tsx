@@ -2,6 +2,7 @@ import {
   isOccurrenceMovable,
   layoutOverlappingEvents,
   MIN_VISUAL_MINUTES,
+  minuteOfDay,
   toZonedDateKey,
 } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
@@ -11,10 +12,12 @@ import { View, type ViewStyle } from 'react-native';
 import { GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import Animated from 'react-native-reanimated';
 
+import { WeekAllDayStrip } from './WeekAllDayStrip';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 import { usePageSwipe } from '../../hooks/usePageSwipe';
 import { dateKeyToInstant, weekDateKeys, weekdayOf, weekIndexOf } from '../../utils/window';
 import { DraggableEventChip, type EventMove } from '../DraggableEventChip';
+import { NowIndicator } from '../NowIndicator';
 
 const HOUR_HEIGHT = 44;
 const GUTTER_WIDTH = 44;
@@ -210,6 +213,7 @@ export function WeekGrid({
                 timeZone={timeZone}
                 hourCycle={hourCycle}
                 compact
+                narrow
                 hourHeight={HOUR_HEIGHT}
                 columnWidth={columnWidth}
                 columnIndex={columnIndex}
@@ -229,6 +233,10 @@ export function WeekGrid({
             );
           })}
         </View>
+
+        {dateKey === todayKey ? (
+          <NowIndicator top={(minuteOfDay(now, timeZone) / 60) * HOUR_HEIGHT} />
+        ) : null}
       </View>
     );
   };
@@ -248,6 +256,18 @@ export function WeekGrid({
             </Animated.View>
           </View>
         </View>
+
+        <WeekAllDayStrip
+          pages={visiblePages}
+          byDateKey={byDateKey}
+          timeZone={timeZone}
+          hourCycle={hourCycle}
+          gutterWidth={GUTTER_WIDTH}
+          width={width}
+          stripStyle={stripStyle}
+          onPressOccurrence={onPressOccurrence}
+          onSelectDate={onSelectDate}
+        />
 
         <ScrollView
           ref={scrollRef}

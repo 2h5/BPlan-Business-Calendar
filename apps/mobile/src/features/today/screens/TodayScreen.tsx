@@ -110,7 +110,7 @@ export function TodayScreen() {
         }
         onNewTask={() => openQuickAdd('task')}
         onNewEvent={() => openNewEvent(summary.dayStart)}
-        onSearch={() => router.push('/search')}
+        onSearch={() => router.push('/search', { dangerouslySingular: true })}
       />
 
       <FindTimeBox timeZone={timeZone} />

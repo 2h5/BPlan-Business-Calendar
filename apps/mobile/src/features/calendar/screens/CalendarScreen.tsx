@@ -1,6 +1,6 @@
 import { addZonedDays, toZonedDateKey } from '@cal/domain';
 import { ErrorState, IconButton, LoadingState, SegmentedControl, useTheme } from '@cal/ui';
-import { ScrollView, View } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { type CalendarViewMode, useCalendarViewStore } from '../../../store/calendar-view.store';
@@ -10,6 +10,7 @@ import { CalendarHeading } from '../components/CalendarHeading';
 import { DayTimeline } from '../components/day-view/DayTimeline';
 import { MonthPager } from '../components/month-view/MonthPager';
 import { WeekGrid } from '../components/week-view/WeekGrid';
+import { useAgendaRefresh } from '../hooks/useAgendaRefresh';
 import { useCalendarWindow } from '../hooks/useCalendarWindow';
 import { useMoveOccurrence, useMoveOccurrenceByDays } from '../hooks/useMoveOccurrence';
 import { formatDayShiftTarget } from '../utils/format';
@@ -53,6 +54,7 @@ const MONTHS = [
  */
 export function CalendarScreen() {
   const theme = useTheme();
+  const agendaRefresh = useAgendaRefresh();
   const mode = useCalendarViewStore((state) => state.mode);
   const setMode = useCalendarViewStore((state) => state.setMode);
   const selectedDateKey = useCalendarViewStore((state) => state.selectedDateKey);
@@ -215,6 +217,13 @@ export function CalendarScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: theme.spacing.xxl }}
+          refreshControl={
+            <RefreshControl
+              refreshing={agendaRefresh.refreshing}
+              onRefresh={agendaRefresh.onRefresh}
+              tintColor={theme.colors.textSecondary}
+            />
+          }
         >
           <AgendaList
             dateKeys={window.dateKeys}

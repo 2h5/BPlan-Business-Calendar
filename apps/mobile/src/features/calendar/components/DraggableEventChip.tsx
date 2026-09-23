@@ -37,6 +37,8 @@ export interface DraggableEventChipProps {
   hourCycle: HourCycle;
   layout: { top: number; height: number; left: string; width: string };
   compact?: boolean;
+  /** Drawn in a narrow week column; see `EventChip`. */
+  narrow?: boolean;
   hourHeight: number;
   /** Width of one day column; 0 in a view with only one day, which pins the drag vertical. */
   columnWidth: number;
@@ -79,6 +81,7 @@ export function DraggableEventChip({
   hourCycle,
   layout,
   compact,
+  narrow,
   hourHeight,
   columnWidth,
   columnIndex,
@@ -91,7 +94,7 @@ export function DraggableEventChip({
 }: DraggableEventChipProps) {
   const theme = useTheme();
   const lift = useDragLift(onDragChange);
-  const { dragX, dragY, dragging, lifted } = lift;
+  const { dragX, dragY, dragging, lifted, pickedUp, putDown, slotChanged, cancel } = lift;
 
   const startMinute = Math.round(
     (occurrence.start - dateKeyToInstant(dateKey, timeZone).getTime()) / 60_000,
@@ -143,7 +146,7 @@ export function DraggableEventChip({
     .onStart(() => {
       dragging.value = true;
       lifted.value = withSpring(1, LIFT);
-      runOnJS(lift.pickedUp)();
+      runOnJS(pickedUp)();
     })
     .onUpdate((event) => {
       const rawMinutes = (event.translationY / hourHeight) * 60;
@@ -163,7 +166,7 @@ export function DraggableEventChip({
       const days = targetDayDelta.value;
 
       if (deltaMinutes === 0 && days === 0) {
-        lift.cancel();
+        cancel();
         runOnJS(clearPreview)();
         return;
       }
@@ -173,7 +176,7 @@ export function DraggableEventChip({
     .onFinalize(() => {
       dragging.value = false;
       lifted.value = withSpring(0, LIFT);
-      runOnJS(lift.putDown)();
+      runOnJS(putDown)();
     });
 
   lift.applyBlocking(drag, blocking);
@@ -194,6 +197,8 @@ export function DraggableEventChip({
         return;
       }
       runOnJS(setPreview)({ dayDelta: next.dayDelta, startMinute: next.startMinute });
+      // The first report is the pick-up itself, which already has its haptic.
+      if (previous?.dragging === true) runOnJS(slotChanged)();
     },
   );
 
@@ -225,6 +230,7 @@ export function DraggableEventChip({
           timeZone={timeZone}
           hourCycle={hourCycle}
           compact={compact}
+          narrow={narrow}
           onPress={onPress}
           layout={{ top: 0, height: layout.height, left: '0%', width: '100%' }}
         />
