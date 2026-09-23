@@ -41,8 +41,16 @@ declare module 'node:child_process' {
 declare module 'node:fs' {
   export function existsSync(path: string): boolean;
   export function statSync(path: string): { isFile(): boolean };
+  export function mkdtempSync(prefix: string): string;
+  export function rmSync(path: string, options: { recursive: boolean; force: boolean }): void;
+}
+
+declare module 'node:os' {
+  export function tmpdir(): string;
+  export function platform(): string;
 }
 
 declare module 'node:path' {
   export function isAbsolute(path: string): boolean;
+  export function join(...paths: string[]): string;
 }
