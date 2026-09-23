@@ -1,0 +1,311 @@
+.root {
+  position: relative;
+  z-index: 1;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  flex: 0 0 var(--control-height-sm);
+}
+
+.surface {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  transition:
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  will-change: width;
+  transform: translateZ(0);
+}
+
+.surface:hover {
+  border-color: var(--color-border-strong);
+}
+
+.surfaceOpen {
+  width: min(420px, 54vw);
+  background: var(--color-bg-surface-elevated);
+  border-color: var(--color-border-strong);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.28),
+    0 0 0 1px var(--color-border-subtle);
+}
+
+.trigger {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    opacity 160ms ease;
+}
+
+.trigger:hover {
+  color: var(--color-text-primary);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.triggerHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 7px 0 11px;
+  gap: 9px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.formVisible {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 40ms;
+}
+
+.searchIcon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+}
+
+.form input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+}
+
+.form input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.form input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -1px;
+  width: min(420px, calc(100vw - 32px));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface-raised);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-7px) scale(0.985);
+  transform-origin: top right;
+  clip-path: inset(0 0 100% 0 round var(--radius-md));
+  transition:
+    opacity 140ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    clip-path 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 220ms;
+}
+
+.panelOpen {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  clip-path: inset(0 0 0 0 round var(--radius-md));
+  transition:
+    opacity 150ms ease 70ms,
+    transform 230ms cubic-bezier(0.22, 1, 0.36, 1) 50ms,
+    clip-path 240ms cubic-bezier(0.22, 1, 0.36, 1) 50ms,
+    visibility 0s linear;
+}
+
+.results {
+  max-height: min(430px, calc(100vh - 180px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.result {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.result:hover,
+.resultActive {
+  background: var(--color-selected);
+}
+
+.resultIcon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+
+.event,
+.calendar {
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.task,
+.list {
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+}
+
+.resultText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.resultText strong,
+.resultText small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resultText strong {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.resultText small {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.arrow {
+  color: var(--color-text-tertiary);
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.result:hover .arrow,
+.resultActive .arrow {
+  opacity: 1;
+  transform: translate(1px, -1px);
+}
+
+.state {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  min-height: 84px;
+  padding: 18px;
+}
+
+.state strong {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.state span {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.viewAll {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 39px;
+  padding: 0 13px;
+  border: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.viewAll:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 768px) {
+  .surfaceOpen {
+    width: min(420px, calc(100vw - 48px));
+  }
+
+  .panel {
+    right: auto;
+    left: 0;
+  }
+}

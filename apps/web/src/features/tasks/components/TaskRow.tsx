@@ -34,13 +34,33 @@ export const TaskRow = memo(function TaskRow({
   const [isExiting, setIsExiting] = useState<
     'completing' | 'uncompleting' | 'deleting' | 'snoozing' | null
   >(null);
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return () => {
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isActionsOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!actionsRef.current?.contains(event.target as Node)) setIsActionsOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsActionsOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isActionsOpen]);
 
   const effectiveCompleted =
     isExiting === 'completing' ? true : isExiting === 'uncompleting' ? false : isCompleted;
@@ -69,6 +89,7 @@ export const TaskRow = memo(function TaskRow({
     e.stopPropagation();
     if (isExiting) return;
 
+    setIsActionsOpen(false);
     setIsExiting('snoozing');
     exitTimerRef.current = setTimeout(() => {
       onSnooze(task);
@@ -79,6 +100,7 @@ export const TaskRow = memo(function TaskRow({
     e.stopPropagation();
     if (isExiting) return;
 
+    setIsActionsOpen(false);
     setIsExiting('deleting');
     exitTimerRef.current = setTimeout(() => {
       onDelete(task);
@@ -188,46 +210,40 @@ export const TaskRow = memo(function TaskRow({
         </div>
       </button>
 
-      <div className={styles.actions}>
+      <div ref={actionsRef} className={styles.actions}>
         <button
           type="button"
           className={styles.actionBtn}
-          onClick={handleSnoozeClick}
-          title="Snooze to tomorrow"
-          aria-label="Snooze to tomorrow"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsActionsOpen((open) => !open);
+          }}
+          title="Task actions"
+          aria-label="Task actions"
+          aria-haspopup="menu"
+          aria-expanded={isActionsOpen}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="19" cy="12" r="1.6" />
           </svg>
         </button>
-
-        <button
-          type="button"
-          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-          onClick={handleDeleteClick}
-          title="Delete task"
-          aria-label="Delete task"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        </button>
+        {isActionsOpen && (
+          <div className={styles.actionsMenu} role="menu">
+            <button type="button" role="menuitem" onClick={handleSnoozeClick}>
+              Snooze until tomorrow
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.dangerMenuItem}
+              onClick={handleDeleteClick}
+            >
+              Delete task
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

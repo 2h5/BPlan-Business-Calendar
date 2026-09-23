@@ -422,12 +422,12 @@
   overflow: hidden;
 }
 .themePreviewSystem {
-  background: linear-gradient(135deg, #101319 50%, #f4f6f8 50%);
+  background: linear-gradient(135deg, #101319 50%, #f3f7fc 50%);
   color: #f3f5f8;
 }
 .themePreviewLight {
-  background: #f4f6f8;
-  color: #171b23;
+  background: #f3f7fc;
+  color: #0b1433;
 }
 .themePreviewDark {
   background: #101319;
@@ -719,6 +719,13 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.55;
+}
+.billingSummary .billingSummaryLabel {
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .billingFeature {
   padding-top: var(--space-4);
