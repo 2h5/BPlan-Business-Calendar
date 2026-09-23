@@ -11,7 +11,11 @@ import {
   runBillingAnnualRenewalReadOnly,
 } from './lifecycle-renewal-command';
 import type { RevenueCatUserSnapshot } from './revenuecat-assertions';
-import type { SubscriptionLedgerRow, SupabaseUserSnapshot } from './supabase-assertions';
+import {
+  createSupabaseAssertionAdapter,
+  type SubscriptionLedgerRow,
+  type SupabaseUserSnapshot,
+} from './supabase-assertions';
 
 const START = Date.parse('2026-09-22T00:00:00Z');
 const END = START + 60 * 60 * 1000;
@@ -481,6 +485,41 @@ describe('annual lifecycle command safety', () => {
     ]);
     expect(output.join('\n')).not.toContain(thrownValue);
     expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('https://');
+  });
+
+  it('prints the Supabase adapter sub-stage code without exposing transport details', async () => {
+    const thrownValue = `mirror failure ${USER} service-role-secret https://secret.example/key`;
+    const supabase = createSupabaseAssertionAdapter({
+      url: 'https://example.supabase.co',
+      serviceRoleKey: 'service-role-secret',
+      transport: {
+        readSubscriptions: async () => {
+          throw new Error(thrownValue);
+        },
+        readLedger: async () => ({ data: [], error: null }),
+        readServerAuthorization: async () => ({ data: false, error: null }),
+      },
+    });
+    const fixture = fixtures();
+    const output: string[] = [];
+
+    const result = await runBillingLifecycleReadOnly(
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => ({ ok: true as const, data: fixture.provider }),
+        readSupabase: supabase.readUser,
+      },
+    );
+
+    expect(result).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: SUPABASE_MIRROR_UNEXPECTED',
+    ]);
+    expect(output.join('\n')).not.toContain(thrownValue);
+    expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('service-role-secret');
     expect(output.join('\n')).not.toContain('https://');
   });
 

@@ -58,6 +58,7 @@ export interface SupabaseAssertionAdapterOptions {
   readonly url: string;
   readonly serviceRoleKey: string;
   readonly transport?: SupabaseAssertionTransport;
+  readonly clientFactory?: (url: string, serviceRoleKey: string) => SupabaseClient;
   readonly now?: () => Date;
 }
 
@@ -205,11 +206,37 @@ function ledgerIsCoherent(
 export function createSupabaseAssertionAdapter(
   options: SupabaseAssertionAdapterOptions,
 ): SupabaseAssertionAdapter {
-  const transport =
-    options.transport ?? createSupabaseAssertionTransport(options.url, options.serviceRoleKey);
+  const transportResult: BillingAssertionResult<SupabaseAssertionTransport> = (() => {
+    if (options.transport) return { ok: true, data: options.transport };
+    try {
+      const client = options.clientFactory?.(options.url, options.serviceRoleKey);
+      return {
+        ok: true,
+        data: createSupabaseAssertionTransport(options.url, options.serviceRoleKey, client),
+      };
+    } catch {
+      return assertionFailure<SupabaseAssertionTransport>(
+        'SUPABASE_CLIENT',
+        'SUPABASE_CLIENT_UNEXPECTED',
+        'Supabase client initialization threw unexpectedly.',
+      );
+    }
+  })();
+
   return {
     async readUser(userId) {
-      const mirror = parseMirrorRows(await transport.readSubscriptions(userId));
+      if (!transportResult.ok) return { ok: false, error: transportResult.error };
+
+      let mirror: BillingAssertionResult<readonly SubscriptionRow[]>;
+      try {
+        mirror = parseMirrorRows(await transportResult.data.readSubscriptions(userId));
+      } catch {
+        return assertionFailure(
+          'SUPABASE_MIRROR',
+          'SUPABASE_MIRROR_UNEXPECTED',
+          'Supabase subscription mirror read threw unexpectedly.',
+        );
+      }
       if (!mirror.ok) return mirror;
       if (mirror.data.length > 1) {
         return assertionFailure(
@@ -233,7 +260,16 @@ export function createSupabaseAssertionAdapter(
         );
       }
 
-      const ledger = parseLedgerRows(await transport.readLedger(userId));
+      let ledger: BillingAssertionResult<readonly SubscriptionLedgerRow[]>;
+      try {
+        ledger = parseLedgerRows(await transportResult.data.readLedger(userId));
+      } catch {
+        return assertionFailure(
+          'SUBSCRIPTION_LEDGER',
+          'SUBSCRIPTION_LEDGER_UNEXPECTED',
+          'Supabase subscription ledger read threw unexpectedly.',
+        );
+      }
       if (!ledger.ok) return ledger;
       if (ledger.data.some((row) => row.user_id !== userId)) {
         return assertionFailure(
@@ -251,7 +287,18 @@ export function createSupabaseAssertionAdapter(
         );
       }
 
-      const authorization = parseAuthorization(await transport.readServerAuthorization(userId));
+      let authorization: BillingAssertionResult<boolean>;
+      try {
+        authorization = parseAuthorization(
+          await transportResult.data.readServerAuthorization(userId),
+        );
+      } catch {
+        return assertionFailure(
+          'SERVER_AUTHORIZATION',
+          'SERVER_AUTHORIZATION_UNEXPECTED',
+          'Supabase server authorization RPC threw unexpectedly.',
+        );
+      }
       if (!authorization.ok) return authorization;
       const now = (options.now ?? (() => new Date()))();
 

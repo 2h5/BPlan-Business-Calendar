@@ -7,6 +7,7 @@ import {
 
 const USER_ID = '11111111-1111-1111-1111-111111111111';
 const NOW = new Date('2026-09-18T12:00:00.000Z');
+const SECRET_LIKE_VALUE = 'service-role-secret-value';
 
 function mirrorRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -203,5 +204,51 @@ describe('Supabase billing assertion adapter', () => {
       error: { code: 'SUPABASE_MIRROR_MALFORMED' },
     });
     expect(JSON.stringify([mirrorError, ledgerError, rpcError])).not.toContain('db raw');
+  });
+
+  it('classifies client initialization throws without exposing thrown details', async () => {
+    const thrownValue = `client failure ${USER_ID} ${SECRET_LIKE_VALUE} https://secret.example/key`;
+    const result = await createSupabaseAssertionAdapter({
+      url: 'https://example.supabase.co',
+      serviceRoleKey: SECRET_LIKE_VALUE,
+      clientFactory: () => {
+        throw new Error(thrownValue);
+      },
+    }).readUser(USER_ID);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'SUPABASE_CLIENT_UNEXPECTED' },
+    });
+    const output = JSON.stringify(result);
+    expect(output).not.toContain(thrownValue);
+    expect(output).not.toContain(USER_ID);
+    expect(output).not.toContain(SECRET_LIKE_VALUE);
+    expect(output).not.toContain('https://');
+  });
+
+  it.each([
+    ['mirror', 'SUPABASE_MIRROR_UNEXPECTED'],
+    ['ledger', 'SUBSCRIPTION_LEDGER_UNEXPECTED'],
+    ['authorization', 'SERVER_AUTHORIZATION_UNEXPECTED'],
+  ] as const)('classifies an unexpected %s transport throw safely', async (stage, code) => {
+    const thrownValue = `${stage} failure ${USER_ID} ${SECRET_LIKE_VALUE} https://secret.example/key`;
+    const fake = transport();
+    if (stage === 'mirror') {
+      fake.readSubscriptions = vi.fn().mockRejectedValue(new Error(thrownValue));
+    } else if (stage === 'ledger') {
+      fake.readLedger = vi.fn().mockRejectedValue(new Error(thrownValue));
+    } else {
+      fake.readServerAuthorization = vi.fn().mockRejectedValue(new Error(thrownValue));
+    }
+
+    const result = await adapter(fake).readUser(USER_ID);
+
+    expect(result).toMatchObject({ ok: false, error: { code } });
+    const output = JSON.stringify(result);
+    expect(output).not.toContain(thrownValue);
+    expect(output).not.toContain(USER_ID);
+    expect(output).not.toContain(SECRET_LIKE_VALUE);
+    expect(output).not.toContain('https://');
   });
 });

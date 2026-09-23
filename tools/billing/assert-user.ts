@@ -185,6 +185,8 @@ function labelForCategory(category: BillingAssertionCategory): string {
       return 'Pro entitlement';
     case 'REVENUECAT_SUBSCRIPTION':
       return 'Subscription';
+    case 'SUPABASE_CLIENT':
+      return 'Supabase client';
     case 'SUPABASE_MIRROR':
       return 'Supabase mirror';
     case 'SUBSCRIPTION_LEDGER':
