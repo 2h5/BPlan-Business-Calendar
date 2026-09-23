@@ -1,11 +1,18 @@
-import { useEffect, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,14 +48,51 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: viewportHeight } = useWindowDimensions();
+  const [mounted, setMounted] = useState(visible);
 
-  const translateY = useSharedValue(0);
+  const translateY = useSharedValue(viewportHeight);
   const backdrop = useSharedValue(0);
 
   useEffect(() => {
-    translateY.value = 0;
-    backdrop.value = withTiming(visible ? 1 : 0, { duration: theme.motion.duration.fast });
-  }, [visible, backdrop, translateY, theme.motion.duration.fast]);
+    if (visible) {
+      translateY.value = viewportHeight;
+      backdrop.value = 0;
+      setMounted(true);
+
+      const frame = requestAnimationFrame(() => {
+        translateY.value = withTiming(0, {
+          duration: theme.motion.duration.slow,
+          easing: Easing.bezier(...theme.motion.easing.decelerate),
+        });
+        backdrop.value = withTiming(1, { duration: theme.motion.duration.base });
+      });
+
+      return () => cancelAnimationFrame(frame);
+    }
+
+    backdrop.value = withTiming(0, { duration: theme.motion.duration.fast });
+    translateY.value = withTiming(
+      viewportHeight,
+      {
+        duration: theme.motion.duration.base,
+        easing: Easing.bezier(...theme.motion.easing.accelerate),
+      },
+      (finished) => {
+        if (finished) runOnJS(setMounted)(false);
+      },
+    );
+  }, [
+    visible,
+    backdrop,
+    translateY,
+    viewportHeight,
+    theme.motion.duration.base,
+    theme.motion.duration.fast,
+    theme.motion.duration.slow,
+    theme.motion.easing.accelerate,
+    theme.motion.easing.decelerate,
+  ]);
 
   const pan = Gesture.Pan()
     .onChange((event) => {
@@ -58,7 +102,10 @@ export function BottomSheet({
       if (translateY.value > dismissThreshold || event.velocityY > 900) {
         runOnJS(onClose)();
       } else {
-        translateY.value = withSpring(0, theme.motion.spring);
+        translateY.value = withTiming(0, {
+          duration: theme.motion.duration.base,
+          easing: Easing.bezier(...theme.motion.easing.decelerate),
+        });
       }
     });
 
@@ -70,9 +117,9 @@ export function BottomSheet({
 
   return (
     <Modal
-      visible={visible}
+      visible={mounted}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
     >

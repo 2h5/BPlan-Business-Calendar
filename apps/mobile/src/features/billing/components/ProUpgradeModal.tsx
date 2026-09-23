@@ -1,11 +1,12 @@
 import { calculateBillingIntervalSavings, PLAN_COMPARISON, PRO_PLAN } from '@cal/domain';
-import { Badge, Button, IconButton, Text, useTheme } from '@cal/ui';
+import { Badge, Button, Text, useTheme } from '@cal/ui';
 import { useState } from 'react';
 import { Modal, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BillingIntervalToggle, type BillingInterval } from './BillingIntervalToggle';
 import { GoldText } from './GoldText';
+import { LiquidGlassCloseButton } from './LiquidGlassCloseButton';
 import { RollingPrice } from './RollingPrice';
 import { usePaywallStore } from '../../../store/paywall.store';
 
@@ -58,7 +59,7 @@ export function ProUpgradeModal() {
         {/* Dismissing lives at the top left, reachable before any of the
             selling below it. */}
         <View style={{ paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.sm }}>
-          <IconButton name="close" accessibilityLabel="Dismiss" onPress={dismiss} />
+          <LiquidGlassCloseButton onPress={dismiss} />
         </View>
 
         <ScrollView

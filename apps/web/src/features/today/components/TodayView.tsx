@@ -9,9 +9,10 @@ import {
   zonedWallClockToUtc,
 } from '@cal/domain';
 import type { TaskList, TaskPriority } from '@cal/schemas';
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { TodaySearch } from './TodaySearch';
 import styles from './TodayView.module.css';
 import { Select } from '../../../components/forms/Select';
 import { FindTimeBox } from '../../scheduling';
@@ -42,73 +43,6 @@ export function TodayView() {
   const quickInputRef = useRef<HTMLInputElement>(null);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchButtonRef = useRef<HTMLButtonElement>(null);
-  const heroActionsRef = useRef<HTMLDivElement>(null);
-
-  const handleOpenSearch = () => {
-    setIsSearchOpen(true);
-    requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-    });
-  };
-
-  const handleCloseSearch = () => {
-    setIsSearchOpen(false);
-    setSearchQuery('');
-    searchButtonRef.current?.focus();
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (query) {
-      navigate(`/search?q=${encodeURIComponent(query)}`);
-    } else {
-      navigate('/search');
-    }
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setIsSearchOpen((prev) => {
-          if (!prev) {
-            requestAnimationFrame(() => {
-              searchInputRef.current?.focus();
-            });
-            return true;
-          } else {
-            searchInputRef.current?.focus();
-            return true;
-          }
-        });
-      } else if (e.key === 'Escape' && isSearchOpen) {
-        setIsSearchOpen(false);
-        setSearchQuery('');
-        searchButtonRef.current?.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSearchOpen]);
-
-  useEffect(() => {
-    if (!isSearchOpen) return;
-
-    const handlePointerDownOutside = (e: MouseEvent) => {
-      if (heroActionsRef.current && !heroActionsRef.current.contains(e.target as Node)) {
-        setIsSearchOpen(false);
-        setSearchQuery('');
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDownOutside);
-    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
-  }, [isSearchOpen]);
 
   const listOptions = useMemo(
     () => [
@@ -292,11 +226,11 @@ export function TodayView() {
           </p>
         </div>
 
-        <div className={styles.heroActions} ref={heroActionsRef}>
+        <div className={styles.heroActions}>
           <div
-            className={`${styles.heroActionButtons} ${
-              isSearchOpen ? styles.heroActionButtonsHidden : ''
-            }`}
+            className={styles.heroActionButtons}
+            aria-hidden={isSearchOpen}
+            inert={isSearchOpen ? true : undefined}
           >
             <button
               type="button"
@@ -316,57 +250,7 @@ export function TodayView() {
             </button>
           </div>
 
-          <div
-            className={`${styles.searchExpandable} ${
-              isSearchOpen ? styles.searchExpandableOpen : ''
-            }`}
-          >
-            <button
-              ref={searchButtonRef}
-              type="button"
-              className={`${styles.searchTriggerButton} ${
-                isSearchOpen ? styles.searchTriggerButtonHidden : ''
-              }`}
-              onClick={handleOpenSearch}
-              title="Search (⌘K)"
-              aria-label="Search"
-              tabIndex={isSearchOpen ? -1 : 0}
-            >
-              <SearchIcon />
-            </button>
-
-            <form
-              className={`${styles.searchBarForm} ${
-                isSearchOpen ? styles.searchBarFormVisible : ''
-              }`}
-              onSubmit={handleSearchSubmit}
-              role="search"
-            >
-              <span className={styles.searchBarIcon} aria-hidden="true">
-                <SearchIcon />
-              </span>
-              <input
-                ref={searchInputRef}
-                type="text"
-                className={styles.searchBarInput}
-                placeholder="Search events, tasks…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                tabIndex={isSearchOpen ? 0 : -1}
-                aria-label="Search query"
-              />
-              <button
-                type="button"
-                className={styles.searchBarCloseButton}
-                onClick={handleCloseSearch}
-                title="Close search (Esc)"
-                aria-label="Close search"
-                tabIndex={isSearchOpen ? 0 : -1}
-              >
-                <CloseIcon />
-              </button>
-            </form>
-          </div>
+          <TodaySearch isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
         </div>
       </header>
 
@@ -1041,42 +925,6 @@ function CalendarIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }

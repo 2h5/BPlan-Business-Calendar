@@ -4,3 +4,4 @@ export * from './utils/billing-checkout';
 export * from './utils/subscription-display';
 export * from './components/BillingSection';
 export * from './components/SubscriptionView';
+export * from './components/PublicPricingView';

@@ -39,6 +39,7 @@ export function BillingSection() {
       <div className={styles.billingBody}>
         <div className={styles.billingSummary}>
           <div>
+            <span className={styles.billingSummaryLabel}>Current plan</span>
             <strong>{subscriptionLabel(subscription.data)}</strong>
             <span>{subscriptionDetail(subscription.data)}</span>
           </div>
@@ -127,10 +128,10 @@ function BillingActions({
 }
 
 function subscriptionLabel(subscription: Subscription | null | undefined): string {
-  if (!subscription) return 'Free plan';
-  if (subscription.status === 'active') return 'Pro active';
-  if (subscription.status === 'paused') return 'Pro paused';
-  return 'Pro expired';
+  if (!subscription) return 'Free Plan';
+  if (subscription.status === 'active') return 'Pro Active';
+  if (subscription.status === 'paused') return 'Pro Paused';
+  return 'Pro Expired';
 }
 
 function subscriptionDetail(subscription: Subscription | null | undefined): string {

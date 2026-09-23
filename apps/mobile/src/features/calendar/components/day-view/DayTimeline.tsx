@@ -17,6 +17,7 @@ import { usePageSwipe } from '../../hooks/usePageSwipe';
 import { dateKeyToInstant, dayIndexOf, shiftDateKey, weekdayOf } from '../../utils/window';
 import { DraggableEventChip, type EventMove } from '../DraggableEventChip';
 import { EventChip } from '../EventChip';
+import { NowIndicator } from '../NowIndicator';
 
 export const HOUR_HEIGHT = 56;
 const GUTTER_WIDTH = 52;
@@ -231,29 +232,7 @@ export function DayTimeline({
           })}
         </View>
 
-        {nowOffset !== null ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: nowOffset - 4,
-              left: 0,
-              right: 0,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: theme.colors.nowIndicator,
-              }}
-            />
-            <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.nowIndicator }} />
-          </View>
-        ) : null}
+        {nowOffset !== null ? <NowIndicator top={nowOffset} /> : null}
       </>
     );
   };

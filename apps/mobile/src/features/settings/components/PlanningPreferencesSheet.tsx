@@ -3,8 +3,14 @@ import type { HourCycle, Profile, WorkingHours } from '@cal/schemas';
 import { BottomSheet, Button, Divider, ListRow, TimePickerField, Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Switch, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { useUpdateProfile } from '../hooks/useProfile';
 
@@ -53,6 +59,10 @@ export function PlanningPreferencesSheet({
   const updateProfile = useUpdateProfile();
   const [workingHours, setWorkingHours] = useState<WorkingHours>([]);
   const [error, setError] = useState<string | null>(null);
+  const retainedPreference = useRef<PlanningPreference | null>(preference);
+
+  if (preference) retainedPreference.current = preference;
+  const activePreference = preference ?? retainedPreference.current;
 
   useEffect(() => {
     if (visible && preference === 'workingHours' && profile) {
@@ -67,7 +77,7 @@ export function PlanningPreferencesSheet({
     return [...new Set([current, ...preferred].filter((zone): zone is string => !!zone))];
   }, [profile?.timezone]);
 
-  if (!preference || !profile) return null;
+  if (!activePreference || !profile) return null;
 
   const save = async (patch: Parameters<typeof updateProfile.mutateAsync>[0]) => {
     setError(null);
@@ -93,9 +103,9 @@ export function PlanningPreferencesSheet({
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      title={PREFERENCE_TITLES[preference]}
+      title={PREFERENCE_TITLES[activePreference]}
       footer={
-        preference === 'workingHours' ? (
+        activePreference === 'workingHours' ? (
           <Button
             label="Save working hours"
             loading={updateProfile.isPending}
@@ -105,14 +115,14 @@ export function PlanningPreferencesSheet({
         ) : null
       }
     >
-      {preference === 'timezone' ? (
+      {activePreference === 'timezone' ? (
         <OptionList
           options={timeZones.map((zone) => ({ label: zone, value: zone }))}
           value={profile.timezone}
           onSelect={(value) => void save({ timezone: value })}
           saving={updateProfile.isPending}
         />
-      ) : preference === 'weekStartsOn' ? (
+      ) : activePreference === 'weekStartsOn' ? (
         <OptionList
           options={[
             { label: 'Sunday', value: 0 },
@@ -122,7 +132,7 @@ export function PlanningPreferencesSheet({
           onSelect={(value) => void save({ weekStartsOn: value })}
           saving={updateProfile.isPending}
         />
-      ) : preference === 'hourCycle' ? (
+      ) : activePreference === 'hourCycle' ? (
         <OptionList<HourCycle>
           options={[
             { label: '12-hour', value: 'h12' },
@@ -132,7 +142,7 @@ export function PlanningPreferencesSheet({
           onSelect={(value) => void save({ hourCycle: value })}
           saving={updateProfile.isPending}
         />
-      ) : preference === 'defaultTaskMinutes' ? (
+      ) : activePreference === 'defaultTaskMinutes' ? (
         <OptionList
           options={TASK_DURATION_OPTIONS.map((minutes) => ({
             label: `${minutes} minutes`,
@@ -156,7 +166,7 @@ export function PlanningPreferencesSheet({
         </Text>
       ) : null}
 
-      {preference !== 'workingHours' ? (
+      {activePreference !== 'workingHours' ? (
         <Text variant="footnote" color="tertiary" align="center">
           Changes save automatically.
         </Text>
@@ -251,47 +261,126 @@ function WorkingHoursEditor({
       contentContainerStyle={{ gap: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
     >
       {WEEKDAYS.map((label, weekday) => {
-        const window = byWeekday.get(weekday);
+        const dayWindow = byWeekday.get(weekday);
         return (
-          <View key={label} style={{ gap: theme.spacing.sm }}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text variant="bodyStrong">{label}</Text>
-              <Switch
-                value={!!window}
-                onValueChange={(enabled) => setDayEnabled(weekday, enabled)}
-                accessibilityLabel={`${label} working hours`}
-                trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
-              />
-            </View>
-
-            {window ? (
-              <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
-                <TimePickerField
-                  value={dateForMinute(window.startMinute)}
-                  onChange={(date) => setTime(weekday, 'startMinute', date)}
-                  label="Starts"
-                  style={{ flex: 1 }}
-                  format={(date) => formatMinute(date, hourCycle)}
-                />
-                <TimePickerField
-                  value={dateForMinute(window.endMinute)}
-                  onChange={(date) => setTime(weekday, 'endMinute', date)}
-                  label="Ends"
-                  style={{ flex: 1 }}
-                  format={(date) => formatMinute(date, hourCycle)}
-                />
-              </View>
-            ) : null}
-          </View>
+          <WorkingHoursDayRow
+            key={label}
+            label={label}
+            weekday={weekday}
+            dayWindow={dayWindow}
+            hourCycle={hourCycle}
+            onToggle={(enabled) => setDayEnabled(weekday, enabled)}
+            onTimeChange={(field, date) => setTime(weekday, field, date)}
+          />
         );
       })}
     </ScrollView>
+  );
+}
+
+function WorkingHoursDayRow({
+  label,
+  weekday,
+  dayWindow,
+  hourCycle,
+  onToggle,
+  onTimeChange,
+}: {
+  label: string;
+  weekday: number;
+  dayWindow: WorkingHours[number] | undefined;
+  hourCycle: HourCycle;
+  onToggle: (enabled: boolean) => void;
+  onTimeChange: (field: 'startMinute' | 'endMinute', date: Date | null) => void;
+}) {
+  const theme = useTheme();
+  const isEnabled = !!dayWindow;
+  const expanded = useSharedValue(isEnabled ? 1 : 0);
+  const contentHeight = useSharedValue(0);
+  const retainedWindow = useRef<WorkingHours[number]>(
+    dayWindow ?? {
+      weekday: weekday as 0 | 1 | 2 | 3 | 4 | 5 | 6,
+      startMinute: 9 * 60,
+      endMinute: 17 * 60,
+    },
+  );
+
+  if (dayWindow) retainedWindow.current = dayWindow;
+
+  useEffect(() => {
+    expanded.value = withTiming(isEnabled ? 1 : 0, {
+      duration: isEnabled ? theme.motion.duration.base : theme.motion.duration.fast,
+      easing: Easing.bezier(...theme.motion.easing.standard),
+    });
+  }, [
+    isEnabled,
+    expanded,
+    theme.motion.duration.base,
+    theme.motion.duration.fast,
+    theme.motion.easing.standard,
+  ]);
+
+  const controlsStyle = useAnimatedStyle(() => ({
+    height: contentHeight.value * expanded.value,
+    opacity: expanded.value,
+    transform: [{ translateY: (1 - expanded.value) * theme.spacing.sm }],
+  }));
+
+  return (
+    <View>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Text variant="bodyStrong">{label}</Text>
+        <Switch
+          value={isEnabled}
+          onValueChange={onToggle}
+          accessibilityLabel={`${label} working hours`}
+          trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+        />
+      </View>
+
+      <Animated.View
+        pointerEvents={isEnabled ? 'auto' : 'none'}
+        accessibilityElementsHidden={!isEnabled}
+        importantForAccessibility={isEnabled ? 'auto' : 'no-hide-descendants'}
+        style={[{ overflow: 'hidden', position: 'relative' }, controlsStyle]}
+      >
+        <View
+          onLayout={(event) => {
+            contentHeight.value = event.nativeEvent.layout.height;
+          }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            paddingTop: theme.spacing.sm,
+          }}
+        >
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            <TimePickerField
+              value={dateForMinute(retainedWindow.current.startMinute)}
+              onChange={(date) => onTimeChange('startMinute', date)}
+              label="Starts"
+              style={{ flex: 1 }}
+              format={(date) => formatMinute(date, hourCycle)}
+            />
+            <TimePickerField
+              value={dateForMinute(retainedWindow.current.endMinute)}
+              onChange={(date) => onTimeChange('endMinute', date)}
+              label="Ends"
+              style={{ flex: 1 }}
+              format={(date) => formatMinute(date, hourCycle)}
+            />
+          </View>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 

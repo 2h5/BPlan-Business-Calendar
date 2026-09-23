@@ -170,12 +170,7 @@ export function IntegrationsScreen() {
         {unavailableProviders.map((provider, index) => (
           <View key={provider.kind}>
             {index > 0 ? <Divider inset /> : null}
-            <ListRow
-              title={provider.name}
-              subtitle={provider.unavailableSubtitle}
-              trailing={<Badge label="Sprint 5" />}
-              disabled
-            />
+            <ListRow title={provider.name} subtitle={provider.unavailableSubtitle} disabled />
           </View>
         ))}
         {unavailableProviders.length > 0 ? <Divider inset /> : null}

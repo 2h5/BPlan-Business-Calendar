@@ -1,19 +1,43 @@
 .loginPage {
-  min-height: 100dvh;
-  padding: var(--space-5);
+  --login-ink: #0b1433;
+  --login-muted: #647091;
+  --login-blue: #1768f2;
+  --login-line: #dce5f3;
+  --login-container: 1460px;
+  --login-gutter: clamp(2rem, 3.33vw, 4rem);
+  position: relative;
+  height: 100dvh;
+  min-height: 720px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at 50% 0%, var(--color-accent-muted), transparent 34rem),
-    var(--color-bg-app);
+    radial-gradient(circle at 76% 18%, rgba(216, 234, 255, 0.48), transparent 32%),
+    radial-gradient(circle at 18% 74%, rgba(235, 244, 255, 0.62), transparent 35%),
+    linear-gradient(135deg, #fbfdff 0%, #f7faff 54%, #f9fcff 100%);
+  color: var(--login-ink);
+  isolation: isolate;
+}
+
+.loginHeader {
+  position: relative;
+  z-index: 2;
+  width: min(100%, var(--login-container));
+  min-height: 72px;
+  margin: 0 auto;
+  padding: 14px var(--login-gutter);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 2rem;
 }
 
 .loginBrand {
   display: inline-flex;
   align-items: center;
-  align-self: flex-start;
-  gap: var(--space-3);
-  color: var(--color-text-primary);
+  justify-self: start;
+  gap: 0.65rem;
+  color: var(--login-ink);
   animation: login-brand-enter 420ms ease-out both;
 }
 
@@ -30,44 +54,552 @@
 }
 
 .loginBrandMark {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  display: grid;
-  place-items: center;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.04em;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--login-blue);
+}
+
+.loginBrandMark svg {
+  width: 100%;
+  height: 100%;
 }
 
 .loginBrandName {
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-size: 1.6rem;
+  font-weight: 750;
   letter-spacing: -0.02em;
 }
 
-.loginContent {
-  width: 100%;
-  flex: 1;
-  display: grid;
-  place-items: center;
-  padding: var(--space-8) 0;
-  animation: login-content-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) 70ms both;
+.loginNav,
+.loginHeaderActions {
+  display: flex;
+  align-items: center;
 }
 
-@keyframes login-content-enter {
+.loginNav {
+  justify-self: center;
+  gap: clamp(1.35rem, 2.4vw, 2.75rem);
+}
+
+.loginNavItem,
+.signInPlaceholder,
+.getStartedPlaceholder {
+  color: #243154;
+  font-size: 1rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.loginNavItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  cursor: default;
+}
+
+.loginNavItem svg {
+  width: 12px;
+  height: 12px;
+}
+
+.loginHeaderActions {
+  justify-self: end;
+  gap: 1.9rem;
+}
+
+.signInPlaceholder {
+  cursor: default;
+}
+
+.getStartedPlaceholder {
+  min-width: 122px;
+  height: 46px;
+  padding: 0 1.35rem;
+  border: 1.5px solid var(--login-blue);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--login-blue);
+  cursor: default;
+}
+
+.loginLayout {
+  position: relative;
+  z-index: 1;
+  width: min(100%, var(--login-container));
+  flex: 1;
+  min-height: 0;
+  margin: 0 auto;
+  padding: clamp(0.75rem, 1.4vh, 1rem) var(--login-gutter) clamp(0.75rem, 1.5vh, 1rem);
+  display: grid;
+  grid-template-columns: minmax(0, 800px) minmax(420px, 450px);
+  justify-content: space-between;
+  column-gap: clamp(5rem, 5vw, 6.25rem);
+  align-items: start;
+}
+
+.loginHero,
+.loginPanel {
+  min-width: 0;
+}
+
+.loginHero {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  animation: homepage-hero-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.heroCopy {
+  padding-left: 0;
+}
+
+.heroEyebrow {
+  margin-bottom: clamp(0.85rem, 1.5vh, 1.2rem);
+  color: #627092;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  color: #070e29;
+  font-size: clamp(3.5rem, 4.5vw, 4.55rem);
+  font-weight: 750;
+  letter-spacing: -0.062em;
+  line-height: 0.96;
+}
+
+.heroTitle span {
+  color: var(--login-blue);
+}
+
+.heroDescription {
+  max-width: 570px;
+  margin-top: clamp(1rem, 1.8vh, 1.35rem);
+  color: var(--login-muted);
+  font-size: 1.15rem;
+  line-height: 1.48;
+}
+
+.heroBenefits {
+  margin-top: clamp(1rem, 1.9vh, 1.4rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.8rem;
+  list-style: none;
+}
+
+.heroBenefits li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: #3d4b70;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.benefitCheck {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: var(--login-blue);
+  color: #ffffff;
+  box-shadow: 0 5px 13px rgba(23, 104, 242, 0.18);
+}
+
+.benefitCheck svg {
+  width: 15px;
+  height: 15px;
+}
+
+.calendarStage {
+  width: min(100%, 820px);
+  margin-top: clamp(0.9rem, 1.7vh, 1.35rem);
+  padding: 4px 14px 16px 0;
+  perspective: 1350px;
+  perspective-origin: 22% 50%;
+  animation: homepage-calendar-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
+}
+
+@keyframes homepage-hero-enter {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
+    transform: translateY(12px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
+}
+
+@keyframes homepage-calendar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes homepage-login-enter {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.calendarPreview {
+  width: 100%;
+  aspect-ratio: 1.76 / 1;
+  border: 8px solid rgba(220, 234, 252, 0.86);
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: 23% minmax(0, 1fr);
+  overflow: visible;
+  background: #ffffff;
+  box-shadow:
+    0 40px 70px rgba(75, 116, 177, 0.2),
+    0 10px 26px rgba(71, 115, 180, 0.12),
+    0 0 0 1px rgba(169, 202, 245, 0.3);
+  transform: rotateY(12deg);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+
+.previewSidebar {
+  padding: 1rem 0.78rem 0.8rem;
+  border-right: 1px solid #eaf0f8;
+  border-radius: 16px 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  background: rgba(251, 253, 255, 0.92);
+}
+
+.previewBrand {
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--login-ink);
+  font-size: 0.76rem;
+}
+
+.previewBrandLockup {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.previewBrand .loginBrandMark {
+  width: 23px;
+  height: 23px;
+}
+
+.previewCollapse {
+  width: 21px;
+  height: 21px;
+  border: 1px solid #e5ecf6;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: #8190aa;
+  background: #ffffff;
+}
+
+.previewCollapse svg {
+  width: 13px;
+  height: 13px;
+}
+
+.previewNavItem {
+  padding: 0.43rem 0.52rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.48rem;
+  color: #53607e;
+  font-size: 0.61rem;
+}
+
+.previewNavItem svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.previewNavItemActive {
+  background: #edf4ff;
+  color: var(--login-blue);
+  font-weight: 650;
+}
+
+.previewCallout {
+  margin-top: auto;
+  min-height: 116px;
+  padding: 0.75rem;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: linear-gradient(145deg, #edf3ff, #f8fbff);
+  color: #243154;
+  font-size: 0.61rem;
+}
+
+.previewCallout span {
+  color: #7a86a0;
+  font-size: 0.5rem;
+}
+
+.previewCallout svg {
+  position: absolute;
+  width: 92%;
+  height: auto;
+  right: -17%;
+  bottom: -17%;
+}
+
+.previewCalendar {
+  position: relative;
+  min-width: 0;
+  overflow: visible;
+  padding: 1.05rem 1.05rem 2.75rem;
+  border-radius: 0 16px 16px 0;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.previewToolbar,
+.previewMonthRow {
+  display: flex;
+  align-items: center;
+}
+
+.previewToolbar {
+  justify-content: flex-end;
+  gap: 0.9rem;
+  color: #8692aa;
+  font-size: 0.6rem;
+}
+
+.previewToday {
+  margin-right: auto;
+  padding: 0.32rem 0.65rem;
+  border: 1px solid #e2e9f3;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #3b4967;
+  font-size: 0.6rem;
+}
+
+.previewToolbar strong {
+  padding: 0.32rem 0.65rem;
+  border-radius: 5px;
+  background: #edf4ff;
+  color: var(--login-blue);
+}
+
+.previewMonthRow {
+  margin: 0.75rem 0 0.32rem;
+  justify-content: space-between;
+  color: #8792aa;
+  font-size: 0.7rem;
+}
+
+.previewMonthRow h2 {
+  color: #14203f;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.previewMonthControls {
+  display: inline-flex;
+  gap: 0.32rem;
+}
+
+.previewMonthControls i {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #e5ebf4;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  color: #73809a;
+  font-size: 0.82rem;
+  font-style: normal;
+}
+
+.previewWeekdays,
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.previewWeekdays span {
+  padding: 0.35rem 0.2rem;
+  color: #8c96aa;
+  font-size: 0.54rem;
+  text-align: center;
+}
+
+.previewGrid {
+  position: relative;
+  height: calc(100% - 82px);
+  grid-template-rows: repeat(5, minmax(0, 1fr));
+  border-top: 1px solid #e9eef6;
+  border-left: 1px solid #e9eef6;
+}
+
+.previewDay {
+  min-width: 0;
+  padding: 0.3rem 0.28rem;
+  border-right: 1px solid #e9eef6;
+  border-bottom: 1px solid #e9eef6;
+  color: #76829b;
+  font-size: 0.56rem;
+  overflow: hidden;
+}
+
+.previewDayMuted {
+  color: #c2cad8;
+}
+
+.previewEvent {
+  width: 100%;
+  margin-top: 0.2rem;
+  padding: 0.3rem 0.32rem;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  color: #1e4289;
+  font-size: 0.43rem;
+  box-shadow: 0 4px 12px rgba(52, 91, 149, 0.1);
+}
+
+.previewEvent strong {
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: normal;
+}
+
+.previewEvent small {
+  font-size: 0.39rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.previewEventsky {
+  background: #dce9ff;
+}
+
+.previewEventblue {
+  background: #2f75ed;
+  color: #ffffff;
+  box-shadow: 0 5px 13px rgba(47, 117, 237, 0.22);
+}
+
+.previewEventgreen {
+  background: #dff4e6;
+  color: #33704c;
+}
+
+.previewEventlavender {
+  background: #eadfff;
+  color: #5b3b94;
+}
+
+.previewScribble {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0.2rem;
+  display: flex;
+  align-items: flex-end;
+  color: #5d6d90;
+  font-family: 'Segoe Print', 'Bradley Hand', cursive;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: center;
+  transform: rotate(-5deg);
+}
+
+.previewScribble svg {
+  width: 43px;
+  height: 48px;
+  margin-right: 0.05rem;
+  margin-bottom: -0.3rem;
+}
+
+.loginPanel {
+  width: 450px;
+  max-width: 100%;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(0.75rem, 1.35vh, 1rem);
+  padding-top: clamp(2.5rem, 5vh, 4rem);
+  animation: homepage-login-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) 110ms both;
+}
+
+.providerStrip {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.75rem;
+  color: #66718c;
+  font-size: 0.82rem;
+}
+
+.providerStrip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.providerStrip svg {
+  width: 19px;
+  height: 19px;
+}
+
+.loginQuote {
+  margin: -0.35rem 0 0 auto;
+  color: #697797;
+  font-family: 'Segoe Print', 'Bradley Hand', cursive;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: right;
+  transform: rotate(-3deg);
+}
+
+.loginQuote cite {
+  margin-top: 0.5rem;
+  display: block;
+  font-family: var(--font-family-sans);
+  font-size: 0.63rem;
+  font-style: normal;
 }
 
 .foundationCard {
@@ -150,21 +682,186 @@
 }
 
 .legalLinks {
-  width: min(100%, 760px);
-  margin-top: var(--space-3);
-  align-self: center;
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
+  color: #8a94aa;
+  font-size: 0.68rem;
   text-align: center;
 }
 
 .legalLinks a {
-  color: var(--color-accent);
+  color: #5371bd;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
+@media (max-width: 1120px) {
+  .loginHeader {
+    grid-template-columns: 1fr auto;
+  }
+
+  .loginNav {
+    display: none;
+  }
+
+  .loginLayout {
+    grid-template-columns: minmax(0, 520px) minmax(410px, 470px);
+    column-gap: 3.5rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(3rem, 5vw, 4rem);
+  }
+
+  .heroBenefits {
+    gap: 0.75rem 1rem;
+  }
+
+  .loginQuote {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .loginPage {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .loginLayout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    padding-bottom: 3rem;
+  }
+
+  .loginHero,
+  .loginPanel {
+    width: min(100%, 560px);
+    justify-self: center;
+  }
+
+  .loginHero {
+    text-align: center;
+  }
+
+  .heroCopy {
+    padding-left: 0;
+  }
+
+  .heroDescription {
+    margin-inline: auto;
+  }
+
+  .heroBenefits {
+    justify-content: center;
+  }
+
+  .calendarStage {
+    margin-inline: auto;
+    padding: 0 0 1rem;
+    perspective: none;
+  }
+
+  .calendarPreview {
+    transform: none;
+  }
+}
+
 @media (max-width: 540px) {
+  .loginHeader {
+    min-height: 68px;
+    padding-inline: 1.15rem;
+  }
+
+  .loginBrandMark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .loginBrandName {
+    font-size: 1.2rem;
+  }
+
+  .loginHeaderActions {
+    gap: 1rem;
+  }
+
+  .signInPlaceholder {
+    display: none;
+  }
+
+  .getStartedPlaceholder {
+    min-width: 0;
+    height: 40px;
+  }
+
+  .loginLayout {
+    padding: 1rem 1rem 2rem;
+  }
+
+  .heroEyebrow {
+    font-size: 0.64rem;
+    letter-spacing: 0.18em;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.75rem, 14vw, 3.45rem);
+  }
+
+  .heroDescription {
+    font-size: 0.98rem;
+  }
+
+  .heroBenefits {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-left: auto;
+    margin-right: auto;
+    width: fit-content;
+  }
+
+  .calendarStage {
+    width: calc(100% + 0.5rem);
+    margin-left: -0.25rem;
+  }
+
+  .calendarPreview {
+    min-height: 255px;
+    grid-template-columns: 24% minmax(0, 1fr);
+    border-width: 5px;
+    border-radius: 17px;
+  }
+
+  .previewSidebar {
+    padding: 0.7rem 0.55rem;
+  }
+
+  .previewCallout {
+    display: none;
+  }
+
+  .previewCalendar {
+    padding: 0.6rem 0.55rem 2.1rem;
+  }
+
+  .previewGrid {
+    height: calc(100% - 68px);
+  }
+
+  .previewEvent strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .previewEvent small {
+    display: none;
+  }
+
+  .providerStrip {
+    flex-wrap: wrap;
+    gap: 0.7rem 1rem;
+  }
+
   .foundationCard {
     min-height: 0;
     padding: var(--space-5);
@@ -183,7 +880,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .loginBrand,
-  .loginContent {
+  .loginHero,
+  .loginPanel,
+  .calendarStage {
     animation: none;
   }
 }

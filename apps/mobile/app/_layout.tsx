@@ -15,6 +15,10 @@ import { AppearanceProvider } from '../src/features/settings/appearance/Appearan
 import { ErrorBoundary } from '../src/lib/errors/ErrorBoundary';
 import { queryClient } from '../src/lib/query/query-client';
 
+export const unstable_settings = {
+  initialRouteName: '(tabs)',
+};
+
 void SplashScreen.preventAutoHideAsync();
 
 /**
@@ -62,7 +66,12 @@ function RootStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen
         name="settings/integrations"
-        options={{ headerShown: true, title: 'Connections', animation: 'default' }}
+        options={{
+          headerShown: true,
+          title: 'Connections',
+          headerBackTitle: 'Settings',
+          animation: 'default',
+        }}
       />
       {/* Search opens over whichever tab you were on, so it is a stack screen
           rather than a hidden tab — a hidden tab is not a navigable route. */}

@@ -1,201 +1,166 @@
 .container {
   width: min(100%, 1040px);
   margin: 0 auto;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-8);
   padding-bottom: var(--space-12);
 }
 
-/* Header */
+.heroBanner {
+  position: relative;
+  min-height: 360px;
+  padding: clamp(2rem, 4vw, 3.5rem);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 16%, var(--color-border-subtle));
+  border-radius: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 350px);
+  align-items: center;
+  gap: clamp(3rem, 7vw, 6.5rem);
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 78% 18%,
+      color-mix(in srgb, var(--color-accent) 18%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-bg-surface) 93%, var(--color-accent) 7%),
+      var(--color-bg-surface)
+    );
+  box-shadow: 0 24px 58px color-mix(in srgb, var(--color-accent) 10%, transparent);
+  isolation: isolate;
+}
+
+.heroBanner::before,
+.heroBanner::after {
+  position: absolute;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border-radius: 50%;
+  content: '';
+}
+
+.heroBanner::before {
+  width: 290px;
+  height: 290px;
+  top: -180px;
+  right: 13%;
+}
+
+.heroBanner::after {
+  width: 220px;
+  height: 220px;
+  right: -125px;
+  bottom: -130px;
+}
+
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.backLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-  width: fit-content;
-}
-
-.backLink:hover {
-  color: var(--color-accent);
-}
-
-.title {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.035em;
-}
-
-.subtitle {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  max-width: 65ch;
-  line-height: var(--line-height-relaxed);
-}
-
-/* Status Banner */
-.statusBanner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.statusMain {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
-  min-width: 0;
+  text-align: left;
 }
 
-.statusIndicator {
-  width: 10px;
-  height: 10px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.statusIndicatorNeutral {
-  background: var(--color-text-tertiary);
-}
-
-.statusIndicatorSuccess {
-  background: var(--color-success);
-  box-shadow: 0 0 8px rgba(97, 214, 162, 0.5);
-}
-
-.statusIndicatorWarning {
-  background: var(--color-warning);
-  box-shadow: 0 0 8px rgba(231, 182, 96, 0.4);
-}
-
-.statusIndicatorDanger {
-  background: var(--color-danger);
-  box-shadow: 0 0 8px rgba(255, 125, 132, 0.4);
-}
-
-.statusText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.statusTitleRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.statusTitle {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-}
-
-.statusBadge {
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
+.eyebrow {
+  color: var(--color-accent);
   font-size: 0.6875rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
-.badgeNeutral {
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-surface-raised);
+.title {
+  max-width: 620px;
+  color: var(--color-text-primary);
+  font-size: clamp(2.35rem, 4.2vw, 3.5rem);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.055em;
+  line-height: 1.02;
+}
+
+.title span {
+  color: var(--color-accent);
+}
+
+.subtitle {
+  max-width: 54ch;
   color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: var(--line-height-relaxed);
 }
 
-.badgeSuccess {
-  border: 1px solid color-mix(in srgb, var(--color-success) 35%, transparent);
-  background: var(--color-success-subtle);
-  color: var(--color-success);
-}
-
-.badgeWarning {
-  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);
-  background: var(--color-warning-subtle);
-  color: var(--color-warning);
-}
-
-.badgeDanger {
-  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
-  background: var(--color-danger-subtle);
-  color: var(--color-danger);
-}
-
-.statusDescription {
-  color: var(--color-text-tertiary);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-normal);
-}
-
-.statusActions {
+.heroProof {
+  margin-top: var(--space-2);
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
   flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  list-style: none;
 }
 
-.refreshButton,
-.manageLink {
+.heroProof li {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 34px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-input);
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  text-decoration: none;
-  cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
-.refreshButton:hover:not(:disabled),
-.manageLink:hover {
-  background: var(--color-hover);
+.heroProof .checkIcon {
+  width: 18px;
+  height: 18px;
+  padding: 4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.heroControlCard {
+  padding: var(--space-6);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border-subtle));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-bg-surface) 92%, transparent);
+  box-shadow: 0 18px 44px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.heroControlEyebrow {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.heroControlCard h2 {
   color: var(--color-text-primary);
-  border-color: var(--color-border-strong);
+  font-size: var(--font-size-xl);
+  letter-spacing: -0.025em;
 }
 
-.refreshButton:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.heroControlCard > p {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-relaxed);
 }
 
-/* Billing Toggle */
 .intervalPicker {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  margin-block: var(--space-2);
+  justify-content: flex-start;
+  margin-top: var(--space-5);
 }
 
 .toggleContainer {
   position: relative;
+  width: 100%;
   display: inline-flex;
   padding: 4px;
   border: 1px solid var(--color-border);
@@ -223,10 +188,13 @@
 .toggleOption {
   position: relative;
   z-index: 2;
+  min-width: 0;
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
@@ -270,31 +238,41 @@
   box-shadow: 0 1px 4px rgba(5, 150, 105, 0.4);
 }
 
-/* Cards Grid */
 .cardsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
+  gap: var(--space-8);
   align-items: stretch;
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  padding: var(--space-6);
+  padding: clamp(1.5rem, 3vw, 2.2rem);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-surface);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--color-bg-surface) 96%, var(--color-accent) 4%);
   position: relative;
+  box-shadow: 0 18px 46px color-mix(in srgb, var(--color-text-primary) 7%, transparent);
   transition:
     border-color var(--transition-fast),
     box-shadow var(--transition-fast);
 }
 
 .cardPro {
-  border-color: rgba(138, 164, 255, 0.45);
-  background: linear-gradient(180deg, rgba(138, 164, 255, 0.04) 0%, var(--color-bg-surface) 35%);
-  box-shadow: 0 4px 24px rgba(138, 164, 255, 0.06);
+  border-color: color-mix(in srgb, var(--color-accent) 48%, transparent);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--color-accent) 13%, transparent),
+      transparent 31%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-surface)) 0%,
+      var(--color-bg-surface) 38%
+    );
+  box-shadow: 0 22px 54px color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
 .cardPro:hover {
@@ -303,9 +281,9 @@
 
 .cardBadge {
   position: absolute;
-  top: -12px;
+  top: 18px;
   right: var(--space-6);
-  padding: 3px 10px;
+  padding: 5px 10px;
   border: 1px solid rgba(138, 164, 255, 0.5);
   border-radius: var(--radius-full);
   background: var(--color-accent);
@@ -676,22 +654,23 @@
 
 /* Feature Comparison Table */
 .comparisonSection {
-  margin-top: var(--space-6);
+  margin-top: var(--space-2);
+  padding: clamp(1.4rem, 3vw, 2.25rem);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
+  border-radius: 22px;
   background: var(--color-bg-surface);
-  overflow: hidden;
+  box-shadow: 0 18px 46px color-mix(in srgb, var(--color-text-primary) 6%, transparent);
 }
 
 .comparisonHeader {
-  padding: var(--space-5);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding-bottom: var(--space-5);
 }
 
 .comparisonTitle {
   color: var(--color-text-primary);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.025em;
 }
 
 .comparisonSubtitle {
@@ -723,7 +702,6 @@
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: var(--color-bg-surface-raised);
 }
 
 .table td {
@@ -760,10 +738,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-surface);
+  padding: var(--space-3) clamp(1rem, 3vw, 2.5rem) 0;
   text-align: center;
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
@@ -792,24 +767,52 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .heroBanner {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+
+  .heroControlCard {
+    width: min(100%, 420px);
+  }
+
   .cardsGrid {
     grid-template-columns: 1fr;
-  }
-
-  .statusBanner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .statusActions {
-    width: 100%;
-    justify-content: flex-start;
   }
 }
 
 @media (max-width: 540px) {
   .container {
     padding-inline: var(--space-3);
+  }
+
+  .heroBanner {
+    min-height: 0;
+    padding: var(--space-6) var(--space-5);
+    border-radius: 18px;
+  }
+
+  .title {
+    font-size: 2.25rem;
+  }
+
+  .heroProof {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .heroControlCard {
+    padding: var(--space-4);
+  }
+
+  .toggleOption {
+    padding-inline: var(--space-2);
+    font-size: 0.6875rem;
+  }
+
+  .savingsPill {
+    padding-inline: 5px;
   }
 
   .card {

@@ -115,7 +115,7 @@ export function SettingsScreen() {
           subtitle={connectionSummary(connections)}
           meta={connections.length > 0 ? String(connections.length) : undefined}
           showChevron
-          onPress={() => router.push('/settings/integrations')}
+          onPress={() => router.push('/settings/integrations', { dangerouslySingular: true })}
         />
         <Divider inset />
         <ListRow

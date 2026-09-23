@@ -28,9 +28,14 @@ export interface DragLift {
   pickedUp: () => void;
   /** Call from `onFinalize`, through `runOnJS`. */
   putDown: () => void;
+  /** Call through `runOnJS` each time the drop target moves to a new slot. */
+  slotChanged: () => void;
   /** Hand a finished drag's offset over to the commit, from `onEnd`. */
   settle: (commit: () => Promise<void>) => void;
-  /** Slide back to where it started, for a drag that changed nothing. */
+  /**
+   * Slide back to where it started, for a drag that changed nothing. A worklet,
+   * so a gesture's `onEnd` calls it directly.
+   */
   cancel: () => void;
   /** Apply Gesture Handler's relations, whatever shape the callers pass. */
   applyBlocking: (gesture: GestureType, blocking?: (RefObject<unknown> | GestureType)[]) => void;
@@ -50,6 +55,11 @@ export interface DragLift {
  *
  * What a drag *means* is left to each view: the hour grid reads minutes and
  * day columns out of the gesture, the month grid reads whole dates.
+ *
+ * Gesture callbacks must take the functions they need off the returned object
+ * rather than calling `lift.x()`: a worklet captures what it references, and
+ * capturing the whole object would carry `style` — a live animated-style handle
+ * — onto the UI thread, which Reanimated warns about on every style update.
  */
 export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLift {
   const dragX = useSharedValue(0);
@@ -68,12 +78,19 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
     onDragChange?.(false);
   }, [onDragChange]);
 
+  // A tick per slot crossed, so the finger covering the event still feels
+  // each quarter hour or date it passes.
+  const slotChanged = useCallback(() => {
+    void Haptics.selectionAsync();
+  }, []);
+
   const settle = useCallback(
     (commit: () => Promise<void>) => {
       settledX.value = dragX.value;
       settledY.value = dragY.value;
       dragX.value = 0;
       dragY.value = 0;
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       void commit().finally(() => {
         settledX.value = 0;
@@ -84,6 +101,7 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
   );
 
   const cancel = useCallback(() => {
+    'worklet';
     dragX.value = withTiming(0, RETURN);
     dragY.value = withTiming(0, RETURN);
   }, [dragX, dragY]);
@@ -124,6 +142,7 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
     style,
     pickedUp,
     putDown,
+    slotChanged,
     settle,
     cancel,
     applyBlocking,

@@ -5,6 +5,8 @@ import { View } from 'react-native';
 export interface RecurrenceFieldProps {
   value: string | null;
   onChange: (rrule: string | null) => void;
+  /** What repeats, for the copy. Defaults to an event. */
+  subject?: 'event' | 'task';
 }
 
 /**
@@ -14,7 +16,7 @@ export interface RecurrenceFieldProps {
  * presets can express. Rather than silently rewriting it, the field shows what
  * the rule says and leaves it alone unless the user picks something else.
  */
-export function RecurrenceField({ value, onChange }: RecurrenceFieldProps) {
+export function RecurrenceField({ value, onChange, subject = 'event' }: RecurrenceFieldProps) {
   const theme = useTheme();
 
   const parsed = value ? parseRRule(value) : null;
@@ -41,7 +43,7 @@ export function RecurrenceField({ value, onChange }: RecurrenceFieldProps) {
         <Text variant="footnote" color="tertiary">
           {parsed
             ? `Currently: ${describeRRule(parsed)}`
-            : 'This event uses a repeat rule set elsewhere. Changing it here will replace it.'}
+            : `This ${subject} uses a repeat rule set elsewhere. Changing it here will replace it.`}
         </Text>
       ) : null}
     </View>

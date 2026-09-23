@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import styles from './AppShell.module.css';
 import { PageTransition } from './PageTransition';
 import { signOut, useAuth } from '../../features/auth';
+import { useProfile } from '../../features/settings/hooks/useSettings';
 
 interface NavItemConfig {
   to: string;
@@ -162,14 +163,29 @@ function isWorkspacePath(pathname: string): boolean {
 
 export function AppShell() {
   const { email } = useAuth();
+  const { data: profile } = useProfile();
   const location = useLocation();
   const navigate = useNavigate();
 
+  const contentAreaRef = useRef<HTMLElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLAnchorElement | null)[]>([]);
   const prevPathRef = useRef<string>(location.pathname);
   const isInitialMount = useRef(true);
   const [metrics, setMetrics] = useState<{ top: number; height: number } | null>(null);
   const [mode, setMode] = useState<'sliding' | 'entering' | 'exiting' | 'hidden'>('hidden');
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+
+  const accountName = profile?.fullName?.trim() || 'Your account';
+  const accountInitial = (profile?.fullName || email || 'B').slice(0, 1).toUpperCase();
+
+  useLayoutEffect(() => {
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    contentArea.scrollTop = 0;
+    contentArea.scrollLeft = 0;
+  }, [location.pathname]);
 
   useLayoutEffect(() => {
     const prevPath = prevPathRef.current;
@@ -228,7 +244,28 @@ export function AppShell() {
     return () => window.removeEventListener('resize', handleResize);
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsAccountMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAccountMenuOpen]);
+
   async function handleSignOut() {
+    setIsAccountMenuOpen(false);
     try {
       await signOut();
       navigate('/login', { replace: true });
@@ -244,12 +281,25 @@ export function AppShell() {
       <aside className={styles.sidebar} aria-label="Sidebar Navigation">
         <div className={styles.brand}>
           <div className={styles.brandLogo} aria-hidden="true">
-            B
+            <svg viewBox="0 0 32 32" fill="none">
+              <rect x="3" y="5" width="26" height="24" rx="6" fill="currentColor" />
+              <path d="M3 12h26" stroke="var(--color-bg-sidebar)" strokeWidth="2" />
+              <path
+                d="m10 20 4 4 8-9"
+                stroke="var(--color-on-accent)"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10 3v5M22 3v5"
+                stroke="var(--color-on-accent)"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+            </svg>
           </div>
-          <div className={styles.brandCopy}>
-            <span className={styles.brandName}>BPlan</span>
-            <span className={styles.brandTag}>Plan with clarity</span>
-          </div>
+          <span className={styles.brandName}>BPlan</span>
         </div>
 
         <nav className={styles.nav} aria-label="Main navigation">
@@ -326,40 +376,65 @@ export function AppShell() {
               <span className={styles.navLabel}>Plan &amp; Pro</span>
               <span className={styles.navBadge}>PRO</span>
             </NavLink>
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
-              }
-            >
-              <span className={styles.navIcon}>
-                <SettingsIcon />
-              </span>
-              <span className={styles.navLabel}>Settings</span>
-            </NavLink>
           </div>
         </nav>
 
-        <div className={styles.sidebarFooter}>
-          {email && (
-            <div className={styles.userCard} title={email}>
-              <span className={styles.userAvatar} aria-hidden="true">
-                {email.slice(0, 1).toUpperCase()}
-              </span>
-              <span className={styles.userMeta}>
-                <span className={styles.userLabel}>Signed in</span>
-                <span className={styles.userEmail}>{email}</span>
-              </span>
+        <div ref={accountMenuRef} className={styles.sidebarFooter}>
+          {isAccountMenuOpen && (
+            <div className={styles.accountMenu} role="menu" aria-label="Account menu">
+              <NavLink
+                to="/settings"
+                className={styles.accountMenuItem}
+                role="menuitem"
+                onClick={() => setIsAccountMenuOpen(false)}
+              >
+                <SettingsIcon />
+                <span>Settings</span>
+              </NavLink>
+              <button
+                type="button"
+                className={`${styles.accountMenuItem} ${styles.accountMenuSignOut}`}
+                onClick={handleSignOut}
+                role="menuitem"
+              >
+                <SignOutIcon />
+                <span>Sign out</span>
+              </button>
             </div>
           )}
+
           <button
             type="button"
-            className={styles.signOutButton}
-            onClick={handleSignOut}
-            aria-label="Sign out of BPlan"
+            className={`${styles.accountButton} ${
+              isAccountMenuOpen ? styles.accountButtonOpen : ''
+            }`}
+            onClick={() => setIsAccountMenuOpen((open) => !open)}
+            aria-label="Open account menu"
+            aria-haspopup="menu"
+            aria-expanded={isAccountMenuOpen}
+            title={email ?? accountName}
           >
-            <SignOutIcon />
-            <span className={styles.signOutText}>Sign out</span>
+            <span className={styles.userAvatar} aria-hidden="true">
+              {accountInitial}
+            </span>
+            <span className={styles.userMeta}>
+              <span className={styles.userName}>{accountName}</span>
+              {email && <span className={styles.userEmail}>{email}</span>}
+            </span>
+            <svg
+              className={styles.accountChevron}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         </div>
       </aside>
@@ -367,6 +442,7 @@ export function AppShell() {
       {/* Main Content Area */}
       <div className={styles.mainContent}>
         <main
+          ref={contentAreaRef}
           className={
             location.pathname === '/tasks' || location.pathname === '/calendar'
               ? styles.contentAreaFull

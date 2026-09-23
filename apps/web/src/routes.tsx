@@ -6,6 +6,7 @@ import { useAuth } from './features/auth';
 import { CalendarPage } from './pages/CalendarPage';
 import { IntegrationsCallbackPage } from './pages/IntegrationsCallbackPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { PricingPage } from './pages/PricingPage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignInPage } from './pages/SignInPage';
@@ -13,21 +14,22 @@ import { SubscriptionPage } from './pages/SubscriptionPage';
 import { TasksPage } from './pages/TasksPage';
 import { TodayPage } from './pages/TodayPage';
 
-function RootRedirect() {
+function RootRoute() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return null;
   }
 
-  return <Navigate to={isAuthenticated ? '/today' : '/login'} replace />;
+  return isAuthenticated ? <Navigate to="/today" replace /> : <SignInPage />;
 }
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<RootRedirect />} />
+      <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<SignInPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/settings/integrations/callback" element={<IntegrationsCallbackPage />} />

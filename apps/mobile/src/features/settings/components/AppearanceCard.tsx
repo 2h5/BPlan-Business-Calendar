@@ -17,14 +17,10 @@ const ICON: Record<ThemeMode, IconName> = {
   dark: 'moon-outline',
 };
 
-/**
- * The web's Appearance section: three preview tiles, the active one outlined
- * and check-marked, and a line underneath saying what is actually on screen —
- * which is the part that matters when the choice is "System default".
- */
+/** The web's Appearance section: three preview tiles, the active one outlined. */
 export function AppearanceCard() {
   const theme = useTheme();
-  const { mode, scheme, setMode } = useAppearance();
+  const { mode, setMode } = useAppearance();
 
   const select = (next: ThemeMode) => {
     if (next === mode) return;
@@ -35,7 +31,7 @@ export function AppearanceCard() {
   return (
     <Card
       eyebrow="Appearance"
-      description="Customize how BCal looks on this device."
+      description="Customize how BPlan looks on this device."
       padded={false}
     >
       <View style={{ padding: theme.spacing.xl, gap: theme.spacing.md }}>
@@ -49,14 +45,6 @@ export function AppearanceCard() {
             />
           ))}
         </View>
-
-        <Text variant="footnote" color="secondary">
-          Currently active:{' '}
-          <Text variant="footnote" color="primary">
-            {scheme === 'dark' ? 'Dark' : 'Light'} theme
-          </Text>
-          {mode === 'auto' ? ' (synchronized with system)' : ''}
-        </Text>
       </View>
     </Card>
   );
@@ -117,6 +105,7 @@ function ThemeTile({ option, selected, onPress }: ThemeTileProps) {
         style={{
           color: selected ? theme.colors.accent : theme.colors.textSecondary,
           fontWeight: '600',
+          textAlign: 'center',
         }}
       >
         {THEME_MODE_LABEL[option]}
