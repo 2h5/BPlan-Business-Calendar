@@ -10,6 +10,11 @@ export interface LifecycleReport {
   readonly providerPro: boolean;
   readonly mirrorPro: boolean;
   readonly serverPro: boolean;
+  readonly providerSubscriptionCount: number;
+  readonly mirrorRowCount: number;
+  readonly ledgerEventCount: number;
+  readonly annualProductMatch: boolean;
+  readonly latestAppliedLedgerEventType: string | null;
   readonly storeIdentifier: string | null;
   readonly subscriptionStatus: string | null;
   readonly givesAccess: boolean | null;
@@ -58,6 +63,7 @@ export function inspectAnnualLifecycle(
   const transitions = events
     .filter((event) => LIFECYCLE_EVENTS.has(event.event_type))
     .map((event) => event.event_type);
+  const latestApplied = [...events].reverse().find((event) => event.applied);
   const renewed = transitions.includes('RENEWAL');
   const cancelled = transitions.includes('CANCELLATION');
   const base: LifecycleReport = {
@@ -68,6 +74,14 @@ export function inspectAnnualLifecycle(
     providerPro: provider.activePro,
     mirrorPro: supabase.activeMirror,
     serverPro: supabase.serverAuthorized,
+    providerSubscriptionCount: provider.subscriptions.length,
+    mirrorRowCount: supabase.mirrorRows.length,
+    ledgerEventCount: events.length,
+    annualProductMatch: sub?.storeIdentifier === BILLING_CONTRACT.products.annual.id,
+    latestAppliedLedgerEventType:
+      latestApplied && LIFECYCLE_EVENTS.has(latestApplied.event_type)
+        ? latestApplied.event_type
+        : null,
     storeIdentifier: sub?.storeIdentifier ?? null,
     subscriptionStatus: sub?.status ?? null,
     givesAccess: sub?.givesAccess ?? null,
@@ -111,7 +125,6 @@ export function inspectAnnualLifecycle(
     return fail('LIFECYCLE_PROVIDER_MALFORMED');
   }
   if (!supabase.ledgerCoherent || events.length === 0) return fail('LIFECYCLE_LEDGER');
-  const latestApplied = [...events].reverse().find((event) => event.applied);
   if (!latestApplied || row.last_event_at !== latestApplied.event_at) {
     return fail('LIFECYCLE_LEDGER');
   }
@@ -158,6 +171,11 @@ export function formatLifecycleReport(report: LifecycleReport): string {
   return [
     'RevenueCat annual lifecycle (read-only)',
     `Result: ${report.ok ? 'PASS' : 'FAIL'}`,
+    ...(report.failure ? [`Failure: ${report.failure}`] : []),
+    `Provider subscriptions: ${report.providerSubscriptionCount}`,
+    `Supabase mirror rows: ${report.mirrorRowCount}`,
+    `Ledger events: ${report.ledgerEventCount}`,
+    `Annual product match: ${report.annualProductMatch ? 'YES' : 'NO'}`,
     `State: ${report.state}`,
     `Product: ${report.storeIdentifier ?? 'UNKNOWN'}`,
     `Subscription status: ${report.subscriptionStatus ?? 'UNKNOWN'}`,
@@ -176,7 +194,7 @@ export function formatLifecycleReport(report: LifecycleReport): string {
     `Skipped ledger events: ${report.skippedLedgerEvents}`,
     `Stale ledger events: ${report.staleLedgerEvents}`,
     `Duplicate ledger events: ${report.duplicateLedgerEvents}`,
-    ...(report.failure ? [`Failure: ${report.failure}`] : []),
+    `Latest applied ledger event: ${report.latestAppliedLedgerEventType ?? 'UNKNOWN'}`,
   ].join('\n');
 }
 

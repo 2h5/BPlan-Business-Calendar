@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { inspectAnnualLifecycle, inspectAnnualRenewal } from './lifecycle';
-import { formatLifecycleReadOnlyFailure, runBillingLifecycleReadOnly } from './lifecycle-command';
+import { formatLifecycleReport, inspectAnnualLifecycle, inspectAnnualRenewal } from './lifecycle';
+import {
+  formatLifecycleReadOnlyFailure,
+  formatLifecycleUnexpectedFailure,
+  runBillingLifecycleReadOnly,
+} from './lifecycle-command';
 import {
   isStablePreRenewalWindow,
   runBillingAnnualRenewalReadOnly,
@@ -393,6 +397,28 @@ describe('annual natural renewal comparison', () => {
 });
 
 describe('annual lifecycle command safety', () => {
+  it('puts lifecycle failure and safe structural diagnostics before detailed state', () => {
+    const fixture = fixtures();
+    const report = inspectAnnualLifecycle(
+      fixture.provider,
+      { ...fixture.supabase, serverAuthorized: false },
+      fixture.now,
+    );
+    const lines = formatLifecycleReport(report).split('\n');
+
+    expect(lines.slice(0, 7)).toEqual([
+      'RevenueCat annual lifecycle (read-only)',
+      'Result: FAIL',
+      'Failure: LIFECYCLE_AUTHORITY_MISMATCH',
+      'Provider subscriptions: 1',
+      'Supabase mirror rows: 1',
+      'Ledger events: 1',
+      'Annual product match: YES',
+    ]);
+    expect(lines).toContain('Latest applied ledger event: INITIAL_PURCHASE');
+    expect(formatLifecycleReport(report)).not.toContain(USER);
+  });
+
   it('prints the failing RevenueCat operation without raw provider details', () => {
     const output = formatLifecycleReadOnlyFailure({
       category: 'REVENUECAT_PROJECT',
@@ -404,6 +430,104 @@ describe('annual lifecycle command safety', () => {
     expect(output).toContain('Failure: CLI_GENERAL_ERROR');
     expect(output).toContain('RevenueCat operation: projects-list');
     expect(output).not.toContain('provider output');
+  });
+
+  it('uses a stable safe code when the CLI promise rejects unexpectedly', () => {
+    expect(formatLifecycleUnexpectedFailure()).toBe(
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_UNEXPECTED',
+    );
+  });
+
+  it('maps an unexpected RevenueCat read throw to a safe provider-stage code', async () => {
+    const thrownValue = `provider exception ${USER} https://provider-secret.example/key`;
+    const output: string[] = [];
+    const result = await runBillingLifecycleReadOnly(
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => {
+          throw new Error(thrownValue);
+        },
+      },
+    );
+
+    expect(result).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_PROVIDER_UNEXPECTED',
+    ]);
+    expect(output.join('\n')).not.toContain(thrownValue);
+    expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('https://');
+  });
+
+  it('maps an unexpected Supabase read throw to a safe Supabase-stage code', async () => {
+    const thrownValue = `supabase exception ${USER} https://supabase-secret.example/service-role`;
+    const fixture = fixtures();
+    const output: string[] = [];
+    const result = await runBillingLifecycleReadOnly(
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => ({ ok: true as const, data: fixture.provider }),
+        readSupabase: async () => {
+          throw new Error(thrownValue);
+        },
+      },
+    );
+
+    expect(result).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_SUPABASE_UNEXPECTED',
+    ]);
+    expect(output.join('\n')).not.toContain(thrownValue);
+    expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('https://');
+  });
+
+  it('maps unexpected reconciliation and formatting throws to the reconciliation-stage code', async () => {
+    const fixture = fixtures();
+    const thrownValue = `reconciliation exception ${USER} https://reconciliation-secret.example/raw`;
+    const output: string[] = [];
+    const reconciliationResult = await runBillingLifecycleReadOnly(
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => ({ ok: true as const, data: fixture.provider }),
+        readSupabase: async () => ({ ok: true as const, data: fixture.supabase }),
+        inspect: () => {
+          throw new Error(thrownValue);
+        },
+      },
+    );
+
+    expect(reconciliationResult).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_RECONCILIATION_UNEXPECTED',
+    ]);
+    expect(output.join('\n')).not.toContain(thrownValue);
+    expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('https://');
+
+    output.length = 0;
+    const formattingResult = await runBillingLifecycleReadOnly(
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => ({ ok: true as const, data: fixture.provider }),
+        readSupabase: async () => ({ ok: true as const, data: fixture.supabase }),
+        formatReport: () => {
+          throw new Error(thrownValue);
+        },
+      },
+    );
+
+    expect(formattingResult).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_RECONCILIATION_UNEXPECTED',
+    ]);
+    expect(output.join('\n')).not.toContain(thrownValue);
+    expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('https://');
   });
 
   it('rejects production and mutating modes before creating any adapter', async () => {
@@ -442,6 +566,17 @@ describe('annual lifecycle command safety', () => {
     }
   });
 });
+
+function lifecycleEnvironment() {
+  return {
+    BILLING_AUTOMATION_MODE: 'live-readonly',
+    BILLING_AUTOMATION_ENV: 'sandbox',
+    BILLING_TEST_USER_ID: USER,
+    REVENUECAT_API_KEY: 'test-api-key',
+    BILLING_SUPABASE_URL: 'https://example.supabase.co',
+    BILLING_SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
+  };
+}
 
 function values(
   fixture: ReturnType<typeof fixtures>,
