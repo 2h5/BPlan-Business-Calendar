@@ -2515,11 +2515,11 @@ manual CI integration is next.
 
 Current phase:
 
-`Billing automation Phases 4 and 5 are complete. The protected GitHub
-lifecycle-read-only run #7 passed on Node 22 without another purchase, and
-normal CI is green. Phase 6 adversarial hardening is active. The monthly and
-annual sandbox chains are proven live. Production billing and production web
-hardening remain pending.`
+`Billing automation Phases 4 through 6 are engineering-complete for the
+reviewed sandbox contract. The atomic webhook is deployed to the hosted
+sandbox/dev Supabase project, the existing identity passed a protected
+lifecycle-read-only run after deployment, and normal CI is green. Production
+billing and production web hardening remain pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2564,19 +2564,20 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current pending gates:
 
-`Annual Phase 3C and billing Phases 4 and 5 are complete. The protected
-lifecycle-read-only workflow passed; Phase 6 adversarial hardening is active.
-Live Luna/Terra evaluation still needs an authorized server-side OpenAI key and
-explicit cost authorization. Production billing stays
-disabled until the seller identity and final legal documents are confirmed.`
+`Annual Phase 3C and billing Phases 4 through 6 are engineering-complete for
+the reviewed sandbox contract. The protected lifecycle-read-only workflow
+passed after the hosted atomic deployment. Live Luna/Terra evaluation still
+needs an authorized server-side OpenAI key and explicit cost authorization.
+Production billing stays disabled until seller identity and final legal
+documents are confirmed.`
 
 Next exact action:
 
-`Continue offline Phase 6 adversarial coverage. Duplicate active RevenueCat
-subscriptions now fail closed in monthly and annual assertions. The local
-two-connection webhook race is fixed and verified through an atomic database
-RPC. Continue the remaining Phase 6 acceptance and runbook reconciliation;
-do not dispatch a live billing workflow unless an item genuinely requires it.`
+`Use the Phase 6 final acceptance matrix in the RevenueCat automation plan
+for sandbox billing handoff. A future natural webhook delivery may be observed
+read-only; do not manufacture a provider event to close an evidence gap.
+Production/legal approval and any later bounded pagination adapter are
+separate decisions.`
 
 Current Sprint 6 verification evidence:
 
@@ -2671,5 +2672,20 @@ returned 405, and the protected sandbox `lifecycle-read-only` workflow
 [run #35834501740](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/35834501740)
 passed for the existing lifecycle identity. No purchase, provider mutation,
 fabricated hosted event, or concurrent provider-side delivery occurred.
+
 **PENDING:** a future natural RevenueCat delivery through the newly deployed
 atomic path has not yet been observed. Production and legal gates remain open.
+
+**Phase 6 final engineering acceptance, 2026-09-23:** The
+[automation plan's final matrix](revenuecat-automation-plan.md)
+separates local race proof, hosted deployment/read-only continuity,
+fail-closed identity/project/pagination/credential guards, accepted external
+observations, and human release gates. The pinned CLI 0.1.1 named reads expose
+no continuation flags; advertised pages fail closed, and `rc api GET` traversal
+would require a separately reviewed exact-path adapter. No independent Auth or
+RevenueCat binding distinguishes an intended fixture from another valid UUID;
+the protected workflow's test-identity secret remains an operator boundary.
+No purchase, cancellation, refund, extension, credential rotation, hosted
+subscription write, or fabricated provider delivery was performed for this
+audit. Phase 6 engineering acceptance is complete for the reviewed sandbox
+contract. Production billing remains disabled.

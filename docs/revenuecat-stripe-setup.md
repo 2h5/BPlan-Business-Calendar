@@ -34,6 +34,18 @@ No purchase, RevenueCat mutation, or concurrent provider-side delivery was
 manufactured. A real delivery through the newly deployed atomic path remains
 unobserved; production billing remains disabled.
 
+**Phase 6 engineering closeout, 2026-09-23:** The final
+[acceptance matrix](revenuecat-automation-plan.md)
+marks the current sandbox hardening contract complete. The pinned RevenueCat
+CLI does not expose continuation controls on the approved named reads, so an
+advertised next page fails closed. A valid but unintended test UUID is an
+operator fixture-selection boundary; matching RevenueCat and Supabase rows
+cannot independently establish intent. Live expired-key and provider-side
+concurrent/replayed delivery exercises are accepted external observations,
+not prerequisites for engineering closeout. No new purchase, provider mutation,
+credential rotation, or webhook event was created for this audit. Production
+billing and final seller/legal approval remain separate human release gates.
+
 Last billing automation checkpoint: **2026-09-23**
 
 ## Annual Phase 3C checkpoint — 2026-09-22
@@ -447,15 +459,11 @@ supabase test db
 pnpm db:types
 ```
 
-The RevenueCat backend commit passed its focused Deno tests, database/RLS
-checks, generated-type checks, and git-diff checks. The current focused webhook
-run passes 18/18 Deno tests. The web billing guard passes 4/4 Vitest tests and
-the web TypeScript check passes. A local `pnpm verify` invocation at the
-current Windows checkout is blocked before project scripts by an environment
-permission error (`EPERM` while inspecting `C:\Users\lache`); this is not a
-reported code-test failure. The implementation checkpoint's CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
-passed both the static and hosted migrations/RLS/generated-types jobs; the
-latest documentation-checkpoint CI result is reported with the final handoff.
+The earlier Windows `EPERM` and focused test counts are historical checkpoints.
+For Phase 6, [main CI #35835780246](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/35835780246)
+passed static, migrations/RLS/generated-types, and Deno checks after the hosted
+deployment documentation commit. The closeout branch verification is recorded
+in the automation plan's final acceptance section.
 
 ## Production readiness checklist
 
