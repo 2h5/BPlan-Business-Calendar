@@ -101,6 +101,7 @@ function providerRunner(
     productExitCode?: number;
     customerNotFound?: boolean;
     projects?: unknown;
+    projectsExitCode?: number;
   } = {},
 ): { runner: RevenueCatCliRunner; invocations: RevenueCatCliInvocation[] } {
   const invocations: RevenueCatCliInvocation[] = [];
@@ -111,6 +112,13 @@ function providerRunner(
     if (invocation.argv[0] === 'version')
       payload = { data: { version: '0.1.1' }, schema_version: 1 };
     else if (command === 'projects list') {
+      if (options.projectsExitCode !== undefined) {
+        return {
+          exitCode: options.projectsExitCode,
+          stdout: '{"providerPayload":"must stay hidden"}',
+          stderr: 'provider diagnostics must stay hidden',
+        };
+      }
       payload = options.projects ?? {
         data: { items: [{ id: 'proj_bplan', name: 'BPlan: Business Calendar' }] },
       };
@@ -350,6 +358,24 @@ describe('RevenueCat user assertion adapter', () => {
       'subscriptions show',
       'products show',
     ]);
+  });
+
+  it('preserves safe operation context for generic CLI failures without provider output', async () => {
+    const result = await providerAdapter({ projectsExitCode: 1 }).adapter.readUser(USER_ID);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        category: 'REVENUECAT_PROJECT',
+        code: 'CLI_GENERAL_ERROR',
+        providerOperation: 'projects-list',
+      },
+    });
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain(API_KEY);
+    expect(serialized).not.toContain(USER_ID);
+    expect(serialized).not.toContain('provider diagnostics');
+    expect(serialized).not.toContain('must stay hidden');
   });
 
   it('represents an absent customer distinctly', async () => {

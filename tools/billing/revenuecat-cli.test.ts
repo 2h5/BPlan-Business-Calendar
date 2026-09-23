@@ -99,6 +99,7 @@ describe('RevenueCat CLI boundary', () => {
       error: {
         code: 'CLI_EXECUTABLE_NOT_FOUND',
         message: 'RevenueCat CLI executable was not found.',
+        operation: 'version',
       },
     });
     expect(JSON.stringify(result)).not.toContain(API_KEY);
@@ -394,8 +395,12 @@ describe('RevenueCat CLI boundary', () => {
         { apiKey: API_KEY, runner: fake.runner },
       );
 
-      expect(result).toMatchObject({ ok: false, error: { code: errorCode } });
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: errorCode, operation: 'projects-list' },
+      });
       expect(JSON.stringify(result)).not.toContain(API_KEY);
+      expect(JSON.stringify(result)).not.toContain('provider payload');
       expect(JSON.stringify(result)).not.toContain('provider');
     }
   });

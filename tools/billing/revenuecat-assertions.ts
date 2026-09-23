@@ -158,7 +158,15 @@ function cliFailure<T>(
     | 'REVENUECAT_SUBSCRIPTION',
   error: RevenueCatCliErrorInfo,
 ): BillingAssertionResult<T> {
-  return assertionFailure(category, error.code, error.message);
+  return {
+    ok: false,
+    error: {
+      category,
+      code: error.code,
+      message: error.message,
+      ...(error.operation === undefined ? {} : { providerOperation: error.operation }),
+    },
+  };
 }
 
 function malformed<T>(

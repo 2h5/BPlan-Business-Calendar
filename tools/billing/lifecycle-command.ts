@@ -1,3 +1,4 @@
+import type { BillingAssertionFailure } from './assertion-types';
 import { isBillingUserId, loadBillingEnvironment, type EnvironmentRecord } from './config';
 import { formatLifecycleReport, inspectAnnualLifecycle } from './lifecycle';
 import { createRevenueCatAssertionAdapter } from './revenuecat-assertions';
@@ -27,7 +28,7 @@ export async function runBillingLifecycleReadOnly(
     apiKey: config.revenueCatApiKey,
   }).readUser(config.testUserId);
   if (!provider.ok) {
-    write(`RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: ${provider.error.code}`);
+    write(formatLifecycleReadOnlyFailure(provider.error));
     return 1;
   }
   const supabase = await createSupabaseAssertionAdapter({
@@ -41,4 +42,12 @@ export async function runBillingLifecycleReadOnly(
   const report = inspectAnnualLifecycle(provider.data, supabase.data, new Date());
   write(formatLifecycleReport(report));
   return report.ok ? 0 : 1;
+}
+
+export function formatLifecycleReadOnlyFailure(error: BillingAssertionFailure): string {
+  const operation =
+    error.providerOperation === undefined
+      ? ''
+      : `\nRevenueCat operation: ${error.providerOperation}`;
+  return `RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: ${error.code}${operation}`;
 }

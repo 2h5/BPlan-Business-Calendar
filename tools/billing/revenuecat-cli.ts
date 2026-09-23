@@ -177,6 +177,7 @@ export interface RevenueCatCliErrorInfo {
   readonly code: RevenueCatCliErrorCode;
   readonly message: string;
   readonly exitCode?: number;
+  readonly operation?: RevenueCatCliOperationKind;
 }
 
 export type RevenueCatCliResult<T> =
@@ -620,45 +621,63 @@ function parseJsonOutput(
     : errorResult('CLI_MALFORMED_JSON', `RevenueCat CLI returned invalid JSON for ${operation}.`);
 }
 
-function mapExitCode(exitCode: number): RevenueCatCliErrorInfo {
+function withOperation<T>(
+  operation: RevenueCatCliOperationKind,
+  error: RevenueCatCliErrorInfo,
+): RevenueCatCliResult<T> {
+  return { ok: false, error: { ...error, operation } };
+}
+
+function mapExitCode(
+  exitCode: number,
+  operation?: RevenueCatCliOperationKind,
+): RevenueCatCliErrorInfo {
+  let error: RevenueCatCliErrorInfo;
   switch (exitCode) {
     case 1:
-      return {
+      error = {
         code: 'CLI_GENERAL_ERROR',
         message: 'RevenueCat CLI returned a general error.',
         exitCode,
       };
+      break;
     case 2:
-      return {
+      error = {
         code: 'CLI_BAD_USAGE',
         message: 'RevenueCat CLI rejected the requested operation.',
         exitCode,
       };
+      break;
     case 4:
-      return {
+      error = {
         code: 'CLI_AUTHORIZATION',
         message: 'RevenueCat CLI authentication or authorization failed.',
         exitCode,
       };
+      break;
     case 5:
-      return {
+      error = {
         code: 'CLI_RESOURCE_NOT_FOUND',
         message: 'RevenueCat CLI could not find the resource.',
         exitCode,
       };
+      break;
     case 6:
-      return {
+      error = {
         code: 'CLI_RATE_LIMITED',
         message: 'RevenueCat CLI reported rate limiting.',
         exitCode,
       };
+      break;
     default:
-      return {
+      error = {
         code: 'CLI_UNEXPECTED_EXIT',
         message: `RevenueCat CLI exited with unsupported code ${exitCode}.`,
         exitCode,
       };
+      break;
   }
+  return operation === undefined ? error : { ...error, operation };
 }
 
 /** Executes only the closed read-only operation union through an injected or real runner. */
@@ -667,13 +686,13 @@ export async function runRevenueCatCli(
   options: RevenueCatCliRunOptions = {},
 ): Promise<RevenueCatCliResult<RevenueCatJsonValue>> {
   const argumentsResult = buildRevenueCatCliArgv(operation);
-  if (!argumentsResult.ok) return argumentsResult;
+  if (!argumentsResult.ok) return withOperation(operation.kind, argumentsResult.error);
 
   if (operation.kind !== 'version' && !options.apiKey?.trim()) {
-    return {
-      ok: false,
-      error: { code: 'CLI_API_KEY_MISSING', message: 'A RevenueCat API key is required.' },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_API_KEY_MISSING',
+      message: 'A RevenueCat API key is required.',
+    });
   }
 
   const invocation: RevenueCatCliInvocation = {
@@ -686,59 +705,55 @@ export async function runRevenueCatCli(
   try {
     processResult = await runner(invocation);
   } catch {
-    return {
-      ok: false,
-      error: { code: 'CLI_PROCESS_ERROR', message: 'RevenueCat CLI process failed.' },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_PROCESS_ERROR',
+      message: 'RevenueCat CLI process failed.',
+    });
   }
 
   if (processResult.failure === 'executable-not-found') {
-    return {
-      ok: false,
-      error: {
-        code: 'CLI_EXECUTABLE_NOT_FOUND',
-        message: 'RevenueCat CLI executable was not found.',
-      },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_EXECUTABLE_NOT_FOUND',
+      message: 'RevenueCat CLI executable was not found.',
+    });
   }
 
   if (processResult.failure === 'timeout') {
-    return {
-      ok: false,
-      error: { code: 'CLI_TIMEOUT', message: 'RevenueCat CLI process timed out.' },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_TIMEOUT',
+      message: 'RevenueCat CLI process timed out.',
+    });
   }
 
   if (processResult.failure === 'output-limit') {
-    return {
-      ok: false,
-      error: { code: 'CLI_OUTPUT_LIMIT', message: 'RevenueCat CLI output exceeded the limit.' },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_OUTPUT_LIMIT',
+      message: 'RevenueCat CLI output exceeded the limit.',
+    });
   }
 
   if (processResult.failure === 'process-error') {
-    return {
-      ok: false,
-      error: { code: 'CLI_PROCESS_ERROR', message: 'RevenueCat CLI process failed.' },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_PROCESS_ERROR',
+      message: 'RevenueCat CLI process failed.',
+    });
   }
 
   if (processResult.exitCode === null) {
-    return {
-      ok: false,
-      error: {
-        code: 'CLI_UNEXPECTED_EXIT',
-        message: 'RevenueCat CLI did not report an exit code.',
-      },
-    };
+    return withOperation(operation.kind, {
+      code: 'CLI_UNEXPECTED_EXIT',
+      message: 'RevenueCat CLI did not report an exit code.',
+    });
   }
 
   if (processResult.exitCode !== 0) {
-    return { ok: false, error: mapExitCode(processResult.exitCode) };
+    return withOperation(operation.kind, mapExitCode(processResult.exitCode, operation.kind));
   }
 
   const parsed = parseJsonOutput(operation.kind, processResult.stdout);
-  return parsed.ok ? { ok: true, operation: operation.kind, data: parsed.data } : parsed;
+  return parsed.ok
+    ? { ok: true, operation: operation.kind, data: parsed.data }
+    : withOperation(operation.kind, parsed.error);
 }
 
 const versionPayloadSchema = z.union([
@@ -815,7 +830,11 @@ export async function checkRevenueCatCliVersion(
   options: RevenueCatCliRunOptions = {},
 ): Promise<RevenueCatCliVersionCheckResult> {
   const result = await runRevenueCatCli({ kind: 'version' }, options);
-  return result.ok ? evaluateRevenueCatCliVersion(result.data) : result;
+  if (!result.ok) return result;
+  const versionResult = evaluateRevenueCatCliVersion(result.data);
+  return versionResult.ok
+    ? versionResult
+    : { ok: false, error: { ...versionResult.error, operation: 'version' } };
 }
 
 export interface RevenueCatProjectIdentity {

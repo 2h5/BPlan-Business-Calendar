@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { inspectAnnualLifecycle, inspectAnnualRenewal } from './lifecycle';
-import { runBillingLifecycleReadOnly } from './lifecycle-command';
+import { formatLifecycleReadOnlyFailure, runBillingLifecycleReadOnly } from './lifecycle-command';
 import {
   isStablePreRenewalWindow,
   runBillingAnnualRenewalReadOnly,
@@ -393,6 +393,19 @@ describe('annual natural renewal comparison', () => {
 });
 
 describe('annual lifecycle command safety', () => {
+  it('prints the failing RevenueCat operation without raw provider details', () => {
+    const output = formatLifecycleReadOnlyFailure({
+      category: 'REVENUECAT_PROJECT',
+      code: 'CLI_GENERAL_ERROR',
+      message: 'provider output must stay hidden',
+      providerOperation: 'projects-list',
+    });
+
+    expect(output).toContain('Failure: CLI_GENERAL_ERROR');
+    expect(output).toContain('RevenueCat operation: projects-list');
+    expect(output).not.toContain('provider output');
+  });
+
   it('rejects production and mutating modes before creating any adapter', async () => {
     const base = {
       BILLING_TEST_USER_ID: USER,

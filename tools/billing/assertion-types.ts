@@ -1,3 +1,5 @@
+import type { RevenueCatCliOperationKind } from './revenuecat-cli';
+
 export type BillingAssertionCategory =
   | 'CONFIGURATION'
   | 'CLI_VERSION'
@@ -14,6 +16,7 @@ export interface BillingAssertionFailure {
   readonly category: BillingAssertionCategory;
   readonly code: string;
   readonly message: string;
+  readonly providerOperation?: RevenueCatCliOperationKind;
 }
 
 export type BillingAssertionResult<T> =
