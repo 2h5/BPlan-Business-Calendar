@@ -20,6 +20,20 @@ the local billing secrets file. See
 [the automation plan](revenuecat-automation-plan.md) for the operation list
 and Phase 6 audit. Production billing remains disabled.
 
+**Phase 6 hosted sandbox/dev deployment, 2026-09-23:** The linked Supabase
+project `nlpyloypcphvajbvasnr` received
+`20260923000001_revenuecat_atomic_event.sql` before `revenuecat-webhook`
+version 6 was deployed. Hosted read-only checks confirmed the migration, the
+service-role-only atomic RPC grant, removal of the service role's old split
+RPC and separate ledger INSERT privileges, and unchanged aggregate mirror and
+ledger counts. The function remains active with JWT verification disabled and
+the existing webhook secret configured. A non-mutating GET returned 405, and
+the existing sandbox identity passed the protected `lifecycle-read-only`
+workflow [run #35834501740](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/35834501740).
+No purchase, RevenueCat mutation, or concurrent provider-side delivery was
+manufactured. A real delivery through the newly deployed atomic path remains
+unobserved; production billing remains disabled.
+
 Last billing automation checkpoint: **2026-09-23**
 
 ## Annual Phase 3C checkpoint — 2026-09-22

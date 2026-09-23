@@ -2656,3 +2656,20 @@ authorization. pgTAP also proves rollback after a mirror write fails and
 unchanged client write boundaries. The prior single-session note is historical.
 No hosted webhook replay or live billing workflow was run for this fix.
 Production billing remains disabled.
+
+**Phase 6 hosted sandbox/dev deployment, 2026-09-23 — PROVEN LIVE for
+deployment and read-only continuity:** `main` matched `origin/main` at
+`d0ddd0b1ce2adcc8ca4f3aae22edaf60784124ca`. The linked project
+`nlpyloypcphvajbvasnr` had exactly the Phase 6 migration pending. It was
+applied before deploying `revenuecat-webhook` version 6. Hosted checks found
+the new RPC executable by `service_role` only; `anon`, `authenticated`, and
+`PUBLIC` cannot execute it. The service role can no longer execute the old
+split RPC or separately insert into the event ledger. Subscription, ledger,
+and applied-event counts stayed at 5, 54, and 30. The function is active with
+JWT verification disabled and its existing secret name present. A safe GET
+returned 405, and the protected sandbox `lifecycle-read-only` workflow
+[run #35834501740](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/35834501740)
+passed for the existing lifecycle identity. No purchase, provider mutation,
+fabricated hosted event, or concurrent provider-side delivery occurred.
+**PENDING:** a future natural RevenueCat delivery through the newly deployed
+atomic path has not yet been observed. Production and legal gates remain open.

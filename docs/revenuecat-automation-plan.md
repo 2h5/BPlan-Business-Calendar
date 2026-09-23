@@ -76,7 +76,7 @@ The current repository already has a substantial billing foundation:
 | RevenueCat project/catalog | The setup runbook records project `BPlan: Business Calendar`, project ID `d455e7e9`, web config `app48a77253da`, offering `bplan_web` / `ofrng560c7ad85b`, products `bplan_pro_monthly` and `bplan_pro_yearly`, and application entitlement `pro`.                                                                               | Phase 2B2 proved exactly one live exact-name project and used its discovered canonical ID for the run. The historical runbook ID remains **UNVERIFIED FOR LIVE V2 USE** and is never used as a provider selector; the canonical ID remains runtime-discovered rather than frozen in Git. |
 | Hosted purchase link       | `apps/web` accepts `VITE_REVENUECAT_WEB_PURCHASE_URL` and appends the authenticated Supabase UUID as the RevenueCat app-user path segment.                                                                                                                                                                                       | The link is external configuration and is not stored as a secret in Git. Its live availability and catalog response remain unverified by automation.                                                                                                                                     |
 | RevenueCat webhook         | `supabase/functions/revenuecat-webhook/` validates the shared secret, parses webhook payloads with Zod, ignores anonymous/non-UUID users safely, handles entitlement events, and delegates ordering/idempotency to the database mirror. `supabase/config.toml` disables JWT verification for this secret-authenticated function. | Handler behavior is covered by focused Deno tests. The setup runbook records that the hosted TEST webhook returned 2xx; Batch 1 does not repeat that live check.                                                                                                                         |
-| Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `process_revenuecat_event` atomically claims the event ID, calls the ordered mirror writer, and records the final ledger outcome.                                                                                 | Local migration/pgTAP and two-session race coverage exist. The first real monthly purchase proved the earlier hosted mirror and ledger through read-only authority reconciliation; the new atomic boundary has not been proven hosted.                                                   |
+| Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `process_revenuecat_event` atomically claims the event ID, calls the ordered mirror writer, and records the final ledger outcome.                                                                                 | Local migration/pgTAP and two-session race coverage exist. The first real monthly purchase proved the earlier hosted mirror and ledger through read-only authority reconciliation; the atomic code is deployed hosted, but a new provider delivery has not been observed.                |
 | Server authorization       | `public.has_active_entitlement(user_id, 'pro')` is the server authority. The `ai-find-time` Edge Function calls it through the service-role client; client RevenueCat/UI state is not trusted.                                                                                                                                   | The first real monthly purchase proved server authorization converged with the RevenueCat and Supabase authorities.                                                                                                                                                                      |
 | Web billing seam           | `apps/web/src/features/billing/api/billing.api.ts` reads the `pro` projection through TanStack Query. `BillingSection` and `SubscriptionView` expose status, guarded hosted checkout, refresh, and comparison UI.                                                                                                                | Web unit tests cover UUID and production/sandbox guards. Monthly and annual sandbox purchases passed the complete authority chain; annual was re-proven on 2026-09-22 after correcting the Product identity assertion.                                                                   |
 | Production safety          | Web checkout defaults to `disabled`; production requires explicit seller-identity and final-legal-document flags plus public Terms/Privacy URLs. The runbook keeps seller identity and final legal approval unresolved.                                                                                                          | Static guards are tested. No production setting is changed by this automation track.                                                                                                                                                                                                     |
@@ -1249,6 +1249,40 @@ cases keep one mirror row, coherent ledger outcomes, and matching server
 authorization. New pgTAP tests prove the atomic contract, rollback after a
 mirror write fails, and unchanged client boundaries. These are local results;
 no hosted webhook or provider delivery was run for this fix.
+
+#### Phase 6 hosted sandbox/dev deployment — 2026-09-23
+
+**PROVEN LIVE (deployment and read-only checks):** `main` and `origin/main`
+matched at `d0ddd0b1ce2adcc8ca4f3aae22edaf60784124ca`. The linked Supabase
+project was `nlpyloypcphvajbvasnr`, the sole project visible to the CLI profile;
+its existing `revenuecat-webhook` and `REVENUECAT_WEBHOOK_SECRET` were present.
+The linked migration dry run listed only
+`20260923000001_revenuecat_atomic_event.sql`. It was applied with vault updates
+skipped, then recorded in hosted migration history with no pending migrations.
+
+Read-only PostgreSQL privilege checks found `process_revenuecat_event` present
+and executable by `service_role`, but not by `authenticated`, `anon`, or
+`PUBLIC`. `service_role` could neither execute the old split
+`apply_revenuecat_event` RPC nor independently insert into
+`subscription_events`. Aggregate mirror/ledger counts were unchanged across
+the migration: 5 subscriptions, 54 events, 30 applied events. No billing RPC
+was invoked with a fabricated hosted event.
+
+After the migration and grant checks, only `revenuecat-webhook` was deployed.
+The hosted function became active at version 6 with `verify_jwt=false`; the
+existing webhook secret name remained present and was not rotated. A
+non-mutating GET returned its expected 405 method guard. The protected
+`lifecycle-read-only` GitHub workflow run
+[#35834501740](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/35834501740)
+passed on the same main SHA for the existing sandbox lifecycle identity. The
+run made no purchase or RevenueCat mutation.
+
+**PENDING:** This establishes the hosted atomic RPC and deployed webhook code,
+plus read-only continuity of existing billing state. No concurrent
+provider-side delivery, replay, or stale event was manufactured or observed
+through the newly deployed path. Live event-handling behavior under a future
+natural RevenueCat delivery remains unproven. Production billing and final
+legal approval remain separate gates.
 
 ## 11. Final desired acceptance flow
 
