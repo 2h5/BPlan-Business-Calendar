@@ -8,6 +8,25 @@ const workflow = readFileSync(
 );
 const packageJson = readFileSync(resolve(process.cwd(), 'package.json'), 'utf8');
 const normalCi = readFileSync(resolve(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+const previewBuild = readFileSync(
+  resolve(process.cwd(), '.github/workflows/preview-build.yml'),
+  'utf8',
+);
+const lockfile = readFileSync(resolve(process.cwd(), 'pnpm-lock.yaml'), 'utf8');
+
+function parseNodeVersion(value: string): [number, number, number] {
+  const match = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(value);
+  expect(match, `Invalid Node version: ${value}`).not.toBeNull();
+  return [Number(match?.[1]), Number(match?.[2] ?? 0), Number(match?.[3] ?? 0)];
+}
+
+function isAtLeast(version: [number, number, number], minimum: [number, number, number]): boolean {
+  return (
+    version[0] > minimum[0] ||
+    (version[0] === minimum[0] && version[1] > minimum[1]) ||
+    (version[0] === minimum[0] && version[1] === minimum[1] && version[2] >= minimum[2])
+  );
+}
 
 function workflowDispatchSection(): string {
   const lines = workflow.split(/\r?\n/);
@@ -23,6 +42,35 @@ function workflowDispatchSection(): string {
 }
 
 describe('manual RevenueCat billing workflow safety', () => {
+  it('runs on a Node version supported by the locked Supabase JS dependency', () => {
+    const supabasePackage = lockfile.match(
+      /^ {2}'@supabase\/supabase-js@[^']+':\r?\n((?:^ {4}.*\r?\n)*)/m,
+    )?.[1];
+    expect(supabasePackage).toBeDefined();
+    const dependencyMinimum = supabasePackage?.match(/engines: \{node: '>=([^']+)'\}/)?.[1];
+    expect(dependencyMinimum).toBeDefined();
+    const minimum = parseNodeVersion(dependencyMinimum ?? '0');
+
+    const rootMinimum = (JSON.parse(packageJson) as { engines: { node: string } }).engines.node;
+    expect(rootMinimum).toMatch(/^>=\d+\.\d+\.\d+$/);
+    expect(isAtLeast(parseNodeVersion(rootMinimum.slice(2)), minimum)).toBe(true);
+
+    for (const [file, contents] of [
+      ['RevenueCat sandbox billing', workflow],
+      ['normal CI', normalCi],
+      ['preview build', previewBuild],
+    ] as const) {
+      const configuredVersion = contents.match(
+        /actions\/setup-node@v4\s+with:\s+node-version:\s*([\d.]+)/,
+      )?.[1];
+      expect(configuredVersion, `${file} must configure Node`).toBeDefined();
+      expect(
+        isAtLeast(parseNodeVersion(configuredVersion ?? '0'), minimum),
+        `${file} must use Node ${dependencyMinimum} or newer`,
+      ).toBe(true);
+    }
+  });
+
   it('has workflow_dispatch as its only trigger', () => {
     const dispatch = workflowDispatchSection();
     const topLevelEvents = dispatch.match(/^\x20{2}[a-z][a-z0-9_-]*:$/gm) ?? [];
