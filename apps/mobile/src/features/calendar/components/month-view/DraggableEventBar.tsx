@@ -84,7 +84,7 @@ export function DraggableEventBar({
 }: DraggableEventBarProps) {
   const theme = useTheme();
   const lift = useDragLift(onDragChange);
-  const { dragX, dragY, dragging, lifted } = lift;
+  const { dragX, dragY, dragging, lifted, pickedUp, putDown, slotChanged, cancel } = lift;
 
   const targetDayDelta = useSharedValue(0);
   const [preview, setPreview] = useState<number | null>(null);
@@ -127,7 +127,7 @@ export function DraggableEventBar({
     .onStart(() => {
       dragging.value = true;
       lifted.value = withSpring(1, LIFT);
-      runOnJS(lift.pickedUp)();
+      runOnJS(pickedUp)();
     })
     .onUpdate((event) => {
       const rawColumns = columnWidth > 0 ? Math.round(event.translationX / columnWidth) : 0;
@@ -142,7 +142,7 @@ export function DraggableEventBar({
     .onEnd(() => {
       const days = targetDayDelta.value;
       if (days === 0) {
-        lift.cancel();
+        cancel();
         runOnJS(clearPreview)();
         return;
       }
@@ -151,7 +151,7 @@ export function DraggableEventBar({
     .onFinalize(() => {
       dragging.value = false;
       lifted.value = withSpring(0, LIFT);
-      runOnJS(lift.putDown)();
+      runOnJS(putDown)();
     });
 
   lift.applyBlocking(drag, blocking);
@@ -162,6 +162,8 @@ export function DraggableEventBar({
       if (!next.dragging) return;
       if (previous?.dragging === true && next.dayDelta === previous.dayDelta) return;
       runOnJS(setPreview)(next.dayDelta);
+      // The first report is the pick-up itself, which already has its haptic.
+      if (previous?.dragging === true) runOnJS(slotChanged)();
     },
   );
 
