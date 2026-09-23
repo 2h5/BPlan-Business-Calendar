@@ -12,14 +12,15 @@ renewed naturally with provider, mirror, ledger, and server authority aligned.
 Replay/order behavior passed deterministic webhook and database checks.
 Production billing remains disabled.
 
-The Phase 5 manual GitHub Actions workflow is implemented and statically
-verified on its feature branch; no live dispatch has been run. It requires a
-protected billing-sandbox Environment and uses GitHub Environment secrets,
-not the local billing secrets file. See
+Billing automation Phase 5 is complete. The protected manual GitHub Actions
+workflow's sandbox lifecycle-read-only run #7 passed on Node 22 after runtime
+alignment resolved hosted Supabase client initialization. Normal CI is green.
+The run made no new purchase and used GitHub Environment secrets rather than
+the local billing secrets file. See
 [the automation plan](revenuecat-automation-plan.md) for the operation list
-and exact setup gate. Production billing remains disabled.
+and Phase 6 audit. Production billing remains disabled.
 
-Last verified: **2026-09-22**
+Last billing automation checkpoint: **2026-09-23**
 
 ## Annual Phase 3C checkpoint — 2026-09-22
 

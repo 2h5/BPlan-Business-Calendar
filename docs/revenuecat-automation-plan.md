@@ -18,9 +18,9 @@ no retry occurred. No UUID, credential, purchase URL, provider payload, or payme
 is recorded here. Phase 4 is complete: cancellation retained paid access,
 expiration revoked Pro, one fresh annual subscription renewed naturally into
 an extended active period, and replay/order behavior passed deterministic
-webhook and database tests. Phase 5 workflow code is implemented and offline-
-tested; protected GitHub Environment setup and a live dispatch remain pending.
-Production remains disabled. This document is the
+webhook and database tests. Phase 5 is complete: normal CI is green on Node 22
+and the protected manual GitHub workflow's sandbox lifecycle-read-only run #7
+passed. No new purchase was needed. Production remains disabled. This document is the
 implementation source of truth for the RevenueCat web-billing automation track.
 
 Audit baseline: `origin/main` at `15c3ea5a5975f647a2c116dbc5e31f41ec1645e3`
@@ -76,7 +76,7 @@ The current repository already has a substantial billing foundation:
 | RevenueCat project/catalog | The setup runbook records project `BPlan: Business Calendar`, project ID `d455e7e9`, web config `app48a77253da`, offering `bplan_web` / `ofrng560c7ad85b`, products `bplan_pro_monthly` and `bplan_pro_yearly`, and application entitlement `pro`.                                                                               | Phase 2B2 proved exactly one live exact-name project and used its discovered canonical ID for the run. The historical runbook ID remains **UNVERIFIED FOR LIVE V2 USE** and is never used as a provider selector; the canonical ID remains runtime-discovered rather than frozen in Git. |
 | Hosted purchase link       | `apps/web` accepts `VITE_REVENUECAT_WEB_PURCHASE_URL` and appends the authenticated Supabase UUID as the RevenueCat app-user path segment.                                                                                                                                                                                       | The link is external configuration and is not stored as a secret in Git. Its live availability and catalog response remain unverified by automation.                                                                                                                                     |
 | RevenueCat webhook         | `supabase/functions/revenuecat-webhook/` validates the shared secret, parses webhook payloads with Zod, ignores anonymous/non-UUID users safely, handles entitlement events, and delegates ordering/idempotency to the database mirror. `supabase/config.toml` disables JWT verification for this secret-authenticated function. | Handler behavior is covered by focused Deno tests. The setup runbook records that the hosted TEST webhook returned 2xx; Batch 1 does not repeat that live check.                                                                                                                         |
-| Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `apply_revenuecat_event` is an atomic, order-aware, replay-safe write boundary.                                                                                                                                   | Local migration/pgTAP coverage and webhook tests exist. The first real monthly purchase also proved the hosted mirror and ledger through read-only authority reconciliation.                                                                                                             |
+| Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `process_revenuecat_event` atomically claims the event ID, calls the ordered mirror writer, and records the final ledger outcome.                                                                                 | Local migration/pgTAP and two-session race coverage exist. The first real monthly purchase proved the earlier hosted mirror and ledger through read-only authority reconciliation; the new atomic boundary has not been proven hosted.                                                   |
 | Server authorization       | `public.has_active_entitlement(user_id, 'pro')` is the server authority. The `ai-find-time` Edge Function calls it through the service-role client; client RevenueCat/UI state is not trusted.                                                                                                                                   | The first real monthly purchase proved server authorization converged with the RevenueCat and Supabase authorities.                                                                                                                                                                      |
 | Web billing seam           | `apps/web/src/features/billing/api/billing.api.ts` reads the `pro` projection through TanStack Query. `BillingSection` and `SubscriptionView` expose status, guarded hosted checkout, refresh, and comparison UI.                                                                                                                | Web unit tests cover UUID and production/sandbox guards. Monthly and annual sandbox purchases passed the complete authority chain; annual was re-proven on 2026-09-22 after correcting the Product identity assertion.                                                                   |
 | Production safety          | Web checkout defaults to `disabled`; production requires explicit seller-identity and final-legal-document flags plus public Terms/Privacy URLs. The runbook keeps seller identity and final legal approval unresolved.                                                                                                          | Static guards are tested. No production setting is changed by this automation track.                                                                                                                                                                                                     |
@@ -1103,8 +1103,8 @@ renewal extended the paid period with active provider, mirror, ledger, and
 server authority. The webhook sequence tests and Postgres ordering/RLS tests
 verify sequential replay deduplication and stale/out-of-order protection;
 provider-side duplicate delivery was not manufactured or claimed live.
-Production billing remains disabled. Phase 5 workflow code is implemented;
-protected Environment setup and live dispatch remain pending.
+Production billing remains disabled. Phase 5 subsequently passed its protected
+live GitHub read-only dispatch, as recorded below.
 
 ### Phase 5 — manually triggered GitHub Actions integration
 
@@ -1120,7 +1120,7 @@ protected Environment setup and live dispatch remain pending.
 - Exit criteria: a manual run can be audited from its report without exposing
   credentials and cannot target production.
 
-#### Phase 5 implementation checkpoint — 2026-09-22
+#### Historical Phase 5 implementation checkpoint — 2026-09-22
 
 **IMPLEMENTED / VERIFIED LOCALLY; NO LIVE WORKFLOW DISPATCH:** the
 [manual workflow](../.github/workflows/revenuecat-sandbox-billing.yml) uses
@@ -1131,8 +1131,9 @@ renewal observation. The only mutation choice is a sandbox purchase; it
 requires both selecting that operation and setting confirm_sandbox_purchase to
 true. Cancellation, refund, and extension are not workflow operations.
 
-The workflow pins Node.js 20.19.6 and pnpm 9.12.0, installs from the lockfile,
-then runs billing typecheck/build and only the selected operation. Its sandbox
+At this historical checkpoint, the workflow pinned Node.js 20.19.6 and pnpm
+9.12.0, installed from the lockfile, then ran billing typecheck/build and only
+the selected operation. Its sandbox
 target is fixed in the job steps; there is no environment selector. Live
 commands receive credentials and dedicated test identities from
 billing-sandbox Environment secrets. The local external secret file at
@@ -1158,7 +1159,18 @@ Environment secrets:
 Each operation uses its own dedicated test identity secret. The workflow must
 also be present on the repository's default branch before GitHub can dispatch
 it. Static tests prove its trigger/input/secret/mutation boundaries; no live
-dispatch or purchase has been run for this checkpoint.
+dispatch or purchase had been run **at this historical checkpoint**.
+
+#### Phase 5 closeout — 2026-09-23
+
+**PROVEN LIVE:** the protected GitHub Environment was configured and the manual
+RevenueCat sandbox billing workflow's lifecycle-read-only run #7 passed. The
+workflow uses Node 22; aligning the runtime resolved the hosted Supabase client
+initialization failure. Normal CI is green on Node 22. This run observed the
+existing sandbox lifecycle state read-only. It made no new purchase and did not
+authorize a purchase, provider write, database write, or production activation.
+Production billing remains disabled. Phase 5 is complete; Phase 6 adversarial
+hardening is active.
 
 ### Phase 6 — adversarial hardening + documentation closeout
 
@@ -1173,6 +1185,70 @@ dispatch or purchase has been run for this checkpoint.
   mandatory.
 - Exit criteria: every claim has local or live evidence labelled, no safety
   regression exists, and the track is ready for a separate production decision.
+
+#### Phase 6 coverage audit — 2026-09-23
+
+| Item                                 | Current coverage | Verification boundary / remaining gap                                                                                                                                                                                                                                                                                            |
+| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wrong UUID                           | Partial          | Malformed, missing, and non-UUID input fails before adapters; an existing but unintended UUID needs a trusted identity expectation to distinguish it from another valid account. Offline input tests; no live mutation needed.                                                                                                   |
+| Wrong or ambiguous project           | Covered          | Exact-name discovery, duplicate/missing project rejection, canonical ID scoping, and customer project identity checks have offline fixtures.                                                                                                                                                                                     |
+| Production target                    | Covered          | Configuration and assertion guards reject production; workflow exposes only sandbox operations. Offline tests.                                                                                                                                                                                                                   |
+| Expired credentials                  | Partial          | CLI authorization exit is mapped to a safe error; Supabase client/read failures are covered. A live expired-key check would require controlled provider credential state, not a purchase.                                                                                                                                        |
+| Pagination gaps                      | Partial          | Project and provider continuation cursors fail closed. Empty cursors now fail as malformed; offline fixtures exercise all billing read surfaces. The approved named CLI has no continuation interface, so complete multi-page traversal and omitted-page detection remain open.                                                  |
+| Stale webhooks                       | Partial          | Handler and local database tests cover stale delivery and no-op behavior; no provider-side stale delivery was manufactured.                                                                                                                                                                                                      |
+| Replay/order races                   | Covered locally  | The two-connection local harness confirms a lock wait before release and proves duplicate event-ID preservation, newer renewal versus stale expiration, and expiration versus older renewal. Atomic rollback, ledger outcomes, mirror count, and server entitlement also pass. No provider-side concurrent delivery was induced. |
+| Duplicate active state               | Partial          | Duplicate Supabase mirror rows and ledger IDs fail closed. Offline monthly and annual assertions now reject two simultaneous active Pro subscriptions, including conflicts across plans, while allowing expired history. Provider-side live duplication was not induced.                                                         |
+| Timeout and output limits            | Covered          | Fixed CLI timeout and output cap map to stable errors without raw provider output; offline runner tests.                                                                                                                                                                                                                         |
+| Redaction                            | Covered          | Secret configuration, subprocess diagnostics, reports, and workflow secret sources have offline tests.                                                                                                                                                                                                                           |
+| Documentation/runbook reconciliation | Partial          | Phase 5 status and this audit are current; Phase 6 final acceptance and production/legal human review remain open.                                                                                                                                                                                                               |
+
+#### Phase 6 duplicate-active checkpoint — 2026-09-23
+
+**VERIFIED LOCALLY:** `billing:assert-user` rejects more than one current,
+access-granting Pro subscription for the explicit test user with
+`REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS`. The guard runs after provider
+product and entitlement validation and before an active-Pro result can pass.
+Monthly and annual fixtures pass for one active subscription with expired
+history, and fail for two active subscriptions on the same or different plans.
+The conflict report redacts the test UUID and does not print subscription IDs,
+provider payloads, or secrets.
+
+**PENDING:** `subscription.test.sql` passed all 26 existing local pgTAP checks,
+including sequential replay, stale ordering, and RLS boundaries. Its single
+transaction and single database connection cannot demonstrate a race. The
+smallest suitable follow-up is a separate local-only test using two independent
+database connections, a synchronization barrier, and the existing service-role
+RPC/ledger path. It must assert the final mirror, unique event ledger, and
+unchanged client permissions after the competing calls complete. No concurrent
+database result is claimed for this checkpoint.
+
+#### Phase 6 atomic webhook race checkpoint — 2026-09-23
+
+**VERIFIED LOCALLY:** A two-connection Postgres test reproduced a real split-write
+race: the first caller updated the mirror, but a duplicate caller wrote the
+unique ledger ID first with `applied=false` and `STALE_EVENT`. The mirror and
+server entitlement were active while the sole ledger row falsely said the
+event was skipped. The prior checkpoint above remains the historical state
+before this investigation.
+
+The forward migration adds `process_revenuecat_event`, the webhook's single
+database call. The function claims `event_id`, applies the existing timestamp
+guard to every affected mirror row, and finalizes the ledger outcome in one
+transaction. A duplicate waits on the unique key, then returns `DUPLICATE`
+without changing the original outcome. An error rolls back both claim and
+mirror changes. The service role can execute the new RPC but no longer has the
+old mirror RPC or a separate ledger INSERT; client grants and RLS were not
+broadened.
+
+The preserved local harness uses two independent service-role Postgres sessions
+and checks `pg_blocking_pids` before releasing the first transaction. Concurrent
+duplicate delivery now leaves one applied ledger row, one active mirror row,
+and active server entitlement. A newer renewal defeats an older expiration;
+a newer expiration defeats an older renewal that completes later. Both ordering
+cases keep one mirror row, coherent ledger outcomes, and matching server
+authorization. New pgTAP tests prove the atomic contract, rollback after a
+mirror write fails, and unchanged client boundaries. These are local results;
+no hosted webhook or provider delivery was run for this fix.
 
 ## 11. Final desired acceptance flow
 
@@ -1232,9 +1308,10 @@ It does not include:
 - a production checkout flag, seller identity, legal approval, or live Stripe
   configuration change.
 
-Batch 1, Phase 2A, Phase 2B1, Phase 2B2, Phase 3A, Phase 3B1, Phase 3B2, Phase 3C, and Phase 4
-are complete. Phase 5 workflow code is implemented and offline-tested; GitHub
-Environment setup and a live dispatch remain pending. The real monthly sandbox purchase proved RevenueCat, webhook,
+Batch 1 and automation Phases 2A through 5 are complete. The protected GitHub
+lifecycle-read-only run #7 passed on Node 22 without a new purchase. Phase 6
+adversarial hardening is active. The real monthly sandbox purchase proved
+RevenueCat, webhook,
 Supabase mirror, ledger, and server authorization convergence; browser
 ambiguity was handled by read-only reconciliation and the purchase was never
 retried. The fresh annual sandbox purchase passed the same active-Pro authority

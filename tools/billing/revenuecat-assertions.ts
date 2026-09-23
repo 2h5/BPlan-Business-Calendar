@@ -14,6 +14,7 @@ import {
 const identifierSchema = z.string().min(1);
 const epochMillisSchema = z.number().int().nonnegative();
 const nullableEpochMillisSchema = epochMillisSchema.nullable();
+const nextPageSchema = z.string().min(1).nullable().optional();
 
 const entitlementSchema = z.object({
   id: identifierSchema,
@@ -22,7 +23,7 @@ const entitlementSchema = z.object({
 
 const entitlementListSchema = z.object({
   items: z.array(entitlementSchema),
-  next_page: z.string().nullable().optional(),
+  next_page: nextPageSchema,
 });
 
 const customerEntitlementSchema = z.object({
@@ -35,7 +36,7 @@ const customerSchema = z.object({
   project_id: identifierSchema,
   active_entitlements: z.object({
     items: z.array(customerEntitlementSchema),
-    next_page: z.string().nullable().optional(),
+    next_page: nextPageSchema,
   }),
 });
 
@@ -71,7 +72,7 @@ const listEnvelope = <T extends z.ZodTypeAny>(item: T) =>
   z.object({
     data: z.object({
       items: z.array(item),
-      next_page: z.string().nullable().optional(),
+      next_page: nextPageSchema,
     }),
   });
 
@@ -80,11 +81,11 @@ const customerProfileEnvelopeSchema = z.object({
     customer: customerSchema,
     subscriptions: z.object({
       items: z.array(subscriptionSchema),
-      next_page: z.string().nullable().optional(),
+      next_page: nextPageSchema,
     }),
     purchases: z.object({
       items: z.array(purchaseSchema),
-      next_page: z.string().nullable().optional(),
+      next_page: nextPageSchema,
     }),
     subscriptions_error: z.string().optional(),
     purchases_error: z.string().optional(),

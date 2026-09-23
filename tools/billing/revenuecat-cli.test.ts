@@ -274,6 +274,9 @@ describe('RevenueCat CLI boundary', () => {
     const paginated = discoverBPlanProject({
       data: { items: [], next_page: '/projects?cursor=x' },
     });
+    const emptyCursor = discoverBPlanProject({
+      data: { items: [{ id: PROJECT_ID, name: BILLING_CONTRACT.project.name }], next_page: '' },
+    });
 
     expect(noMatch).toMatchObject({ ok: false, error: { code: 'PROJECT_NOT_FOUND' } });
     expect(duplicate).toMatchObject({ ok: false, error: { code: 'PROJECT_DUPLICATE' } });
@@ -283,6 +286,7 @@ describe('RevenueCat CLI boundary', () => {
       ok: false,
       error: { code: 'PROJECT_PAGINATION_UNSUPPORTED' },
     });
+    expect(emptyCursor).toMatchObject({ ok: false, error: { code: 'PROJECT_LIST_MALFORMED' } });
   });
 
   it('fails if project identity changes during a run', () => {

@@ -1,71 +1,51 @@
 import { adminClient } from '../_shared/auth/index.ts';
 import type { SubscriptionStatus } from '@cal/schemas/subscription';
 
-/**
- * The mirror's write surface, as an interface so the handler can be tested
- * without a database. The Supabase implementation is the only place that
- * knows about tables or RPC names.
- */
+export type EventOutcome = 'APPLIED' | 'STALE' | 'IGNORED' | 'DUPLICATE';
 
-export interface ApplyEntitlementInput {
-  userId: string;
-  entitlement: string;
-  status: SubscriptionStatus;
-  expiresAt: string | null;
-  eventAt: string;
-  customerId: string | null;
-}
-
-export interface LedgerEntry {
+export interface ProcessEventInput {
   eventId: string;
   userId: string | null;
   eventType: string;
   eventAt: string;
-  applied: boolean;
+  status: SubscriptionStatus | null;
+  expiresAt: string | null;
+  customerId: string | null;
+  entitlements: string[];
+  revokeFrom: string[];
   skippedReason: string | null;
   payload: unknown;
 }
 
 export interface RevenueCatMirror {
-  /** Returns true when the mirror changed, false when the event was stale. */
-  applyEntitlement(input: ApplyEntitlementInput): Promise<boolean>;
-  /** Appends to the ledger. A repeat event id is a no-op, not an error. */
-  recordEvent(entry: LedgerEntry): Promise<void>;
+  /** Claims the event ID, applies ordered mirror changes, and records one outcome. */
+  processEvent(input: ProcessEventInput): Promise<EventOutcome>;
 }
 
 export function supabaseRevenueCatMirror(
   admin: ReturnType<typeof adminClient> = adminClient(),
 ): RevenueCatMirror {
   return {
-    async applyEntitlement(input) {
-      const { data, error } = await admin.rpc('apply_revenuecat_event', {
+    async processEvent(input) {
+      const { data, error } = await admin.rpc('process_revenuecat_event', {
+        p_event_id: input.eventId,
         p_user_id: input.userId,
-        p_entitlement: input.entitlement,
+        p_event_type: input.eventType,
+        p_event_at: input.eventAt,
         p_status: input.status,
         p_expires_at: input.expiresAt,
-        p_event_at: input.eventAt,
         p_customer_id: input.customerId,
+        p_entitlements: input.entitlements,
+        p_revoke_from: input.revokeFrom,
+        p_skipped_reason: input.skippedReason,
+        p_payload: input.payload,
       });
 
       if (error) throw error;
-      return data === true;
-    },
-
-    async recordEvent(entry) {
-      const { error } = await admin.from('subscription_events').upsert(
-        {
-          event_id: entry.eventId,
-          user_id: entry.userId,
-          event_type: entry.eventType,
-          event_at: entry.eventAt,
-          applied: entry.applied,
-          skipped_reason: entry.skippedReason,
-          payload: entry.payload,
-        },
-        { onConflict: 'event_id', ignoreDuplicates: true },
-      );
-
-      if (error) throw error;
+      if (data === 'APPLIED' || data === 'STALE' || data === 'IGNORED' || data === 'DUPLICATE') {
+        return data;
+      }
+      throw new Error('Unexpected RevenueCat database outcome');
     },
   };
 }

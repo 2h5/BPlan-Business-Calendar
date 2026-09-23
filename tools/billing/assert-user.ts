@@ -215,10 +215,20 @@ function providerSupportsPro(snapshot: RevenueCatUserSnapshot): boolean {
   );
 }
 
+function activeProSubscriptions(snapshot: RevenueCatUserSnapshot, nowMillis: number): number {
+  return snapshot.subscriptions.filter(
+    (item) =>
+      item.grantsPro &&
+      item.givesAccess &&
+      (item.currentPeriodEndsAt === null || item.currentPeriodEndsAt > nowMillis),
+  ).length;
+}
+
 function compareSnapshots(
   expectedState: BillingExpectedState,
   provider: RevenueCatUserSnapshot,
   supabase: SupabaseUserSnapshot,
+  nowMillis: number,
   expectedPlan?: BillingPlan,
 ): BillingAssertionResult<readonly BillingUserAssertionCheck[]> {
   const supportsPro = providerSupportsPro(provider);
@@ -240,6 +250,13 @@ function compareSnapshots(
       );
     }
     checks.push(passCheck('REVENUECAT_CUSTOMER', 'PASS', 'The exact customer UUID exists.'));
+    if (activeProSubscriptions(provider, nowMillis) > 1) {
+      return assertionFailure(
+        'REVENUECAT_SUBSCRIPTION',
+        'REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS',
+        'RevenueCat returned multiple simultaneously active Pro subscriptions for the test user.',
+      );
+    }
     if (!provider.activePro) {
       return assertionFailure(
         'REVENUECAT_ENTITLEMENT',
@@ -501,10 +518,18 @@ export async function runBillingAssertUser(
     expectedState,
     providerResult.data,
     supabaseResult.data,
+    (options.now ?? (() => new Date()))().getTime(),
     expectedPlan,
   );
   if (!comparison.ok) {
-    return failureReport(userId, expectedState, 'sandbox', comparison.error, [], expectedPlan);
+    return failureReport(
+      comparison.error.code === 'REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS' ? '[REDACTED]' : userId,
+      expectedState,
+      'sandbox',
+      comparison.error,
+      [],
+      expectedPlan,
+    );
   }
 
   return {

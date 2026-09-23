@@ -11,11 +11,8 @@ import { supabaseRevenueCatMirror, type RevenueCatMirror } from './mirror.ts';
  * - RevenueCat retries any non-2xx with backoff. So a response code is a
  *   decision about whether redelivery could ever help. Understood-and-ignored
  *   is a 200; only a genuinely transient failure earns a 5xx.
- * - Deliveries repeat and arrive out of order. Correctness therefore lives in
- *   `apply_revenuecat_event` (atomic, order-guarded, idempotent) rather than
- *   in any check performed here. The mirror write happens before the ledger
- *   write so that a crash between them loses an audit row, never an
- *   entitlement — a redelivery re-applies harmlessly.
+ * - Deliveries repeat and arrive out of order. The database claims the event
+ *   ID, applies ordered mirror changes, and records the outcome in one RPC.
  */
 
 export interface RevenueCatWebhookDeps {
@@ -56,56 +53,37 @@ export async function handleRevenueCatWebhook(
 
   try {
     if (decision.kind === 'ignore') {
-      await mirror.recordEvent({
+      const result = await mirror.processEvent({
         eventId: event.id,
         userId: null,
         eventType: event.type,
         eventAt,
-        applied: false,
+        status: null,
+        expiresAt: null,
+        customerId: null,
+        entitlements: [],
+        revokeFrom: [],
         skippedReason: decision.reason,
         payload: parsed.data,
       });
-      return status(200, 'IGNORED');
+      return status(200, result);
     }
 
-    let applied = false;
-    for (const entitlement of decision.entitlements) {
-      const changed = await mirror.applyEntitlement({
-        userId: decision.userId,
-        entitlement,
-        status: decision.status,
-        expiresAt: decision.expiresAt,
-        eventAt,
-        customerId: event.original_app_user_id ?? event.app_user_id,
-      });
-      applied = applied || changed;
-
-      // A TRANSFER moves the entitlement: the senders lose it as the
-      // recipient gains it, under the same ordering guard.
-      for (const previousOwner of decision.revokeFrom) {
-        await mirror.applyEntitlement({
-          userId: previousOwner,
-          entitlement,
-          status: 'expired',
-          expiresAt: eventAt,
-          eventAt,
-          customerId: null,
-        });
-      }
-    }
-
-    await mirror.recordEvent({
+    const result = await mirror.processEvent({
       eventId: event.id,
       userId: decision.userId,
       eventType: event.type,
       eventAt,
-      applied,
-      // A write that changed nothing was outrun by a newer event.
-      skippedReason: applied ? null : 'STALE_EVENT',
+      status: decision.status,
+      expiresAt: decision.expiresAt,
+      customerId: event.original_app_user_id ?? event.app_user_id,
+      entitlements: decision.entitlements,
+      revokeFrom: decision.revokeFrom,
+      skippedReason: null,
       payload: parsed.data,
     });
 
-    return status(200, applied ? 'APPLIED' : 'STALE');
+    return status(200, result);
   } catch (error) {
     // Transient: ask RevenueCat to redeliver. Never echo the payload, which
     // carries store identifiers.

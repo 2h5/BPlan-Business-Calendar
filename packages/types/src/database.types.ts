@@ -1075,6 +1075,22 @@ export type Database = {
         Args: { p_entitlement?: string; p_user_id: string }
         Returns: boolean
       }
+      process_revenuecat_event: {
+        Args: {
+          p_customer_id: string
+          p_entitlements: string[]
+          p_event_at: string
+          p_event_id: string
+          p_event_type: string
+          p_expires_at: string
+          p_payload: Json
+          p_revoke_from: string[]
+          p_skipped_reason: string
+          p_status: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       prune_sync_history: { Args: { p_older_than?: string }; Returns: number }
       read_provider_secret: { Args: { p_account_id: string }; Returns: string }
       store_provider_secret: {

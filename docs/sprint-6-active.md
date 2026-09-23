@@ -2515,11 +2515,11 @@ manual CI integration is next.
 
 Current phase:
 
-`Billing automation Phase 4 lifecycle verification is complete. Phase 5 manual
-CI workflow code is implemented and statically verified on its feature branch;
-protected GitHub Environment setup and a separately authorized live dispatch
-remain pending. The monthly and annual sandbox chains are proven live.
-Production billing and production web hardening remain pending.`
+`Billing automation Phases 4 and 5 are complete. The protected GitHub
+lifecycle-read-only run #7 passed on Node 22 without another purchase, and
+normal CI is green. Phase 6 adversarial hardening is active. The monthly and
+annual sandbox chains are proven live. Production billing and production web
+hardening remain pending.`
 
 Latest verified Sprint 6 checkpoint:
 
@@ -2564,19 +2564,19 @@ by `20b75bed4ea163eb1d983a6495cf7b9137b3fa46` (formatting fix; GitHub CI run #33
 
 Current pending gates:
 
-`Annual Phase 3C and billing Phase 4 lifecycle are complete. Phase 5 manual CI
-workflow code is implemented and offline-tested; protected Environment setup
-and a live dispatch remain pending.
+`Annual Phase 3C and billing Phases 4 and 5 are complete. The protected
+lifecycle-read-only workflow passed; Phase 6 adversarial hardening is active.
 Live Luna/Terra evaluation still needs an authorized server-side OpenAI key and
 explicit cost authorization. Production billing stays
 disabled until the seller identity and final legal documents are confirmed.`
 
 Next exact action:
 
-`Configure and protect the billing-sandbox GitHub Environment, add the named
-secrets, and merge the manual-only workflow to the default branch. Then choose
-one read-only sandbox operation for the first authorized dispatch. The optional
-sandbox purchase requires its explicit operation and confirmation inputs.`
+`Continue offline Phase 6 adversarial coverage. Duplicate active RevenueCat
+subscriptions now fail closed in monthly and annual assertions. The local
+two-connection webhook race is fixed and verified through an atomic database
+RPC. Continue the remaining Phase 6 acceptance and runbook reconciliation;
+do not dispatch a live billing workflow unless an item genuinely requires it.`
 
 Current Sprint 6 verification evidence:
 
@@ -2594,10 +2594,12 @@ page, BPlan UI polish, server-side development rate-limit overrides, and the
 committed web billing seam and hosted ACL migrations.
 GitHub CI run [#67](https://github.com/2h5/BPlan-Business-Calendar/actions/runs/34311380054)
 passed both the static and hosted migrations/RLS/generated-types jobs for the
-earlier billing checkpoint. No newer CI result is claimed in this handoff; the
-local `pnpm verify` command remains environment-dependent.
+earlier billing checkpoint. Normal CI is now green on Node 22 after the billing
+workflow runtime alignment. Local `pnpm verify` passed for the Phase 6 slice;
+nested local pnpm commands still use the workstation's Node 20 shim and warn
+about the repository's Node 22 minimum.
 
-### Billing automation Phase 5 — 2026-09-22
+### Historical billing automation Phase 5 implementation — 2026-09-22
 
 Status: **IMPLEMENTED / VERIFIED LOCALLY; NO LIVE DISPATCH**
 
@@ -2614,4 +2616,43 @@ Before dispatch, create the protected billing-sandbox GitHub Environment,
 require an authorized reviewer, prevent self-review, disable administrator
 bypass, allow deployments from main only, configure the workflow's named
 Environment secrets, and ensure the workflow has reached the default branch.
-No live dispatch has been run.
+No live dispatch had been run at this historical checkpoint.
+
+### Billing automation Phase 5 closeout and Phase 6 start — 2026-09-23
+
+**PROVEN LIVE:** the protected manual GitHub workflow's sandbox
+`lifecycle-read-only` run #7 passed. Node 22 runtime alignment fixed the hosted
+Supabase client initialization issue, and normal CI is green on Node 22. The
+run used an existing lifecycle identity; no new purchase or provider/database
+mutation was needed. Production billing remains disabled.
+
+**VERIFIED LOCALLY:** the Phase 6 audit in
+[the automation plan](revenuecat-automation-plan.md) distinguishes existing
+offline guards from gaps. The first hardening slice rejects malformed empty
+pagination cursors and tests continuation rejection across the project,
+entitlement, customer, subscription, and purchase read surfaces. Full
+multi-page traversal and concurrent replay races remain Phase 6 work; the
+duplicate active provider state check is recorded below.
+
+**Phase 6 duplicate-active checkpoint, 2026-09-23:** monthly and annual
+offline fixtures now reject simultaneous active Pro subscriptions with
+`REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS`, including cross-plan conflicts;
+expired history remains valid. The local subscription pgTAP suite passed 26/26
+sequential ordering, ledger, and RLS checks. Its single-session transaction
+does not test concurrent delivery, so that race remains open for a separate
+coordinated two-connection local harness. Production billing remains disabled.
+
+**Phase 6 atomic webhook race checkpoint, 2026-09-23 — VERIFIED LOCALLY:** a
+two-session local test reproduced the split mirror/ledger bug: the duplicate
+delivery recorded `STALE_EVENT` before the caller that had changed the mirror
+could record its applied result. A forward migration now claims the provider
+event ID, updates ordered mirror state, and finalizes the ledger in one
+transaction. The webhook makes one RPC call. The local barrier confirms the
+second Postgres session is blocked before the first releases its transaction.
+Duplicate delivery preserves one applied ledger row and one active mirror row;
+renewal/stale-expiration and expiration/older-renewal races preserve the newest
+event timestamp, one mirror row, coherent ledger outcomes, and matching server
+authorization. pgTAP also proves rollback after a mirror write fails and
+unchanged client write boundaries. The prior single-session note is historical.
+No hosted webhook replay or live billing workflow was run for this fix.
+Production billing remains disabled.

@@ -10,6 +10,7 @@ import type { BillingAssertionResult } from './assertion-types';
 import {
   createRevenueCatAssertionAdapter,
   type RevenueCatAssertionAdapter,
+  type RevenueCatSubscriptionEvidence,
   type RevenueCatUserSnapshot,
 } from './revenuecat-assertions';
 import type { RevenueCatCliInvocation, RevenueCatCliRunner } from './revenuecat-cli';
@@ -95,6 +96,7 @@ function customerProfile(
 function providerRunner(
   options: {
     customer?: unknown;
+    entitlements?: unknown;
     subscription?: unknown | ((id: string) => unknown);
     purchase?: unknown;
     product?: unknown | ((id: string) => unknown);
@@ -123,7 +125,7 @@ function providerRunner(
         data: { items: [{ id: 'proj_bplan', name: 'BPlan: Business Calendar' }] },
       };
     } else if (command === 'entitlements list') {
-      payload = { data: entitlementList() };
+      payload = options.entitlements ?? { data: entitlementList() };
     } else if (command === 'customers show') {
       if (options.customerNotFound) {
         return { exitCode: 5, stdout: '', stderr: 'raw provider output' };
@@ -194,6 +196,20 @@ function activeProvider(overrides: Partial<RevenueCatUserSnapshot> = {}): Revenu
       },
     ],
     purchases: [],
+    ...overrides,
+  };
+}
+
+function planSubscription(
+  plan: 'monthly' | 'annual',
+  id: string,
+  overrides: Partial<RevenueCatSubscriptionEvidence> = {},
+): RevenueCatSubscriptionEvidence {
+  return {
+    ...activeProvider().subscriptions[0]!,
+    id,
+    productId: plan === 'monthly' ? 'prod_monthly' : 'prod_annual',
+    storeIdentifier: plan === 'monthly' ? 'bplan_pro_monthly' : 'bplan_pro_yearly',
     ...overrides,
   };
 }
@@ -539,6 +555,84 @@ describe('RevenueCat user assertion adapter', () => {
     expect(none).toMatchObject({ ok: false, error: { code: 'PROJECT_NOT_FOUND' } });
     expect(duplicate).toMatchObject({ ok: false, error: { code: 'PROJECT_DUPLICATE' } });
   });
+
+  it('rejects entitlement continuation and malformed empty cursors before customer reads', async () => {
+    for (const nextPage of ['next-page', '']) {
+      const fake = providerAdapter({
+        entitlements: { data: { ...entitlementList(), next_page: nextPage } },
+      });
+      const result = await fake.adapter.readUser(USER_ID);
+      expect(result).toMatchObject({
+        ok: false,
+        error: {
+          code:
+            nextPage === '' ? 'REVENUECAT_RESPONSE_MALFORMED' : 'REVENUECAT_PAGINATION_UNSUPPORTED',
+        },
+      });
+      expect(fake.invocations.map(({ argv }) => argv.slice(0, 2).join(' '))).not.toContain(
+        'customers show',
+      );
+    }
+  });
+
+  it('rejects each incomplete customer list before following any subscription', async () => {
+    for (const resource of ['active_entitlements', 'subscriptions', 'purchases'] as const) {
+      const profile = customerProfile();
+      const customer = profile.data.customer;
+      const page =
+        resource === 'active_entitlements' ? customer.active_entitlements : profile.data[resource];
+      const fake = providerAdapter({
+        customer: {
+          ...profile,
+          data: {
+            ...profile.data,
+            ...(resource === 'active_entitlements'
+              ? {
+                  customer: {
+                    ...customer,
+                    active_entitlements: { ...page, next_page: 'next-page' },
+                  },
+                }
+              : { [resource]: { ...page, next_page: 'next-page' } }),
+          },
+        },
+      });
+      const result = await fake.adapter.readUser(USER_ID);
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: 'REVENUECAT_PAGINATION_UNSUPPORTED' },
+      });
+      expect(fake.invocations.map(({ argv }) => argv.slice(0, 2).join(' '))).not.toContain(
+        'subscriptions show',
+      );
+    }
+  });
+
+  it('rejects incomplete followed subscription and purchase entitlement lists', async () => {
+    const partialSubscription = subscription({
+      entitlements: { ...entitlementList(), next_page: 'next-page' },
+    });
+    const subscriptionResult = await providerAdapter({
+      customer: customerProfile({ subscriptions: [partialSubscription] }),
+      subscription: { data: partialSubscription },
+    }).adapter.readUser(USER_ID);
+    expect(subscriptionResult).toMatchObject({
+      ok: false,
+      error: { code: 'REVENUECAT_PAGINATION_UNSUPPORTED' },
+    });
+
+    const partialPurchase = purchase({
+      entitlements: { ...entitlementList(), next_page: 'next-page' },
+    });
+    const purchaseResult = await providerAdapter({
+      customer: customerProfile({ subscriptions: [], purchases: [partialPurchase] }),
+      purchase: { data: partialPurchase },
+    }).adapter.readUser(USER_ID);
+    expect(purchaseResult).toMatchObject({
+      ok: false,
+      error: { code: 'REVENUECAT_PAGINATION_UNSUPPORTED' },
+    });
+  });
 });
 
 describe('cross-layer billing consistency', () => {
@@ -547,6 +641,75 @@ describe('cross-layer billing consistency', () => {
     expect(report.ok).toBe(true);
     expect(formatBillingAssertUserReport(report)).toContain('Result: PASS');
   });
+
+  it.each(['monthly', 'annual'] as const)(
+    'accepts one active %s subscription and an expired historical subscription',
+    async (plan) => {
+      const active = planSubscription(plan, 'active-subscription');
+      const historical = planSubscription(plan, 'historical-subscription', {
+        status: 'expired',
+        givesAccess: false,
+        currentPeriodEndsAt: NOW.getTime() - 86_400_000,
+      });
+      const report = await runWithSnapshots(
+        activeProvider({ subscriptions: [active, historical] }),
+        activeSupabase(),
+        ['--user', USER_ID, '--expect', 'active-pro', '--plan', plan],
+      );
+      expect(report.ok).toBe(true);
+    },
+  );
+
+  it.each(['monthly', 'annual'] as const)(
+    'rejects two simultaneously active %s subscriptions without authorizing Pro',
+    async (plan) => {
+      const report = await runWithSnapshots(
+        activeProvider({
+          subscriptions: [
+            planSubscription(plan, 'first-subscription'),
+            planSubscription(plan, 'second-subscription'),
+          ],
+        }),
+        activeSupabase({ serverAuthorized: true }),
+        ['--user', USER_ID, '--expect', 'active-pro', '--plan', plan],
+      );
+      expect(report).toMatchObject({
+        ok: false,
+        userId: '[REDACTED]',
+        failure: { code: 'REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS' },
+      });
+      const diagnostics = formatBillingAssertUserReport(report);
+      expect(diagnostics).toContain('Result: FAIL');
+      expect(diagnostics).not.toContain('first-subscription');
+      expect(diagnostics).not.toContain('second-subscription');
+      expect(diagnostics).not.toContain(USER_ID);
+      expect(diagnostics).not.toContain(API_KEY);
+      expect(diagnostics).not.toContain(SERVICE_KEY);
+      expect(JSON.stringify(report)).not.toContain(USER_ID);
+      expect(JSON.stringify(report)).not.toContain('first-subscription');
+      expect(JSON.stringify(report)).not.toContain('second-subscription');
+    },
+  );
+
+  it.each(['monthly', 'annual'] as const)(
+    'rejects simultaneous monthly and annual subscriptions when expecting %s',
+    async (plan) => {
+      const report = await runWithSnapshots(
+        activeProvider({
+          subscriptions: [
+            planSubscription('monthly', 'monthly-subscription'),
+            planSubscription('annual', 'annual-subscription'),
+          ],
+        }),
+        activeSupabase(),
+        ['--user', USER_ID, '--expect', 'active-pro', '--plan', plan],
+      );
+      expect(report).toMatchObject({
+        ok: false,
+        failure: { code: 'REVENUECAT_MULTIPLE_ACTIVE_SUBSCRIPTIONS' },
+      });
+    },
+  );
 
   it('passes monthly evidence through the CLI plan scope', async () => {
     const monthly = await runWithSnapshots(

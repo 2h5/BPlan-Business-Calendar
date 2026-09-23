@@ -885,12 +885,12 @@ const projectListEnvelopeSchema = z.union([
   z.object({
     data: z.object({
       items: z.array(projectIdentitySchema),
-      next_page: z.string().nullable().optional(),
+      next_page: z.string().min(1).nullable().optional(),
     }),
   }),
   z.object({
     items: z.array(projectIdentitySchema),
-    next_page: z.string().nullable().optional(),
+    next_page: z.string().min(1).nullable().optional(),
   }),
 ]);
 
