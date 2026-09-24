@@ -79,6 +79,22 @@ jobs:
       - name: Database tests
         run: supabase test db
 
+      # pgTAP runs in one session and cannot interleave transactions. The race
+      # harness drives real concurrent sessions against the local stack only.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: RevenueCat billing race tests
+        run: pnpm billing:test:race:local
+
       - name: Check generated types are current
         run: |
           supabase gen types typescript --local > /tmp/database.types.ts

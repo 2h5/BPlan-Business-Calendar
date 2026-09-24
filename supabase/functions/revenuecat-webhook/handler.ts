@@ -1,23 +1,47 @@
-import { revenueCatWebhookSchema } from '@cal/schemas/subscription';
+import {
+  revenueCatEnvironmentSchema,
+  revenueCatWebhookEnvelopeSchema,
+  type RevenueCatEnvironment,
+  type RevenueCatWebhookEnvelope,
+} from '@cal/schemas/subscription';
 
 import { decideEvent } from './events.ts';
-import { supabaseRevenueCatMirror, type RevenueCatMirror } from './mirror.ts';
+import {
+  supabaseRevenueCatMirror,
+  type ProcessEventInput,
+  type RevenueCatMirror,
+} from './mirror.ts';
+import { constantTimeEqual } from '../_shared/billing/constant-time.ts';
+import { SIGNATURE_HEADER, verifyRevenueCatSignature } from './signature.ts';
 
 /**
  * RevenueCat webhook receiver.
  *
- * Two behaviours drive the shape of this handler:
- *
- * - RevenueCat retries any non-2xx with backoff. So a response code is a
- *   decision about whether redelivery could ever help. Understood-and-ignored
- *   is a 200; only a genuinely transient failure earns a 5xx.
+ * - RevenueCat retries every non-200 response (5, 10, 20, 40, 80 minutes) and
+ *   then stops. So a response code is a decision about whether redelivery
+ *   could ever help. Anything understood — applied, deferred to
+ *   reconciliation, or terminally ignored with a recorded reason — is a 200.
+ *   Only a transient failure earns a 5xx.
  * - Deliveries repeat and arrive out of order. The database claims the event
- *   ID, applies ordered mirror changes, and records the outcome in one RPC.
+ *   ID, applies ordered mirror changes or queues reconciliation, and records
+ *   the outcome in one RPC.
+ * - The deployment's environment is required configuration. An event from the
+ *   other environment is recorded and ignored, whatever the dashboard sends.
  */
+
+/** RevenueCat events are a few kilobytes; refuse anything absurd before parsing. */
+const MAX_BODY_BYTES = 256 * 1024;
+
+export interface RevenueCatWebhookConfig {
+  secret: string | undefined;
+  environment: string | undefined;
+  signingSecret: string | undefined;
+}
 
 export interface RevenueCatWebhookDeps {
   mirror?: RevenueCatMirror;
-  readSecret?: () => string | undefined;
+  readConfig?: () => RevenueCatWebhookConfig;
+  nowSeconds?: () => number;
 }
 
 export async function handleRevenueCatWebhook(
@@ -26,64 +50,104 @@ export async function handleRevenueCatWebhook(
 ): Promise<Response> {
   if (request.method !== 'POST') return status(405, 'METHOD_NOT_ALLOWED');
 
-  const expected = (deps.readSecret ?? defaultSecret)();
-  if (!expected) {
+  const config = (deps.readConfig ?? defaultConfig)();
+  const environment = revenueCatEnvironmentSchema.safeParse(config.environment);
+  if (!config.secret || !environment.success) {
     // Unconfigured, not unauthorised. 503 so RevenueCat retries after the
-    // secret is set instead of discarding real purchase events.
-    console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_SECRET_MISSING' }));
+    // deployment is configured instead of discarding real purchase events.
+    console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_NOT_CONFIGURED' }));
     return status(503, 'NOT_CONFIGURED');
   }
 
-  if (!sameSecret(request.headers.get('Authorization'), expected)) {
+  const authorization = request.headers.get('Authorization');
+  if (!authorization || !constantTimeEqual(authorization, config.secret)) {
     return status(403, 'NOT_AUTHORIZED');
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = revenueCatWebhookSchema.safeParse(body);
+  const rawBody = await request.text().catch(() => null);
+  if (rawBody === null || new TextEncoder().encode(rawBody).length > MAX_BODY_BYTES) {
+    return status(400, 'VALIDATION_FAILED');
+  }
+
+  if (config.signingSecret) {
+    const failure = await verifyRevenueCatSignature(
+      request.headers.get(SIGNATURE_HEADER),
+      rawBody,
+      config.signingSecret,
+      (deps.nowSeconds ?? (() => Math.floor(Date.now() / 1000)))(),
+    );
+    if (failure) {
+      console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_SIGNATURE', failure }));
+      return status(403, 'NOT_AUTHORIZED');
+    }
+  }
+
+  const parsed = revenueCatWebhookEnvelopeSchema.safeParse(parseJson(rawBody));
   if (!parsed.success) {
-    // Redelivering an unparseable body cannot help, so do not ask for one.
+    // Without an event ID nothing can be recorded. RevenueCat will retry a
+    // few times; each attempt is logged here without its body.
     console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_MALFORMED' }));
     return status(400, 'VALIDATION_FAILED');
   }
 
   const event = parsed.data.event;
-  const decision = decideEvent(event);
+  const decision = decideEvent(event, environment.data);
   const mirror = deps.mirror ?? supabaseRevenueCatMirror();
-  const eventAt = new Date(event.event_timestamp_ms).toISOString();
+  const base = {
+    eventId: event.id,
+    eventType: event.type,
+    eventAt: new Date(event.event_timestamp_ms).toISOString(),
+    environment: eventEnvironment(event.environment),
+    appUserId: decision.appUserId,
+    payload: redactedPayload(parsed.data),
+  };
 
-  try {
-    if (decision.kind === 'ignore') {
-      const result = await mirror.processEvent({
-        eventId: event.id,
+  let input: ProcessEventInput;
+  switch (decision.kind) {
+    case 'ignore':
+      input = {
+        ...base,
+        decision: 'ignore',
         userId: null,
-        eventType: event.type,
-        eventAt,
         status: null,
         expiresAt: null,
         customerId: null,
         entitlements: [],
-        revokeFrom: [],
+        reconcileUserIds: [],
         skippedReason: decision.reason,
-        payload: parsed.data,
-      });
-      return status(200, result);
-    }
+      };
+      break;
+    case 'reconcile':
+      input = {
+        ...base,
+        decision: 'reconcile',
+        userId: decision.primaryUserId,
+        status: null,
+        expiresAt: null,
+        customerId: null,
+        entitlements: [],
+        reconcileUserIds: decision.userIds,
+        skippedReason: null,
+      };
+      break;
+    case 'apply':
+      input = {
+        ...base,
+        environment: decision.environment,
+        decision: 'apply',
+        userId: decision.userId,
+        status: decision.status,
+        expiresAt: decision.expiresAt,
+        customerId: decision.customerId,
+        entitlements: decision.entitlements,
+        reconcileUserIds: decision.reconcile ? [decision.userId] : [],
+        skippedReason: null,
+      };
+      break;
+  }
 
-    const result = await mirror.processEvent({
-      eventId: event.id,
-      userId: decision.userId,
-      eventType: event.type,
-      eventAt,
-      status: decision.status,
-      expiresAt: decision.expiresAt,
-      customerId: event.original_app_user_id ?? event.app_user_id,
-      entitlements: decision.entitlements,
-      revokeFrom: decision.revokeFrom,
-      skippedReason: null,
-      payload: parsed.data,
-    });
-
-    return status(200, result);
+  try {
+    return status(200, await mirror.processEvent(input));
   } catch (error) {
     // Transient: ask RevenueCat to redeliver. Never echo the payload, which
     // carries store identifiers.
@@ -94,12 +158,67 @@ export async function handleRevenueCatWebhook(
         reason: error instanceof Error ? error.name : 'UNKNOWN',
       }),
     );
+    await queueReconciliationAfterFailure(mirror, input);
     return status(500, 'UNKNOWN');
   }
 }
 
-function defaultSecret(): string | undefined {
-  return Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
+/**
+ * RevenueCat stops after five retries. Queue an authoritative read for every
+ * user the failed delivery named, so the mirror converges even if every retry
+ * fails too. Best effort: if the database is unreachable this fails as well,
+ * and the operator runbook covers recovery.
+ */
+async function queueReconciliationAfterFailure(
+  mirror: RevenueCatMirror,
+  input: ProcessEventInput,
+): Promise<void> {
+  const userIds = [
+    ...new Set([...(input.userId ? [input.userId] : []), ...input.reconcileUserIds]),
+  ];
+  if (userIds.length === 0) return;
+  try {
+    const queued = await mirror.recordFailure(userIds);
+    console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_FAILURE_QUEUED', queued }));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        code: 'REVENUECAT_WEBHOOK_FAILURE_UNRECORDED',
+        reason: error instanceof Error ? error.name : 'UNKNOWN',
+      }),
+    );
+  }
+}
+
+function defaultConfig(): RevenueCatWebhookConfig {
+  return {
+    secret: Deno.env.get('REVENUECAT_WEBHOOK_SECRET'),
+    environment: Deno.env.get('REVENUECAT_ENVIRONMENT'),
+    signingSecret: Deno.env.get('REVENUECAT_WEBHOOK_SIGNING_SECRET'),
+  };
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Only a recognised value is stored in the typed ledger column. */
+function eventEnvironment(value: string | null | undefined): RevenueCatEnvironment | null {
+  const parsed = revenueCatEnvironmentSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * The ledger keeps the delivered event for diagnosis, minus developer-defined
+ * subscriber attributes, which can hold personal data (email, name, phone).
+ */
+export function redactedPayload(envelope: RevenueCatWebhookEnvelope): unknown {
+  const { subscriber_attributes: _removed, ...event } = envelope.event;
+  return { api_version: envelope.api_version, event };
 }
 
 function status(code: number, result: string): Response {
@@ -107,17 +226,4 @@ function status(code: number, result: string): Response {
     status: code,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
-}
-
-/** Length-independent comparison, matching webhook-microsoft's `sameSecret`. */
-function sameSecret(actual: string | null | undefined, expected: string): boolean {
-  if (!actual) return false;
-  const left = new TextEncoder().encode(actual);
-  const right = new TextEncoder().encode(expected);
-  let difference = left.length ^ right.length;
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-  }
-  return difference === 0;
 }

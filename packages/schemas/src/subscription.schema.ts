@@ -3,60 +3,88 @@ import { z } from 'zod';
 /**
  * RevenueCat webhook payloads and the entitlement mirror.
  *
- * Two rules shape this file:
+ * RevenueCat event types do not share one shape. Subscription lifecycle events
+ * carry `app_user_id`, `entitlement_ids`, and `expiration_at_ms`; TRANSFER
+ * carries only `transferred_from`/`transferred_to`; PURCHASE_REDEEMED carries
+ * `redeemed_by`/`redeemed_from`; TEMPORARY_ENTITLEMENT_GRANT carries only
+ * `app_user_id` (https://www.revenuecat.com/docs/integrations/webhooks/event-types-and-fields).
+ * So parsing is two-stage:
  *
- * 1. `type` is a plain string, not an enum. RevenueCat adds event types over
- *    time, and an unrecognised one must be recorded and ignored — never
- *    rejected. A 4xx here would make RevenueCat retry a delivery that can
- *    never succeed, and a schema that fails closed on new event types turns a
- *    routine provider change into an outage.
- * 2. Only fields the handler actually uses are parsed. The untouched remainder
- *    still reaches the ledger, because the raw body is stored alongside.
+ * 1. The envelope requires only what every event has (`id`, `type`,
+ *    `event_timestamp_ms`). `type` is a plain string: RevenueCat adds event
+ *    types over time, and an unrecognised one must be recorded and ignored.
+ *    RevenueCat retries every non-200 response, so rejecting a whole class of
+ *    valid deliveries at the envelope would turn a provider change into a
+ *    retry storm followed by silent loss.
+ * 2. Each handled type is then parsed with its own schema. A body that fails
+ *    its type schema is still recorded under its event ID.
  */
 
 /** RevenueCat sends epoch milliseconds; the database stores timestamptz. */
 const epochMillisSchema = z.number().int().nonnegative();
 
 export const revenueCatEnvironmentSchema = z.enum(['SANDBOX', 'PRODUCTION']);
+export type RevenueCatEnvironment = z.infer<typeof revenueCatEnvironmentSchema>;
 
-export const revenueCatEventSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().min(1),
-  /**
-   * Equal to the Supabase auth user id, because the client calls
-   * `Purchases.logIn(session.user.id)`. Anything prefixed `$RCAnonymousID:`
-   * is a purchase made before sign-in and cannot be attributed yet.
-   */
-  app_user_id: z.string().min(1),
-  original_app_user_id: z.string().min(1).optional(),
-  event_timestamp_ms: epochMillisSchema,
-  /** Null for non-renewing or lifetime purchases. */
-  expiration_at_ms: epochMillisSchema.nullish(),
-  purchased_at_ms: epochMillisSchema.nullish(),
-  entitlement_ids: z.array(z.string()).nullish(),
-  product_id: z.string().nullish(),
-  store: z.string().nullish(),
-  environment: revenueCatEnvironmentSchema.nullish(),
-  /** Present on TRANSFER events. */
-  transferred_from: z.array(z.string()).nullish(),
-  transferred_to: z.array(z.string()).nullish(),
-});
-
-export const revenueCatWebhookSchema = z.object({
+export const revenueCatWebhookEnvelopeSchema = z.object({
   api_version: z.string().optional(),
-  event: revenueCatEventSchema,
+  event: z
+    .object({
+      id: z.string().min(1).max(255),
+      type: z.string().min(1).max(64),
+      event_timestamp_ms: epochMillisSchema,
+      /**
+       * Deliberately a plain string here. An unexpected value is recorded as
+       * ENVIRONMENT_INVALID under the event ID rather than rejected unaudited.
+       */
+      environment: z.string().nullish(),
+    })
+    .passthrough(),
 });
 
-export type RevenueCatEvent = z.infer<typeof revenueCatEventSchema>;
-export type RevenueCatWebhook = z.infer<typeof revenueCatWebhookSchema>;
+export type RevenueCatWebhookEnvelope = z.infer<typeof revenueCatWebhookEnvelopeSchema>;
+export type RevenueCatEnvelopeEvent = RevenueCatWebhookEnvelope['event'];
+
+/**
+ * Subscription lifecycle events. `app_user_id` equals the Supabase auth user
+ * id, because checkout identifies the customer with it; anything prefixed
+ * `$RCAnonymousID:` cannot be attributed. `expiration_at_ms` is documented as
+ * always included for lifecycle events; `null` means no expiry and is only
+ * accepted for a non-renewing purchase.
+ */
+export const revenueCatLifecycleEventSchema = z.object({
+  app_user_id: z.string().min(1),
+  original_app_user_id: z.string().min(1).nullish(),
+  entitlement_ids: z.array(z.string().min(1)).nullish(),
+  expiration_at_ms: epochMillisSchema.nullable(),
+});
+
+/** TRANSFER: sent for the destination; names both sides, but not entitlements. */
+export const revenueCatTransferEventSchema = z.object({
+  transferred_from: z.array(z.string().min(1)),
+  transferred_to: z.array(z.string().min(1)),
+});
+
+/** PURCHASE_REDEEMED: a web purchase was associated with an App User ID. */
+export const revenueCatRedemptionEventSchema = z.object({
+  redeemed_by: z.array(z.string().min(1)),
+  redeemed_from: z.array(z.string().min(1)).nullish(),
+});
+
+/** Events that name one subscriber but not the resulting access. */
+export const revenueCatSubjectEventSchema = z.object({
+  app_user_id: z.string().min(1),
+});
 
 /**
  * Mirror status values.
  *
  * `active` is the only one `has_active_entitlement()` accepts, and it is
- * deliberately kept through cancellation and billing retries: both mean "will
- * not renew", not "access ends now". Access ends when `expires_at` passes or
- * an EXPIRATION event arrives.
+ * deliberately kept through cancellation, billing retries, and a scheduled
+ * pause: each means "will not renew", not "access ends now". Access ends when
+ * `expires_at` passes, when EXPIRATION arrives, or when reconciliation finds
+ * RevenueCat no longer grants it. `paused` is legacy: nothing writes it now,
+ * but it remains readable so an old row still parses.
  */
 export const subscriptionStatusSchema = z.enum(['active', 'expired', 'paused']);
 

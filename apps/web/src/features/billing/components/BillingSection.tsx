@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { env } from '../../../lib/env';
 import { useAuth } from '../../auth';
 import styles from '../../settings/components/SettingsView.module.css';
-import { useSubscription } from '../hooks/useBilling';
+import { useRefreshAccess, useSubscription } from '../hooks/useBilling';
 import {
   checkoutAvailability,
   revenueCatCheckoutUrl,
@@ -24,6 +24,7 @@ const billingConfig: BillingConfig = {
 export function BillingSection() {
   const { userId } = useAuth();
   const subscription = useSubscription();
+  const refreshAccess = useRefreshAccess();
   const availability = checkoutAvailability(billingConfig);
   const checkoutUrl = revenueCatCheckoutUrl(billingConfig, userId);
 
@@ -63,8 +64,8 @@ export function BillingSection() {
         <BillingActions
           availability={availability}
           checkoutUrl={checkoutUrl}
-          isRefreshing={subscription.isFetching}
-          onRefresh={() => void subscription.refetch()}
+          isRefreshing={refreshAccess.isPending || subscription.isFetching}
+          onRefresh={() => refreshAccess.mutate()}
         />
       </div>
     </section>
@@ -120,7 +121,7 @@ function BillingActions({
       <p className={availabilityMessageClass(availability)} role="status">
         {availabilityMessage(availability)}
         {checkoutUrl
-          ? ' After checkout, refresh access status here while the webhook finishes processing.'
+          ? ' After checkout, refresh access status here; it re-checks your purchase with RevenueCat.'
           : null}
       </p>
     </div>

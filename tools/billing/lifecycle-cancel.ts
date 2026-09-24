@@ -63,6 +63,7 @@ export async function runSandboxCancellation(
     !config.testUserId ||
     !isBillingUserId(config.testUserId) ||
     !config.revenueCatApiKey ||
+    !config.revenueCatMutationApiKey ||
     !config.supabaseUrl ||
     !config.supabaseServiceRoleKey
   )
@@ -115,7 +116,8 @@ export async function runSandboxCancellation(
   const result = await cancel(
     provider.data.projectId as Parameters<typeof cancel>[0],
     firstSubscription.id,
-    { apiKey: config.revenueCatApiKey },
+    // Reads above used the read-only key; only this one write uses the mutation key.
+    { apiKey: config.revenueCatMutationApiKey },
   );
   write(
     `RevenueCat sandbox cancellation\nSubmission: ONE\nResult: ${result.ok ? 'SUBMITTED' : 'AMBIGUOUS_OR_FAILED'}${result.ok ? '' : `\nFailure: ${result.error.code}`}`,
