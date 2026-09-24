@@ -112,7 +112,7 @@
   gap: var(--space-2);
   height: var(--control-height-sm);
   padding: 0 var(--space-3);
-  border: 1px solid rgba(138, 164, 255, 0.4);
+  border: 1px solid rgba(23, 104, 242, 0.4);
   border-radius: var(--radius-sm);
   background: var(--color-accent);
   color: var(--color-on-accent);
@@ -179,26 +179,28 @@
   text-align: left;
 }
 
-.bentoCard[role='button'] {
-  cursor: pointer;
+/* The glance card takes two of the three columns, like mobile's card leads the screen. */
+.glanceCell {
+  grid-column: span 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.bentoCard[role='button']:hover {
-  border-color: var(--color-border-strong);
+.glanceCell > * {
+  flex: 1;
 }
 
-.bentoCardActive {
-  border-color: rgba(97, 214, 162, 0.45);
-  background: linear-gradient(180deg, var(--color-bg-surface) 0%, rgba(97, 214, 162, 0.03) 100%);
-}
-
-.bentoCardEmpty {
-  justify-content: flex-start;
+.taskPulseRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+  min-width: 0;
 }
 
-.bentoCardEmpty .bentoCardHeader {
-  margin-bottom: 0;
+.taskPulseRow .bentoCardBody {
+  min-width: 0;
 }
 
 .bentoCardHeader {
@@ -217,45 +219,7 @@
   text-transform: uppercase;
 }
 
-.bentoIconBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  flex-shrink: 0;
-  transition:
-    transform var(--transition-fast),
-    background-color var(--transition-fast);
-}
-
-.bentoCard:hover .bentoIconBadge {
-  transform: scale(1.05);
-}
-
-.bentoIconClock {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
-}
-
-.bentoIconFocus {
-  background: var(--color-focus-subtle);
-  color: var(--color-focus-accent);
-}
-
-.bentoIconTasks {
-  background: var(--color-success-subtle);
-  color: var(--color-success);
-}
-
-.bentoIcon {
-  display: block;
-}
-
 /* Crisp micro-tags instead of pill-shaped bubbles */
-.activePill,
-.soonPill,
 .overduePill,
 .donePill {
   display: inline-flex;
@@ -266,24 +230,6 @@
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
-}
-
-.activePill {
-  background: var(--color-success-subtle);
-  color: var(--color-success);
-}
-
-.livePulse {
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
-  background: var(--color-success);
-  box-shadow: 0 0 4px var(--color-success);
-}
-
-.soonPill {
-  background: var(--color-accent-subtle);
-  color: var(--color-accent);
 }
 
 .overduePill {
@@ -322,64 +268,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.calendarDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.locationTag {
-  color: var(--color-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardActionHint {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-xs);
-  color: var(--color-accent);
-  font-weight: var(--font-weight-medium);
-}
-
-/* Progress bars inside bento cards */
-.progressContainer {
-  margin-top: var(--space-2);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.progressBar {
-  flex: 1;
-  height: 4px;
-  background: var(--color-bg-surface-elevated);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.progressFillCapacity {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-accent) 0%, var(--color-focus-accent) 100%);
-  border-radius: 2px;
-  transition: width var(--transition-normal);
-}
-
-.progressFillTasks {
-  height: 100%;
-  background: var(--color-success);
-  border-radius: 2px;
-  transition: width var(--transition-normal);
-}
-
-.progressLabel {
-  font-size: 0.6875rem;
-  font-family: var(--font-family-mono);
-  color: var(--color-text-tertiary);
-  font-weight: var(--font-weight-medium);
 }
 
 /* Main Split Columns: Crisp 8px radius containers */
@@ -648,19 +536,6 @@
   white-space: nowrap;
 }
 
-.liveBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 5px;
-  border-radius: 2px;
-  background: var(--color-success-subtle);
-  color: var(--color-success);
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.04em;
-}
-
 .eventCardMeta {
   display: flex;
   align-items: center;
@@ -688,12 +563,34 @@
   white-space: nowrap;
 }
 
-.timelinePast .eventCard {
-  opacity: 0.6;
+.timelinePast .eventCard,
+.timelinePast .timelineTimeCol {
+  opacity: 0.5;
 }
 
+/* The event happening now is tinted green with "Now" in the time column, as on mobile. */
 .timelineCurrent .eventCard {
-  border-color: rgba(97, 214, 162, 0.45);
+  border-color: color-mix(in srgb, var(--color-success) 45%, transparent);
+  background: var(--color-success-subtle);
+  box-shadow: 0 0 18px -6px color-mix(in srgb, var(--color-success) 55%, transparent);
+}
+
+.timelineCurrent .timelineTime {
+  color: var(--color-success);
+  font-weight: var(--font-weight-semibold);
+}
+
+.timelineCurrent .timelineNode {
+  animation: node-pulse 2s ease-out infinite;
+}
+
+@keyframes node-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
 }
 
 /* Empty Schedule State */
@@ -882,6 +779,9 @@
   .quickAddAccordion,
   .quickAddAccordionOpen {
     transition: none;
+  }
+  .timelineCurrent .timelineNode {
+    animation: none;
   }
 }
 
@@ -1304,7 +1204,8 @@
   .bentoGrid {
     grid-template-columns: 1fr;
   }
-  .bentoCard:last-child {
+  .bentoCard:last-child,
+  .glanceCell {
     grid-column: span 1;
   }
 }

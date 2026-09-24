@@ -15,13 +15,13 @@
   --color-text-secondary: #aeb6c4;
   --color-text-tertiary: #737d8d;
   --color-text-inverse: #0a0d12;
-  --color-accent: #8aa4ff;
-  --color-accent-hover: #9bb2ff;
-  --color-accent-pressed: #718ff5;
-  --color-accent-subtle: rgba(125, 153, 255, 0.13);
-  --color-accent-muted: rgba(125, 153, 255, 0.08);
-  --color-on-accent: #071021;
-  --color-selected: rgba(125, 153, 255, 0.11);
+  --color-accent: #1768f2;
+  --color-accent-hover: #2f7bff;
+  --color-accent-pressed: #0e5fdf;
+  --color-accent-subtle: rgba(23, 104, 242, 0.18);
+  --color-accent-muted: rgba(23, 104, 242, 0.1);
+  --color-on-accent: #ffffff;
+  --color-selected: rgba(23, 104, 242, 0.16);
   --color-hover: rgba(255, 255, 255, 0.045);
   --color-success: #61d6a2;
   --color-success-subtle: rgba(60, 200, 139, 0.12);
@@ -32,7 +32,7 @@
   --color-danger-subtle: rgba(255, 111, 120, 0.11);
   --color-focus-accent: #a78bfa;
   --color-focus-subtle: rgba(167, 139, 250, 0.15);
-  --color-focus-ring: rgba(138, 164, 255, 0.28);
+  --color-focus-ring: rgba(23, 104, 242, 0.35);
   --background-app-canvas: var(--color-bg-app);
   --font-family-sans:
     Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

@@ -1,4 +1,4 @@
-import { calculateFreeTime, deviceTimeZone, toZonedDateKey } from '@cal/domain';
+import { calculateFreeTime, deviceTimeZone, expandWorkingHours, toZonedDateKey } from '@cal/domain';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useCalendarWindow } from '../../calendar/hooks/useCalendarWindow';
@@ -45,23 +45,49 @@ export function useToday() {
       ),
     [tasks.buckets.allCompleted, timeZone, todayKey],
   );
-  const allDay = calendar.occurrences.filter((item) => item.event.allDay);
-  const timed = calendar.occurrences
-    .filter((item) => !item.event.allDay)
-    .sort((a, b) => a.start - b.start);
+  const allDay = useMemo(
+    () => calendar.occurrences.filter((item) => item.event.allDay),
+    [calendar.occurrences],
+  );
+  const timed = useMemo(
+    () =>
+      calendar.occurrences.filter((item) => !item.event.allDay).sort((a, b) => a.start - b.start),
+    [calendar.occurrences],
+  );
   const next = timed.find((item) => item.end > now.getTime()) ?? null;
-  const freeTime = calculateFreeTime({
-    dayStart: calendar.window.start,
-    dayEnd: calendar.window.end,
-    now,
-    timeZone,
-    workingHours: profileQuery.data?.workingHours ?? [],
-    busy: calendar.occurrences.map((item) => ({ start: item.start, end: item.end })),
-  });
+  const workingHours = profileQuery.data?.workingHours;
+  const { start: dayStart, end: dayEnd } = calendar.window;
+  // All-day events do not block working time, matching mobile and how Google
+  // and Outlook mark them "free" — a conference banner is not a booked day.
+  const freeTime = useMemo(
+    () =>
+      calculateFreeTime({
+        dayStart,
+        dayEnd,
+        now,
+        timeZone,
+        workingHours: workingHours ?? [],
+        busy: timed.map((item) => ({ start: item.start, end: item.end })),
+      }),
+    [dayEnd, dayStart, now, timeZone, timed, workingHours],
+  );
+  const { workdayStartsAt, workdayEndsAt } = useMemo(() => {
+    const windows = expandWorkingHours(
+      { start: dayStart.getTime(), end: dayEnd.getTime() },
+      workingHours ?? [],
+      timeZone,
+    );
+    return {
+      workdayStartsAt: windows.length > 0 ? Math.min(...windows.map((w) => w.start)) : null,
+      workdayEndsAt: windows.length > 0 ? Math.max(...windows.map((w) => w.end)) : null,
+    };
+  }, [dayEnd, dayStart, timeZone, workingHours]);
 
   return {
     now,
     todayKey,
+    dayStart,
+    dayEnd,
     timeZone,
     profile: profileQuery.data,
     hourCycle: calendar.hourCycle,
@@ -70,6 +96,8 @@ export function useToday() {
     timed,
     next,
     freeTime,
+    workdayStartsAt,
+    workdayEndsAt,
     overdue: tasks.buckets.overdue,
     dueToday: tasks.buckets.dueToday,
     unscheduled,

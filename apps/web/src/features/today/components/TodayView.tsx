@@ -6,12 +6,15 @@ import {
   getZonedParts,
   isNotablePriority,
   PRIORITY_LABELS,
+  resolveEventColor,
   zonedWallClockToUtc,
 } from '@cal/domain';
 import type { TaskList, TaskPriority } from '@cal/schemas';
 import React, { useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { DayGlanceCard } from './DayGlanceCard';
+import { ProgressRing } from './ProgressRing';
 import { TodaySearch } from './TodaySearch';
 import styles from './TodayView.module.css';
 import { Select } from '../../../components/forms/Select';
@@ -67,8 +70,6 @@ export function TodayView() {
 
   const relevantCount = today.overdue.length + today.dueToday.length + today.unscheduled.length;
   const totalTasks = relevantCount + today.completedToday.length;
-  const completionPercentage =
-    totalTasks > 0 ? Math.round((today.completedToday.length / totalTasks) * 100) : 100;
 
   const localParts = useMemo(
     () => getZonedParts(today.now, today.timeZone),
@@ -91,18 +92,6 @@ export function TodayView() {
       timeZone: today.timeZone,
     }).format(today.now);
   }, [today.now, today.timeZone]);
-
-  // Check if the "next" event is currently active or upcoming
-  const nextStatus = useMemo(() => {
-    if (!today.next) return null;
-    const nowMs = today.now.getTime();
-    const isActive = nowMs >= today.next.start && nowMs < today.next.end;
-    const diffMinutes = Math.max(0, Math.round((today.next.start - nowMs) / 60000));
-    return {
-      isActive,
-      diffMinutes,
-    };
-  }, [today.next, today.now]);
 
   const handleOpenQuickAdd = () => {
     setIsQuickAddOpen(true);
@@ -207,9 +196,6 @@ export function TodayView() {
     );
   }
 
-  // Workday capacity estimate (assumes standard 8h/480m workday or remaining free time)
-  const capacityPercent = Math.min(100, Math.round((today.freeTime.freeMinutes / 480) * 100));
-
   return (
     <div className={styles.page}>
       {/* Dynamic Command Hero */}
@@ -256,103 +242,13 @@ export function TodayView() {
 
       <FindTimeBox timeZone={today.timeZone} />
 
-      {/* Bento Metric Cards */}
+      {/* Day overview: the glance card mirrors mobile; tasks keep their own card */}
       <section className={styles.bentoGrid} aria-label="Day Overview">
-        {/* Card 1: Up Next / In Progress */}
-        <div
-          className={`${styles.bentoCard} ${
-            nextStatus?.isActive ? styles.bentoCardActive : ''
-          } ${!today.next ? styles.bentoCardEmpty : ''}`}
-          onClick={() => {
-            if (today.next) {
-              navigate(`/calendar?date=${today.todayKey}&event=${today.next.event.id}`);
-            }
-          }}
-          role={today.next ? 'button' : undefined}
-          tabIndex={today.next ? 0 : undefined}
-          onKeyDown={(e) => {
-            if (today.next && (e.key === 'Enter' || e.key === ' ')) {
-              navigate(`/calendar?date=${today.todayKey}&event=${today.next.event.id}`);
-            }
-          }}
-        >
-          <div className={styles.bentoCardHeader}>
-            <span className={styles.bentoEyebrow}>
-              {nextStatus?.isActive ? (
-                <span className={styles.activePill}>
-                  <span className={styles.livePulse} />
-                  Happening Now
-                </span>
-              ) : today.next ? (
-                nextStatus && nextStatus.diffMinutes <= 60 ? (
-                  <span className={styles.soonPill}>In {nextStatus.diffMinutes}m</span>
-                ) : (
-                  'Up Next'
-                )
-              ) : (
-                'Up Next'
-              )}
-            </span>
-            <div className={`${styles.bentoIconBadge} ${styles.bentoIconClock}`}>
-              <ClockIcon className={styles.bentoIcon} />
-            </div>
-          </div>
-          <div className={styles.bentoCardBody}>
-            <strong className={styles.bentoMainValue}>
-              {today.next?.event.title ?? 'No upcoming events'}
-            </strong>
-            <p className={styles.bentoMeta}>
-              {today.next ? (
-                <>
-                  <span
-                    className={styles.calendarDot}
-                    style={{ backgroundColor: today.next.calendar?.color ?? 'var(--color-accent)' }}
-                  />
-                  <span>
-                    {formatTimeOfDay(new Date(today.next.start), today.timeZone, today.hourCycle)} –{' '}
-                    {formatTimeOfDay(new Date(today.next.end), today.timeZone, today.hourCycle)}
-                  </span>
-                  {today.next.event.location && (
-                    <span className={styles.locationTag}>· {today.next.event.location}</span>
-                  )}
-                </>
-              ) : (
-                'Schedule is open for deep work'
-              )}
-            </p>
-          </div>
-          {today.next && <div className={styles.cardActionHint}>View in calendar →</div>}
-        </div>
-
-        {/* Card 2: Work Capacity & Focus */}
-        <div className={styles.bentoCard}>
-          <div className={styles.bentoCardHeader}>
-            <span className={styles.bentoEyebrow}>Focus Capacity</span>
-            <div className={`${styles.bentoIconBadge} ${styles.bentoIconFocus}`}>
-              <FocusIcon className={styles.bentoIcon} />
-            </div>
-          </div>
-          <div className={styles.bentoCardBody}>
-            <strong className={styles.bentoMainValue}>
-              {today.freeTime.freeMinutes > 0
-                ? `${formatDuration(today.freeTime.freeMinutes)} free`
-                : 'Fully booked'}
-            </strong>
-            <p className={styles.bentoMeta}>
-              {today.freeTime.intervals.length > 0
-                ? `${today.freeTime.intervals.length} open block${today.freeTime.intervals.length === 1 ? '' : 's'} inside working hours`
-                : 'No remaining open windows today'}
-            </p>
-          </div>
-          <div className={styles.progressContainer}>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressFillCapacity}
-                style={{ width: `${capacityPercent}%` }}
-              />
-            </div>
-            <span className={styles.progressLabel}>{capacityPercent}% open</span>
-          </div>
+        <div className={styles.glanceCell}>
+          <DayGlanceCard
+            today={today}
+            onOpenEvent={(eventId) => navigate(`/calendar?date=${today.todayKey}&event=${eventId}`)}
+          />
         </div>
 
         {/* Card 3: Task Velocity & Progress */}
@@ -367,32 +263,25 @@ export function TodayView() {
                 'Task Pulse'
               )}
             </span>
-            <div className={`${styles.bentoIconBadge} ${styles.bentoIconTasks}`}>
-              <CheckCircleIcon className={styles.bentoIcon} />
-            </div>
           </div>
-          <div className={styles.bentoCardBody}>
-            <strong className={styles.bentoMainValue}>
-              {totalTasks > 0 ? `${today.completedToday.length} of ${totalTasks} done` : 'No tasks'}
-            </strong>
-            <p className={styles.bentoMeta}>
-              {today.dueToday.length > 0
-                ? `${today.dueToday.length} due today`
-                : today.overdue.length > 0
-                  ? `${today.overdue.length} needing attention`
-                  : totalTasks > 0
-                    ? 'All daily commitments completed!'
-                    : 'Clear task queue'}
-            </p>
-          </div>
-          <div className={styles.progressContainer}>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressFillTasks}
-                style={{ width: `${completionPercentage}%` }}
-              />
+          <div className={styles.taskPulseRow}>
+            <div className={styles.bentoCardBody}>
+              <strong className={styles.bentoMainValue}>
+                {totalTasks > 0
+                  ? `${today.completedToday.length} of ${totalTasks} done`
+                  : 'No tasks'}
+              </strong>
+              <p className={styles.bentoMeta}>
+                {today.dueToday.length > 0
+                  ? `${today.dueToday.length} due today`
+                  : today.overdue.length > 0
+                    ? `${today.overdue.length} needing attention`
+                    : totalTasks > 0
+                      ? 'All daily commitments completed!'
+                      : 'Clear task queue'}
+              </p>
             </div>
-            <span className={styles.progressLabel}>{completionPercentage}%</span>
+            <ProgressRing done={today.completedToday.length} total={totalTasks} />
           </div>
         </div>
       </section>
@@ -433,7 +322,13 @@ export function TodayView() {
                   >
                     <span
                       className={styles.allDayDot}
-                      style={{ backgroundColor: item.calendar?.color ?? 'var(--color-accent)' }}
+                      style={{
+                        backgroundColor: resolveEventColor(
+                          item.event.color,
+                          item.calendar?.color,
+                          'var(--color-accent)',
+                        ),
+                      }}
                     />
                     <span className={styles.allDayTitle}>{item.event.title}</span>
                   </button>
@@ -463,6 +358,11 @@ export function TodayView() {
                 const isCurrent = nowMs >= item.start && nowMs < item.end;
                 const isPast = nowMs >= item.end;
                 const durationMins = Math.round((item.end - item.start) / 60000);
+                const color = resolveEventColor(
+                  item.event.color,
+                  item.calendar?.color,
+                  'var(--color-accent)',
+                );
                 const startTimeStr = formatTimeOfDay(
                   new Date(item.start),
                   today.timeZone,
@@ -482,7 +382,9 @@ export function TodayView() {
                     }`}
                   >
                     <div className={styles.timelineTimeCol}>
-                      <time className={styles.timelineTime}>{startTimeStr}</time>
+                      <time className={styles.timelineTime}>
+                        {isCurrent ? 'Now' : startTimeStr}
+                      </time>
                       <span className={styles.timelineDuration}>
                         {formatDuration(durationMins)}
                       </span>
@@ -492,10 +394,8 @@ export function TodayView() {
                       <div
                         className={styles.timelineNode}
                         style={{
-                          borderColor: item.calendar?.color ?? 'var(--color-accent)',
-                          backgroundColor: isCurrent
-                            ? (item.calendar?.color ?? 'var(--color-accent)')
-                            : undefined,
+                          borderColor: color,
+                          backgroundColor: isCurrent ? color : undefined,
                         }}
                       />
                       <div className={styles.timelineLine} />
@@ -510,17 +410,11 @@ export function TodayView() {
                     >
                       <div
                         className={styles.eventCardColorBar}
-                        style={{ backgroundColor: item.calendar?.color ?? 'var(--color-accent)' }}
+                        style={{ backgroundColor: color }}
                       />
                       <div className={styles.eventCardContent}>
                         <div className={styles.eventCardTop}>
                           <strong className={styles.eventCardTitle}>{item.event.title}</strong>
-                          {isCurrent && (
-                            <span className={styles.liveBadge}>
-                              <span className={styles.livePulse} />
-                              LIVE
-                            </span>
-                          )}
                         </div>
                         <div className={styles.eventCardMeta}>
                           <span className={styles.eventCardRange}>
@@ -925,64 +819,6 @@ function CalendarIcon() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.16" />
-      <polyline points="12 6 12 12 16 14" strokeWidth="2.2" />
-    </svg>
-  );
-}
-
-function FocusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" fill="currentColor" fillOpacity="0.1" />
-      <circle cx="12" cy="12" r="6" fill="currentColor" fillOpacity="0.18" />
-      <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function CheckCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" fill="currentColor" fillOpacity="0.16" />
-      <polyline points="22 4 12 14.01 9 11.01" strokeWidth="2.2" />
     </svg>
   );
 }

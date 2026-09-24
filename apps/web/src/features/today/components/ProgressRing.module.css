@@ -1,0 +1,54 @@
+.ring {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+}
+
+.ring svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.ringTrack {
+  fill: none;
+  stroke: var(--color-bg-surface-elevated);
+}
+
+.ringFill {
+  fill: none;
+  stroke: var(--color-success);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: ring-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: var(--ring-circumference, 200);
+  }
+}
+
+.ringComplete .ringFill {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 60%, transparent));
+}
+
+.ringLabel {
+  position: relative;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ringComplete .ringLabel {
+  color: var(--color-success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringFill {
+    animation: none;
+    transition: none;
+  }
+}

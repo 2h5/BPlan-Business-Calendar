@@ -1,0 +1,217 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.track {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--color-bg-surface-elevated);
+}
+
+.gridline {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 1px;
+  background: var(--color-border);
+  opacity: 0.6;
+}
+
+/* The part of the day already gone, hatched so what is still ahead reads first. */
+.elapsed {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 7px 0 0 7px;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--color-text-tertiary) 14%, transparent) 4px 5px
+  );
+  pointer-events: none;
+}
+
+.segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 3px;
+  padding: 0;
+  border-radius: 4px;
+  transform-origin: left center;
+  animation: segment-grow 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--segment-index, 0) * 45ms);
+  transition:
+    top var(--transition-fast),
+    bottom var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+@keyframes segment-grow {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+}
+
+.segment:hover,
+.segment:focus-visible {
+  z-index: 3;
+  top: -3px;
+  bottom: -3px;
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.free {
+  border: 1px solid var(--color-success);
+  background: var(--color-success-subtle);
+}
+
+/* The open slot you are in right now breathes, so free time reads as available. */
+.freeNow {
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 45%, transparent);
+  animation:
+    segment-grow 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    free-breathe 2.8s ease-in-out 600ms infinite;
+}
+
+@keyframes free-breathe {
+  50% {
+    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--color-success) 45%, transparent);
+  }
+}
+
+.busy {
+  z-index: 1;
+  border: 0;
+  background: var(--segment-color);
+  cursor: pointer;
+}
+
+/* Faded by mixing the colour, not opacity, so a hover label inside stays fully legible. */
+.past {
+  background: color-mix(in srgb, var(--segment-color) 40%, var(--color-bg-surface-elevated));
+}
+
+.past:hover,
+.past:focus-visible {
+  background: var(--segment-color);
+}
+
+.live {
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--segment-color) 60%, transparent),
+    0 0 14px color-mix(in srgb, var(--segment-color) 55%, transparent);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  z-index: 4;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.segment:hover .tooltip,
+.segment:focus-visible .tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.now {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  z-index: 3;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--color-danger);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-danger) 70%, transparent);
+  pointer-events: none;
+}
+
+.labels {
+  position: relative;
+  height: 14px;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transform: translateX(-50%);
+}
+
+.labelFirst {
+  transform: none;
+}
+
+.labelLast {
+  right: 0;
+  transform: none;
+}
+
+.legend {
+  display: flex;
+  gap: var(--space-4);
+  color: var(--color-text-tertiary);
+  font-size: 0.6875rem;
+}
+
+.legendKey {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  display: inline-block;
+}
+
+.swatchFree {
+  width: 14px;
+  height: 8px;
+  border: 1px solid var(--color-success);
+  border-radius: 2px;
+  background: var(--color-success-subtle);
+}
+
+.swatchNow {
+  width: 2px;
+  height: 11px;
+  border-radius: 1px;
+  background: var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment,
+  .freeNow {
+    animation: none;
+  }
+}

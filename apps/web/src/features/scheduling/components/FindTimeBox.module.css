@@ -1,5 +1,4 @@
 .container {
-  margin-bottom: var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
@@ -79,11 +78,11 @@
 
 /* Input scanning effect while finding */
 .inputWrapScanning .input {
-  border-color: rgba(138, 164, 255, 0.4);
+  border-color: rgba(23, 104, 242, 0.4);
   background: linear-gradient(
     90deg,
     var(--color-bg-input) 0%,
-    rgba(138, 164, 255, 0.04) 50%,
+    rgba(23, 104, 242, 0.04) 50%,
     var(--color-bg-input) 100%
   );
   background-size: 200% 100%;
@@ -105,7 +104,7 @@
   gap: var(--space-2);
   height: var(--control-height, 40px);
   padding: 0 var(--space-4);
-  border: 1px solid rgba(138, 164, 255, 0.35);
+  border: 1px solid rgba(23, 104, 242, 0.35);
   border-radius: var(--radius-md);
   background: var(--color-accent);
   color: var(--color-on-accent);
@@ -119,7 +118,7 @@
 
 .submit:hover:not(:disabled) {
   background: var(--color-accent-hover);
-  border-color: rgba(138, 164, 255, 0.55);
+  border-color: rgba(23, 104, 242, 0.55);
 }
 
 .submit:disabled {
@@ -131,7 +130,7 @@
   position: relative;
   overflow: hidden;
   background: var(--color-accent);
-  border-color: rgba(138, 164, 255, 0.6);
+  border-color: rgba(23, 104, 242, 0.6);
 }
 
 .submitFinding::after {
@@ -164,9 +163,9 @@
 .loadingArea {
   margin-top: var(--space-4);
   padding: var(--space-4);
-  border: 1px solid rgba(138, 164, 255, 0.2);
+  border: 1px solid rgba(23, 104, 242, 0.2);
   border-radius: var(--radius-md);
-  background: rgba(138, 164, 255, 0.03);
+  background: rgba(23, 104, 242, 0.03);
   animation: fadeInDown 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -183,7 +182,7 @@
   gap: 5px;
   padding: 3px 8px;
   border-radius: var(--radius-sm);
-  background: rgba(138, 164, 255, 0.15);
+  background: rgba(23, 104, 242, 0.15);
   color: var(--color-accent);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -306,8 +305,8 @@
 
 .chipTitle {
   color: var(--color-accent);
-  background: rgba(138, 164, 255, 0.08);
-  border-color: rgba(138, 164, 255, 0.25);
+  background: rgba(23, 104, 242, 0.08);
+  border-color: rgba(23, 104, 242, 0.25);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -376,30 +375,30 @@
 }
 
 .slotCard:hover {
-  border-color: rgba(138, 164, 255, 0.45);
+  border-color: rgba(23, 104, 242, 0.45);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
 /* Rank 1 Top Pick / Best match */
 .slotCardTopPick {
-  border-color: rgba(138, 164, 255, 0.35);
+  border-color: rgba(23, 104, 242, 0.35);
   background: linear-gradient(
     135deg,
-    rgba(138, 164, 255, 0.06) 0%,
+    rgba(23, 104, 242, 0.06) 0%,
     var(--color-bg-surface-raised) 100%
   );
-  box-shadow: 0 2px 8px rgba(138, 164, 255, 0.06);
+  box-shadow: 0 2px 8px rgba(23, 104, 242, 0.06);
 }
 
 .slotCardTopPick:hover {
   border-color: var(--color-accent);
-  box-shadow: 0 4px 18px rgba(138, 164, 255, 0.18);
+  box-shadow: 0 4px 18px rgba(23, 104, 242, 0.18);
 }
 
 .slotCardBooking {
   border-color: var(--color-accent) !important;
-  background: rgba(138, 164, 255, 0.08) !important;
+  background: rgba(23, 104, 242, 0.08) !important;
 }
 
 .slotCardDimmed {
@@ -437,10 +436,10 @@
 }
 
 .rankBadgeTop {
-  border-color: rgba(138, 164, 255, 0.4);
+  border-color: rgba(23, 104, 242, 0.4);
   background: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow: 0 2px 6px rgba(138, 164, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(23, 104, 242, 0.3);
 }
 
 .slotDetails {
@@ -467,7 +466,7 @@
 .topPickTag {
   padding: 1px 7px;
   border-radius: var(--radius-sm);
-  background: rgba(138, 164, 255, 0.15);
+  background: rgba(23, 104, 242, 0.15);
   color: var(--color-accent);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -500,15 +499,15 @@
 }
 
 .scheduleButton:hover:not(:disabled) {
-  border-color: rgba(138, 164, 255, 0.5);
+  border-color: rgba(23, 104, 242, 0.5);
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   transform: translateX(1px);
 }
 
 .scheduleButtonPrimary {
-  border-color: rgba(138, 164, 255, 0.3);
-  background: rgba(138, 164, 255, 0.12);
+  border-color: rgba(23, 104, 242, 0.3);
+  background: rgba(23, 104, 242, 0.12);
   color: var(--color-accent);
 }
 
@@ -519,8 +518,8 @@
 }
 
 .scheduleButtonLoading {
-  border-color: rgba(138, 164, 255, 0.4);
-  background: rgba(138, 164, 255, 0.1);
+  border-color: rgba(23, 104, 242, 0.4);
+  background: rgba(23, 104, 242, 0.1);
   color: var(--color-accent);
   cursor: progress;
 }

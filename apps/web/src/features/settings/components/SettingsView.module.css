@@ -372,6 +372,29 @@
 .error {
   font-size: var(--font-size-xs);
 }
+/* Always mounted and right-anchored, so fading it never shifts the save button. */
+.saveNotice {
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(6px);
+  transition:
+    opacity 260ms ease-out,
+    transform 260ms ease-out;
+}
+.saveNoticeVisible {
+  opacity: 1;
+  transform: translateX(0);
+}
+.saveButton {
+  display: inline-grid;
+  place-items: center;
+}
+.saveButton > span {
+  grid-area: 1 / 1;
+}
+.labelHidden {
+  visibility: hidden;
+}
 .success {
   color: var(--color-success);
 }
@@ -870,6 +893,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .saveNotice {
+    transform: none;
+    transition: opacity 120ms linear;
+  }
   .scheduleRow,
   .dayCheckbox,
   .dayCheckbox::before,

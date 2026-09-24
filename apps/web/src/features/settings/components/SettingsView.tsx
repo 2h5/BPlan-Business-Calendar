@@ -17,6 +17,9 @@ import { buildTimezoneOptions } from '../utils/timezone-options';
 import { minuteOfDayToTimeInput, timeInputToMinute } from '../utils/working-hours-time';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SAVED_NOTICE_MS = 3000;
+
+type SaveNotice = { tone: 'success' | 'error'; text: string };
 
 export function SettingsView() {
   const { email } = useAuth();
@@ -27,7 +30,8 @@ export function SettingsView() {
   const profile = useProfile();
   const update = useUpdateProfile();
   const [draft, setDraft] = useState<Profile | null>(() => profile.data ?? null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<SaveNotice | null>(null);
+  const [noticeVisible, setNoticeVisible] = useState(false);
   const [integrationMessage, setIntegrationMessage] = useState<string | null>(null);
   const callbackResult = useMemo(
     () => callbackResultFromNavigationState(location.state),
@@ -37,6 +41,13 @@ export function SettingsView() {
   useEffect(() => {
     if (profile.data) setDraft(profile.data);
   }, [profile.data]);
+
+  // Success confirmations fade out on their own; errors stay until the next save.
+  useEffect(() => {
+    if (!noticeVisible || notice?.tone !== 'success') return;
+    const timer = window.setTimeout(() => setNoticeVisible(false), SAVED_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [notice, noticeVisible]);
 
   const timeZoneOptions = useMemo(
     () =>
@@ -72,7 +83,7 @@ export function SettingsView() {
     );
 
   const save = async () => {
-    setMessage(null);
+    setNoticeVisible(false);
     try {
       new Intl.DateTimeFormat('en-US', { timeZone: draft.timezone }).format();
       await update.mutateAsync({
@@ -84,16 +95,19 @@ export function SettingsView() {
         defaultEventMinutes: draft.defaultEventMinutes,
         workingHours: draft.workingHours,
       });
-      setMessage('Settings saved.');
+      setNotice({ tone: 'success', text: 'Settings saved.' });
     } catch (error) {
-      setMessage(
-        error instanceof RangeError
-          ? 'Choose a valid IANA time zone.'
-          : typeof error === 'object' && error !== null && 'message' in error
-            ? String(error.message)
-            : 'Settings could not be saved.',
-      );
+      setNotice({
+        tone: 'error',
+        text:
+          error instanceof RangeError
+            ? 'Choose a valid IANA time zone.'
+            : typeof error === 'object' && error !== null && 'message' in error
+              ? String(error.message)
+              : 'Settings could not be saved.',
+      });
     }
+    setNoticeVisible(true);
   };
   const updateWorking = (workingHours: WorkingHours) => setDraft({ ...draft, workingHours });
   const byDay = new Map(draft.workingHours.map((window) => [window.weekday, window]));
@@ -429,21 +443,29 @@ export function SettingsView() {
             </div>
 
             <footer className={styles.sectionFooter}>
-              {message && (
-                <span
-                  className={message === 'Settings saved.' ? styles.success : styles.error}
-                  role="status"
-                >
-                  {message}
-                </span>
-              )}
+              <span
+                className={[
+                  styles.saveNotice,
+                  notice?.tone === 'error' ? styles.error : styles.success,
+                  noticeVisible ? styles.saveNoticeVisible : '',
+                ].join(' ')}
+                role="status"
+                aria-hidden={!noticeVisible}
+              >
+                {notice?.text}
+              </span>
               <button
                 type="button"
-                className={styles.primary}
+                className={`${styles.primary} ${styles.saveButton}`}
                 onClick={() => void save()}
                 disabled={update.isPending}
+                aria-busy={update.isPending}
               >
-                {update.isPending ? 'Saving…' : 'Save changes'}
+                {/* Both labels share one grid cell so the button keeps the wider label's width. */}
+                <span className={update.isPending ? styles.labelHidden : undefined}>
+                  Save changes
+                </span>
+                <span className={update.isPending ? undefined : styles.labelHidden}>Saving…</span>
               </button>
             </footer>
           </section>

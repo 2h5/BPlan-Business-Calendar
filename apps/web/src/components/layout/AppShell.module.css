@@ -208,14 +208,14 @@
 }
 
 .navItemHighlight:not(.navItemActive) {
-  background: rgba(138, 164, 255, 0.06);
-  border: 1px solid rgba(138, 164, 255, 0.16);
+  background: rgba(23, 104, 242, 0.06);
+  border: 1px solid rgba(23, 104, 242, 0.16);
   color: var(--color-text-primary);
 }
 
 .navItemHighlight:not(.navItemActive):hover {
-  background: rgba(138, 164, 255, 0.12);
-  border-color: rgba(138, 164, 255, 0.3);
+  background: rgba(23, 104, 242, 0.12);
+  border-color: rgba(23, 104, 242, 0.3);
   color: var(--color-text-primary);
 }
 
@@ -227,7 +227,7 @@
   margin-left: auto;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  background: rgba(138, 164, 255, 0.14);
+  background: rgba(23, 104, 242, 0.14);
   color: var(--color-accent);
   font-size: 0.625rem;
   font-weight: var(--font-weight-bold);
@@ -237,7 +237,7 @@
 }
 
 .navItemActive .navBadge {
-  background: rgba(138, 164, 255, 0.22);
+  background: rgba(23, 104, 242, 0.22);
 }
 
 .navIcon {
