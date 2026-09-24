@@ -70,12 +70,15 @@ export function TodayScreen() {
     [now, timeZone],
   );
 
+  const hour = getZonedParts(now, timeZone).hour;
+  // Sun from 5am to 5pm, moon from 5pm to 5am, in the user's own time zone.
+  const isDaytime = hour >= 5 && hour < 17;
+
   const greeting = useMemo(() => {
-    const { hour } = getZonedParts(now, timeZone);
     const timeOfDay = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     const firstName = fullName?.trim().split(' ')[0];
     return firstName ? `${timeOfDay}, ${firstName}` : timeOfDay;
-  }, [now, timeZone, fullName]);
+  }, [hour, fullName]);
 
   const timed = useMemo(
     () => summary.eventOccurrences.filter((item) => !item.event.allDay),
@@ -166,6 +169,7 @@ export function TodayScreen() {
       <TodayHeader
         dateLabel={dateLabel}
         greeting={greeting}
+        isDaytime={isDaytime}
         onSearch={() => router.push('/search', { dangerouslySingular: true })}
       />
 

@@ -7,6 +7,8 @@ export interface TodayHeaderProps {
   dateLabel: string;
   /** "Good morning, Dev". */
   greeting: string;
+  /** A sun between 5am and 5pm local time, a moon otherwise. */
+  isDaytime: boolean;
   onSearch: () => void;
 }
 
@@ -15,7 +17,7 @@ export interface TodayHeaderProps {
  * in the floating "+" rather than here, so the header stays quiet; search is
  * the one control, drawn as a translucent round button in the iOS 26 manner.
  */
-export function TodayHeader({ dateLabel, greeting, onSearch }: TodayHeaderProps) {
+export function TodayHeader({ dateLabel, greeting, isDaytime, onSearch }: TodayHeaderProps) {
   const theme = useTheme();
 
   return (
@@ -25,7 +27,12 @@ export function TodayHeader({ dateLabel, greeting, onSearch }: TodayHeaderProps)
           <Text variant="display" accessibilityRole="header">
             Today
           </Text>
-          <Ionicons name="sunny" size={26} color={theme.colors.warning} />
+          <Ionicons
+            name={isDaytime ? 'sunny' : 'moon'}
+            size={isDaytime ? 26 : 22}
+            color={theme.colors.warning}
+            accessibilityLabel={isDaytime ? 'Daytime' : 'Nighttime'}
+          />
         </View>
         <Text variant="footnote" color="secondary" numberOfLines={1}>
           {`${dateLabel} · ${greeting}`}
