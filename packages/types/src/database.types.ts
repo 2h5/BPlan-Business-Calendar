@@ -620,35 +620,89 @@ export type Database = {
         }
         Relationships: []
       }
+      revenuecat_reconciliations: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          completed_at: string | null
+          last_error: string | null
+          last_outcome: string | null
+          lease_token: string | null
+          leased_until: string | null
+          not_before: string
+          reason: string
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          last_error?: string | null
+          last_outcome?: string | null
+          lease_token?: string | null
+          leased_until?: string | null
+          not_before?: string
+          reason: string
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          completed_at?: string | null
+          last_error?: string | null
+          last_outcome?: string | null
+          lease_token?: string | null
+          leased_until?: string | null
+          not_before?: string
+          reason?: string
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscription_events: {
         Row: {
+          app_user_id: string | null
           applied: boolean
+          duplicate_deliveries: number
+          environment: string | null
           event_at: string
           event_id: string
           event_type: string
           payload: Json
           received_at: string
           skipped_reason: string | null
+          source: string
           user_id: string | null
         }
         Insert: {
+          app_user_id?: string | null
           applied?: boolean
+          duplicate_deliveries?: number
+          environment?: string | null
           event_at: string
           event_id: string
           event_type: string
           payload: Json
           received_at?: string
           skipped_reason?: string | null
+          source?: string
           user_id?: string | null
         }
         Update: {
+          app_user_id?: string | null
           applied?: boolean
+          duplicate_deliveries?: number
+          environment?: string | null
           event_at?: string
           event_id?: string
           event_type?: string
           payload?: Json
           received_at?: string
           skipped_reason?: string | null
+          source?: string
           user_id?: string | null
         }
         Relationships: []
@@ -1004,6 +1058,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      apply_revenuecat_snapshot: {
+        Args: {
+          p_active: Json
+          p_environment: string
+          p_lease_token: string
+          p_snapshot_at: string
+          p_summary: Json
+          p_unverifiable: string[]
+          p_user_id: string
+        }
+        Returns: string
+      }
       claim_ai_schedule_request: {
         Args: {
           p_ad_hoc_duration_minutes?: number
@@ -1014,6 +1080,22 @@ export type Database = {
           p_user_id: string
         }
         Returns: string
+      }
+      claim_revenuecat_reconciliations: {
+        Args: { p_lease_seconds: number; p_limit: number }
+        Returns: {
+          claimed_attempts: number
+          claimed_lease_token: string
+          claimed_reason: string
+          claimed_user_id: string
+        }[]
+      }
+      claim_revenuecat_user_reconciliation: {
+        Args: { p_lease_seconds: number; p_user_id: string }
+        Returns: {
+          claim_status: string
+          claimed_lease_token: string
+        }[]
       }
       claim_sync_jobs: {
         Args: { p_limit?: number }
@@ -1060,6 +1142,14 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: undefined
       }
+      enqueue_revenuecat_reconciliation: {
+        Args: { p_reason: string; p_user_id: string }
+        Returns: boolean
+      }
+      enqueue_revenuecat_reconciliation_sweep: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       enqueue_sync_job: {
         Args: {
           p_idempotency_key?: string
@@ -1077,14 +1167,17 @@ export type Database = {
       }
       process_revenuecat_event: {
         Args: {
+          p_app_user_id: string
           p_customer_id: string
+          p_decision: string
           p_entitlements: string[]
+          p_environment: string
           p_event_at: string
           p_event_id: string
           p_event_type: string
           p_expires_at: string
           p_payload: Json
-          p_revoke_from: string[]
+          p_reconcile_user_ids: string[]
           p_skipped_reason: string
           p_status: string
           p_user_id: string
@@ -1093,6 +1186,15 @@ export type Database = {
       }
       prune_sync_history: { Args: { p_older_than?: string }; Returns: number }
       read_provider_secret: { Args: { p_account_id: string }; Returns: string }
+      release_revenuecat_reconciliation: {
+        Args: {
+          p_error_code: string
+          p_lease_token: string
+          p_retry_after_seconds?: number
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       store_provider_secret: {
         Args: { p_account_id: string; p_secret: string }
         Returns: string

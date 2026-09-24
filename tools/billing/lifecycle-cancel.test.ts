@@ -93,6 +93,7 @@ const environment = {
   BILLING_AUTOMATION_ENV: 'sandbox',
   BILLING_TEST_USER_ID: USER,
   REVENUECAT_API_KEY: 'secret',
+  REVENUECAT_MUTATION_API_KEY: 'mutation-secret',
   BILLING_SUPABASE_URL: 'https://example.com',
   BILLING_SUPABASE_SERVICE_ROLE_KEY: 'secret',
 };
@@ -220,8 +221,36 @@ describe('sandbox cancellation guards', () => {
     expect(readProvider).toHaveBeenCalledTimes(2);
     expect(readSupabase).toHaveBeenCalledTimes(1);
     expect(cancel).toHaveBeenCalledTimes(1);
+    // Only the single write receives the write-capable key.
+    expect(cancel.mock.calls[0]).toEqual([
+      provider.projectId,
+      provider.subscriptions[0]?.id,
+      { apiKey: 'mutation-secret' },
+    ]);
     expect(output.join('\n')).toContain('Submission: ONE');
     expect(output.join('\n')).not.toContain(USER);
+    expect(output.join('\n')).not.toContain('mutation-secret');
+  });
+
+  it('refuses to run without a separate mutation key', async () => {
+    const readProvider = vi.fn();
+    const cancel = vi.fn();
+    const { REVENUECAT_MUTATION_API_KEY: _omitted, ...withoutMutationKey } = environment;
+    for (const candidate of [
+      withoutMutationKey,
+      { ...environment, REVENUECAT_MUTATION_API_KEY: environment.REVENUECAT_API_KEY },
+    ]) {
+      const output: string[] = [];
+      expect(
+        await runSandboxCancellation(candidate, (value) => output.push(value), {
+          readProvider,
+          cancel,
+        }),
+      ).toBe(1);
+      expect(output.join('\n')).toContain('Failure: CONFIGURATION');
+    }
+    expect(readProvider).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
   });
 
   it('aborts without submission if the subscription changes on the final provider read', async () => {

@@ -1,5 +1,44 @@
 # RevenueCat Web Billing Automation Plan
 
+## 2026-09-24 hardening checkpoint (review branch)
+
+**PROVEN LOCAL:** The `billing/revenuecat-hardening` working tree adds a
+RevenueCat convergence path: `20260924000001_revenuecat_convergence.sql`, an
+environment-checked webhook decision, a bounded read-only API v2 adapter, a
+lease-fenced scheduled reconciler, and a signed-in user's access refresh. A
+missing RevenueCat customer is `UNVERIFIED` and leaves mirror access unchanged.
+Real-shape TRANSFER and scheduled SUBSCRIPTION_PAUSED fixtures, replay ordering,
+RLS/function grants, and two-connection races are covered by local tests. The
+CLI acceptance tools keep `REVENUECAT_API_KEY` for observations and require a
+distinct `REVENUECAT_MUTATION_API_KEY` only for explicit `sandbox-cancel`.
+Configuration enforces key separation and mode boundaries; it cannot inspect
+the permissions assigned to either provider key.
+
+**PROVEN HOSTED:** The 2026-09-23 Phase 6 atomic migration and webhook version 6
+were deployed and checked read-only in the sandbox/dev Supabase project. The
+protected lifecycle read-only workflow passed. Those observations predate this
+hardening branch and do not prove the new reconciliation functions or migration
+are hosted.
+
+**PENDING external/provider evidence:** The new migration, webhook revision,
+`revenuecat-reconcile`, and `revenuecat-refresh` have not been deployed. A later
+release must verify the exact linked target and pending migration before any
+hosted deployment, then provision `REVENUECAT_READONLY_API_KEY`, a freshly
+provider-discovered `REVENUECAT_PROJECT_ID`, and the enforced
+`REVENUECAT_ENVIRONMENT`. The scheduled worker also needs matching
+`BILLING_RECONCILE_CRON_SECRET` (Edge secret) and
+`app.settings.billing_reconcile_cron_secret` (database setting), plus
+`app.settings.functions_url` when installing its cron job. The optional webhook
+HMAC secret is `REVENUECAT_WEBHOOK_SIGNING_SECRET` and requires the provider
+integration to enable signing. Verify cron installation, real provider reads,
+and an actual delivery/refresh after deployment. Do not manufacture a purchase
+or event to fill that evidence gap. Production checkout and legal release gates
+remain separate and disabled.
+
+The earlier CLI-first decision below concerns sandbox acceptance tooling. The
+new server-side GET adapter serves ongoing entitlement convergence and does not
+give the browser a provider key or a mutation method.
+
 Status: Phase 2B2 is complete: the real hosted read-only sandbox assertion
 passed for a fresh free Supabase test user. Phase 3A is complete: the real
 provider-observed sandbox template was accepted without opening a browser,

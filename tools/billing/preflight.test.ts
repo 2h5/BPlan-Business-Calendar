@@ -136,6 +136,49 @@ describe('billing preflight foundation', () => {
     expect(redacted).not.toContain(secret);
   });
 
+  it('accepts a write-capable key only in sandbox-cancel mode, and never as the read key', () => {
+    const live = { ...FUTURE_LIVE_READONLY_ENV, BILLING_TEST_USER_ID: USER_ID };
+    for (const mode of ['offline', 'live-readonly', 'sandbox-purchase']) {
+      const loaded = loadBillingEnvironment({
+        ...live,
+        BILLING_AUTOMATION_MODE: mode,
+        REVENUECAT_MUTATION_API_KEY: 'rc_write_key',
+      });
+      expect(loaded.issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ code: 'MUTATION_KEY_NOT_ALLOWED' })]),
+      );
+      expect(loaded.config.revenueCatMutationApiKey).toBeUndefined();
+    }
+
+    const reused = loadBillingEnvironment({
+      ...live,
+      BILLING_AUTOMATION_MODE: 'sandbox-cancel',
+      REVENUECAT_MUTATION_API_KEY: live.REVENUECAT_API_KEY,
+    });
+    expect(reused.issues).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'MUTATION_KEY_REUSED' })]),
+    );
+
+    const missing = loadBillingEnvironment({ ...live, BILLING_AUTOMATION_MODE: 'sandbox-cancel' });
+    expect(missing.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'MISSING_VALUE', variable: 'REVENUECAT_MUTATION_API_KEY' }),
+      ]),
+    );
+
+    const accepted = loadBillingEnvironment({
+      ...live,
+      BILLING_AUTOMATION_MODE: 'sandbox-cancel',
+      REVENUECAT_MUTATION_API_KEY: 'rc_write_key',
+    });
+    expect(accepted.issues).toEqual([]);
+    expect(accepted.config.revenueCatMutationApiKey).toBe('rc_write_key');
+    expect(PRIVILEGED_ENVIRONMENT_VARIABLES).toContain('REVENUECAT_MUTATION_API_KEY');
+    expect(
+      redactSecrets('value rc_write_key', { REVENUECAT_MUTATION_API_KEY: 'rc_write_key' }),
+    ).toBe('value [REDACTED]');
+  });
+
   it('fails closed for production targets', () => {
     const report = runBillingPreflight({
       BILLING_AUTOMATION_ENV: 'production',

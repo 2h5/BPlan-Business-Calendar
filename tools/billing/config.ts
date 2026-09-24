@@ -1,6 +1,7 @@
 import {
   BILLING_CONTRACT,
   LIVE_READ_ONLY_REQUIRED_ENVIRONMENT_VARIABLES,
+  MUTATION_API_KEY_VARIABLE,
   REDACTED_OUTPUT_ENVIRONMENT_VARIABLES,
   REVENUECAT_API_BASE_URL,
 } from './contract';
@@ -15,13 +16,21 @@ export interface BillingEnvironmentConfig {
   mode: BillingAutomationMode;
   targetEnvironment: BillingTargetEnvironment;
   revenueCatApiKey?: string;
+  /** Only ever set in sandbox-cancel mode. */
+  revenueCatMutationApiKey?: string;
   supabaseUrl?: string;
   supabaseServiceRoleKey?: string;
   testUserId?: string;
 }
 
 export interface BillingConfigIssue {
-  code: 'INVALID_VALUE' | 'MISSING_VALUE' | 'INVALID_URL' | 'INVALID_UUID';
+  code:
+    | 'INVALID_VALUE'
+    | 'MISSING_VALUE'
+    | 'INVALID_URL'
+    | 'INVALID_UUID'
+    | 'MUTATION_KEY_NOT_ALLOWED'
+    | 'MUTATION_KEY_REUSED';
   variable: string;
   message: string;
 }
@@ -102,11 +111,38 @@ export function loadBillingEnvironment(raw: EnvironmentRecord): BillingEnvironme
     });
   }
 
+  // The write-capable key exists only for the one-shot sandbox cancellation.
+  const mutationApiKey = optionalValue(raw[MUTATION_API_KEY_VARIABLE]);
+  if (mode === 'sandbox-cancel') {
+    if (!mutationApiKey) {
+      issues.push({
+        code: 'MISSING_VALUE',
+        variable: MUTATION_API_KEY_VARIABLE,
+        message: `${MUTATION_API_KEY_VARIABLE} is required for sandbox-cancel mode.`,
+      });
+    } else if (mutationApiKey === revenueCatApiKey) {
+      issues.push({
+        code: 'MUTATION_KEY_REUSED',
+        variable: MUTATION_API_KEY_VARIABLE,
+        message: `${MUTATION_API_KEY_VARIABLE} must be a different key from the read-only REVENUECAT_API_KEY.`,
+      });
+    }
+  } else if (mutationApiKey) {
+    issues.push({
+      code: 'MUTATION_KEY_NOT_ALLOWED',
+      variable: MUTATION_API_KEY_VARIABLE,
+      message: `${MUTATION_API_KEY_VARIABLE} is only accepted in sandbox-cancel mode.`,
+    });
+  }
+
   return {
     config: {
       mode,
       targetEnvironment,
       revenueCatApiKey,
+      ...(mode === 'sandbox-cancel' && mutationApiKey
+        ? { revenueCatMutationApiKey: mutationApiKey }
+        : {}),
       supabaseUrl,
       supabaseServiceRoleKey,
       testUserId,

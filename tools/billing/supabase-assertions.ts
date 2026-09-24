@@ -25,6 +25,7 @@ const ledgerRowSchema = z.object({
   event_at: timestampSchema,
   applied: z.boolean(),
   skipped_reason: z.string().nullable(),
+  duplicate_deliveries: z.number().int().nonnegative().optional(),
   received_at: timestampSchema,
 });
 
@@ -96,7 +97,9 @@ export function createSupabaseAssertionTransport(
     async readLedger(userId) {
       return client
         .from('subscription_events')
-        .select('event_id,user_id,event_type,event_at,applied,skipped_reason,received_at')
+        .select(
+          'event_id,user_id,event_type,event_at,applied,skipped_reason,duplicate_deliveries,received_at',
+        )
         .eq('user_id', userId)
         .order('event_at', { ascending: false });
     },

@@ -61,7 +61,7 @@ export function inspectAnnualLifecycle(
   const row = supabase.mirrorRows[0];
   const events = [...supabase.ledgerRows].reverse();
   const transitions = events
-    .filter((event) => LIFECYCLE_EVENTS.has(event.event_type))
+    .filter((event) => event.applied && LIFECYCLE_EVENTS.has(event.event_type))
     .map((event) => event.event_type);
   const latestApplied = [...events].reverse().find((event) => event.applied);
   const renewed = transitions.includes('RENEWAL');
@@ -78,10 +78,7 @@ export function inspectAnnualLifecycle(
     mirrorRowCount: supabase.mirrorRows.length,
     ledgerEventCount: events.length,
     annualProductMatch: sub?.storeIdentifier === BILLING_CONTRACT.products.annual.id,
-    latestAppliedLedgerEventType:
-      latestApplied && LIFECYCLE_EVENTS.has(latestApplied.event_type)
-        ? latestApplied.event_type
-        : null,
+    latestAppliedLedgerEventType: latestApplied?.event_type ?? null,
     storeIdentifier: sub?.storeIdentifier ?? null,
     subscriptionStatus: sub?.status ?? null,
     givesAccess: sub?.givesAccess ?? null,
@@ -95,9 +92,10 @@ export function inspectAnnualLifecycle(
     staleLedgerEvents: events.filter(
       (event) => !event.applied && /stale|out.of.order/i.test(event.skipped_reason ?? ''),
     ).length,
-    duplicateLedgerEvents: events.filter(
-      (event) => !event.applied && /duplicat/i.test(event.skipped_reason ?? ''),
-    ).length,
+    duplicateLedgerEvents: events.reduce(
+      (total, event) => total + (event.duplicate_deliveries ?? 0),
+      0,
+    ),
   };
   const fail = (code: string): LifecycleReport => ({ ...base, failure: code });
 
@@ -144,7 +142,12 @@ export function inspectAnnualLifecycle(
     return fail('LIFECYCLE_AUTHORITY_MISMATCH');
   }
   if (active && latestApplied.event_type === 'EXPIRATION') return fail('LIFECYCLE_LEDGER');
-  if (expired && latestApplied.event_type !== 'EXPIRATION') return fail('LIFECYCLE_LEDGER');
+  if (
+    expired &&
+    latestApplied.event_type !== 'EXPIRATION' &&
+    latestApplied.event_type !== 'RECONCILIATION'
+  )
+    return fail('LIFECYCLE_LEDGER');
   const latestRenewalDecision = [...events]
     .reverse()
     .find(

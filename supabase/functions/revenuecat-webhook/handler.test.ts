@@ -1,10 +1,21 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
-import { handleRevenueCatWebhook } from './handler.ts';
+import {
+  dashboardTest,
+  initialPurchase,
+  OTHER_USER,
+  refundCancellation,
+  transfer,
+  USER,
+  type Body,
+} from './fixtures.ts';
+import { handleRevenueCatWebhook, type RevenueCatWebhookConfig } from './handler.ts';
 import type { EventOutcome, ProcessEventInput, RevenueCatMirror } from './mirror.ts';
+import { hmacSha256Hex, SIGNATURE_HEADER } from './signature.ts';
 
 const SECRET = 'test-webhook-secret';
-const USER = '11111111-1111-1111-1111-111111111111';
+const SIGNING_SECRET = 'test-signing-secret';
+const NOW_SECONDS = 1_760_000_100;
 
 interface Recorder extends RevenueCatMirror {
   calls: ProcessEventInput[];
@@ -17,216 +28,195 @@ function recorder(options: { result?: EventOutcome; fail?: boolean } = {}): Reco
     processEvent(input) {
       if (options.fail) return Promise.reject(new Error('db down'));
       calls.push(input);
-      return Promise.resolve(options.result ?? (input.skippedReason ? 'IGNORED' : 'APPLIED'));
+      const fallback: EventOutcome =
+        input.decision === 'ignore'
+          ? 'IGNORED'
+          : input.decision === 'reconcile'
+            ? 'DEFERRED'
+            : 'APPLIED';
+      return Promise.resolve(options.result ?? fallback);
     },
   };
 }
 
-function post(event: Record<string, unknown>, authorization: string | null = SECRET): Request {
-  const headers = new Headers({ 'Content-Type': 'application/json' });
-  if (authorization !== null) headers.set('Authorization', authorization);
+function config(overrides: Partial<RevenueCatWebhookConfig> = {}): () => RevenueCatWebhookConfig {
+  return () => ({ secret: SECRET, environment: 'SANDBOX', signingSecret: undefined, ...overrides });
+}
+
+function post(body: Body | string, headers: Record<string, string | null> = {}): Request {
+  const all = new Headers({ 'Content-Type': 'application/json' });
+  const authorization = headers.Authorization === undefined ? SECRET : headers.Authorization;
+  if (authorization !== null) all.set('Authorization', authorization);
+  for (const [name, value] of Object.entries(headers)) {
+    if (name !== 'Authorization' && value !== null) all.set(name, value);
+  }
   return new Request('https://example.test/revenuecat-webhook', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ api_version: '1.0', event }),
+    headers: all,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
 
-function event(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    id: 'evt_1',
-    type: 'INITIAL_PURCHASE',
-    app_user_id: USER,
-    event_timestamp_ms: 1_760_000_000_000,
-    expiration_at_ms: 1_790_000_000_000,
-    entitlement_ids: ['pro'],
-    environment: 'SANDBOX',
-    ...overrides,
-  };
+async function run(request: Request, mirror: RevenueCatMirror, overrides = {}) {
+  return await handleRevenueCatWebhook(request, {
+    mirror,
+    readConfig: config(overrides),
+    nowSeconds: () => NOW_SECONDS,
+  });
 }
 
 Deno.test('rejects a non-POST request', async () => {
   const mirror = recorder();
   const response = await handleRevenueCatWebhook(
-    new Request('https://example.test/revenuecat-webhook'),
-    { mirror, readSecret: () => SECRET },
+    new Request('https://example.test/revenuecat-webhook', { method: 'GET' }),
+    { mirror, readConfig: config() },
   );
   assertEquals(response.status, 405);
   assertEquals(mirror.calls.length, 0);
 });
 
-Deno.test('reports 503 when the secret is not configured', async () => {
-  const mirror = recorder();
-  const response = await handleRevenueCatWebhook(post(event()), {
-    mirror,
-    readSecret: () => undefined,
-  });
-  assertEquals(response.status, 503);
-  assertEquals(mirror.calls.length, 0);
+Deno.test('reports 503 until both the secret and the environment are configured', async () => {
+  for (const overrides of [
+    { secret: undefined },
+    { environment: undefined },
+    { environment: 'prod' },
+  ]) {
+    const mirror = recorder();
+    const response = await run(post(initialPurchase()), mirror, overrides);
+    assertEquals(response.status, 503);
+    assertEquals(mirror.calls.length, 0);
+  }
 });
 
-Deno.test('rejects a wrong secret', async () => {
-  const mirror = recorder();
-  const response = await handleRevenueCatWebhook(post(event(), 'not-the-secret'), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(response.status, 403);
-  assertEquals(mirror.calls.length, 0);
+Deno.test('rejects a wrong or missing Authorization header', async () => {
+  for (const Authorization of ['not-the-secret', null]) {
+    const mirror = recorder();
+    const response = await run(post(initialPurchase(), { Authorization }), mirror);
+    assertEquals(response.status, 403);
+    assertEquals(mirror.calls.length, 0);
+  }
 });
 
-Deno.test('rejects a missing Authorization header', async () => {
-  const mirror = recorder();
-  const response = await handleRevenueCatWebhook(post(event(), null), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(response.status, 403);
-  assertEquals(mirror.calls.length, 0);
+Deno.test('an envelope without an event ID cannot be recorded and is refused', async () => {
+  for (const body of ['not json', JSON.stringify({ event: { type: 'RENEWAL' } })]) {
+    const mirror = recorder();
+    const response = await run(post(body), mirror);
+    assertEquals(response.status, 400);
+    assertEquals(mirror.calls.length, 0);
+  }
 });
 
-Deno.test('rejects a malformed body without asking for redelivery', async () => {
+Deno.test('an oversized body is refused before parsing', async () => {
   const mirror = recorder();
-  const request = new Request('https://example.test/revenuecat-webhook', {
-    method: 'POST',
-    headers: { Authorization: SECRET, 'Content-Type': 'application/json' },
-    body: '{"nope":true}',
-  });
-  const response = await handleRevenueCatWebhook(request, {
-    mirror,
-    readSecret: () => SECRET,
-  });
+  const response = await run(post('x'.repeat(300 * 1024)), mirror);
   assertEquals(response.status, 400);
   assertEquals(mirror.calls.length, 0);
 });
 
-Deno.test('one valid delivery uses one atomic database call with all event facts', async () => {
+Deno.test('a documented TRANSFER is accepted and deferred, not rejected as malformed', async () => {
   const mirror = recorder();
-  const response = await handleRevenueCatWebhook(post(event()), {
-    mirror,
-    readSecret: () => SECRET,
-  });
+  const response = await run(post(transfer()), mirror);
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { result: 'DEFERRED' });
+  assertEquals(mirror.calls[0]?.decision, 'reconcile');
+  assertEquals(mirror.calls[0]?.reconcileUserIds, [USER, OTHER_USER]);
+  assertEquals(mirror.calls[0]?.userId, USER);
+  assertEquals(mirror.calls[0]?.entitlements, []);
+  assertEquals(mirror.calls[0]?.environment, 'SANDBOX');
+});
+
+Deno.test('one valid purchase is one atomic database call with all event facts', async () => {
+  const mirror = recorder();
+  const response = await run(post(initialPurchase()), mirror);
   assertEquals(await response.json(), { result: 'APPLIED' });
   assertEquals(mirror.calls.length, 1);
-  assertEquals(mirror.calls[0]?.eventId, 'evt_1');
-  assertEquals(mirror.calls[0]?.userId, USER);
-  assertEquals(mirror.calls[0]?.status, 'active');
-  assertEquals(mirror.calls[0]?.entitlements, ['pro']);
-  assertEquals(mirror.calls[0]?.expiresAt, new Date(1_790_000_000_000).toISOString());
-  assertEquals(mirror.calls[0]?.skippedReason, null);
+  const call = mirror.calls[0];
+  assertEquals(call?.eventId, 'evt-initial-purchase');
+  assertEquals(call?.decision, 'apply');
+  assertEquals(call?.userId, USER);
+  assertEquals(call?.appUserId, USER);
+  assertEquals(call?.status, 'active');
+  assertEquals(call?.entitlements, ['pro']);
+  assertEquals(call?.environment, 'SANDBOX');
+  assertEquals(call?.skippedReason, null);
 });
 
-Deno.test('returns the database stale outcome without a second write', async () => {
-  const mirror = recorder({ result: 'STALE' });
-  const response = await handleRevenueCatWebhook(post(event()), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(await response.json(), { result: 'STALE' });
-  assertEquals(mirror.calls.length, 1);
-});
-
-Deno.test('acknowledges a duplicate after one atomic database call', async () => {
-  const mirror = recorder({ result: 'DUPLICATE' });
-  const response = await handleRevenueCatWebhook(post(event()), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(await response.json(), { result: 'DUPLICATE' });
-  assertEquals(mirror.calls.length, 1);
-});
-
-Deno.test('cancellation keeps entitlement active until expiration', async () => {
+Deno.test('the ledger payload keeps the event but drops subscriber attributes', async () => {
   const mirror = recorder();
-  await handleRevenueCatWebhook(post(event({ type: 'CANCELLATION' })), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(mirror.calls[0]?.status, 'active');
-  assertEquals(mirror.calls[0]?.expiresAt, new Date(1_790_000_000_000).toISOString());
+  await run(post(initialPurchase()), mirror);
+  const payload = mirror.calls[0]?.payload as { event: Record<string, unknown> };
+  assertEquals('subscriber_attributes' in payload.event, false);
+  assertEquals(payload.event.product_id, 'bplan_pro_monthly');
+  assertEquals(JSON.stringify(payload).includes('customer@example.com'), false);
 });
 
-Deno.test('billing issue keeps entitlement active', async () => {
+Deno.test('a sandbox event is recorded and ignored by a production deployment', async () => {
   const mirror = recorder();
-  await handleRevenueCatWebhook(post(event({ type: 'BILLING_ISSUE' })), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(mirror.calls[0]?.status, 'active');
+  const response = await run(post(initialPurchase()), mirror, { environment: 'PRODUCTION' });
+  assertEquals(response.status, 200);
+  assertEquals(mirror.calls[0]?.decision, 'ignore');
+  assertEquals(mirror.calls[0]?.skippedReason, 'ENVIRONMENT_MISMATCH');
+  assertEquals(mirror.calls[0]?.userId, null);
+  assertEquals(mirror.calls[0]?.appUserId, USER);
 });
 
-Deno.test('expiration revokes entitlement', async () => {
-  const mirror = recorder();
-  await handleRevenueCatWebhook(post(event({ type: 'EXPIRATION' })), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(mirror.calls[0]?.status, 'expired');
-});
-
-for (const [name, overrides, reason] of [
-  [
-    'anonymous user',
-    { id: 'evt_anon', app_user_id: '$RCAnonymousID:abc123' },
-    'ANONYMOUS_APP_USER_ID',
-  ],
-  ['invalid user ID', { id: 'evt_bad', app_user_id: 'legacy-42' }, 'APP_USER_ID_NOT_A_USER'],
-  ['unknown type', { id: 'evt_new', type: 'SOMETHING_ADDED_LATER' }, 'UNHANDLED_EVENT_TYPE'],
-  ['test event', { id: 'evt_test', type: 'TEST' }, 'TEST_EVENT'],
-] as const) {
-  Deno.test(`records ${name} as ignored through one database call`, async () => {
-    const mirror = recorder();
-    const response = await handleRevenueCatWebhook(post(event(overrides)), {
-      mirror,
-      readSecret: () => SECRET,
-    });
-    assertEquals(await response.json(), { result: 'IGNORED' });
+Deno.test('database outcomes pass through without a second write', async () => {
+  for (const result of ['STALE', 'DUPLICATE', 'IGNORED'] as const) {
+    const mirror = recorder({ result });
+    const response = await run(post(refundCancellation()), mirror);
+    assertEquals(response.status, 200);
+    assertEquals(await response.json(), { result });
     assertEquals(mirror.calls.length, 1);
-    assertEquals(mirror.calls[0]?.userId, null);
-    assertEquals(mirror.calls[0]?.entitlements, []);
-    assertEquals(mirror.calls[0]?.skippedReason, reason);
-  });
-}
-
-Deno.test('a lifetime purchase has no expiry', async () => {
-  const mirror = recorder();
-  await handleRevenueCatWebhook(
-    post(event({ type: 'NON_RENEWING_PURCHASE', expiration_at_ms: null })),
-    {
-      mirror,
-      readSecret: () => SECRET,
-    },
-  );
-  assertEquals(mirror.calls[0]?.expiresAt, null);
+  }
 });
 
-Deno.test('a transfer passes both owners to one atomic operation', async () => {
-  const previous = '22222222-2222-2222-2222-222222222222';
+Deno.test('a dashboard TEST event is acknowledged and recorded as ignored', async () => {
   const mirror = recorder();
-  await handleRevenueCatWebhook(post(event({ type: 'TRANSFER', transferred_from: [previous] })), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(mirror.calls.length, 1);
-  assertEquals(mirror.calls[0]?.userId, USER);
-  assertEquals(mirror.calls[0]?.revokeFrom, [previous]);
-  assertEquals(mirror.calls[0]?.entitlements, ['pro']);
+  const response = await run(post(dashboardTest()), mirror);
+  assertEquals(response.status, 200);
+  assertEquals(mirror.calls[0]?.skippedReason, 'TEST_EVENT');
 });
 
-Deno.test('passes every entitlement in one atomic call', async () => {
-  const mirror = recorder();
-  await handleRevenueCatWebhook(post(event({ entitlement_ids: ['pro', 'beta'] })), {
-    mirror,
-    readSecret: () => SECRET,
-  });
-  assertEquals(mirror.calls.length, 1);
-  assertEquals(mirror.calls[0]?.entitlements, ['pro', 'beta']);
-});
-
-Deno.test('asks for redelivery when the atomic database operation fails', async () => {
-  const response = await handleRevenueCatWebhook(post(event()), {
-    mirror: recorder({ fail: true }),
-    readSecret: () => SECRET,
-  });
+Deno.test('asks for redelivery only when the database operation fails', async () => {
+  const response = await run(post(initialPurchase()), recorder({ fail: true }));
   assertEquals(response.status, 500);
 });
+
+async function signed(body: Body, timestamp = NOW_SECONDS, secret = SIGNING_SECRET) {
+  const raw = JSON.stringify(body);
+  const signature = await hmacSha256Hex(secret, `${timestamp}.${raw}`);
+  return post(raw, { [SIGNATURE_HEADER]: `t=${timestamp},v1=${signature}` });
+}
+
+Deno.test('a configured signing secret accepts a fresh HMAC over the raw body', async () => {
+  const mirror = recorder();
+  const response = await run(await signed(initialPurchase()), mirror, {
+    signingSecret: SIGNING_SECRET,
+  });
+  assertEquals(response.status, 200);
+  assertEquals(mirror.calls.length, 1);
+});
+
+Deno.test(
+  'a configured signing secret rejects missing, stale, forged, or altered signatures',
+  async () => {
+    const altered = await signed(initialPurchase());
+    const tampered = new Request(altered.url, {
+      method: 'POST',
+      headers: altered.headers,
+      body: JSON.stringify(initialPurchase({ entitlement_ids: ['pro', 'admin'] })),
+    });
+    for (const request of [
+      post(initialPurchase()),
+      await signed(initialPurchase(), NOW_SECONDS - 301),
+      await signed(initialPurchase(), NOW_SECONDS, 'wrong-secret'),
+      tampered,
+      post(initialPurchase(), { [SIGNATURE_HEADER]: 'v1=deadbeef' }),
+    ]) {
+      const mirror = recorder();
+      const response = await run(request, mirror, { signingSecret: SIGNING_SECRET });
+      assertEquals(response.status, 403);
+      assertEquals(mirror.calls.length, 0);
+    }
+  },
+);

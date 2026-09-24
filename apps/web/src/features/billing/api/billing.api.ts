@@ -30,3 +30,31 @@ export async function fetchSubscription(userId: string): Promise<Subscription | 
     expiresAt: row.expires_at,
   });
 }
+
+const accessRefreshSchema = z.object({
+  status: z.enum([
+    'REPAIRED',
+    'CONVERGED',
+    'STALE',
+    'UNVERIFIED',
+    'LEASE_LOST',
+    'RETRY',
+    'IN_PROGRESS',
+    'RECENTLY_VERIFIED',
+  ]),
+});
+
+export type AccessRefreshStatus = z.infer<typeof accessRefreshSchema>['status'];
+
+/**
+ * Ask the server to re-read the signed-in user's entitlement from RevenueCat
+ * and repair the mirror if a webhook was lost. The server decides everything;
+ * this call can never grant access by itself.
+ */
+export async function requestAccessRefresh(): Promise<AccessRefreshStatus> {
+  const { data, error } = await supabase.functions.invoke<unknown>('revenuecat-refresh', {
+    body: {},
+  });
+  if (error) throw toAppError(error);
+  return accessRefreshSchema.parse(data).status;
+}

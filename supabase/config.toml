@@ -116,6 +116,14 @@ verify_jwt = false
 import_map = "./functions/deno.json"
 
 # Called by pg_cron with a shared secret, not by a signed-in user.
+[functions.revenuecat-reconcile]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+[functions.revenuecat-refresh]
+import_map = "./functions/deno.json"
+
+# Called by pg_cron with a shared secret, not by a signed-in user.
 [functions.sync-cron]
 verify_jwt = false
 import_map = "./functions/deno.json"

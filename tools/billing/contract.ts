@@ -56,6 +56,7 @@ export const BROWSER_SAFE_ENVIRONMENT_VARIABLES = [
 /** Values that must remain in a server/tooling secret store. */
 export const PRIVILEGED_ENVIRONMENT_VARIABLES = [
   'REVENUECAT_API_KEY',
+  'REVENUECAT_MUTATION_API_KEY',
   'BILLING_SUPABASE_SERVICE_ROLE_KEY',
   'REVENUECAT_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
@@ -67,8 +68,18 @@ export const REDACTED_OUTPUT_ENVIRONMENT_VARIABLES = [
   'BILLING_REVENUECAT_SANDBOX_PURCHASE_URL',
 ] as const;
 
+/**
+ * REVENUECAT_API_KEY is the key every observational command uses and should be
+ * provisioned read-only. A write-capable key has its own name and is accepted
+ * only by the explicitly authorized sandbox-cancel mode, which also refuses a
+ * mutation key equal to the read key. The loader cannot inspect a key's
+ * RevenueCat permissions; keeping the names separate is what lets an operator
+ * provision the read key without write scope.
+ */
 export const LIVE_READ_ONLY_REQUIRED_ENVIRONMENT_VARIABLES = [
   'REVENUECAT_API_KEY',
   'BILLING_SUPABASE_URL',
   'BILLING_SUPABASE_SERVICE_ROLE_KEY',
 ] as const;
+
+export const MUTATION_API_KEY_VARIABLE = 'REVENUECAT_MUTATION_API_KEY' as const;

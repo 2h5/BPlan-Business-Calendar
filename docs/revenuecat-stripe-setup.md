@@ -1,5 +1,27 @@
 # RevenueCat + Stripe Web Billing Setup
 
+## 2026-09-24 review branch status
+
+**PROVEN LOCAL:** The billing hardening branch now has an atomic reconciliation
+queue and snapshot writer, a scheduled read-only RevenueCat worker, and a
+user-authenticated refresh function. Local pgTAP, concurrent database races,
+Edge Function tests, and billing tooling tests exercise these paths. The
+separate `REVENUECAT_MUTATION_API_KEY` is accepted only for a one-shot sandbox
+cancellation; `REVENUECAT_API_KEY` remains the observational tooling key.
+
+**PROVEN HOSTED:** Only the preceding Phase 6 atomic webhook deployment and
+read-only continuity checks described below are hosted evidence. They do not
+cover the new convergence migration or functions.
+
+**PENDING:** The hardening branch requires a separate, target-checked hosted
+migration/function deployment and provider configuration before a live
+reconciliation claim. Confirm the canonical RevenueCat API v2 project ID by
+provider discovery; the historical runbook ID below is not a selector. Provision
+the read-only Edge key, enforced environment, and matching cron secret/database
+setting described in the [automation checkpoint](revenuecat-automation-plan.md).
+Then observe a real provider read, worker schedule, and signed-in refresh.
+Production checkout remains disabled until the separate legal and release gate.
+
 Status: **Sandbox catalog, hosted checkout, webhook, identified web billing
 integration, and the real monthly and annual sandbox billing chains are verified.
 Phase 3C annual verification passed on 2026-09-22 through the corrected

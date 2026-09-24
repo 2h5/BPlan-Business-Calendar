@@ -205,6 +205,36 @@ describe('annual lifecycle read-only reconciliation', () => {
     });
   });
 
+  it('counts recorded redeliveries without claiming a stale renewal occurred', () => {
+    const fixture = fixtures({
+      ledger: [
+        { ...event('RENEWAL', 20, false), duplicate_deliveries: 2 },
+        { ...event('INITIAL_PURCHASE', 0), duplicate_deliveries: 1 },
+      ],
+    });
+    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+      ok: true,
+      renewed: false,
+      ledgerTransitions: ['INITIAL_PURCHASE'],
+      duplicateLedgerEvents: 3,
+      staleLedgerEvents: 1,
+    });
+  });
+
+  it('accepts an expired mirror repaired by a RevenueCat reconciliation snapshot', () => {
+    const fixture = fixtures({
+      now: END + 30 * 60_000,
+      status: 'expired',
+      givesAccess: false,
+      ledger: [event('RECONCILIATION', 65), event('INITIAL_PURCHASE', 0)],
+    });
+    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+      ok: true,
+      state: 'expired',
+      latestAppliedLedgerEventType: 'RECONCILIATION',
+    });
+  });
+
   it('fails closed for missing period or renewal fields and contradictory provider access', () => {
     const fixture = fixtures({ renewalStatus: null });
     expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
