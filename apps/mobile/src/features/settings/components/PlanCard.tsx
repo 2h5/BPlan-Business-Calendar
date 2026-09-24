@@ -1,12 +1,12 @@
 import { PRO_PLAN, type SubscriptionStatusInfo } from '@cal/domain';
-import { Badge, Button, Card, Text, useTheme } from '@cal/ui';
+import { Badge, Card, Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { GoldText } from '../../billing/components/GoldText';
-import { usePlanState, useSubscription } from '../../billing/hooks/useSubscription';
+import { usePlanState } from '../../billing/hooks/useSubscription';
 
 const TITLE = `Upgrade to ${PRO_PLAN_NAME}`;
 const SUBTITLE = 'Unlock Find Time with AI';
@@ -47,17 +47,11 @@ export function PlanCard() {
 
 /**
  * The status readout for a subscriber, drawn as the web subscription page's
- * status banner: a lit dot, the plan state with its badge, the sentence that
- * explains it, and a way to re-check.
- *
- * The refresh is here because entitlement changes arrive by webhook — someone
- * who has just paid, or just renewed, would otherwise wait out the query's
- * stale time before the card believed them. On a phone the button sits under
- * the text, where the web banner also puts it once the page is narrow.
+ * status banner: a lit dot, the plan state with its badge, and the sentence
+ * that explains it.
  */
 function ProStatusCard({ info }: { info: SubscriptionStatusInfo }) {
   const theme = useTheme();
-  const { refetch, isFetching } = useSubscription();
 
   const dotColor: Record<SubscriptionStatusInfo['badgeVariant'], string> = {
     neutral: theme.colors.textTertiary,
@@ -69,42 +63,31 @@ function ProStatusCard({ info }: { info: SubscriptionStatusInfo }) {
 
   return (
     <Card eyebrow="Plan">
-      <View style={{ gap: theme.spacing.lg }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: theme.radius.pill,
-              backgroundColor: dot,
-              // The web's glow; a lone colour reads as a bullet, not a light.
-              shadowColor: dot,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: info.badgeVariant === 'neutral' ? 0 : 0.5,
-              shadowRadius: 4,
-            }}
-          />
-          <View style={{ flex: 1, gap: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-              <Text variant="bodyStrong">{PLAN_NAME}</Text>
-              <Badge label={info.state} tone={info.badgeVariant} />
-            </View>
-            <Text variant="footnote" color="tertiary">
-              {ACTIVE_DESCRIPTION}
-            </Text>
-          </View>
-        </View>
-
-        <Button
-          label={isFetching ? 'Refreshing…' : 'Refresh access status'}
-          variant="secondary"
-          size="sm"
-          disabled={isFetching}
-          leadingIcon={<Ionicons name="refresh" size={14} color={theme.colors.textPrimary} />}
-          onPress={() => void refetch()}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: theme.radius.pill,
+            backgroundColor: dot,
+            // The web's glow; a lone colour reads as a bullet, not a light.
+            shadowColor: dot,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: info.badgeVariant === 'neutral' ? 0 : 0.5,
+            shadowRadius: 4,
+          }}
         />
+        <View style={{ flex: 1, gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Text variant="bodyStrong">{PLAN_NAME}</Text>
+            <Badge label={info.state} tone={info.badgeVariant} />
+          </View>
+          <Text variant="footnote" color="tertiary">
+            {ACTIVE_DESCRIPTION}
+          </Text>
+        </View>
       </View>
     </Card>
   );
