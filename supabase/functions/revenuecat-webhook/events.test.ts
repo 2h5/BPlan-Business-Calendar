@@ -35,12 +35,32 @@ Deno.test('a documented purchase applies active Pro with its period end', () => 
   assertEquals(decision.expiresAt, new Date(1_762_592_000_000).toISOString());
 });
 
-Deno.test('a refund keeps status active but carries an expiry already in the past', () => {
+Deno.test('a refund applies its payload and is also reconciled from RevenueCat', () => {
   const decision = decide(refundCancellation());
   assertEquals(decision.kind, 'apply');
   if (decision.kind !== 'apply') return;
   assertEquals(decision.status, 'active');
   assertEquals(Date.parse(decision.expiresAt ?? '') < 1_760_000_000_000, true);
+  // Access must not depend on what expiration_at_ms holds on a refund.
+  assertEquals(decision.reconcile, true);
+});
+
+Deno.test('a cancellation that keeps its paid period is still confirmed from RevenueCat', () => {
+  const decision = decide(
+    initialPurchase({ type: 'CANCELLATION', cancel_reason: 'UNSUBSCRIBE', id: 'evt-cancel' }),
+  );
+  assertEquals(decision.kind === 'apply' && decision.reconcile, true);
+  const billing = decide(
+    initialPurchase({ type: 'BILLING_ISSUE', grace_period_expiration_at_ms: null, id: 'evt-bill' }),
+  );
+  assertEquals(billing.kind === 'apply' && billing.reconcile, true);
+});
+
+Deno.test('self-describing lifecycle events apply without an extra RevenueCat read', () => {
+  for (const body of [initialPurchase(), expiration(), subscriptionPaused(), refundReversed()]) {
+    const decision = decide(body);
+    assertEquals(decision.kind === 'apply' && decision.reconcile, false);
+  }
 });
 
 Deno.test('a scheduled pause keeps access until the end of the paid period', () => {
@@ -66,6 +86,16 @@ Deno.test('the documented TRANSFER payload defers to reconciliation for both own
     primaryUserId: USER,
     userIds: [USER, OTHER_USER],
   });
+});
+
+Deno.test('opposite transfers queue the same users in the same order', () => {
+  const forward = decide(transfer([USER], [OTHER_USER]));
+  const back = decide(transfer([OTHER_USER], [USER]));
+  assertEquals(forward.kind === 'reconcile' && forward.userIds, [USER, OTHER_USER]);
+  assertEquals(back.kind === 'reconcile' && back.userIds, [USER, OTHER_USER]);
+  // Ledger attribution still follows the destination.
+  assertEquals(forward.kind === 'reconcile' && forward.primaryUserId, OTHER_USER);
+  assertEquals(back.kind === 'reconcile' && back.primaryUserId, USER);
 });
 
 Deno.test('a transfer ignores anonymous IDs, normalises case, and needs a real user', () => {

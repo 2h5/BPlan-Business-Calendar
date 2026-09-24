@@ -55,7 +55,12 @@ export function initialPurchase(overrides: Record<string, unknown> = {}): Body {
   };
 }
 
-/** A refund: CANCELLATION with cancel_reason CUSTOMER_SUPPORT, expiry before the event. */
+/**
+ * A refund: CANCELLATION with cancel_reason CUSTOMER_SUPPORT. RevenueCat does
+ * not document expiration_at_ms on a refund; this fixture assumes the refund
+ * time, and the webhook reconciles every CANCELLATION so correctness does not
+ * depend on that assumption.
+ */
 export function refundCancellation(): Body {
   return initialPurchase({
     id: 'evt-refund',

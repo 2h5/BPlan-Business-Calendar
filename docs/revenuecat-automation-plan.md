@@ -2,17 +2,39 @@
 
 ## 2026-09-24 hardening checkpoint (review branch)
 
-**PROVEN LOCAL:** The `billing/revenuecat-hardening` working tree adds a
-RevenueCat convergence path: `20260924000001_revenuecat_convergence.sql`, an
-environment-checked webhook decision, a bounded read-only API v2 adapter, a
+**PROVEN LOCAL (repository tests):** The `billing/revenuecat-hardening` branch
+adds a RevenueCat convergence path: `20260924000001_revenuecat_convergence.sql`,
+an environment-checked webhook decision, a bounded read-only API v2 adapter, a
 lease-fenced scheduled reconciler, and a signed-in user's access refresh. A
 missing RevenueCat customer is `UNVERIFIED` and leaves mirror access unchanged.
-Real-shape TRANSFER and scheduled SUBSCRIPTION_PAUSED fixtures, replay ordering,
-RLS/function grants, and two-connection races are covered by local tests. The
-CLI acceptance tools keep `REVENUECAT_API_KEY` for observations and require a
-distinct `REVENUECAT_MUTATION_API_KEY` only for explicit `sandbox-cancel`.
+The webhook tests use fixtures built from RevenueCat's documented sample
+payloads (TRANSFER, SUBSCRIPTION_PAUSED, PURCHASE_REDEEMED, a refund
+CANCELLATION); they are not captured provider deliveries. Replay ordering,
+RLS/function grants, and two-connection races are covered by pgTAP and the
+local race harness, which CI runs. The CLI acceptance tools keep
+`REVENUECAT_API_KEY` for observations and require a distinct
+`REVENUECAT_MUTATION_API_KEY` only for explicit `sandbox-cancel`.
 Configuration enforces key separation and mode boundaries; it cannot inspect
 the permissions assigned to either provider key.
+
+Convergence behaviour on this branch:
+
+- RevenueCat's entitlement catalog is cached per project in
+  `revenuecat_provider_state` (15-minute freshness, one fetcher at a time) and
+  backs off on failure. A project-wide customer-read failure (invalid key or 429) blocks every RevenueCat read until its backoff ends. Neither the worker
+  nor user refreshes can repeatedly spend the 60-per-minute
+  project-configuration limit.
+- User refresh (`revenuecat-refresh`) respects the same per-user backoff as the
+  worker and answers `BACKING_OFF` with `retryAfterSeconds`.
+- A snapshot that loses to a newer webhook row stays pending and is retried
+  once it can be dated after that row, instead of completing as `STALE`.
+- CANCELLATION and BILLING_ISSUE are applied and also reconciled, so refund and
+  grace-period access follows RevenueCat's answer rather than an assumption
+  about `expiration_at_ms`.
+- A webhook delivery that reaches the function but cannot be committed queues a
+  reconciliation for every user it named (`WEBHOOK_FAILED`).
+- Hints lock users in `user_id` order, so opposite-direction transfers cannot
+  deadlock.
 
 **PROVEN HOSTED:** The 2026-09-23 Phase 6 atomic migration and webhook version 6
 were deployed and checked read-only in the sandbox/dev Supabase project. The
@@ -21,19 +43,17 @@ hardening branch and do not prove the new reconciliation functions or migration
 are hosted.
 
 **PENDING external/provider evidence:** The new migration, webhook revision,
-`revenuecat-reconcile`, and `revenuecat-refresh` have not been deployed. A later
-release must verify the exact linked target and pending migration before any
-hosted deployment, then provision `REVENUECAT_READONLY_API_KEY`, a freshly
-provider-discovered `REVENUECAT_PROJECT_ID`, and the enforced
-`REVENUECAT_ENVIRONMENT`. The scheduled worker also needs matching
-`BILLING_RECONCILE_CRON_SECRET` (Edge secret) and
-`app.settings.billing_reconcile_cron_secret` (database setting), plus
-`app.settings.functions_url` when installing its cron job. The optional webhook
-HMAC secret is `REVENUECAT_WEBHOOK_SIGNING_SECRET` and requires the provider
-integration to enable signing. Verify cron installation, real provider reads,
-and an actual delivery/refresh after deployment. Do not manufacture a purchase
-or event to fill that evidence gap. Production checkout and legal release gates
-remain separate and disabled.
+`revenuecat-reconcile`, and `revenuecat-refresh` have not been deployed.
+Follow the deployment order and schedule installation in
+[Convergence operations](revenuecat-stripe-setup.md#convergence-operations).
+After deployment, observe: `ensure_revenuecat_reconcile_schedule()` returning
+`INSTALLED`, a successful scheduled run in `revenuecat_billing_health()`, a
+real RevenueCat v2 read (including whether `/customers/{uuid}` resolves an
+aliased customer), a real CANCELLATION or refund delivery followed by its
+reconciliation, and a signed-in refresh. Confirm the provisioned
+`REVENUECAT_READONLY_API_KEY` is read-only in the RevenueCat dashboard; nothing
+in code can. Do not manufacture a purchase or event to fill that evidence gap.
+Production checkout and legal release gates remain separate and disabled.
 
 The earlier CLI-first decision below concerns sandbox acceptance tooling. The
 new server-side GET adapter serves ongoing entitlement convergence and does not

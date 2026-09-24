@@ -1,7 +1,7 @@
 import { assertEquals } from 'jsr:@std/assert@1';
 
 import { EdgeError } from '../_shared/errors/index.ts';
-import type { ReconcileConfigResult } from '../_shared/billing/reconciler.ts';
+import type { ReconcileConfigResult, ReconcileResult } from '../_shared/billing/reconciler.ts';
 import { createRefreshHandler, type RefreshClaim } from './handler.ts';
 
 const USER = '0f8b3a52-6c1e-4b8e-9a51-2d7c4e9f1a01';
@@ -11,7 +11,12 @@ const CONFIGURED: ReconcileConfigResult = {
 };
 
 function handler(
-  options: { claim?: RefreshClaim; config?: ReconcileConfigResult; signedIn?: boolean } = {},
+  options: {
+    claim?: RefreshClaim;
+    config?: ReconcileConfigResult;
+    signedIn?: boolean;
+    result?: ReconcileResult;
+  } = {},
 ) {
   const calls: { claimedFor: string[]; reconciled: string[] } = { claimedFor: [], reconciled: [] };
   const handle = createRefreshHandler({
@@ -22,12 +27,15 @@ function handler(
     config: options.config ?? CONFIGURED,
     claim: (userId) => {
       calls.claimedFor.push(userId);
-      return Promise.resolve(options.claim ?? { status: 'CLAIMED', leaseToken: 'lease' });
+      return Promise.resolve(
+        options.claim ?? { status: 'CLAIMED', leaseToken: 'lease', retryAfterSeconds: null },
+      );
     },
     reconciler: () => ({
+      prepare: () => Promise.reject(new Error('the refresh path never prepares separately')),
       reconcile: (userId, lease) => {
         calls.reconciled.push(`${userId}:${lease}`);
-        return Promise.resolve('REPAIRED');
+        return Promise.resolve(options.result ?? { outcome: 'REPAIRED', retryAfterSeconds: null });
       },
     }),
   });
@@ -48,13 +56,29 @@ Deno.test('requires a signed-in user and targets only that user', async () => {
   assertEquals(signedIn.calls.reconciled, [`${USER}:lease`]);
 });
 
-Deno.test('rate limiting and an in-flight lease return without reading RevenueCat', async () => {
-  for (const status of ['RECENTLY_VERIFIED', 'IN_PROGRESS'] as const) {
-    const { handle, calls } = handler({ claim: { status, leaseToken: null } });
-    assertEquals(await (await handle(post())).json(), { status });
-    assertEquals(calls.reconciled, []);
-  }
-});
+Deno.test(
+  'rate limiting, backoff, and an in-flight lease return without reading RevenueCat',
+  async () => {
+    for (const status of ['RECENTLY_VERIFIED', 'IN_PROGRESS', 'BACKING_OFF'] as const) {
+      const { handle, calls } = handler({
+        claim: { status, leaseToken: null, retryAfterSeconds: 37 },
+      });
+      assertEquals(await (await handle(post())).json(), { status, retryAfterSeconds: 37 });
+      assertEquals(calls.reconciled, []);
+    }
+  },
+);
+
+Deno.test(
+  'a project-wide backoff discovered while refreshing is reported with its wait',
+  async () => {
+    const { handle } = handler({ result: { outcome: 'BACKING_OFF', retryAfterSeconds: 120 } });
+    assertEquals(await (await handle(post())).json(), {
+      status: 'BACKING_OFF',
+      retryAfterSeconds: 120,
+    });
+  },
+);
 
 Deno.test('an unconfigured deployment refuses before claiming', async () => {
   const { handle, calls } = handler({ config: { ok: false, missing: ['REVENUECAT_PROJECT_ID'] } });

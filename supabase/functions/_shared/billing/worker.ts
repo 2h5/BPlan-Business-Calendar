@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { RECONCILE_LEASE_SECONDS, type ReconcileOutcome, type Reconciler } from './reconciler.ts';
+import {
+  RECONCILE_LEASE_SECONDS,
+  releaseReconciliation,
+  type ReconcileOutcome,
+  type Reconciler,
+} from './reconciler.ts';
 
 /**
  * One scheduled reconciliation cycle: queue the users most likely to be wrong,
@@ -8,6 +13,11 @@ import { RECONCILE_LEASE_SECONDS, type ReconcileOutcome, type Reconciler } from 
  * under a lease, so overlapping cycles cannot apply two snapshots for the
  * same user, and a crashed cycle's work becomes claimable again when its
  * lease expires.
+ *
+ * Project-wide readiness is resolved before anything is claimed: while the
+ * catalog is unavailable or RevenueCat is backing off, nothing is claimed and
+ * no user's backoff grows. If a project-wide failure happens mid-cycle, the
+ * remaining claims are handed back unread.
  */
 
 export interface ReconcileQueue {
@@ -18,6 +28,7 @@ export interface ReconcileQueue {
     leaseToken: string,
     code: string,
     retryAfterSeconds: number | null,
+    countAttempt: boolean,
   ): Promise<void>;
 }
 
@@ -25,6 +36,8 @@ export interface CycleSummary {
   swept: number;
   claimed: number;
   outcomes: Partial<Record<ReconcileOutcome | 'DEADLINE' | 'ERROR', number>>;
+  /** Present when project-wide state stopped the cycle from reading RevenueCat. */
+  backoff?: { code: string; retryAfterSeconds: number };
 }
 
 export async function runReconcileCycle(deps: {
@@ -37,23 +50,53 @@ export async function runReconcileCycle(deps: {
   const now = deps.now ?? Date.now;
   const deadline = now() + deps.budgetMs;
   const swept = await deps.queue.sweep(200);
+
+  const ready = await deps.reconciler.prepare();
+  if (!ready.ok) {
+    return {
+      swept,
+      claimed: 0,
+      outcomes: {},
+      backoff: { code: ready.code, retryAfterSeconds: ready.retryAfterSeconds },
+    };
+  }
+
   const claims = await deps.queue.claim(deps.batchSize, RECONCILE_LEASE_SECONDS);
   const outcomes: CycleSummary['outcomes'] = {};
   const count = (key: keyof CycleSummary['outcomes']) => {
     outcomes[key] = (outcomes[key] ?? 0) + 1;
   };
+  let backoff: CycleSummary['backoff'];
 
   for (const claim of claims) {
+    if (backoff !== undefined) {
+      await deps.queue
+        .release(
+          claim.userId,
+          claim.leaseToken,
+          'PROVIDER_BACKOFF',
+          backoff.retryAfterSeconds,
+          false,
+        )
+        .catch(() => undefined);
+      count('BACKING_OFF');
+      continue;
+    }
     if (now() >= deadline) {
       // Hand the lease back immediately rather than let it block the user.
+      // Running out of time is not the user's failure.
       await deps.queue
-        .release(claim.userId, claim.leaseToken, 'DEADLINE', 0)
+        .release(claim.userId, claim.leaseToken, 'DEADLINE', 0, false)
         .catch(() => undefined);
       count('DEADLINE');
       continue;
     }
     try {
-      count(await deps.reconciler.reconcile(claim.userId, claim.leaseToken));
+      const result = await deps.reconciler.reconcile(claim.userId, claim.leaseToken);
+      count(result.outcome);
+      if (result.outcome === 'BACKING_OFF') {
+        backoff = { code: 'PROVIDER_BACKOFF', retryAfterSeconds: result.retryAfterSeconds ?? 60 };
+      }
     } catch {
       // A database failure mid-apply rolled back; the lease expires and the
       // user is claimed again by a later cycle.
@@ -61,7 +104,7 @@ export async function runReconcileCycle(deps: {
     }
   }
 
-  return { swept, claimed: claims.length, outcomes };
+  return { swept, claimed: claims.length, outcomes, ...(backoff ? { backoff } : {}) };
 }
 
 export function supabaseReconcileQueue(admin: SupabaseClient): ReconcileQueue {
@@ -86,14 +129,7 @@ export function supabaseReconcileQueue(admin: SupabaseClient): ReconcileQueue {
           : [],
       );
     },
-    async release(userId, leaseToken, code, retryAfterSeconds) {
-      const { error } = await admin.rpc('release_revenuecat_reconciliation', {
-        p_user_id: userId,
-        p_lease_token: leaseToken,
-        p_error_code: code,
-        p_retry_after_seconds: retryAfterSeconds,
-      });
-      if (error) throw error;
-    },
+    release: (userId, leaseToken, code, retryAfterSeconds, countAttempt) =>
+      releaseReconciliation(admin, userId, leaseToken, code, retryAfterSeconds, countAttempt),
   };
 }

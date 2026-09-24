@@ -28,10 +28,10 @@ function format(report: AnnualRenewalReport): string {
     `RevenueCat Pro: ${report.providerPro ? 'ACTIVE' : 'INACTIVE'}`,
     `Supabase mirror: ${report.mirrorPro ? 'ACTIVE' : 'INACTIVE'}`,
     `Server authorization: ${report.serverPro ? 'ACTIVE' : 'INACTIVE'}`,
-    `Ledger transitions: ${report.ledgerTransitions.join(' > ') || 'NONE'}`,
-    `Skipped ledger events: ${report.skippedLedgerEvents}`,
+    `Applied lifecycle transitions: ${report.ledgerTransitions.join(' > ') || 'NONE'}`,
+    `Unapplied ledger events (stale, deferred, ignored): ${report.skippedLedgerEvents}`,
     `Stale ledger events: ${report.staleLedgerEvents}`,
-    `Duplicate ledger events: ${report.duplicateLedgerEvents}`,
+    `Duplicate deliveries (recorded since 2026-09-24): ${report.duplicateLedgerEvents}`,
     ...(report.failure ? [`Failure: ${report.failure}`] : []),
   ].join('\n');
 }

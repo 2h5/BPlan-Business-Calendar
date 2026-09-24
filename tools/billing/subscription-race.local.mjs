@@ -535,6 +535,88 @@ async function hintDuringSnapshotStaysPending() {
   });
 }
 
+async function transferHint(client, eventId, userIds) {
+  const result = await client.query(
+    `select public.process_revenuecat_event(
+      $1::text, 'TRANSFER', now(), 'SANDBOX', 'reconcile', null, null, null, null, null,
+      array[]::text[], $2::uuid[], null, '{}'::jsonb
+    ) as outcome`,
+    [eventId, userIds],
+  );
+  return result.rows[0].outcome;
+}
+
+async function oppositeTransfersQueueInOneOrder() {
+  const [low, high] = [await newUser(), await newUser()].sort();
+  await first.query('begin');
+  let open = true;
+  try {
+    assert.equal(await transferHint(first, `race-l-low-${run}`, [low]), 'DEFERRED');
+    // The reverse-ordered hint must wait on `low` before it touches `high`.
+    const waiting = transferHint(second, `race-l-reverse-${run}`, [high, low]);
+    waiting.catch(() => undefined);
+    await waitUntilBlocked(second, first);
+    // Had the waiting hint locked `high` first, this would now deadlock.
+    assert.equal(await transferHint(first, `race-l-high-${run}`, [high]), 'DEFERRED');
+    await first.query('commit');
+    open = false;
+    assert.equal(await waiting, 'DEFERRED');
+    process.stdout.write('opposite transfer hints: one lock order, no deadlock\n');
+  } finally {
+    if (open) await first.query('rollback');
+  }
+}
+
+async function cancellationWebhookBeatsWaitingSnapshot() {
+  const userId = await newUser();
+  const purchase = delivery(
+    'race-m-purchase',
+    'INITIAL_PURCHASE',
+    'active',
+    minutesAgo(60),
+    daysAhead(10),
+  );
+  assert.equal(await processEvent(first, userId, purchase), 'APPLIED');
+  const lease = await claimFor(second, userId);
+  const cancellation = `race-m-cancel-${run}`;
+  const result = await overlap({
+    holder: first,
+    waiter: second,
+    // Applies the refund payload and queues a RevenueCat read, in one transaction.
+    holdFn: async (client) =>
+      (
+        await client.query(
+          `select public.process_revenuecat_event(
+            $1::text, 'CANCELLATION', $2::timestamptz, 'SANDBOX', 'apply', $3::text, $3::uuid,
+            'active', $2::timestamptz, null, array['pro']::text[], array[$3::uuid], null,
+            '{}'::jsonb
+          ) as outcome`,
+          [cancellation, minutesAgo(0.5), userId],
+        )
+      ).rows[0].outcome,
+    // A snapshot read before the refund still grants Pro.
+    waitFn: (client) =>
+      applySnapshot(client, userId, lease, minutesAgo(1), [
+        { entitlement: 'pro', expires_at: daysAhead(10) },
+      ]),
+  });
+  assert.deepEqual(result, { held: 'APPLIED', waited: 'STALE' });
+  const state = await admin.query(
+    `select r.reason, r.requested_at > coalesce(r.completed_at, '-infinity') as pending,
+            r.not_before > now() as deferred, r.lease_token is null as unleased,
+            public.has_active_entitlement($1::uuid, 'pro') as entitled
+       from public.revenuecat_reconciliations r where r.user_id = $1::uuid`,
+    [userId],
+  );
+  expectState('snapshot waiting on a cancellation webhook', state.rows[0], {
+    reason: 'CANCELLATION',
+    pending: true,
+    deferred: true,
+    unleased: true,
+    entitled: false,
+  });
+}
+
 async function main() {
   let connected = 0;
   try {
@@ -565,6 +647,8 @@ async function main() {
     await concurrentWorkersClaimDisjointUsers();
     await expiredLeaseIsFenced();
     await hintDuringSnapshotStaysPending();
+    await oppositeTransfersQueueInOneOrder();
+    await cancellationWebhookBeatsWaitingSnapshot();
     process.stdout.write('All RevenueCat billing race scenarios passed.\n');
   } finally {
     for (const client of [first, second, admin].slice(0, connected)) {

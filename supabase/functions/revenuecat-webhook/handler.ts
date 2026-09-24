@@ -140,7 +140,7 @@ export async function handleRevenueCatWebhook(
         expiresAt: decision.expiresAt,
         customerId: decision.customerId,
         entitlements: decision.entitlements,
-        reconcileUserIds: [],
+        reconcileUserIds: decision.reconcile ? [decision.userId] : [],
         skippedReason: null,
       };
       break;
@@ -158,7 +158,35 @@ export async function handleRevenueCatWebhook(
         reason: error instanceof Error ? error.name : 'UNKNOWN',
       }),
     );
+    await queueReconciliationAfterFailure(mirror, input);
     return status(500, 'UNKNOWN');
+  }
+}
+
+/**
+ * RevenueCat stops after five retries. Queue an authoritative read for every
+ * user the failed delivery named, so the mirror converges even if every retry
+ * fails too. Best effort: if the database is unreachable this fails as well,
+ * and the operator runbook covers recovery.
+ */
+async function queueReconciliationAfterFailure(
+  mirror: RevenueCatMirror,
+  input: ProcessEventInput,
+): Promise<void> {
+  const userIds = [
+    ...new Set([...(input.userId ? [input.userId] : []), ...input.reconcileUserIds]),
+  ];
+  if (userIds.length === 0) return;
+  try {
+    const queued = await mirror.recordFailure(userIds);
+    console.error(JSON.stringify({ code: 'REVENUECAT_WEBHOOK_FAILURE_QUEUED', queued }));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        code: 'REVENUECAT_WEBHOOK_FAILURE_UNRECORDED',
+        reason: error instanceof Error ? error.name : 'UNKNOWN',
+      }),
+    );
   }
 }
 

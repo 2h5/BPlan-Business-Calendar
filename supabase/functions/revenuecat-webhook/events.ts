@@ -45,6 +45,8 @@ export type EventDecision =
       status: ApplyStatus;
       expiresAt: string | null;
       customerId: string;
+      /** Also queue an authoritative read, because the payload may not say when access ends. */
+      reconcile: boolean;
     }
   | {
       kind: 'reconcile';
@@ -60,10 +62,15 @@ export type EventDecision =
  *
  * CANCELLATION, BILLING_ISSUE, and SUBSCRIPTION_PAUSED keep the entitlement
  * active until `expiration_at_ms`. RevenueCat documents SUBSCRIPTION_PAUSED as
- * "scheduled to pause at the end of the current period"; the pause itself ends
- * access through a later EXPIRATION. A refund arrives as CANCELLATION whose
- * `expiration_at_ms` is the refund time, so the expiry clock revokes it.
- * REFUND_REVERSED carries entitlements and a restored expiry.
+ * "scheduled to pause at the end of the current period" and says to revoke
+ * access only on EXPIRATION with reason SUBSCRIPTION_PAUSED. REFUND_REVERSED
+ * carries entitlements and a restored expiry.
+ *
+ * RevenueCat does not document what `expiration_at_ms` holds on a refund
+ * CANCELLATION, nor that an EXPIRATION follows one, and a BILLING_ISSUE's
+ * grace period may end access at a different time. Those two types are
+ * applied and also reconciled (RECONCILE_AFTER_APPLY), so the mirror follows
+ * RevenueCat's own answer rather than an assumption about the payload.
  */
 const APPLY_STATUS: Readonly<Record<string, ApplyStatus>> = {
   INITIAL_PURCHASE: 'active',
@@ -78,6 +85,8 @@ const APPLY_STATUS: Readonly<Record<string, ApplyStatus>> = {
   REFUND_REVERSED: 'active',
   EXPIRATION: 'expired',
 };
+
+const RECONCILE_AFTER_APPLY = new Set(['CANCELLATION', 'BILLING_ISSUE']);
 
 /** Only a non-renewing (for example lifetime) purchase may omit an expiry. */
 const MAY_HAVE_NO_EXPIRY = new Set(['NON_RENEWING_PURCHASE']);
@@ -177,6 +186,7 @@ function decideLifecycle(
     status,
     expiresAt: toIsoOrNull(lifecycle.expiration_at_ms),
     customerId: lifecycle.original_app_user_id ?? lifecycle.app_user_id,
+    reconcile: RECONCILE_AFTER_APPLY.has(event.type),
   };
 }
 
@@ -185,7 +195,9 @@ function hint(
   secondary: readonly string[],
   ignore: (reason: IgnoreReason) => EventDecision,
 ): EventDecision {
-  const userIds = [...new Set([...primary, ...secondary].filter(isAttributable).map(lower))];
+  // Sorted, like the database queues them, so lock order never depends on
+  // which side of a transfer the payload lists first.
+  const userIds = [...new Set([...primary, ...secondary].filter(isAttributable).map(lower))].sort();
   if (userIds.length === 0) return ignore('NO_ATTRIBUTABLE_USER');
   if (userIds.length > MAX_HINTED_USERS) return ignore('MALFORMED_EVENT');
   const primaryUserId = primary.find(isAttributable)?.toLowerCase() ?? null;

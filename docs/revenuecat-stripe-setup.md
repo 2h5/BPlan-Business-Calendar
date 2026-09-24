@@ -2,10 +2,11 @@
 
 ## 2026-09-24 review branch status
 
-**PROVEN LOCAL:** The billing hardening branch now has an atomic reconciliation
-queue and snapshot writer, a scheduled read-only RevenueCat worker, and a
-user-authenticated refresh function. Local pgTAP, concurrent database races,
-Edge Function tests, and billing tooling tests exercise these paths. The
+**PROVEN LOCAL (repository tests):** The billing hardening branch has an
+atomic reconciliation queue and snapshot writer, a shared RevenueCat catalog
+cache and provider backoff, a scheduled read-only RevenueCat worker, and a
+user-authenticated refresh function. pgTAP, the two-session race harness (in
+CI), Edge Function tests, and billing tooling tests exercise these paths. The
 separate `REVENUECAT_MUTATION_API_KEY` is accepted only for a one-shot sandbox
 cancellation; `REVENUECAT_API_KEY` remains the observational tooling key.
 
@@ -13,14 +14,97 @@ cancellation; `REVENUECAT_API_KEY` remains the observational tooling key.
 read-only continuity checks described below are hosted evidence. They do not
 cover the new convergence migration or functions.
 
-**PENDING:** The hardening branch requires a separate, target-checked hosted
-migration/function deployment and provider configuration before a live
-reconciliation claim. Confirm the canonical RevenueCat API v2 project ID by
-provider discovery; the historical runbook ID below is not a selector. Provision
-the read-only Edge key, enforced environment, and matching cron secret/database
-setting described in the [automation checkpoint](revenuecat-automation-plan.md).
-Then observe a real provider read, worker schedule, and signed-in refresh.
-Production checkout remains disabled until the separate legal and release gate.
+**PENDING:** A target-checked hosted deployment following
+[Convergence operations](#convergence-operations), then observation of a real
+provider read, a scheduled run, and a signed-in refresh. Confirm the canonical
+RevenueCat API v2 project ID by provider discovery; the historical runbook ID
+below is not a selector. Production checkout remains disabled until the
+separate legal and release gate.
+
+## Convergence operations
+
+### Deployment order
+
+Migration `20260924000001` drops the `process_revenuecat_event` signature the
+deployed webhook (version 6) calls. Between applying the migration and
+deploying the new `revenuecat-webhook`, every delivery returns 500 and
+RevenueCat retries it at 5, 10, 20, 40 and 80 minutes, then stops. Apply the
+migration and deploy `revenuecat-webhook`, `revenuecat-reconcile`, and
+`revenuecat-refresh` in one sitting, well inside that window. Any delivery that
+still failed can be retried from the RevenueCat dashboard's webhook log.
+
+Edge secrets: `REVENUECAT_READONLY_API_KEY` (a v2 key with read-only
+permissions), `REVENUECAT_PROJECT_ID`, `REVENUECAT_ENVIRONMENT` (`SANDBOX` or
+`PRODUCTION`), and `BILLING_RECONCILE_CRON_SECRET`.
+
+### Schedule installation
+
+The five-minute `revenuecat-reconcile` job reads its URL and secret from Vault
+each time it runs, so neither is stored in `cron.job`. As an operator (the
+`postgres` role, for example in the SQL editor):
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/revenuecat-reconcile',
+                           'revenuecat_reconcile_url');
+select vault.create_secret('<same value as BILLING_RECONCILE_CRON_SECRET>',
+                           'billing_reconcile_cron_secret');
+select public.ensure_revenuecat_reconcile_schedule();
+```
+
+The installer is idempotent and returns `INSTALLED`, or what is missing:
+`EXTENSIONS_UNAVAILABLE` (enable `pg_cron` and `pg_net`),
+`VAULT_UNAVAILABLE`, `MISSING_VAULT_SECRETS`, or `INVALID_RECONCILE_URL`. The
+migration runs it once and reports the result as a NOTICE; rerun it after
+provisioning. To rotate the cron secret, update the Vault secret and the Edge
+secret together; the job needs no reinstall.
+
+### Health and alerting
+
+`select public.revenuecat_billing_health();` (service role) returns counts and
+timestamps only. Alert when any of these hold:
+
+- `schedule.installed` is false, or `schedule.last_run.status` is not
+  `succeeded`, or `schedule.last_run.started_at` is older than 15 minutes.
+- `queue.overdue` > 0: pending work nobody has claimed for 30 minutes.
+- `queue.failing` > 0: a user has failed three or more attempts.
+- `queue.webhook_failures_pending` > 0 for more than 15 minutes.
+- a `provider[].blocked_until` in the future, or a repeated
+  `provider[].last_error` (`PROVIDER_AUTH` means the key is wrong or revoked).
+
+Also alert on these Edge Function log codes: `REVENUECAT_WEBHOOK_FAILED`,
+`REVENUECAT_WEBHOOK_FAILURE_UNRECORDED` (the failure could not be queued, so
+the database was unreachable), `REVENUECAT_WEBHOOK_SIGNATURE`,
+`REVENUECAT_RECONCILE_FAILED`, and `REVENUECAT_RECONCILE_NOT_CONFIGURED`.
+
+### A first purchase whose webhook never arrived
+
+The scheduled sweep only sees users who already have a mirror row. A first
+purchase whose deliveries all failed is recovered by:
+
+1. **Automatically**, if the delivery reached the webhook: the failure queues a
+   `WEBHOOK_FAILED` reconciliation for the named user.
+2. **The user**: "Refresh access status" re-reads RevenueCat for them.
+3. **An operator**, when deliveries never reached the function (an outage over
+   about 2.5 hours, a wrong Authorization value, or a signing-secret mismatch):
+   retry the failed deliveries from the RevenueCat dashboard's webhook
+   delivery log, or queue a specific user as `postgres`:
+
+   ```sql
+   select public.enqueue_revenuecat_reconciliation('<supabase user uuid>', 'OPERATOR');
+   ```
+
+   The next scheduled run reads RevenueCat for that user.
+
+### Webhook HMAC signing
+
+`REVENUECAT_WEBHOOK_SIGNING_SECRET` is optional and additive to the
+Authorization header. RevenueCat signs `<t>.<raw body>` and re-signs every
+retry with a fresh timestamp, so the five-minute tolerance does not reject
+retries. RevenueCat's "Rotate secret" invalidates the old secret immediately:
+update the Edge secret at the same moment, or deliveries return 403 until it
+matches (RevenueCat's retries cover about 2.5 hours; retry anything later from
+the dashboard). Enable signing in RevenueCat before setting the Edge secret,
+not after.
 
 Status: **Sandbox catalog, hosted checkout, webhook, identified web billing
 integration, and the real monthly and annual sandbox billing chains are verified.

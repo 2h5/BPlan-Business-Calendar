@@ -24,6 +24,8 @@ export interface ProcessEventInput {
 export interface RevenueCatMirror {
   /** Claims the event ID, applies or defers the decision, and records one outcome. */
   processEvent(input: ProcessEventInput): Promise<EventOutcome>;
+  /** After processEvent failed: queue reconciliation for the named users. Returns how many exist. */
+  recordFailure(userIds: string[]): Promise<number>;
 }
 
 const OUTCOMES: readonly EventOutcome[] = ['APPLIED', 'STALE', 'DEFERRED', 'IGNORED', 'DUPLICATE'];
@@ -55,6 +57,14 @@ export function supabaseRevenueCatMirror(
         return data as EventOutcome;
       }
       throw new Error('Unexpected RevenueCat database outcome');
+    },
+
+    async recordFailure(userIds) {
+      const { data, error } = await admin.rpc('record_revenuecat_webhook_failure', {
+        p_user_ids: userIds,
+      });
+      if (error) throw error;
+      return typeof data === 'number' ? data : 0;
     },
   };
 }

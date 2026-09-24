@@ -35,6 +35,7 @@ const report: LifecycleReport = {
   skippedLedgerEvents: 0,
   staleLedgerEvents: 0,
   duplicateLedgerEvents: 0,
+  mirrorAuthority: 'webhook',
 };
 const provider: RevenueCatUserSnapshot = {
   projectId: 'discovered-project',

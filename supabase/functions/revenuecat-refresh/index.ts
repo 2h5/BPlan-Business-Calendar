@@ -7,6 +7,7 @@ const CLAIM_STATUSES: readonly RefreshClaim['status'][] = [
   'CLAIMED',
   'IN_PROGRESS',
   'RECENTLY_VERIFIED',
+  'BACKING_OFF',
 ];
 
 const config = readReconcileConfig((name) => Deno.env.get(name));
@@ -28,7 +29,9 @@ Deno.serve(
       if (!status) throw new EdgeError('UNKNOWN', 'Could not refresh access.', 500);
       const leaseToken =
         typeof row?.claimed_lease_token === 'string' ? row.claimed_lease_token : null;
-      return { status, leaseToken };
+      const retryAfterSeconds =
+        typeof row?.retry_after_seconds === 'number' ? row.retry_after_seconds : null;
+      return { status, leaseToken, retryAfterSeconds };
     },
     reconciler() {
       if (!config.ok) throw new EdgeError('UNKNOWN', 'Access refresh is not available.', 503);

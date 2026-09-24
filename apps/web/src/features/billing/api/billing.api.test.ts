@@ -27,6 +27,15 @@ describe('access refresh API contract', () => {
     }
   });
 
+  it('accepts a server backoff with its wait', async () => {
+    invokeMock.mockResolvedValue({
+      data: { status: 'BACKING_OFF', retryAfterSeconds: 120 },
+      error: null,
+    });
+
+    await expect(requestAccessRefresh()).resolves.toBe('BACKING_OFF');
+  });
+
   it('rejects an unexpected server response instead of trusting it', async () => {
     invokeMock.mockResolvedValue({ data: { status: 'GRANTED', isPro: true }, error: null });
 

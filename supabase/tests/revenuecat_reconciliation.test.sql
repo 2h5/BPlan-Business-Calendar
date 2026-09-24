@@ -2,7 +2,7 @@
 -- Sequential contract only; the two-session harness covers interleavings.
 begin;
 create extension if not exists pgtap;
-select plan(48);
+select plan(80);
 
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
 values
@@ -13,7 +13,9 @@ values
   ('00000000-0000-0000-0000-000000000000', 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3',
    'authenticated', 'authenticated', 'reconcile-free@example.com', now(), now()),
   ('00000000-0000-0000-0000-000000000000', 'd4d4d4d4-d4d4-d4d4-d4d4-d4d4d4d4d4d4',
-   'authenticated', 'authenticated', 'reconcile-requester@example.com', now(), now());
+   'authenticated', 'authenticated', 'reconcile-requester@example.com', now(), now()),
+  ('00000000-0000-0000-0000-000000000000', 'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5',
+   'authenticated', 'authenticated', 'reconcile-lapsed@example.com', now(), now());
 
 -- ---------------------------------------------------------------------------
 -- Privileges and isolation
@@ -34,21 +36,43 @@ select ok(
   'clients cannot see reconciliation state; service_role may only inspect it directly'
 );
 select ok(
+  (select relrowsecurity from pg_class
+    where oid = 'public.revenuecat_provider_state'::regclass)
+  and (select count(*) from pg_policies
+        where schemaname = 'public' and tablename = 'revenuecat_provider_state') = 0
+  and not has_table_privilege('authenticated', 'public.revenuecat_provider_state', 'SELECT')
+  and not has_table_privilege('service_role', 'public.revenuecat_provider_state', 'UPDATE')
+  and has_table_privilege('service_role', 'public.revenuecat_provider_state', 'SELECT'),
+  'provider state is server-only and written only through its functions'
+);
+select ok(
   has_function_privilege('service_role', 'public.claim_revenuecat_reconciliations(integer,integer)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.claim_revenuecat_user_reconciliation(uuid,integer)', 'EXECUTE')
-  and has_function_privilege('service_role', 'public.release_revenuecat_reconciliation(uuid,uuid,text,integer)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.release_revenuecat_reconciliation(uuid,uuid,text,integer,boolean)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.apply_revenuecat_snapshot(uuid,uuid,timestamptz,text,jsonb,text[],jsonb)', 'EXECUTE')
-  and has_function_privilege('service_role', 'public.enqueue_revenuecat_reconciliation_sweep(integer)', 'EXECUTE'),
+  and has_function_privilege('service_role', 'public.enqueue_revenuecat_reconciliation_sweep(integer)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.begin_revenuecat_provider_read(text)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.complete_revenuecat_catalog_read(text,uuid,jsonb)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.record_revenuecat_provider_failure(text,text,uuid,text,integer)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.revenuecat_billing_health()', 'EXECUTE'),
   'the reconciler worker surface is callable by service_role'
 );
 select ok(
   not has_function_privilege('authenticated', 'public.claim_revenuecat_reconciliations(integer,integer)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.claim_revenuecat_user_reconciliation(uuid,integer)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.apply_revenuecat_snapshot(uuid,uuid,timestamptz,text,jsonb,text[],jsonb)', 'EXECUTE')
-  and not has_function_privilege('authenticated', 'public.release_revenuecat_reconciliation(uuid,uuid,text,integer)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.release_revenuecat_reconciliation(uuid,uuid,text,integer,boolean)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.enqueue_revenuecat_reconciliation_sweep(integer)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.begin_revenuecat_provider_read(text)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.record_revenuecat_provider_failure(text,text,uuid,text,integer)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.revenuecat_billing_health()', 'EXECUTE')
   and not has_function_privilege('anon', 'public.apply_revenuecat_snapshot(uuid,uuid,timestamptz,text,jsonb,text[],jsonb)', 'EXECUTE'),
-  'clients cannot claim work, request a lease for another user, or write a snapshot'
+  'clients cannot claim work, request a lease for another user, write a snapshot, or touch provider state'
+);
+select ok(
+  not has_function_privilege('service_role', 'public.ensure_revenuecat_reconcile_schedule()', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.ensure_revenuecat_reconcile_schedule()', 'EXECUTE'),
+  'only an operator (the owner) can install the schedule'
 );
 
 -- ---------------------------------------------------------------------------
@@ -202,6 +226,47 @@ select ok(
   public.has_active_entitlement('b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2', 'pro'),
   'the newer renewal remains authoritative'
 );
+select ok(
+  (select lease_token is null and last_outcome = 'STALE' and requested_at > completed_at
+          and not_before = now() + interval '5 minutes 1 second'
+     from public.revenuecat_reconciliations
+    where user_id = 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2'),
+  'a snapshot that lost to a newer row stays pending until one can be dated after that row'
+);
+select is(
+  (select count(*)::int from public.claim_revenuecat_reconciliations(10, 60)
+    where claimed_user_id = 'b2b2b2b2-b2b2-b2b2-b2b2-b2b2b2b2b2b2'),
+  0, 'the deferred request is not claimable before the ordering margin passes'
+);
+
+-- A paid period that ended without its EXPIRATION webhook: the row is still
+-- marked active. The snapshot records the lapse and keeps the real expiry.
+select is(
+  public.process_revenuecat_event(
+    'recon-lapsed-purchase', 'INITIAL_PURCHASE', now() - interval '40 days', 'SANDBOX', 'apply',
+    'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5', 'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5',
+    'active', now() - interval '10 days', null, array['pro'], array[]::uuid[], null, '{}'::jsonb
+  ), 'APPLIED', 'a row whose paid period ended days ago is still marked active'
+);
+select ok(
+  public.enqueue_revenuecat_reconciliation('e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5', 'SWEEP'),
+  'queue the lapsed user'
+);
+create temporary table claim_lapsed as
+  select * from public.claim_revenuecat_reconciliations(10, 60);
+select is(
+  public.apply_revenuecat_snapshot(
+    'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5',
+    (select claimed_lease_token from claim_lapsed where claimed_user_id = 'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5'),
+    now() - interval '1 minute', 'SANDBOX', '[]'::jsonb, array[]::text[], '{}'::jsonb
+  ), 'REPAIRED', 'the snapshot records the lost expiration'
+);
+select ok(
+  (select status = 'expired' and expires_at = now() - interval '10 days'
+          and last_event_at = now() - interval '1 minute'
+     from public.subscriptions where user_id = 'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5'),
+  'the lapsed row keeps its real expiry instead of the snapshot time'
+);
 
 -- ---------------------------------------------------------------------------
 -- Hints during a lease, failure backoff, and invalid snapshots
@@ -251,6 +316,24 @@ select ok(
     where user_id = 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3'),
   'a failed attempt stays pending, backs off, and honours Retry-After'
 );
+select ok(
+  (select claim_status = 'BACKING_OFF' and claimed_lease_token is null and retry_after_seconds >= 600
+     from public.claim_revenuecat_user_reconciliation('c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', 60)),
+  'a user refresh respects the backoff a failed attempt set, and says how long it lasts'
+);
+select ok(
+  (select lease_token is null and not_before >= now() + interval '600 seconds'
+     from public.revenuecat_reconciliations
+    where user_id = 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3'),
+  'and leaves the backoff untouched'
+);
+select ok(
+  public.enqueue_revenuecat_reconciliation('c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', 'TRANSFER')
+  and (select not_before >= now() + interval '600 seconds'
+         from public.revenuecat_reconciliations
+        where user_id = 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3'),
+  'a new hint does not shorten an existing backoff'
+);
 select throws_ok(
   $$select public.release_revenuecat_reconciliation(
     'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', pg_catalog.gen_random_uuid(), 'raw provider text', null)$$,
@@ -275,6 +358,135 @@ select throws_ok(
     '[]'::jsonb, array[]::text[], '{}'::jsonb)$$,
     (select claimed_lease_token from claim_seven limit 1)),
   '23514', null, 'a snapshot must name an enforced environment'
+);
+select ok(
+  public.release_revenuecat_reconciliation(
+    'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', (select claimed_lease_token from claim_seven limit 1),
+    'PROVIDER_BACKOFF', 90, false),
+  'a project-wide backoff hands the lease back'
+);
+select ok(
+  (select lease_token is null and requested_at > completed_at
+          and attempts = (select claimed_attempts - 1 from claim_seven limit 1)
+          and not_before = now() + interval '90 seconds'
+     from public.revenuecat_reconciliations
+    where user_id = 'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3'),
+  'without counting the attempt or growing the backoff beyond the provider wait'
+);
+select throws_ok(
+  $$select public.release_revenuecat_reconciliation(
+    'c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3', pg_catalog.gen_random_uuid(), 'PROVIDER_BACKOFF', 90, null)$$,
+  '23514', null, 'the attempt accounting must be explicit'
+);
+
+-- ---------------------------------------------------------------------------
+-- Project-wide provider state: shared catalog cache and backoff
+-- ---------------------------------------------------------------------------
+create temporary table provider_one as
+  select * from public.begin_revenuecat_provider_read('proj_a');
+select ok(
+  (select action = 'FETCH' and catalog is null and lease_token is not null from provider_one),
+  'the first caller for a project leases the catalog fetch'
+);
+select ok(
+  (select action = 'BLOCKED' and retry_after_seconds between 1 and 30
+     from public.begin_revenuecat_provider_read('proj_a')),
+  'a concurrent caller with no usable catalog waits instead of fetching too'
+);
+select ok(
+  not public.complete_revenuecat_catalog_read('proj_a', pg_catalog.gen_random_uuid(),
+    '[{"id":"entl_pro","lookup_key":"pro"}]'::jsonb),
+  'only the lease holder stores the catalog'
+);
+select throws_ok(
+  format($$select public.complete_revenuecat_catalog_read('proj_a', %L::uuid, '[{"id":"entl_pro"}]'::jsonb)$$,
+    (select lease_token from provider_one)),
+  '23514', null, 'a catalog entry without a lookup key is refused'
+);
+select ok(
+  public.complete_revenuecat_catalog_read('proj_a', (select lease_token from provider_one),
+    '[{"id":"entl_pro","lookup_key":"pro"}]'::jsonb),
+  'the lease holder stores the catalog'
+);
+select ok(
+  (select action = 'USE' and catalog = '[{"id":"entl_pro","lookup_key":"pro"}]'::jsonb
+     from public.begin_revenuecat_provider_read('proj_a')),
+  'every later caller uses the cached catalog without reading RevenueCat'
+);
+select ok(
+  public.record_revenuecat_provider_failure('proj_a', 'CUSTOMER', null, 'PROVIDER_RATE_LIMITED', 120) >= 120
+  and (select action = 'BLOCKED' and retry_after_seconds >= 120
+         from public.begin_revenuecat_provider_read('proj_a')),
+  'a project-wide customer rate limit blocks every RevenueCat read and honours Retry-After'
+);
+
+create temporary table provider_two as
+  select * from public.begin_revenuecat_provider_read('proj_b');
+select is(
+  public.record_revenuecat_provider_failure('proj_b', 'CATALOG',
+    (select lease_token from provider_two), 'PROVIDER_UNAVAILABLE', null),
+  30, 'a first catalog failure backs off thirty seconds'
+);
+select ok(
+  (select action = 'BLOCKED' and retry_after_seconds between 1 and 30
+     from public.begin_revenuecat_provider_read('proj_b')),
+  'with no catalog to fall back on, callers wait out the catalog backoff'
+);
+update public.revenuecat_provider_state
+   set catalog = '[{"id":"entl_pro","lookup_key":"pro"}]'::jsonb,
+       catalog_fetched_at = now() - interval '1 hour'
+ where project_id = 'proj_b';
+select ok(
+  (select action = 'USE' and catalog is not null
+     from public.begin_revenuecat_provider_read('proj_b')),
+  'during a catalog backoff an older catalog stays usable'
+);
+update public.revenuecat_provider_state set catalog_retry_at = null where project_id = 'proj_b';
+select ok(
+  (select action = 'FETCH' and catalog is not null
+     from public.begin_revenuecat_provider_read('proj_b')),
+  'a stale catalog is refreshed by one lease holder, with the old copy as its fallback'
+);
+select ok(
+  public.record_revenuecat_provider_failure('proj_b', 'CATALOG', null, 'PROVIDER_AUTH', null) = 60
+  and (select action = 'BLOCKED' from public.begin_revenuecat_provider_read('proj_b')),
+  'a rejected key blocks every read, growing the backoff'
+);
+select throws_ok(
+  $$select public.record_revenuecat_provider_failure('proj_b', 'EVERYTHING', null, 'PROVIDER_AUTH', null)$$,
+  '23514', null, 'a failure scope must be known'
+);
+
+-- ---------------------------------------------------------------------------
+-- A webhook delivery that failed queues its users; health and schedule report
+-- ---------------------------------------------------------------------------
+select is(
+  public.record_revenuecat_webhook_failure(
+    array['ffffffff-ffff-ffff-ffff-ffffffffffff', 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1']::uuid[]),
+  1, 'a failed delivery queues every known user it named'
+);
+select ok(
+  (select reason = 'WEBHOOK_FAILED' and requested_at > completed_at
+     from public.revenuecat_reconciliations
+    where user_id = 'a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1'),
+  'and leaves an observable pending request'
+);
+select throws_ok(
+  $$select public.record_revenuecat_webhook_failure(array[]::uuid[])$$,
+  '23514', null, 'a failure must name at least one user'
+);
+select ok(
+  (select (h -> 'queue' ->> 'webhook_failures_pending')::int >= 1
+          and (h -> 'queue' ->> 'pending')::int >= 1
+          and jsonb_typeof(h -> 'provider') = 'array'
+          and h -> 'schedule' ? 'installed'
+     from (select public.revenuecat_billing_health() as h) health),
+  'the health report exposes backlog, webhook failures, provider state, and the schedule'
+);
+select ok(
+  public.ensure_revenuecat_reconcile_schedule()
+    in ('INSTALLED', 'EXTENSIONS_UNAVAILABLE', 'VAULT_UNAVAILABLE', 'MISSING_VAULT_SECRETS'),
+  'the schedule installer reports its outcome instead of failing'
 );
 
 -- ---------------------------------------------------------------------------

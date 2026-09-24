@@ -19,7 +19,10 @@ function deps(overrides: { cronSecret?: string | undefined; config?: ReconcileCo
     claim: () => Promise.resolve([]),
     release: () => Promise.resolve(),
   };
-  const reconciler: Reconciler = { reconcile: () => Promise.resolve('CONVERGED') };
+  const reconciler: Reconciler = {
+    prepare: () => Promise.resolve({ ok: true, catalog: [] }),
+    reconcile: () => Promise.resolve({ outcome: 'CONVERGED', retryAfterSeconds: null }),
+  };
   return {
     value: {
       cronSecret: 'cron-secret',

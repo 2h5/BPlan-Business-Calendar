@@ -620,6 +620,45 @@ export type Database = {
         }
         Relationships: []
       }
+      revenuecat_provider_state: {
+        Row: {
+          blocked_until: string | null
+          catalog: Json | null
+          catalog_fetched_at: string | null
+          catalog_lease_token: string | null
+          catalog_leased_until: string | null
+          catalog_retry_at: string | null
+          failures: number
+          last_error: string | null
+          last_failure_at: string | null
+          project_id: string
+        }
+        Insert: {
+          blocked_until?: string | null
+          catalog?: Json | null
+          catalog_fetched_at?: string | null
+          catalog_lease_token?: string | null
+          catalog_leased_until?: string | null
+          catalog_retry_at?: string | null
+          failures?: number
+          last_error?: string | null
+          last_failure_at?: string | null
+          project_id: string
+        }
+        Update: {
+          blocked_until?: string | null
+          catalog?: Json | null
+          catalog_fetched_at?: string | null
+          catalog_lease_token?: string | null
+          catalog_leased_until?: string | null
+          catalog_retry_at?: string | null
+          failures?: number
+          last_error?: string | null
+          last_failure_at?: string | null
+          project_id?: string
+        }
+        Relationships: []
+      }
       revenuecat_reconciliations: {
         Row: {
           attempts: number
@@ -1070,6 +1109,15 @@ export type Database = {
         }
         Returns: string
       }
+      begin_revenuecat_provider_read: {
+        Args: { p_project_id: string }
+        Returns: {
+          action: string
+          catalog: Json
+          lease_token: string
+          retry_after_seconds: number
+        }[]
+      }
       claim_ai_schedule_request: {
         Args: {
           p_ad_hoc_duration_minutes?: number
@@ -1095,6 +1143,7 @@ export type Database = {
         Returns: {
           claim_status: string
           claimed_lease_token: string
+          retry_after_seconds: number
         }[]
       }
       claim_sync_jobs: {
@@ -1120,6 +1169,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      complete_revenuecat_catalog_read: {
+        Args: { p_catalog: Json; p_lease_token: string; p_project_id: string }
+        Returns: boolean
       }
       complete_sync_job: {
         Args: {
@@ -1150,6 +1203,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      enqueue_revenuecat_reconciliations: {
+        Args: { p_reason: string; p_user_ids: string[] }
+        Returns: number
+      }
       enqueue_sync_job: {
         Args: {
           p_idempotency_key?: string
@@ -1161,6 +1218,7 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_revenuecat_reconcile_schedule: { Args: never; Returns: string }
       has_active_entitlement: {
         Args: { p_entitlement?: string; p_user_id: string }
         Returns: boolean
@@ -1186,8 +1244,23 @@ export type Database = {
       }
       prune_sync_history: { Args: { p_older_than?: string }; Returns: number }
       read_provider_secret: { Args: { p_account_id: string }; Returns: string }
+      record_revenuecat_provider_failure: {
+        Args: {
+          p_error_code: string
+          p_lease_token: string
+          p_project_id: string
+          p_retry_after_seconds: number
+          p_scope: string
+        }
+        Returns: number
+      }
+      record_revenuecat_webhook_failure: {
+        Args: { p_user_ids: string[] }
+        Returns: number
+      }
       release_revenuecat_reconciliation: {
         Args: {
+          p_count_attempt?: boolean
           p_error_code: string
           p_lease_token: string
           p_retry_after_seconds?: number
@@ -1195,6 +1268,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      revenuecat_billing_health: { Args: never; Returns: Json }
+      revenuecat_seconds_until: { Args: { p_at: string }; Returns: number }
       store_provider_secret: {
         Args: { p_account_id: string; p_secret: string }
         Returns: string

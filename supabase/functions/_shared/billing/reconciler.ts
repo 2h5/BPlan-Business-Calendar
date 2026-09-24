@@ -2,9 +2,15 @@ import { revenueCatEnvironmentSchema, type RevenueCatEnvironment } from '@cal/sc
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+  isProjectWideFailure,
+  openProviderAccess,
+  supabaseProviderStateStore,
+  type ProviderAccess,
+  type ProviderStateStore,
+} from './provider-state.ts';
+import {
   createRevenueCatReadApi,
   RevenueCatApiError,
-  type CatalogEntitlement,
   type RevenueCatReadApi,
 } from './revenuecat-api.ts';
 import { buildMirrorSnapshot, SnapshotError, type MirrorSnapshot } from './snapshot.ts';
@@ -15,19 +21,33 @@ import { buildMirrorSnapshot, SnapshotError, type MirrorSnapshot } from './snaps
  * Webhooks are hints. This reads RevenueCat's customer state for one leased
  * user and hands the database a snapshot, which it applies through the same
  * ordering guard as the webhook: a webhook newer than the snapshot wins, and a
- * snapshot never regresses newer state.
+ * snapshot never regresses newer state. When a newer webhook wins, the
+ * database keeps the request pending and retries after the clock margin.
  *
  * The snapshot time is taken before the first read and moved back by a clock
  * margin. An event RevenueCat generated before the read is already reflected
  * in what the read returns; one generated during or after it is newer than
  * the snapshot and still applies when its webhook arrives.
+ *
+ * Project-wide state (the entitlement catalog and any provider backoff) is
+ * resolved once per reconciler instance through `revenuecat_provider_state`,
+ * so a worker run or a refresh never reads the catalog per user, and a
+ * project-wide failure hands leases back without counting them against users.
  */
 
 export const SNAPSHOT_CLOCK_MARGIN_MS = 60_000;
 export const RECONCILE_LEASE_SECONDS = 120;
 
 export type ReconcileOutcome =
-  'REPAIRED' | 'CONVERGED' | 'STALE' | 'UNVERIFIED' | 'LEASE_LOST' | 'RETRY';
+  'REPAIRED' | 'CONVERGED' | 'STALE' | 'UNVERIFIED' | 'LEASE_LOST' | 'RETRY' | 'BACKING_OFF';
+
+export interface ReconcileResult {
+  outcome: ReconcileOutcome;
+  /** Set for BACKING_OFF: when RevenueCat may be read again. */
+  retryAfterSeconds: number | null;
+}
+
+type SnapshotOutcome = Exclude<ReconcileOutcome, 'RETRY' | 'BACKING_OFF'>;
 
 export interface ReconcileStore {
   applySnapshot(input: {
@@ -36,12 +56,17 @@ export interface ReconcileStore {
     snapshotAt: string;
     environment: RevenueCatEnvironment;
     snapshot: MirrorSnapshot | null;
-  }): Promise<Exclude<ReconcileOutcome, 'RETRY'>>;
+  }): Promise<SnapshotOutcome>;
+  /**
+   * countAttempt false hands the lease back for a reason unrelated to this
+   * user, waiting exactly retryAfterSeconds without growing their backoff.
+   */
   release(
     userId: string,
     leaseToken: string,
     code: string,
     retryAfterSeconds: number | null,
+    countAttempt: boolean,
   ): Promise<void>;
 }
 
@@ -71,44 +96,47 @@ export function readReconcileConfig(
 }
 
 export interface Reconciler {
-  reconcile(userId: string, leaseToken: string): Promise<ReconcileOutcome>;
+  /** Resolve project-wide readiness once; later calls reuse the answer. */
+  prepare(): Promise<ProviderAccess>;
+  reconcile(userId: string, leaseToken: string): Promise<ReconcileResult>;
 }
 
 export function createReconciler(deps: {
   api: RevenueCatReadApi;
   store: ReconcileStore;
+  provider: ProviderStateStore;
   environment: RevenueCatEnvironment;
   now?: () => number;
 }): Reconciler {
   const now = deps.now ?? Date.now;
-  // One catalog read per worker run: it is project configuration, rate
-  // limited separately and far more tightly than customer reads.
-  let catalog: Promise<CatalogEntitlement[]> | null = null;
+  let access: Promise<ProviderAccess> | null = null;
+
+  const prepare = (): Promise<ProviderAccess> => {
+    access ??= openProviderAccess(deps.api, deps.provider).catch((error: unknown) => {
+      // A database failure is not an answer; let the next call ask again.
+      access = null;
+      throw error;
+    });
+    return access;
+  };
+
+  const backOff = async (
+    userId: string,
+    leaseToken: string,
+    code: string,
+    retryAfterSeconds: number,
+  ): Promise<ReconcileResult> => {
+    await deps.store.release(userId, leaseToken, code, retryAfterSeconds, false);
+    return { outcome: 'BACKING_OFF', retryAfterSeconds };
+  };
 
   return {
+    prepare,
     async reconcile(userId, leaseToken) {
-      const retry = async (error: unknown): Promise<ReconcileOutcome> => {
-        const code =
-          error instanceof RevenueCatApiError || error instanceof SnapshotError
-            ? error.code
-            : 'RECONCILE_FAILED';
-        const retryAfter = error instanceof RevenueCatApiError ? error.retryAfterSeconds : null;
-        await deps.store.release(userId, leaseToken, code, retryAfter);
-        return 'RETRY';
-      };
+      const ready = await prepare();
+      if (!ready.ok) return await backOff(userId, leaseToken, ready.code, ready.retryAfterSeconds);
 
       const snapshotAt = new Date(now() - SNAPSHOT_CLOCK_MARGIN_MS);
-
-      // The catalog is read on its own so that its 404 (a wrong project ID)
-      // can never be mistaken for an unknown customer.
-      let entitlements: CatalogEntitlement[];
-      try {
-        catalog ??= deps.api.listEntitlements();
-        entitlements = await catalog;
-      } catch (error) {
-        catalog = null;
-        return await retry(error);
-      }
 
       let snapshot: MirrorSnapshot | null;
       try {
@@ -119,28 +147,47 @@ export function createReconciler(deps: {
         ]);
         snapshot = buildMirrorSnapshot({
           environment: deps.environment,
-          catalog: entitlements,
+          catalog: ready.catalog,
           active,
           subscriptions,
           purchases,
           nowMs: now(),
         });
       } catch (error) {
+        if (isProjectWideFailure(error)) {
+          // Every other customer read would fail the same way. Block the
+          // project for everyone, and stop this instance reading too.
+          const retryAfterSeconds = await deps.provider.recordFailure(
+            'CUSTOMER',
+            null,
+            error.code,
+            error.retryAfterSeconds,
+          );
+          access = Promise.resolve({ ok: false, code: 'PROVIDER_BACKOFF', retryAfterSeconds });
+          return await backOff(userId, leaseToken, error.code, retryAfterSeconds);
+        }
         // RevenueCat has no such customer: nothing to grant, and no proof
         // either way for rows the mirror already holds.
         if (!(error instanceof RevenueCatApiError && error.code === 'PROVIDER_NOT_FOUND')) {
-          return await retry(error);
+          const code =
+            error instanceof RevenueCatApiError || error instanceof SnapshotError
+              ? error.code
+              : 'RECONCILE_FAILED';
+          const retryAfter = error instanceof RevenueCatApiError ? error.retryAfterSeconds : null;
+          await deps.store.release(userId, leaseToken, code, retryAfter, true);
+          return { outcome: 'RETRY', retryAfterSeconds: null };
         }
         snapshot = null;
       }
 
-      return await deps.store.applySnapshot({
+      const outcome = await deps.store.applySnapshot({
         userId,
         leaseToken,
         snapshotAt: snapshotAt.toISOString(),
         environment: deps.environment,
         snapshot,
       });
+      return { outcome, retryAfterSeconds: null };
     },
   };
 }
@@ -164,16 +211,27 @@ export function supabaseReconcileStore(admin: SupabaseClient): ReconcileStore {
       if (!outcome) throw new Error('Unexpected reconciliation outcome');
       return outcome;
     },
-    async release(userId, leaseToken, code, retryAfterSeconds) {
-      const { error } = await admin.rpc('release_revenuecat_reconciliation', {
-        p_user_id: userId,
-        p_lease_token: leaseToken,
-        p_error_code: code,
-        p_retry_after_seconds: retryAfterSeconds,
-      });
-      if (error) throw error;
-    },
+    release: (userId, leaseToken, code, retryAfterSeconds, countAttempt) =>
+      releaseReconciliation(admin, userId, leaseToken, code, retryAfterSeconds, countAttempt),
   };
+}
+
+export async function releaseReconciliation(
+  admin: SupabaseClient,
+  userId: string,
+  leaseToken: string,
+  code: string,
+  retryAfterSeconds: number | null,
+  countAttempt: boolean,
+): Promise<void> {
+  const { error } = await admin.rpc('release_revenuecat_reconciliation', {
+    p_user_id: userId,
+    p_lease_token: leaseToken,
+    p_error_code: code,
+    p_retry_after_seconds: retryAfterSeconds,
+    p_count_attempt: countAttempt,
+  });
+  if (error) throw error;
 }
 
 export function createConfiguredReconciler(
@@ -183,6 +241,7 @@ export function createConfiguredReconciler(
   return createReconciler({
     api: createRevenueCatReadApi({ apiKey: config.apiKey, projectId: config.projectId }),
     store: supabaseReconcileStore(admin),
+    provider: supabaseProviderStateStore(admin, config.projectId),
     environment: config.environment,
   });
 }

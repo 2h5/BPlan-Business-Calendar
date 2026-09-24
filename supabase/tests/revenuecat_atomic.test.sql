@@ -3,7 +3,7 @@
 -- interleavings that a single pgTAP transaction cannot.
 begin;
 create extension if not exists pgtap;
-select plan(35);
+select plan(42);
 
 insert into auth.users (instance_id, id, aud, role, email, created_at, updated_at)
 values
@@ -41,8 +41,16 @@ select ok(
 );
 select ok(
   not has_function_privilege('service_role',
-    'public.enqueue_revenuecat_reconciliation(uuid,text)', 'EXECUTE'),
-  'the internal enqueue helper is not directly callable'
+    'public.enqueue_revenuecat_reconciliation(uuid,text)', 'EXECUTE')
+  and not has_function_privilege('service_role',
+    'public.enqueue_revenuecat_reconciliations(uuid[],text)', 'EXECUTE'),
+  'the internal enqueue helpers are not directly callable'
+);
+select ok(
+  has_function_privilege('service_role', 'public.record_revenuecat_webhook_failure(uuid[])', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.record_revenuecat_webhook_failure(uuid[])', 'EXECUTE')
+  and not has_function_privilege('anon', 'public.record_revenuecat_webhook_failure(uuid[])', 'EXECUTE'),
+  'only the webhook can queue reconciliation after a failed delivery'
 );
 select ok(
   not has_table_privilege('service_role', 'public.subscription_events', 'INSERT'),
@@ -191,6 +199,56 @@ select is(
 select is(
   (select skipped_reason from public.subscription_events where event_id = 'atomic-transfer-unknown'),
   'UNKNOWN_APP_USER', 'and is audited as such'
+);
+select throws_ok(
+  $$select public.process_revenuecat_event(
+    'atomic-transfer-flood', 'TRANSFER', now(), 'SANDBOX', 'reconcile', null, null,
+    null, null, null, array[]::text[],
+    (select array_agg(pg_catalog.gen_random_uuid()) from generate_series(1, 21)),
+    null, '{}'::jsonb)$$,
+  '23514', null, 'one hint cannot queue more than twenty users'
+);
+
+-- ---------------------------------------------------------------------------
+-- apply + reconcile (CANCELLATION, BILLING_ISSUE)
+-- ---------------------------------------------------------------------------
+update public.revenuecat_reconciliations
+   set completed_at = clock_timestamp(), last_outcome = 'CONVERGED'
+ where user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+select is(
+  public.process_revenuecat_event(
+    'atomic-refund', 'CANCELLATION', '2026-09-23T00:00:00Z', 'SANDBOX', 'apply',
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'active', '2026-09-23T00:00:00Z', null, array['pro'],
+    array['eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee']::uuid[], null, '{}'::jsonb
+  ), 'APPLIED', 'a cancellation applies its payload'
+);
+select ok(
+  (select reason = 'CANCELLATION' and requested_at > completed_at
+     from public.revenuecat_reconciliations
+    where user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
+  'and queues an authoritative read in the same transaction'
+);
+select ok(
+  (select applied and skipped_reason is null
+     from public.subscription_events where event_id = 'atomic-refund'),
+  'the ledger still records the apply outcome'
+);
+select throws_ok(
+  $$select public.process_revenuecat_event(
+    'atomic-apply-other', 'CANCELLATION', now(), 'SANDBOX', 'apply',
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'active', now() + interval '1 day', null, array['pro'],
+    array['dddddddd-dddd-dddd-dddd-dddddddddddd']::uuid[], null, '{}'::jsonb)$$,
+  '23514', null, 'an applied event can only queue its own subject'
+);
+select is(
+  public.process_revenuecat_event(
+    'atomic-refund-deleted', 'CANCELLATION', '2026-09-23T00:00:00Z', 'SANDBOX', 'apply',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff', 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'active', '2026-09-23T00:00:00Z', null, array['pro'],
+    array['ffffffff-ffff-ffff-ffff-ffffffffffff']::uuid[], null, '{}'::jsonb
+  ), 'IGNORED', 'a cancellation for a deleted user stays terminal'
 );
 
 -- ---------------------------------------------------------------------------

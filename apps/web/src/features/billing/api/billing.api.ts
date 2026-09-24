@@ -39,9 +39,12 @@ const accessRefreshSchema = z.object({
     'UNVERIFIED',
     'LEASE_LOST',
     'RETRY',
+    'BACKING_OFF',
     'IN_PROGRESS',
     'RECENTLY_VERIFIED',
   ]),
+  /** When asking again could read RevenueCat; present for waits and backoff. */
+  retryAfterSeconds: z.number().int().positive().optional(),
 });
 
 export type AccessRefreshStatus = z.infer<typeof accessRefreshSchema>['status'];

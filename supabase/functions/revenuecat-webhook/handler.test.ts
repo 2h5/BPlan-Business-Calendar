@@ -19,12 +19,22 @@ const NOW_SECONDS = 1_760_000_100;
 
 interface Recorder extends RevenueCatMirror {
   calls: ProcessEventInput[];
+  failures: string[][];
 }
 
-function recorder(options: { result?: EventOutcome; fail?: boolean } = {}): Recorder {
+function recorder(
+  options: { result?: EventOutcome; fail?: boolean; failureFails?: boolean } = {},
+): Recorder {
   const calls: ProcessEventInput[] = [];
+  const failures: string[][] = [];
   return {
     calls,
+    failures,
+    recordFailure(userIds) {
+      if (options.failureFails) return Promise.reject(new Error('db down'));
+      failures.push(userIds);
+      return Promise.resolve(userIds.length);
+    },
     processEvent(input) {
       if (options.fail) return Promise.reject(new Error('db down'));
       calls.push(input);
@@ -180,6 +190,36 @@ Deno.test('a dashboard TEST event is acknowledged and recorded as ignored', asyn
 Deno.test('asks for redelivery only when the database operation fails', async () => {
   const response = await run(post(initialPurchase()), recorder({ fail: true }));
   assertEquals(response.status, 500);
+});
+
+Deno.test('a failed delivery queues reconciliation for every user it named', async () => {
+  const purchase = recorder({ fail: true });
+  assertEquals((await run(post(initialPurchase()), purchase)).status, 500);
+  assertEquals(purchase.failures, [[USER]]);
+
+  const moved = recorder({ fail: true });
+  assertEquals((await run(post(transfer()), moved)).status, 500);
+  assertEquals(moved.failures, [[USER, OTHER_USER]]);
+
+  const ignored = recorder({ fail: true });
+  assertEquals((await run(post(dashboardTest()), ignored)).status, 500);
+  assertEquals(ignored.failures, []);
+});
+
+Deno.test('a failure to queue after a failed delivery still asks for redelivery', async () => {
+  const response = await run(post(initialPurchase()), recorder({ fail: true, failureFails: true }));
+  assertEquals(response.status, 500);
+});
+
+Deno.test('a cancellation asks the database to reconcile its subject after applying', async () => {
+  const mirror = recorder();
+  await run(post(refundCancellation()), mirror);
+  assertEquals(mirror.calls[0]?.decision, 'apply');
+  assertEquals(mirror.calls[0]?.reconcileUserIds, [USER]);
+
+  const purchase = recorder();
+  await run(post(initialPurchase()), purchase);
+  assertEquals(purchase.calls[0]?.reconcileUserIds, []);
 });
 
 async function signed(body: Body, timestamp = NOW_SECONDS, secret = SIGNING_SECRET) {

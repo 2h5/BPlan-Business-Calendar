@@ -12,19 +12,24 @@ import {
  *
  * Reads the caller's own entitlement from RevenueCat and repairs the mirror
  * through the same lease-fenced snapshot path as the scheduled worker. It is
- * the only convergence path for a user with no mirror row at all, such as a
- * first purchase whose webhook never arrived.
+ * the fastest convergence path for a user with no mirror row at all, such as
+ * a first purchase whose webhook never arrived.
  *
  * The caller can only ever target themselves (the user ID comes from the
- * verified JWT), and the database rate-limits to one snapshot per minute.
- * A result never grants anything the RevenueCat read did not.
+ * verified JWT). The database limits a user to one snapshot a minute and
+ * applies the same backoff the scheduled worker respects after a failed or
+ * ordering-deferred attempt (BACKING_OFF). RevenueCat's catalog and any
+ * project-wide backoff are shared through the database, so refreshes cannot
+ * spend the provider's rate limits. A result never grants anything the
+ * RevenueCat read did not.
  */
 
 export type RefreshStatus = ReconcileOutcome | 'IN_PROGRESS' | 'RECENTLY_VERIFIED';
 
 export interface RefreshClaim {
-  status: 'CLAIMED' | 'IN_PROGRESS' | 'RECENTLY_VERIFIED';
+  status: 'CLAIMED' | 'IN_PROGRESS' | 'RECENTLY_VERIFIED' | 'BACKING_OFF';
   leaseToken: string | null;
+  retryAfterSeconds: number | null;
 }
 
 export interface RefreshDeps {
@@ -51,13 +56,14 @@ export function createRefreshHandler(deps: RefreshDeps): (request: Request) => P
     }
 
     const claim = await deps.claim(user.id, RECONCILE_LEASE_SECONDS);
-    if (claim.status !== 'CLAIMED') {
-      const status: RefreshStatus = claim.status;
-      return jsonResponse({ status });
-    }
+    if (claim.status !== 'CLAIMED') return respond(claim.status, claim.retryAfterSeconds);
     if (claim.leaseToken === null) throw new EdgeError('UNKNOWN', 'Could not refresh access.', 500);
 
-    const status: RefreshStatus = await deps.reconciler().reconcile(user.id, claim.leaseToken);
-    return jsonResponse({ status });
+    const result = await deps.reconciler().reconcile(user.id, claim.leaseToken);
+    return respond(result.outcome, result.retryAfterSeconds);
   });
+}
+
+function respond(status: RefreshStatus, retryAfterSeconds: number | null): Response {
+  return jsonResponse(retryAfterSeconds === null ? { status } : { status, retryAfterSeconds });
 }

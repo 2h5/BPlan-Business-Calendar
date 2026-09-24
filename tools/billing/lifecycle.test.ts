@@ -221,7 +221,8 @@ describe('annual lifecycle read-only reconciliation', () => {
     });
   });
 
-  it('accepts an expired mirror repaired by a RevenueCat reconciliation snapshot', () => {
+  it('accepts a lost EXPIRATION recorded by reconciliation with the provider end kept', () => {
+    // apply_revenuecat_snapshot keeps a lapsed row's own expiry.
     const fixture = fixtures({
       now: END + 30 * 60_000,
       status: 'expired',
@@ -232,6 +233,72 @@ describe('annual lifecycle read-only reconciliation', () => {
       ok: true,
       state: 'expired',
       latestAppliedLedgerEventType: 'RECONCILIATION',
+      mirrorAuthority: 'reconciliation',
+    });
+  });
+
+  it('accepts a reconciliation that ended access at its snapshot, after the provider end', () => {
+    const fixture = fixtures({
+      now: END + 30 * 60_000,
+      status: 'expired',
+      givesAccess: false,
+      ledger: [event('RECONCILIATION', 65), event('INITIAL_PURCHASE', 0)],
+    });
+    const [row] = fixture.supabase.mirrorRows;
+    if (!row) throw new Error('fixture has a mirror row');
+    // The snapshot revoked a row that still expected a later end.
+    const revoked = {
+      ...fixture.supabase,
+      mirrorRows: [{ ...row, expires_at: new Date(START + 65 * 60_000).toISOString() }],
+    };
+    expect(inspectAnnualLifecycle(fixture.provider, revoked, fixture.now)).toMatchObject({
+      ok: true,
+      state: 'expired',
+      mirrorAuthority: 'reconciliation',
+    });
+  });
+
+  it('rejects a reconciliation expiry before the provider end or in the future', () => {
+    const fixture = fixtures({
+      now: END + 30 * 60_000,
+      status: 'expired',
+      givesAccess: false,
+      ledger: [event('RECONCILIATION', 65), event('INITIAL_PURCHASE', 0)],
+    });
+    const [row] = fixture.supabase.mirrorRows;
+    if (!row) throw new Error('fixture has a mirror row');
+    for (const expiresAt of [END - 60_000, END + 60 * 60_000]) {
+      const mirror = {
+        ...fixture.supabase,
+        mirrorRows: [{ ...row, expires_at: new Date(expiresAt).toISOString() }],
+      };
+      expect(inspectAnnualLifecycle(fixture.provider, mirror, fixture.now)).toMatchObject({
+        ok: false,
+        failure: 'LIFECYCLE_AUTHORITY_MISMATCH',
+      });
+    }
+  });
+
+  it('still requires an exact provider end for a webhook-written expiry', () => {
+    const fixture = fixtures({
+      now: END + 30 * 60_000,
+      status: 'expired',
+      givesAccess: false,
+      ledger: [event('EXPIRATION', 60), event('INITIAL_PURCHASE', 0)],
+    });
+    const [row] = fixture.supabase.mirrorRows;
+    if (!row) throw new Error('fixture has a mirror row');
+    const late = {
+      ...fixture.supabase,
+      mirrorRows: [{ ...row, expires_at: new Date(END + 60_000).toISOString() }],
+    };
+    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+      ok: true,
+      mirrorAuthority: 'webhook',
+    });
+    expect(inspectAnnualLifecycle(fixture.provider, late, fixture.now)).toMatchObject({
+      ok: false,
+      failure: 'LIFECYCLE_AUTHORITY_MISMATCH',
     });
   });
 
@@ -450,6 +517,9 @@ describe('annual lifecycle command safety', () => {
       'Annual product match: YES',
     ]);
     expect(lines).toContain('Latest applied ledger event: INITIAL_PURCHASE');
+    expect(lines).toContain('Mirror written by: webhook');
+    expect(lines).toContain('Cancellation applied: NO');
+    expect(lines).toContain('Duplicate deliveries (recorded since 2026-09-24): 0');
     expect(formatLifecycleReport(report)).not.toContain(USER);
   });
 

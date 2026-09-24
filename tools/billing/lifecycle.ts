@@ -23,10 +23,15 @@ export interface LifecycleReport {
   readonly periodEndsAt: string | null;
   readonly endsAt: string | null;
   readonly autoRenewalStatus: string | null;
+  /** Applied lifecycle events only; a stale or deferred delivery is not a transition. */
   readonly ledgerTransitions: readonly string[];
+  /** Every unapplied ledger row: stale, deferred to reconciliation, or ignored. */
   readonly skippedLedgerEvents: number;
   readonly staleLedgerEvents: number;
+  /** Redeliveries recorded by duplicate_deliveries, which starts at the 2026-09-24 migration. */
   readonly duplicateLedgerEvents: number;
+  /** Who wrote the mirror's current state: a webhook event or a reconciliation snapshot. */
+  readonly mirrorAuthority: 'webhook' | 'reconciliation' | null;
   readonly failure?: string;
 }
 
@@ -96,6 +101,11 @@ export function inspectAnnualLifecycle(
       (total, event) => total + (event.duplicate_deliveries ?? 0),
       0,
     ),
+    mirrorAuthority: latestApplied
+      ? latestApplied.event_type === 'RECONCILIATION'
+        ? 'reconciliation'
+        : 'webhook'
+      : null,
   };
   const fail = (code: string): LifecycleReport => ({ ...base, failure: code });
 
@@ -132,12 +142,22 @@ export function inspectAnnualLifecycle(
   const expired = sub.status === 'expired' && !sub.givesAccess && sub.endsAt <= now.getTime();
   if (!active && !expired) return fail('LIFECYCLE_PROVIDER_INCONSISTENT');
   if (active && !sub.grantsPro) return fail('LIFECYCLE_IDENTITY');
+  // A webhook mirrors RevenueCat's end exactly. A reconciliation that expired
+  // the row keeps that end when it records a lost EXPIRATION, or ends access
+  // at its snapshot time when RevenueCat stopped granting earlier than the
+  // mirror expected; either way access ended no earlier than RevenueCat's end
+  // and no later than now.
+  const mirrorExpiry = Date.parse(row.expires_at ?? '');
+  const expiryAgrees =
+    expired && base.mirrorAuthority === 'reconciliation'
+      ? mirrorExpiry >= sub.endsAt && mirrorExpiry <= now.getTime()
+      : mirrorExpiry === sub.endsAt;
   if (
     provider.activePro !== active ||
     supabase.activeMirror !== active ||
     supabase.serverAuthorized !== active ||
     row.status !== (active ? 'active' : 'expired') ||
-    Date.parse(row.expires_at ?? '') !== sub.endsAt
+    !expiryAgrees
   ) {
     return fail('LIFECYCLE_AUTHORITY_MISMATCH');
   }
@@ -185,7 +205,7 @@ export function formatLifecycleReport(report: LifecycleReport): string {
     `Subscription access: ${report.givesAccess === null ? 'UNKNOWN' : report.givesAccess ? 'ACTIVE' : 'INACTIVE'}`,
     `Subscription Pro attachment: ${report.subscriptionGrantsPro === null ? 'UNKNOWN' : report.subscriptionGrantsPro ? 'PRESENT' : 'ABSENT'}`,
     `Renewed: ${report.renewed ? 'YES' : 'NO'}`,
-    `Cancellation observed: ${report.cancelled ? 'YES' : 'NO'}`,
+    `Cancellation applied: ${report.cancelled ? 'YES' : 'NO'}`,
     `RevenueCat Pro: ${report.providerPro ? 'ACTIVE' : 'INACTIVE'}`,
     `Supabase mirror: ${report.mirrorPro ? 'ACTIVE' : 'INACTIVE'}`,
     `Server authorization: ${report.serverPro ? 'ACTIVE' : 'INACTIVE'}`,
@@ -193,11 +213,12 @@ export function formatLifecycleReport(report: LifecycleReport): string {
     `Period end: ${report.periodEndsAt ?? 'UNKNOWN'}`,
     `End: ${report.endsAt ?? 'UNKNOWN'}`,
     `Renewal state: ${report.autoRenewalStatus ?? 'UNKNOWN'}`,
-    `Ledger transitions: ${report.ledgerTransitions.join(' > ') || 'NONE'}`,
-    `Skipped ledger events: ${report.skippedLedgerEvents}`,
+    `Applied lifecycle transitions: ${report.ledgerTransitions.join(' > ') || 'NONE'}`,
+    `Unapplied ledger events (stale, deferred, ignored): ${report.skippedLedgerEvents}`,
     `Stale ledger events: ${report.staleLedgerEvents}`,
-    `Duplicate ledger events: ${report.duplicateLedgerEvents}`,
+    `Duplicate deliveries (recorded since 2026-09-24): ${report.duplicateLedgerEvents}`,
     `Latest applied ledger event: ${report.latestAppliedLedgerEventType ?? 'UNKNOWN'}`,
+    `Mirror written by: ${report.mirrorAuthority ?? 'UNKNOWN'}`,
   ].join('\n');
 }
 
