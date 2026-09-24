@@ -4,6 +4,7 @@ import { isoDateTimeSchema, minuteOfDaySchema, timeZoneSchema, uuidSchema } from
 import { workingHoursSchema } from './profile.schema.ts';
 
 export * from './intent.schema.ts';
+export * from './event-edit.schema.ts';
 
 export { workingHoursSchema } from './profile.schema.ts';
 export type { WorkingHours } from './profile.schema.ts';

@@ -1,7 +1,9 @@
 import {
   isValidCalendarDate,
   schedulingIntentSchema,
+  type DateIntent,
   type SchedulingIntent,
+  type TimeIntent,
   type WeekdayName,
 } from '@cal/schemas/scheduling';
 
@@ -368,9 +370,55 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     }
   }
 
-  // Convert and strictly validate date
-  let date: SchedulingIntent['date'];
-  const d = requireRecord(raw.date, 'Date intent');
+  const date = parseDateIntentOutput(raw.date);
+  const time = parseTimeIntentOutput(raw.time);
+
+  const requiresClarification = raw.requiresClarification;
+  const clarificationQuestion =
+    typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
+      ? raw.clarificationQuestion.trim()
+      : null;
+
+  if (requiresClarification && !clarificationQuestion) {
+    throw new EdgeError(
+      'AI_INVALID_OUTPUT',
+      'A non-empty clarification question is required when requiresClarification is true.',
+      502,
+    );
+  }
+
+  const normalized = {
+    title: typeof raw.title === 'string' ? raw.title.trim() : '',
+    duration,
+    date,
+    time,
+    location: typeof raw.location === 'string' && raw.location.trim() ? raw.location.trim() : null,
+    description:
+      typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null,
+    requiresClarification,
+    clarificationQuestion,
+  };
+
+  const parsed = schedulingIntentSchema.safeParse(normalized);
+  if (!parsed.success) {
+    throw new EdgeError(
+      'AI_INVALID_OUTPUT',
+      `The AI returned an invalid scheduling intent: ${parsed.error.issues[0]?.message ?? 'Unknown'}`,
+      502,
+    );
+  }
+
+  return parsed.data;
+}
+
+/**
+ * Converts the model's strict-mode date object (every key present, unused ones
+ * null) into a DateIntent, failing closed on anything malformed. Shared by
+ * every prompt that asks the model for a date.
+ */
+export function parseDateIntentOutput(value: unknown): DateIntent {
+  let date: DateIntent;
+  const d = requireRecord(value, 'Date intent');
   rejectUnexpectedKeys(d, DATE_KEYS, 'date');
   validateOptionalEnum(d, 'weekday', [
     'monday',
@@ -466,9 +514,13 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  // Convert and strictly validate time
-  let time: SchedulingIntent['time'];
-  const t = requireRecord(raw.time, 'Time intent');
+  return date;
+}
+
+/** The time counterpart of `parseDateIntentOutput`. */
+export function parseTimeIntentOutput(value: unknown): TimeIntent {
+  let time: TimeIntent;
+  const t = requireRecord(value, 'Time intent');
   rejectUnexpectedKeys(t, TIME_KEYS, 'time');
   for (const key of [
     'hour',
@@ -568,52 +620,17 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  const requiresClarification = raw.requiresClarification;
-  const clarificationQuestion =
-    typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
-      ? raw.clarificationQuestion.trim()
-      : null;
-
-  if (requiresClarification && !clarificationQuestion) {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      'A non-empty clarification question is required when requiresClarification is true.',
-      502,
-    );
-  }
-
-  const normalized = {
-    title: typeof raw.title === 'string' ? raw.title.trim() : '',
-    duration,
-    date,
-    time,
-    location: typeof raw.location === 'string' && raw.location.trim() ? raw.location.trim() : null,
-    description:
-      typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null,
-    requiresClarification,
-    clarificationQuestion,
-  };
-
-  const parsed = schedulingIntentSchema.safeParse(normalized);
-  if (!parsed.success) {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      `The AI returned an invalid scheduling intent: ${parsed.error.issues[0]?.message ?? 'Unknown'}`,
-      502,
-    );
-  }
-
-  return parsed.data;
+  return time;
 }
 
-function requireRecord(value: unknown, label: string): Record<string, unknown> {
+export function requireRecord(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new EdgeError('AI_INVALID_OUTPUT', `${label} must be a valid object.`, 502);
   }
   return value as Record<string, unknown>;
 }
 
-function rejectUnexpectedKeys(
+export function rejectUnexpectedKeys(
   value: Record<string, unknown>,
   allowed: readonly string[],
   label: string,

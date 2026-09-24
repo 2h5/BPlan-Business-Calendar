@@ -27,7 +27,8 @@ export type EdgeErrorCode =
   | 'AI_INVALID_OUTPUT'
   | 'AI_PROVIDER_UNAVAILABLE'
   | 'AI_PROPOSAL_STALE'
-  | 'AI_CLARIFICATION_REQUIRED';
+  | 'AI_CLARIFICATION_REQUIRED'
+  | 'AI_EVENT_NOT_FOUND';
 
 export class EdgeError extends Error {
   constructor(

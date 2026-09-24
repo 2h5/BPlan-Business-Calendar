@@ -95,6 +95,9 @@ import_map = "./functions/deno.json"
 [functions.ai-find-time]
 import_map = "./functions/deno.json"
 
+[functions.ai-edit-event]
+import_map = "./functions/deno.json"
+
 [functions.delete-account]
 import_map = "./functions/deno.json"
 
