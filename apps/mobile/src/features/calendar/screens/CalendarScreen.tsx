@@ -66,6 +66,7 @@ export function CalendarScreen() {
 
   const openEvent = useEventEditorStore((state) => state.openEvent);
   const openNewEvent = useEventEditorStore((state) => state.openNew);
+  const openNewEventOnDay = useEventEditorStore((state) => state.openNewOnDay);
 
   const { window, byDateKey, timeZone, hourCycle, weekStartsOn, isLoading, isError, refetch } =
     useCalendarWindow();
@@ -153,7 +154,7 @@ export function CalendarScreen() {
           tone="accent"
           filled
           accessibilityLabel="New event"
-          onPress={() => openNewEvent(anchor)}
+          onPress={() => openNewEventOnDay(selectedDateKey)}
         />
       </View>
 
@@ -190,6 +191,7 @@ export function CalendarScreen() {
           selectedDateKey={selectedDateKey}
           onSelectDate={selectDate}
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
+          onPressSlot={(start) => openNewEvent(start)}
           onMoveOccurrence={moveOccurrence}
         />
       ) : mode === 'month' ? (

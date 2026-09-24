@@ -2,9 +2,10 @@ import { type NextTaskDue, nextTaskDue } from '@cal/domain';
 import type { CreateTaskInput, Task, UpdateTaskInput } from '@cal/schemas';
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { queryKeys } from '../../../lib/query/query-client';
+import { useUndoStore } from '../../../store/undo.store';
 import { useAuth, useRequiredUserId } from '../../auth';
 import { useUserTimeZone } from '../../settings/hooks/useProfile';
 import {
@@ -33,11 +34,22 @@ import {
 export function useTasks(options?: { openOnly?: boolean }) {
   const { isAuthenticated } = useAuth();
   const openOnly = options?.openOnly ?? false;
+  const hiddenTaskIds = useUndoStore((state) => state.hiddenTaskIds);
+
+  // Tasks whose delete is still undoable stay in the cache but out of view.
+  const select = useMemo(
+    () =>
+      hiddenTaskIds.length === 0
+        ? undefined
+        : (tasks: TaskWithTags[]) => tasks.filter((task) => !hiddenTaskIds.includes(task.id)),
+    [hiddenTaskIds],
+  );
 
   return useQuery({
     queryKey: queryKeys.tasks.list(openOnly),
     queryFn: () => fetchTasks({ openOnly }),
     enabled: isAuthenticated,
+    select,
   });
 }
 

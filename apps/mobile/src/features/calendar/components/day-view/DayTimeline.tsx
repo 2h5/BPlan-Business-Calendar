@@ -239,7 +239,10 @@ export function DayTimeline({
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={{ flex: 1 }}>
+      {/* The hour labels are short and right-aligned, so the screen's margin
+          left of them was empty space. Letting the timeline run into it gives
+          the day columns that width instead. */}
+      <View style={{ flex: 1, marginLeft: -(theme.screenPadding - theme.spacing.xs) }}>
         <View style={{ flexDirection: 'row' }}>
           <View style={{ width: GUTTER_WIDTH }} />
           <View style={{ flex: 1, overflow: 'hidden' }}>

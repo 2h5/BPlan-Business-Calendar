@@ -3,11 +3,12 @@ import { Badge, Button, Card, Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, type ViewStyle } from 'react-native';
 
+import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { GoldText } from '../../billing/components/GoldText';
 import { usePlanState, useSubscription } from '../../billing/hooks/useSubscription';
 
-const TITLE = 'Upgrade to BPlan Pro';
+const TITLE = `Upgrade to ${PRO_PLAN_NAME}`;
 const SUBTITLE = 'Unlock Find Time with AI';
 /** This row keeps its own three-second rhythm; the upgrade page uses 3.5s. */
 const CYCLE_MS = 3000;
@@ -16,7 +17,7 @@ const CYCLE_MS = 3000;
  * that label describes the state, which the badge beside it already says. This
  * is the name used everywhere else the product sells or mentions the plan.
  */
-const PLAN_NAME = 'BPlan Pro';
+const PLAN_NAME = PRO_PLAN_NAME;
 /**
  * What the card says under the plan state. The shared status text swaps in the
  * renewal date when there is one; this card wants the same sentence every time,

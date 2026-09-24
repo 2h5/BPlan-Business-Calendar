@@ -1,25 +1,12 @@
 import { useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
-import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { GlassView } from 'expo-glass-effect';
+import { Pressable, StyleSheet, View } from 'react-native';
+
+import { canUseGlassEffect } from '../../../lib/glass';
 
 export interface LiquidGlassCloseButtonProps {
   onPress: () => void;
-}
-
-function canUseGlassEffect(): boolean {
-  if (Platform.OS !== 'ios') {
-    return false;
-  }
-
-  try {
-    return isGlassEffectAPIAvailable();
-  } catch {
-    // Expo Go and development builds created before expo-glass-effect was
-    // installed do not include ExpoGlassEffect. Keep the paywall dismissible
-    // until the native app is rebuilt with the module linked.
-    return false;
-  }
 }
 
 /** Native iOS 26 liquid glass with a surfaced fallback for older systems. */

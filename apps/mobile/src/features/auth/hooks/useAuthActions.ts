@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 
 import { logEvent } from '../../../lib/logger';
 import {
+  deleteAccount,
   sendPasswordReset,
   signInWithApple,
   signInWithPassword,
@@ -45,15 +46,30 @@ export function useAuthActions() {
     onSuccess: () => logEvent('auth_reset_requested'),
   });
 
+  const leave = (event: string) => {
+    // Drop every cached row so the next account never sees the last one's data.
+    queryClient.clear();
+    logEvent(event);
+    router.replace('/(auth)/sign-in');
+  };
+
   const signOutMutation = useMutation({
     mutationFn: () => signOut(),
-    onSuccess: () => {
-      // Drop every cached row so the next account never sees the last one's data.
-      queryClient.clear();
-      logEvent('auth_sign_out');
-      router.replace('/(auth)/sign-in');
-    },
+    onSuccess: () => leave('auth_sign_out'),
   });
 
-  return { signIn, signUp, apple, resetPassword, signOut: signOutMutation };
+  const deleteAccountMutation = useMutation({
+    mutationFn: () => deleteAccount(),
+    onSuccess: () => leave('auth_account_deleted'),
+    onError: () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
+  });
+
+  return {
+    signIn,
+    signUp,
+    apple,
+    resetPassword,
+    signOut: signOutMutation,
+    deleteAccount: deleteAccountMutation,
+  };
 }

@@ -1,20 +1,27 @@
-import { Text, useTheme } from '@cal/ui';
+import { Button, Text, singleLine, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { FindTimeLoading } from './FindTimeLoading';
+import { FindTimePill, FindTimeSendButton } from './FindTimePill';
+import { usePaywallStore } from '../../../store/paywall.store';
 import type { FindTimeReadback, FindTimeSuggestion } from '../api/find-time.api';
 import { useConfirmSlot } from '../hooks/useConfirmSlot';
 import { useFindTime } from '../hooks/useFindTime';
 
-const PLACEHOLDER = 'Try "15 minutes with Patrick next week"';
+// Short enough to fit the field on a phone; a truncated example reads as a bug.
+const PLACEHOLDER = 'Coffee with Pat Friday';
 
 export interface FindTimeBoxProps {
   timeZone: string;
   /** Notified after a slot is booked, e.g. so the screen can navigate to it. */
   onScheduled?: (suggestion: FindTimeSuggestion) => void;
+  /** Focuses the field on mount, for a box that was just expanded from a bar. */
+  autoFocus?: boolean;
+  /** The field lost focus with nothing typed and nothing showing — the box can fold away. */
+  onIdleBlur?: () => void;
 }
 
 /**
@@ -27,10 +34,9 @@ export interface FindTimeBoxProps {
  * hooks verbatim — only the presentation differs, so the two surfaces cannot
  * drift on which errors they surface or how a stale slot is handled.
  */
-export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
+export function FindTimeBox({ timeZone, onScheduled, autoFocus, onIdleBlur }: FindTimeBoxProps) {
   const theme = useTheme();
   const [text, setText] = useState('');
-  const [focused, setFocused] = useState(false);
   const findTime = useFindTime();
   const confirmSlot = useConfirmSlot();
 
@@ -49,92 +55,50 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const canSubmit = text.trim().length > 0 && !findTime.isPending;
   const { confirmation } = confirmSlot;
   const errorMessage = findTime.errorMessage ?? confirmSlot.errorMessage;
+  const openPaywall = usePaywallStore((state) => state.open);
 
   return (
-    <View
-      accessibilityLabel="Find a time"
-      style={{
-        padding: theme.spacing.lg,
-        gap: theme.spacing.md,
-        borderRadius: theme.radius.md,
-        borderWidth: theme.borderWidth.hairline,
-        borderColor: focused ? theme.colors.accent : theme.colors.borderSubtle,
-        backgroundColor: theme.colors.surface,
-      }}
-    >
-      <View style={{ flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' }}>
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <Ionicons
-            name="sparkles"
-            size={16}
-            color={focused ? theme.colors.accent : theme.colors.textTertiary}
-            style={{ position: 'absolute', left: theme.spacing.md, zIndex: 1 }}
+    <View accessibilityLabel="Find a time" style={{ gap: theme.spacing.md }}>
+      <FindTimePill
+        trailing={
+          <FindTimeSendButton
+            enabled={canSubmit}
+            pending={findTime.isPending}
+            onPress={handleSubmit}
           />
-          <TextInput
-            value={text}
-            placeholder={PLACEHOLDER}
-            placeholderTextColor={theme.colors.textTertiary}
-            selectionColor={theme.colors.accent}
-            accessibilityLabel="Describe what you want to schedule"
-            returnKeyType="search"
-            onSubmitEditing={handleSubmit}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onChangeText={(next) => {
-              setText(next);
-              if (findTime.proposal || findTime.clarification || findTime.errorMessage)
-                findTime.reset();
-              if (confirmSlot.confirmation || confirmSlot.errorMessage) confirmSlot.reset();
-            }}
-            style={[
-              theme.typography.callout,
-              {
-                height: theme.hitSlopSize,
-                paddingLeft: theme.spacing.md * 2 + 16,
-                paddingRight: theme.spacing.md,
-                borderRadius: theme.radius.sm,
-                borderWidth: theme.borderWidth.hairline,
-                borderColor: focused ? theme.colors.accent : theme.colors.borderSubtle,
-                backgroundColor: theme.colors.inputBackground,
-                color: theme.colors.textPrimary,
-              },
-            ]}
-          />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit, busy: findTime.isPending }}
-          disabled={!canSubmit}
-          onPress={handleSubmit}
-          style={({ pressed }) => ({
-            height: theme.hitSlopSize,
-            paddingHorizontal: theme.spacing.lg,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: theme.radius.sm,
-            borderWidth: theme.borderWidth.hairline,
-            borderColor: theme.colors.accentSubtle,
-            backgroundColor: pressed ? theme.colors.accentPressed : theme.colors.accent,
-            opacity: canSubmit ? 1 : 0.55,
-          })}
-        >
-          {findTime.isPending ? (
-            <ActivityIndicator size="small" color={theme.colors.onAccent} />
-          ) : (
-            <Text variant="subhead" color="onAccent" style={{ fontWeight: '600' }}>
-              Find time
-            </Text>
-          )}
-        </Pressable>
-      </View>
-
-      {!findTime.proposal && !findTime.clarification && !findTime.errorMessage && !confirmation ? (
-        <Text variant="footnote" color="tertiary">
-          Describe a meeting — including when, like “next week” or “this weekend” — and BCal will
-          suggest the three best open slots.
-        </Text>
-      ) : null}
+        }
+      >
+        <TextInput
+          value={text}
+          placeholder={PLACEHOLDER}
+          placeholderTextColor={theme.colors.textTertiary}
+          selectionColor={theme.colors.accent}
+          accessibilityLabel="Describe what you want to schedule"
+          returnKeyType="search"
+          onSubmitEditing={handleSubmit}
+          autoFocus={autoFocus}
+          onBlur={() => {
+            const idle =
+              text.trim().length === 0 &&
+              !findTime.isPending &&
+              !findTime.proposal &&
+              !findTime.clarification &&
+              !errorMessage &&
+              !confirmation;
+            if (idle) onIdleBlur?.();
+          }}
+          onChangeText={(next) => {
+            setText(next);
+            if (findTime.proposal || findTime.clarification || findTime.errorMessage)
+              findTime.reset();
+            if (confirmSlot.confirmation || confirmSlot.errorMessage) confirmSlot.reset();
+          }}
+          style={[
+            singleLine(theme.typography.callout),
+            { height: '100%', color: theme.colors.textPrimary },
+          ]}
+        />
+      </FindTimePill>
 
       {/* Three placeholders in the shape of the answer, so the wait explains
           itself rather than leaving the box looking inert. */}
@@ -217,6 +181,11 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
           <Text variant="footnote" color="danger">
             {errorMessage}
           </Text>
+          {findTime.requiresUpgrade ? (
+            <View style={{ marginTop: theme.spacing.sm, alignSelf: 'flex-start' }}>
+              <Button label="See Pro plans" size="sm" onPress={openPaywall} />
+            </View>
+          ) : null}
         </View>
       ) : null}
     </View>

@@ -1,3 +1,4 @@
+export { FindTimeBar, type FindTimeBarProps } from './components/FindTimeBar';
 export { FindTimeBox, type FindTimeBoxProps } from './components/FindTimeBox';
 export {
   DEFAULT_MEETING_MINUTES,

@@ -1,20 +1,36 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, focusManager } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
 
 import { toAppError } from '../errors/app-error';
 import { logError } from '../logger';
 
 /**
+ * React Native has no window focus event, so TanStack Query never learns that
+ * the app came back to the foreground. Without this, an app left in the
+ * background overnight keeps showing yesterday's rows until something else
+ * invalidates them. `staleTime` still bounds how often a quick app switch
+ * refetches.
+ */
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((handleFocus) => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      handleFocus(state === 'active');
+    });
+    return () => subscription.remove();
+  });
+}
+
+/**
  * Server state lives here, not in a global store. Defaults are tuned for a
- * calendar: data is fresh for a short while, refetching on reconnect matters
- * more than refetching on every focus, and authorisation failures must not be
- * retried in a loop.
+ * calendar: data is fresh for a short while, returning to the app refetches
+ * anything stale, and authorisation failures must not be retried in a loop.
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
       gcTime: 30 * 60_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       retry: (failureCount, error) => {
         const { code } = toAppError(error);

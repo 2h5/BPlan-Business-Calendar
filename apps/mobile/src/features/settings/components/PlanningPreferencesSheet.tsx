@@ -15,7 +15,12 @@ import Animated, {
 import { useUpdateProfile } from '../hooks/useProfile';
 
 export type PlanningPreference =
-  'timezone' | 'weekStartsOn' | 'hourCycle' | 'workingHours' | 'defaultTaskMinutes';
+  | 'timezone'
+  | 'weekStartsOn'
+  | 'hourCycle'
+  | 'workingHours'
+  | 'defaultTaskMinutes'
+  | 'defaultEventMinutes';
 
 export interface PlanningPreferencesSheetProps {
   visible: boolean;
@@ -39,6 +44,7 @@ const COMMON_TIME_ZONES = [
 ] as const;
 
 const TASK_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120] as const;
+const EVENT_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120] as const;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const PREFERENCE_TITLES: Record<PlanningPreference, string> = {
@@ -47,6 +53,7 @@ const PREFERENCE_TITLES: Record<PlanningPreference, string> = {
   hourCycle: 'Clock',
   workingHours: 'Working hours',
   defaultTaskMinutes: 'Default task duration',
+  defaultEventMinutes: 'Default event duration',
 };
 
 /** Edits profile-backed planning preferences without putting form state in a store. */
@@ -152,6 +159,16 @@ export function PlanningPreferencesSheet({
           onSelect={(value) => void save({ defaultTaskMinutes: value })}
           saving={updateProfile.isPending}
         />
+      ) : activePreference === 'defaultEventMinutes' ? (
+        <OptionList
+          options={EVENT_DURATION_OPTIONS.map((minutes) => ({
+            label: `${minutes} minutes`,
+            value: minutes,
+          }))}
+          value={profile.defaultEventMinutes}
+          onSelect={(value) => void save({ defaultEventMinutes: value })}
+          saving={updateProfile.isPending}
+        />
       ) : (
         <WorkingHoursEditor
           value={workingHours}
@@ -172,7 +189,8 @@ export function PlanningPreferencesSheet({
         </Text>
       ) : (
         <Text variant="footnote" color="tertiary">
-          These hours guide the future Find Time scheduler. They do not change your calendar events.
+          These hours guide Find Time and Today&apos;s focus capacity. They do not change your
+          calendar events.
         </Text>
       )}
     </BottomSheet>

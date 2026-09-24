@@ -1,7 +1,9 @@
 import { BottomSheet, Button, Chip, Text, useTheme } from '@cal/ui';
 import { View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { QuickAddTaskForm } from '../../features/tasks/components/QuickAddTaskForm';
+import { useKeyboardLift } from '../../lib/keyboard';
 import { useEventEditorStore } from '../../store/event-editor.store';
 import { type QuickAddMode, useQuickAddStore } from '../../store/quick-add.store';
 
@@ -25,13 +27,17 @@ const MODES: {
  */
 export function QuickAddSheet() {
   const theme = useTheme();
-  const { isOpen, mode, seedDateKey, close, setMode } = useQuickAddStore();
+  const { isOpen, mode, seedDateKey, close, handOff, setMode } = useQuickAddStore();
   const openEventEditor = useEventEditorStore((state) => state.openNew);
+  const openEventEditorOnDay = useEventEditorStore((state) => state.openNewOnDay);
+  // The task field focuses on open; keep "Add task" and "More options" above the keyboard.
+  const { spacerStyle } = useKeyboardLift({ collapseGap: theme.spacing.lg });
 
-  const handOffToEventEditor = () => {
-    close();
-    openEventEditor(seedDateKey ? new Date(`${seedDateKey}T09:00:00`) : undefined);
-  };
+  const handOffToEventEditor = () =>
+    handOff(() => {
+      if (seedDateKey) openEventEditorOnDay(seedDateKey);
+      else openEventEditor();
+    });
 
   return (
     <BottomSheet visible={isOpen} onClose={close} title="Quick add">
@@ -48,7 +54,7 @@ export function QuickAddSheet() {
       </View>
 
       {mode === 'task' ? (
-        <QuickAddTaskForm onCaptured={close} seedDateKey={seedDateKey} />
+        <QuickAddTaskForm onCaptured={close} onHandOff={handOff} seedDateKey={seedDateKey} />
       ) : mode === 'event' ? (
         <View style={{ gap: theme.spacing.lg }}>
           <Text variant="callout" color="secondary">
@@ -61,6 +67,8 @@ export function QuickAddSheet() {
           Time blocks arrive with the scheduling engine in a later sprint.
         </Text>
       )}
+
+      <Animated.View style={spacerStyle} />
     </BottomSheet>
   );
 }

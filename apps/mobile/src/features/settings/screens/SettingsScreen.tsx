@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
+import { APP_NAME } from '../../../lib/brand';
 import { useAuth, useAuthActions } from '../../auth';
 import { useConnections } from '../../integrations/hooks/useIntegrations';
 import { NotificationSettingsCard } from '../../notifications';
@@ -36,7 +37,7 @@ export function SettingsScreen() {
   const { email } = useAuth();
   const { data: profile, isLoading } = useProfile();
   const { data: connections = [] } = useConnections();
-  const { signOut } = useAuthActions();
+  const { signOut, deleteAccount } = useAuthActions();
   const [preference, setPreference] = useState<PlanningPreference | null>(null);
 
   if (isLoading) return <LoadingState fullScreen />;
@@ -46,6 +47,28 @@ export function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => signOut.mutate() },
     ]);
+
+  // App Store review requires deletion to be reachable in the app itself.
+  const confirmDeleteAccount = () =>
+    Alert.alert(
+      'Delete your account?',
+      `This permanently deletes your ${APP_NAME} account, tasks, calendars and events, and disconnects Google and Outlook. Events stored in Google or Outlook themselves are not touched. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () =>
+            deleteAccount.mutate(undefined, {
+              onError: () =>
+                Alert.alert(
+                  'Could not delete your account',
+                  'Your account is still active. Check your connection and try again.',
+                ),
+            }),
+        },
+      ],
+    );
 
   return (
     <View style={{ gap: theme.spacing.xl }}>
@@ -101,6 +124,13 @@ export function SettingsScreen() {
           showChevron
           onPress={() => setPreference('defaultTaskMinutes')}
         />
+        <Divider inset />
+        <ListRow
+          title="Default event duration"
+          meta={`${profile?.defaultEventMinutes ?? 60} min`}
+          showChevron
+          onPress={() => setPreference('defaultEventMinutes')}
+        />
       </Card>
 
       <CalendarsCard />
@@ -120,9 +150,10 @@ export function SettingsScreen() {
         <Divider inset />
         <ListRow
           title="Find Time with AI"
-          subtitle="Schedule flexible work around your commitments"
+          subtitle="Find open slots from Today"
           trailing={<Badge label="Pro" tone="accent" />}
-          disabled
+          showChevron
+          onPress={() => router.push('/(tabs)/today')}
         />
       </Card>
 
@@ -133,6 +164,14 @@ export function SettingsScreen() {
           fullWidth
           loading={signOut.isPending}
           onPress={confirmSignOut}
+        />
+        <Button
+          label="Delete account"
+          variant="destructive"
+          fullWidth
+          loading={deleteAccount.isPending}
+          disabled={signOut.isPending}
+          onPress={confirmDeleteAccount}
         />
         <Text variant="footnote" color="tertiary" align="center">
           Deleting your account removes your data and revokes every calendar connection.

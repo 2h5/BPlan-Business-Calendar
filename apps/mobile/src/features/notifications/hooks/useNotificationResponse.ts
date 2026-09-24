@@ -1,10 +1,18 @@
+import { parseEventAlertKey } from '@cal/domain';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 
 import { logError } from '../../../lib/logger';
-import type { ReminderPayload } from '../../../lib/notifications';
+import { useEventEditorStore } from '../../../store/event-editor.store';
 import { useSnoozeTask, useToggleTaskComplete } from '../../tasks/hooks/useTasks';
+
+interface ResponsePayload {
+  kind?: unknown;
+  taskId?: unknown;
+  eventId?: unknown;
+  reminderKey?: unknown;
+}
 
 /**
  * Handles what happens when a reminder is tapped or one of its action buttons
@@ -14,12 +22,31 @@ import { useSnoozeTask, useToggleTaskComplete } from '../../tasks/hooks/useTasks
 export function useNotificationResponse(): void {
   const toggleComplete = useToggleTaskComplete();
   const snooze = useSnoozeTask();
+  const openEvent = useEventEditorStore((state) => state.openEvent);
 
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       try {
-        const payload = response.notification.request.content.data as
-          Partial<ReminderPayload> | undefined;
+        const payload = response.notification.request.content.data as ResponsePayload | undefined;
+
+        // Event alerts are recognised by their key as well as their kind:
+        // alerts scheduled before the payload carried `kind: 'event'` were
+        // labelled as tasks, with the event id in `taskId`.
+        const eventAlert =
+          typeof payload?.reminderKey === 'string' ? parseEventAlertKey(payload.reminderKey) : null;
+        const eventId =
+          eventAlert?.eventId ??
+          (payload?.kind === 'event' && typeof payload.eventId === 'string'
+            ? payload.eventId
+            : null);
+
+        if (eventId) {
+          // An event has no quick actions; only a plain tap does anything.
+          if (response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
+            openEvent(eventId);
+          }
+          return;
+        }
 
         if (payload?.kind !== 'task' || typeof payload.taskId !== 'string') return;
         const taskId = payload.taskId;
@@ -47,5 +74,5 @@ export function useNotificationResponse(): void {
     });
 
     return () => subscription.remove();
-  }, [toggleComplete, snooze]);
+  }, [toggleComplete, snooze, openEvent]);
 }

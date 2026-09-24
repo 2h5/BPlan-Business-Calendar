@@ -2,6 +2,7 @@ import type { SchedulingIntent } from '@cal/schemas/scheduling';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
+import { APP_NAME } from '../../../lib/brand';
 import {
   findTimeForText,
   type FindTimeClarification,
@@ -15,6 +16,8 @@ export interface FindTimeState {
   proposal: FindTimeProposal | null;
   clarification: FindTimeClarification | null;
   errorMessage: string | null;
+  /** The request failed only because Find Time needs Pro — the fix is an upgrade. */
+  requiresUpgrade: boolean;
   isPending: boolean;
   submit: (text: string, timeZone: string) => void;
   reset: () => void;
@@ -58,6 +61,7 @@ export function useFindTime(): FindTimeState {
     proposal,
     clarification,
     errorMessage: mutation.error ? messageForError(mutation.error) : null,
+    requiresUpgrade: mutation.error ? codeOf(mutation.error) === 'SUBSCRIPTION_REQUIRED' : false,
     isPending: mutation.isPending,
     submit,
     reset,
@@ -75,13 +79,13 @@ function messageForError(error: unknown): string {
     case 'AI_PROVIDER_UNAVAILABLE':
       return 'AI scheduling is temporarily unavailable. Please try again shortly.';
     case 'SUBSCRIPTION_REQUIRED':
-      return 'Find Time is a Pro feature. Upgrade to let BCal find open slots for you.';
+      return `Find Time is a Pro feature. Upgrade to let ${APP_NAME} find open slots for you.`;
     case 'AI_NO_VALID_SLOT':
       return 'No open time fits that in the window you asked for. Try a shorter block or a wider window.';
     case 'AI_RATE_LIMITED':
       return "You've used all 10 Find Time attempts this hour. Try again shortly.";
     case 'AI_DEFAULT_CALENDAR_MISSING':
-      return 'Restore a writable default BCal calendar before finding time.';
+      return `Restore a writable default ${APP_NAME} calendar before finding time.`;
     case 'AI_WINDOW_TOO_FAR':
       return 'That date is too far ahead to schedule yet. Try a date within the next year.';
     case 'AI_SCHEDULING_WINDOW_INVALID':

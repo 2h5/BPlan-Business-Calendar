@@ -5,6 +5,7 @@ import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 
+import { APP_NAME } from '../../../lib/brand';
 import { toAppError } from '../../../lib/errors/app-error';
 import { AppleSignInButton } from '../components/AppleSignInButton';
 import { AuthDivider } from '../components/AuthDivider';
@@ -29,7 +30,7 @@ export function SignInScreen() {
         style={{ gap: theme.spacing.xxl }}
       >
         <AuthHeader
-          eyebrow="BCal workspace"
+          eyebrow={`${APP_NAME} workspace`}
           title="Welcome back"
           subtitle="Sign in to continue to your calendar and tasks."
         />

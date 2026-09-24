@@ -8,7 +8,7 @@ import { IntegrationsScreen } from '../../src/features/integrations';
  */
 export default function IntegrationsRoute() {
   return (
-    <Screen>
+    <Screen belowHeader>
       <IntegrationsScreen />
     </Screen>
   );

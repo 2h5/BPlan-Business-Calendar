@@ -24,6 +24,7 @@ export function AppSheets() {
         onClose={taskEditor.close}
         taskId={taskEditor.taskId}
         defaultListId={taskEditor.defaultListId}
+        draft={taskEditor.draft}
       />
 
       <EventEditorSheet
@@ -31,6 +32,7 @@ export function AppSheets() {
         onClose={eventEditor.close}
         eventId={eventEditor.eventId}
         seedStart={eventEditor.seedStart ? new Date(eventEditor.seedStart) : null}
+        seedDateKey={eventEditor.seedDateKey}
       />
     </>
   );

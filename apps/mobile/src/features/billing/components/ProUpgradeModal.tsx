@@ -8,6 +8,7 @@ import { BillingIntervalToggle, type BillingInterval } from './BillingIntervalTo
 import { GoldText } from './GoldText';
 import { LiquidGlassCloseButton } from './LiquidGlassCloseButton';
 import { RollingPrice } from './RollingPrice';
+import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 
 /** What the hero feature promises, in the words the website uses. */
@@ -75,7 +76,7 @@ export function ProUpgradeModal() {
               <Badge label="Most Popular" tone="accent" />
             </View>
             <GoldText variant="title1" cycleMs={CYCLE_MS}>
-              BPlan Pro
+              {PRO_PLAN_NAME}
             </GoldText>
             <Text variant="callout" color="secondary">
               {PRO_PLAN.tagline}

@@ -7,7 +7,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppSheets } from '../src/components/app-shell/AppSheets';
-import { TaskEditorHost } from '../src/components/app-shell/TaskEditorHost';
+import { HeaderBackButton } from '../src/components/app-shell/HeaderBackButton';
+import { UndoToast } from '../src/components/app-shell/UndoToast';
 import { AuthProvider, useAuth } from '../src/features/auth';
 import { ProUpgradeModal } from '../src/features/billing/components/ProUpgradeModal';
 import { ReminderSync } from '../src/features/notifications';
@@ -69,7 +70,7 @@ function RootStack() {
         options={{
           headerShown: true,
           title: 'Connections',
-          headerBackTitle: 'Settings',
+          headerLeft: () => <HeaderBackButton label="Settings" />,
           animation: 'default',
         }}
       />
@@ -80,8 +81,7 @@ function RootStack() {
         options={{
           headerShown: true,
           title: 'Search',
-          // Without this the back button reads "(tabs)" — the route group's name.
-          headerBackTitle: 'Back',
+          headerLeft: () => <HeaderBackButton label="Back" />,
           animation: 'default',
         }}
       />
@@ -97,9 +97,9 @@ function AuthenticatedOverlays() {
   return (
     <>
       <AppSheets />
-      <TaskEditorHost />
       <ReminderSync />
       <ProUpgradeModal />
+      <UndoToast />
     </>
   );
 }

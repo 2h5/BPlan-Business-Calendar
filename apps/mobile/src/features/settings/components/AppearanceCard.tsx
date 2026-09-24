@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Pressable, View } from 'react-native';
 
+import { APP_NAME } from '../../../lib/brand';
 import { useAppearance } from '../appearance/AppearanceProvider';
 import {
   THEME_MODES,
@@ -31,7 +32,7 @@ export function AppearanceCard() {
   return (
     <Card
       eyebrow="Appearance"
-      description="Customize how BPlan looks on this device."
+      description={`Customize how ${APP_NAME} looks on this device.`}
       padded={false}
     >
       <View style={{ padding: theme.spacing.xl, gap: theme.spacing.md }}>
@@ -123,9 +124,9 @@ function ThemePreview({ option }: { option: ThemeMode }) {
 
   const swatch =
     option === 'light'
-      ? { bg: '#FFFFFF', line: '#D9DDE5', icon: '#4766DB' }
+      ? { bg: '#FFFFFF', line: '#D9DDE5', icon: '#196AF3' }
       : option === 'dark'
-        ? { bg: '#13171E', line: '#29313E', icon: '#8AA4FF' }
+        ? { bg: '#13171E', line: '#29313E', icon: '#196AF3' }
         : {
             bg: theme.colors.surfaceElevated,
             line: theme.colors.border,

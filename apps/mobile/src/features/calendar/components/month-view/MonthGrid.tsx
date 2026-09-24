@@ -274,10 +274,17 @@ export function MonthGrid({
                   ),
                 )}
 
-                {overflowByColumn.map((count, column) =>
-                  count > 0 ? (
-                    <View
+                {/* "+N" opens the day, like tapping its cell — without a
+                  press handler of its own it swallowed the tap. */}
+                {overflowByColumn.map((count, column) => {
+                  const dateKey = weekKeys[column];
+                  return count > 0 && dateKey ? (
+                    <Pressable
                       key={`overflow-${column}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${count} more on ${dateKey}`}
+                      hitSlop={{ top: 4, bottom: 4 }}
+                      onPress={() => onSelectDate(dateKey)}
                       style={{
                         position: 'absolute',
                         top: lanes * (BAR_HEIGHT + BAR_GAP),
@@ -289,9 +296,9 @@ export function MonthGrid({
                       <Text variant="caption" color="tertiary">
                         {`+${count}`}
                       </Text>
-                    </View>
-                  ) : null,
-                )}
+                    </Pressable>
+                  ) : null;
+                })}
               </View>
             </View>
           );

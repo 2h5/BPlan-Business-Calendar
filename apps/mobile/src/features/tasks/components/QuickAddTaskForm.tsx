@@ -20,6 +20,8 @@ type DuePreset = 'none' | 'today' | 'tomorrow' | 'next-week';
 export interface QuickAddTaskFormProps {
   /** Called after a successful capture so the sheet can dismiss itself. */
   onCaptured: () => void;
+  /** Closes Quick Add and runs `next`, which opens another sheet, once it has gone. */
+  onHandOff: (next: () => void) => void;
   /** Set when opened from a specific day, which pre-selects a due date. */
   seedDateKey?: string | null;
 }
@@ -29,7 +31,7 @@ export interface QuickAddTaskFormProps {
  * only required input is a title — everything else is a single tap, and the
  * full editor is one tap away for anything more involved.
  */
-export function QuickAddTaskForm({ onCaptured, seedDateKey }: QuickAddTaskFormProps) {
+export function QuickAddTaskForm({ onCaptured, onHandOff, seedDateKey }: QuickAddTaskFormProps) {
   const theme = useTheme();
   const timeZone = useUserTimeZone();
   const createTask = useCreateTask();
@@ -163,8 +165,14 @@ export function QuickAddTaskForm({ onCaptured, seedDateKey }: QuickAddTaskFormPr
           variant="ghost"
           fullWidth
           onPress={() => {
-            onCaptured();
-            openEditor(null);
+            // Whatever was typed so far carries over rather than being thrown away.
+            const draft = {
+              title: title.trim(),
+              priority,
+              dueAt: resolveDueAt(),
+              estimatedMinutes,
+            };
+            onHandOff(() => openEditor(null, draft));
           }}
         />
       </View>

@@ -1,4 +1,4 @@
-import type { PlannedReminder } from '@cal/domain';
+import { parseEventAlertKey, type PlannedReminder } from '@cal/domain';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -15,11 +15,9 @@ import { logError } from '../logger';
 export const TASK_REMINDER_CATEGORY = 'task-reminder';
 
 /** Payload attached to every reminder so a tap can deep-link to the item. */
-export interface ReminderPayload extends Record<string, unknown> {
-  kind: 'task';
-  taskId: string;
-  reminderKey: string;
-}
+export type ReminderPayload = Record<string, unknown> & { reminderKey: string } & (
+    { kind: 'task'; taskId: string } | { kind: 'event'; eventId: string }
+  );
 
 export function configureNotificationHandler(): void {
   Notifications.setNotificationHandler({
@@ -72,7 +70,7 @@ export async function getScheduledReminders(): Promise<Map<string, Date>> {
   const result = new Map<string, Date>();
 
   for (const request of scheduled) {
-    const payload = request.content.data as Partial<ReminderPayload> | undefined;
+    const payload = request.content.data as { reminderKey?: unknown } | undefined;
     const key = payload?.reminderKey;
     if (typeof key !== 'string') continue;
 
@@ -105,11 +103,13 @@ export async function scheduleReminder(reminder: PlannedReminder): Promise<void>
   // never leave two notifications for the same task.
   await cancelReminder(reminder.key);
 
-  const payload: ReminderPayload = {
-    kind: 'task',
-    taskId: reminder.taskId,
-    reminderKey: reminder.key,
-  };
+  // Event alerts share the planner's shape, where `taskId` carries the event
+  // id; the key tells them apart. They must not get the task category, whose
+  // "Mark done" and "Snooze" buttons mean nothing for an event.
+  const eventAlert = parseEventAlertKey(reminder.key);
+  const payload: ReminderPayload = eventAlert
+    ? { kind: 'event', eventId: eventAlert.eventId, reminderKey: reminder.key }
+    : { kind: 'task', taskId: reminder.taskId, reminderKey: reminder.key };
 
   await Notifications.scheduleNotificationAsync({
     identifier: reminder.key,
@@ -117,7 +117,7 @@ export async function scheduleReminder(reminder: PlannedReminder): Promise<void>
       title: reminder.title,
       body: reminder.body,
       data: payload,
-      categoryIdentifier: TASK_REMINDER_CATEGORY,
+      ...(eventAlert ? {} : { categoryIdentifier: TASK_REMINDER_CATEGORY }),
       sound: true,
     },
     trigger: {

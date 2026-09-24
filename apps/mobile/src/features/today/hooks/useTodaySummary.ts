@@ -3,6 +3,7 @@ import {
   bucketTasks,
   calculateFreeTime,
   deviceTimeZone,
+  expandWorkingHours,
   startOfZonedDay,
   toZonedDateKey,
   type FreeTimeSummary,
@@ -62,6 +63,12 @@ export interface TodaySummary {
   timeline: TodayTimelineItem[];
   next: TodayTimelineItem | null;
   freeTime: FreeTimeSummary;
+  /** Total working minutes in today's working hours, whether past or still ahead. */
+  workingMinutes: number;
+  /** When today's first working window opens, or null on a day with no working hours. */
+  workdayStartsAt: number | null;
+  /** When today's last working window closes, or null on a day with no working hours. */
+  workdayEndsAt: number | null;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -180,6 +187,11 @@ export function useTodaySummary(): TodaySummary {
     [now, timeline],
   );
 
+  const workingHours = profileQuery.data?.workingHours;
+
+  // All-day events do not block working time, matching how Google and Outlook
+  // mark them "free" by default — a conference or a holiday banner should not
+  // report the whole day as booked.
   const freeTime = useMemo(
     () =>
       calculateFreeTime({
@@ -187,14 +199,29 @@ export function useTodaySummary(): TodaySummary {
         dayEnd,
         now,
         timeZone,
-        workingHours: profileQuery.data?.workingHours ?? [],
-        busy: eventOccurrences.map((occurrence) => ({
-          start: occurrence.start,
-          end: occurrence.end,
-        })),
+        workingHours: workingHours ?? [],
+        busy: eventOccurrences
+          .filter((occurrence) => !occurrence.event.allDay)
+          .map((occurrence) => ({ start: occurrence.start, end: occurrence.end })),
       }),
-    [dayEnd, dayStart, eventOccurrences, now, profileQuery.data?.workingHours, timeZone],
+    [dayEnd, dayStart, eventOccurrences, now, workingHours, timeZone],
   );
+
+  const { workingMinutes, workdayStartsAt, workdayEndsAt } = useMemo(() => {
+    const windows = expandWorkingHours(
+      { start: dayStart.getTime(), end: dayEnd.getTime() },
+      workingHours ?? [],
+      timeZone,
+    );
+    return {
+      workingMinutes: Math.round(
+        windows.reduce((total, window) => total + (window.end - window.start), 0) / 60_000,
+      ),
+      workdayStartsAt:
+        windows.length > 0 ? Math.min(...windows.map((window) => window.start)) : null,
+      workdayEndsAt: windows.length > 0 ? Math.max(...windows.map((window) => window.end)) : null,
+    };
+  }, [dayEnd, dayStart, workingHours, timeZone]);
 
   return {
     todayKey,
@@ -214,6 +241,9 @@ export function useTodaySummary(): TodaySummary {
     timeline,
     next,
     freeTime,
+    workingMinutes,
+    workdayStartsAt,
+    workdayEndsAt,
     isLoading:
       profileQuery.isLoading ||
       tasksQuery.isLoading ||

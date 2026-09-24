@@ -1,5 +1,5 @@
 import { forwardRef, useState, type ReactNode } from 'react';
-import { TextInput, type TextInputProps, View, type ViewStyle } from 'react-native';
+import { TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native';
 
 import { Text } from '../text/Text';
 import { useTheme } from '../theme/ThemeProvider';
@@ -82,7 +82,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
               onBlur?.(event);
             }}
             style={[
-              theme.typography.callout,
+              rest.multiline ? theme.typography.callout : singleLine(theme.typography.callout),
               { flex: 1, color: theme.colors.textPrimary, paddingVertical: theme.spacing.sm },
             ]}
             {...rest}
@@ -103,3 +103,13 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     </View>
   );
 });
+
+/**
+ * iOS draws a single-line TextInput's text low when its style carries a
+ * `lineHeight`, so typed text sits under the centre of the box and out of line
+ * with its icons. Line height only matters across lines, so drop it here.
+ */
+export function singleLine(style: TextStyle): TextStyle {
+  const { lineHeight: _lineHeight, ...rest } = style;
+  return rest;
+}

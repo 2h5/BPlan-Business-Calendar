@@ -15,7 +15,7 @@ export { Avatar, type AvatarProps } from './layout/Avatar';
 export { EmptyState, type EmptyStateProps } from './state/EmptyState';
 export { LoadingState, Skeleton, type LoadingStateProps } from './state/LoadingState';
 export { ErrorState, type ErrorStateProps } from './state/ErrorState';
-export { TextField, type TextFieldProps } from './form/TextField';
+export { TextField, singleLine, type TextFieldProps } from './form/TextField';
 export { Checkbox, strikeThroughStyle, type CheckboxProps } from './form/Checkbox';
 export {
   SegmentedControl,

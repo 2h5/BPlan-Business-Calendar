@@ -1,22 +1,12 @@
 import type { ProviderKind } from '@cal/schemas';
-import {
-  Badge,
-  Button,
-  Card,
-  Divider,
-  EmptyState,
-  ErrorState,
-  ListRow,
-  LoadingState,
-  Text,
-  useTheme,
-} from '@cal/ui';
+import { ErrorState, LoadingState, Text, useTheme } from '@cal/ui';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 
 import { CalendarPickerSheet } from '../components/CalendarPickerSheet';
 import { ConnectionCard } from '../components/ConnectionCard';
+import { ProviderList } from '../components/ProviderList';
 import { CONNECT_MESSAGES, useConnectProvider } from '../hooks/useConnectProvider';
 import {
   useConnections,
@@ -90,97 +80,46 @@ export function IntegrationsScreen() {
 
   const accounts = connections.data ?? [];
   const connectedKinds = new Set(accounts.map((account) => account.provider));
-  const connectableProviders = PROVIDER_OPTIONS.filter(
-    (provider) => provider.available && !connectedKinds.has(provider.kind),
-  );
-  const unavailableProviders = PROVIDER_OPTIONS.filter(
-    (provider) => !provider.available && !connectedKinds.has(provider.kind),
-  );
-  const firstConnectableProvider = connectableProviders[0];
+  const connectingKind = connect.isPending ? (connect.variables ?? null) : null;
   const healthFor = (accountId: string) =>
     (health.data ?? []).filter((entry) => entry.providerAccountId === accountId);
 
   return (
-    <View style={{ gap: theme.spacing.xl }}>
-      <View style={{ gap: theme.spacing.sm }}>
-        <Text variant="title1">Connections</Text>
-        <Text variant="footnote" color="secondary">
-          Connected calendars sync both ways. Events you create on them are written to the provider
-          first.
-        </Text>
-      </View>
+    <View style={{ gap: theme.spacing.xxl }}>
+      <Text variant="footnote" color="secondary">
+        Connected calendars sync both ways. Events you create on them are written to the provider
+        first.
+      </Text>
 
-      {accounts.length === 0 ? (
-        <EmptyState
-          icon="calendar-outline"
-          title="No calendars connected"
-          message="Connect a calendar to see your existing events alongside your tasks."
-          actionLabel={connect.isPending ? 'Connecting…' : firstConnectableProvider?.connectLabel}
-          onAction={
-            connect.isPending || !firstConnectableProvider
-              ? undefined
-              : () => onConnect(firstConnectableProvider.kind)
-          }
-        />
-      ) : (
-        accounts.map((account) => (
-          <ConnectionCard
-            key={account.id}
-            account={account}
-            health={healthFor(account.id)}
-            isSyncing={syncNow.isPending && busyAccountId === account.id}
-            isDisconnecting={disconnect.isPending && busyAccountId === account.id}
-            onChooseCalendars={() => setPickerAccountId(account.id)}
-            onSyncNow={() => onSyncNow(account.id)}
-            onReconnect={
-              providerMetadata(account.provider).available
-                ? () => onConnect(account.provider)
-                : undefined
-            }
-            onDisconnect={() => onDisconnect(account.id)}
-          />
-        ))
-      )}
-
-      {accounts.length > 0
-        ? connectableProviders.map((provider) => (
-            <Button
-              key={provider.kind}
-              label={provider.connectLabel}
-              variant="secondary"
-              fullWidth
-              loading={connect.isPending}
-              onPress={() => onConnect(provider.kind)}
+      {accounts.length > 0 ? (
+        <View style={{ gap: theme.spacing.lg }}>
+          {accounts.map((account) => (
+            <ConnectionCard
+              key={account.id}
+              account={account}
+              health={healthFor(account.id)}
+              isSyncing={syncNow.isPending && busyAccountId === account.id}
+              isDisconnecting={disconnect.isPending && busyAccountId === account.id}
+              onChooseCalendars={() => setPickerAccountId(account.id)}
+              onSyncNow={() => onSyncNow(account.id)}
+              onReconnect={
+                providerMetadata(account.provider).available
+                  ? () => onConnect(account.provider)
+                  : undefined
+              }
+              onDisconnect={() => onDisconnect(account.id)}
             />
-          ))
-        : connectableProviders
-            .slice(1)
-            .map((provider) => (
-              <Button
-                key={provider.kind}
-                label={provider.connectLabel}
-                variant="secondary"
-                fullWidth
-                loading={connect.isPending}
-                onPress={() => onConnect(provider.kind)}
-              />
-            ))}
+          ))}
+        </View>
+      ) : null}
 
-      <Card eyebrow="Coming soon" padded={false}>
-        {unavailableProviders.map((provider, index) => (
-          <View key={provider.kind}>
-            {index > 0 ? <Divider inset /> : null}
-            <ListRow title={provider.name} subtitle={provider.unavailableSubtitle} disabled />
-          </View>
-        ))}
-        {unavailableProviders.length > 0 ? <Divider inset /> : null}
-        <ListRow
-          title="Find Time with AI"
-          subtitle="Schedule flexible work around your commitments"
-          trailing={<Badge label="Pro" tone="accent" />}
-          disabled
-        />
-      </Card>
+      <ProviderList
+        title={accounts.length > 0 ? 'Add another calendar' : 'Connect a calendar'}
+        providers={PROVIDER_OPTIONS}
+        connectedKinds={connectedKinds}
+        connectingKind={connectingKind}
+        onConnect={onConnect}
+      />
 
       <CalendarPickerSheet
         visible={pickerAccountId !== null}

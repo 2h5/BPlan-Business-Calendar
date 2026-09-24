@@ -17,6 +17,11 @@ export interface ScreenProps {
   scrollable?: boolean;
   /** Applies the standard horizontal page inset. */
   padded?: boolean;
+  /**
+   * The screen sits under a native navigation header, which already clears
+   * the status bar — so skip the top safe-area inset instead of doubling it.
+   */
+  belowHeader?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
   /** Pinned above the safe-area bottom inset, e.g. a primary action. */
@@ -34,6 +39,7 @@ export function Screen({
   children,
   scrollable = true,
   padded = true,
+  belowHeader = false,
   onRefresh,
   refreshing = false,
   footer,
@@ -45,7 +51,7 @@ export function Screen({
 
   const inner: ViewStyle = {
     paddingHorizontal: padded ? theme.screenPadding : 0,
-    paddingTop: insets.top + theme.spacing.sm,
+    paddingTop: belowHeader ? theme.spacing.lg : insets.top + theme.spacing.sm,
     paddingBottom: footer ? theme.spacing.lg : insets.bottom + theme.spacing.xxl,
     gap: theme.spacing.xl,
   };

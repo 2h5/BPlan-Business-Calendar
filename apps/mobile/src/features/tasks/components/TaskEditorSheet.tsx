@@ -8,11 +8,14 @@ import {
   type SegmentedOption,
 } from '@cal/ui';
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { DueDateField, type DueDateValue } from './DueDateField';
 import { DurationField } from './DurationField';
 import { ListPicker } from './ListPicker';
+import { useKeyboardLift } from '../../../lib/keyboard';
+import type { TaskDraft } from '../../../store/task-editor.store';
 import { RecurrenceField } from '../../events/components/RecurrenceField';
 import { useProfile, useUserTimeZone } from '../../settings/hooks/useProfile';
 import {
@@ -37,6 +40,8 @@ export interface TaskEditorSheetProps {
   taskId: string | null;
   /** Pre-selects a list when creating from inside one. */
   defaultListId?: string | null;
+  /** Pre-fills a new task, e.g. from what was typed in Quick Add. */
+  draft?: TaskDraft | null;
 }
 
 interface FormState {
@@ -48,6 +53,10 @@ interface FormState {
   estimatedMinutes: number | null;
   recurrenceRule: string | null;
 }
+
+/** The form's scroll height with the keyboard down, and the least it shrinks to. */
+const SCROLL_MAX_HEIGHT = 460;
+const MIN_SCROLL_HEIGHT = 140;
 
 const EMPTY_FORM: FormState = {
   title: '',
@@ -69,9 +78,16 @@ export function TaskEditorSheet({
   onClose,
   taskId,
   defaultListId = null,
+  draft = null,
 }: TaskEditorSheetProps) {
   const theme = useTheme();
   const timeZone = useUserTimeZone();
+  // The sheet keeps its height when the keyboard rises: the form scrolls in
+  // less space and the buttons stay above the keyboard.
+  const { lift, spacerStyle } = useKeyboardLift();
+  const scrollStyle = useAnimatedStyle(() => ({
+    maxHeight: Math.max(MIN_SCROLL_HEIGHT, SCROLL_MAX_HEIGHT - lift.value),
+  }));
   const { data: profile } = useProfile();
   const { data: lists } = useTaskLists();
   const { data: existing } = useTask(visible ? taskId : null);
@@ -88,7 +104,18 @@ export function TaskEditorSheet({
     if (!visible) return;
 
     if (!taskId) {
-      setForm({ ...EMPTY_FORM, listId: defaultListId });
+      setForm({
+        ...EMPTY_FORM,
+        listId: defaultListId,
+        ...(draft
+          ? {
+              title: draft.title,
+              priority: draft.priority,
+              due: { dueAt: draft.dueAt ? new Date(draft.dueAt) : null, hasTime: false },
+              estimatedMinutes: draft.estimatedMinutes,
+            }
+          : {}),
+      });
       setError(null);
       return;
     }
@@ -108,7 +135,7 @@ export function TaskEditorSheet({
       });
       setError(null);
     }
-  }, [visible, taskId, existing, defaultListId]);
+  }, [visible, taskId, existing, defaultListId, draft]);
 
   const isEditing = taskId !== null;
   const isSaving = createTask.isPending || updateTask.isPending;
@@ -163,23 +190,26 @@ export function TaskEditorSheet({
       onClose={onClose}
       title={isEditing ? 'Edit task' : 'New task'}
       footer={
-        <View style={{ gap: theme.spacing.sm }}>
-          <Button
-            label={isEditing ? 'Save changes' : 'Add task'}
-            loading={isSaving}
-            fullWidth
-            onPress={() => void handleSave()}
-          />
-          {isEditing ? (
-            <Button label="Delete task" variant="ghost" fullWidth onPress={handleDelete} />
-          ) : null}
-        </View>
+        <>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Button
+              label={isEditing ? 'Save changes' : 'Add task'}
+              loading={isSaving}
+              fullWidth
+              onPress={() => void handleSave()}
+            />
+            {isEditing ? (
+              <Button label="Delete task" variant="ghost" fullWidth onPress={handleDelete} />
+            ) : null}
+          </View>
+          <Animated.View style={spacerStyle} />
+        </>
       }
     >
-      <ScrollView
+      <Animated.ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        style={{ maxHeight: 460 }}
+        style={scrollStyle}
         contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.sm }}
       >
         <TextField
@@ -238,7 +268,7 @@ export function TaskEditorSheet({
           value={form.listId}
           onChange={(listId) => setForm((previous) => ({ ...previous, listId }))}
         />
-      </ScrollView>
+      </Animated.ScrollView>
     </BottomSheet>
   );
 }

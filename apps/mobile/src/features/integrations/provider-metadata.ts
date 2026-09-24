@@ -10,6 +10,8 @@ import type { ProviderKind } from '@cal/schemas';
 export interface ProviderMetadata {
   readonly kind: ProviderKind;
   readonly name: string;
+  /** Which accounts this provider covers, in the words users know them by. */
+  readonly tagline: string;
   readonly connectLabel: string;
   readonly oauthStartFunction: string;
   readonly available: boolean;
@@ -20,6 +22,7 @@ export const PROVIDER_METADATA: Record<ProviderKind, ProviderMetadata> = {
   google: {
     kind: 'google',
     name: 'Google Calendar',
+    tagline: 'Gmail and Workspace',
     connectLabel: 'Connect Google Calendar',
     oauthStartFunction: 'oauth-google-start',
     available: true,
@@ -27,6 +30,7 @@ export const PROVIDER_METADATA: Record<ProviderKind, ProviderMetadata> = {
   microsoft: {
     kind: 'microsoft',
     name: 'Outlook Calendar',
+    tagline: 'Outlook and Microsoft 365',
     connectLabel: 'Connect Outlook Calendar',
     oauthStartFunction: 'oauth-microsoft-start',
     available: true,

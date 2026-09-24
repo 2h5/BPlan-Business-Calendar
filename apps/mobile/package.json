@@ -9,6 +9,7 @@
     "android": "expo run:android",
     "prebuild": "expo prebuild --clean",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run src",
     "doctor": "npx expo-doctor"
   },
   "dependencies": {

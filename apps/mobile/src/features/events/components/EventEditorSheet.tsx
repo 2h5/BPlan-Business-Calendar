@@ -3,6 +3,7 @@ import {
   formatDueDate,
   formatTimeOfDay,
   getZonedParts,
+  toZonedDateKey,
   zonedWallClockToUtc,
 } from '@cal/domain';
 import {
@@ -16,28 +17,56 @@ import {
   useTheme,
 } from '@cal/ui';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Pressable, Switch, View } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { RecurrenceField } from './RecurrenceField';
+import { useKeyboardLift } from '../../../lib/keyboard';
 import { useProfile, useUserTimeZone } from '../../settings/hooks/useProfile';
 import { useCalendars, useDefaultCalendarId } from '../hooks/useCalendars';
 import { useCreateEvent, useDeleteEvent, useEvent, useUpdateEvent } from '../hooks/useEvents';
+
+/** The form's scroll height with the keyboard down, and the least it shrinks to. */
+const SCROLL_MAX_HEIGHT = 470;
+const MIN_SCROLL_HEIGHT = 140;
 
 /** Alert offsets offered in the editor, in minutes before the start. */
 const ALERT_PRESETS = [
   { label: 'At start', minutes: 0 },
   { label: '5 min', minutes: 5 },
+  { label: '10 min', minutes: 10 },
   { label: '15 min', minutes: 15 },
   { label: '30 min', minutes: 30 },
   { label: '1 hour', minutes: 60 },
   { label: '1 day', minutes: 1440 },
 ];
 
+/** A label for an alert offset that is not one of the presets, e.g. one synced from Google. */
+function alertLabel(minutes: number): string {
+  if (minutes === 0) return 'At start';
+  if (minutes % 1440 === 0) return `${minutes / 1440} day${minutes === 1440 ? '' : 's'}`;
+  if (minutes % 60 === 0) return `${minutes / 60} hour${minutes === 60 ? '' : 's'}`;
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+/**
+ * The presets plus any alert already on the event that is not a preset, so
+ * every alert that will fire is visible and can be turned off.
+ */
+function alertOptions(selected: readonly number[]): { label: string; minutes: number }[] {
+  const extra = selected
+    .filter((minutes) => !ALERT_PRESETS.some((preset) => preset.minutes === minutes))
+    .map((minutes) => ({ label: alertLabel(minutes), minutes }));
+  return [...ALERT_PRESETS, ...extra].sort((a, b) => a.minutes - b.minutes);
+}
+
 export interface EventEditorSheetProps {
   visible: boolean;
   onClose: () => void;
   eventId: string | null;
   seedStart: Date | null;
+  seedDateKey: string | null;
 }
 
 interface FormState {
@@ -54,18 +83,38 @@ interface FormState {
   alerts: number[];
 }
 
-/** Round up to the next half hour — the usual case for "new event, now". */
-function defaultStart(seed: Date | null): Date {
-  const base = seed ?? new Date();
-  if (seed) return base;
-  const rounded = new Date(base);
-  rounded.setMinutes(base.getMinutes() < 30 ? 30 : 60, 0, 0);
-  return rounded;
+/**
+ * Where a new event starts. An exact seed (a tapped calendar slot) wins. A
+ * seeded day starts at the next half hour when it is today, or 09:00 on any
+ * other day — never midnight, which is almost never what anyone means.
+ */
+function defaultStart(seedStart: Date | null, seedDateKey: string | null, timeZone: string): Date {
+  if (seedStart) return seedStart;
+
+  const now = new Date();
+  const nextHalfHour = new Date(now);
+  nextHalfHour.setMinutes(now.getMinutes() < 30 ? 30 : 60, 0, 0);
+  if (!seedDateKey || seedDateKey === toZonedDateKey(now, timeZone)) return nextHalfHour;
+
+  const [year = 1970, month = 1, day = 1] = seedDateKey.split('-').map(Number);
+  return zonedWallClockToUtc({ year, month, day, hour: 9, minute: 0 }, timeZone);
 }
 
-export function EventEditorSheet({ visible, onClose, eventId, seedStart }: EventEditorSheetProps) {
+export function EventEditorSheet({
+  visible,
+  onClose,
+  eventId,
+  seedStart,
+  seedDateKey,
+}: EventEditorSheetProps) {
   const theme = useTheme();
   const timeZone = useUserTimeZone();
+  // The sheet keeps its height when the keyboard rises: the form scrolls in
+  // less space and the buttons stay above the keyboard.
+  const { lift, spacerStyle } = useKeyboardLift();
+  const scrollStyle = useAnimatedStyle(() => ({
+    maxHeight: Math.max(MIN_SCROLL_HEIGHT, SCROLL_MAX_HEIGHT - lift.value),
+  }));
   const { data: profile } = useProfile();
   const hourCycle = profile?.hourCycle ?? 'h23';
   const defaultDurationMinutes = profile?.defaultEventMinutes ?? 60;
@@ -85,7 +134,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
     if (!visible) return;
 
     if (!eventId) {
-      const start = defaultStart(seedStart);
+      const start = defaultStart(seedStart, seedDateKey, timeZone);
       setForm({
         title: '',
         location: '',
@@ -117,7 +166,16 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
       });
       setError(null);
     }
-  }, [visible, eventId, existing, seedStart, defaultCalendarId, defaultDurationMinutes]);
+  }, [
+    visible,
+    eventId,
+    existing,
+    seedStart,
+    seedDateKey,
+    timeZone,
+    defaultCalendarId,
+    defaultDurationMinutes,
+  ]);
 
   if (!form) return null;
 
@@ -220,29 +278,32 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
       onClose={onClose}
       title={isEditing ? 'Edit event' : 'New event'}
       footer={
-        <View style={{ gap: theme.spacing.sm }}>
-          {isReadOnly ? (
-            <Text variant="footnote" color="tertiary" align="center">
-              This calendar is read-only.
-            </Text>
-          ) : (
-            <Button
-              label={isEditing ? 'Save changes' : 'Add event'}
-              loading={isSaving}
-              fullWidth
-              onPress={() => void handleSave()}
-            />
-          )}
-          {isEditing && !isReadOnly ? (
-            <Button label="Delete event" variant="ghost" fullWidth onPress={handleDelete} />
-          ) : null}
-        </View>
+        <>
+          <View style={{ gap: theme.spacing.sm }}>
+            {isReadOnly ? (
+              <Text variant="footnote" color="tertiary" align="center">
+                This calendar is read-only.
+              </Text>
+            ) : (
+              <Button
+                label={isEditing ? 'Save changes' : 'Add event'}
+                loading={isSaving}
+                fullWidth
+                onPress={() => void handleSave()}
+              />
+            )}
+            {isEditing && !isReadOnly ? (
+              <Button label="Delete event" variant="ghost" fullWidth onPress={handleDelete} />
+            ) : null}
+          </View>
+          <Animated.View style={spacerStyle} />
+        </>
       }
     >
-      <ScrollView
+      <Animated.ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        style={{ maxHeight: 470 }}
+        style={scrollStyle}
         contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.sm }}
       >
         <TextField
@@ -400,7 +461,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
             Alert
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-            {ALERT_PRESETS.map((preset) => (
+            {alertOptions(form.alerts).map((preset) => (
               <Chip
                 key={preset.minutes}
                 label={preset.label}
@@ -425,7 +486,7 @@ export function EventEditorSheet({ visible, onClose, eventId, seedStart }: Event
           multiline
           numberOfLines={3}
         />
-      </ScrollView>
+      </Animated.ScrollView>
     </BottomSheet>
   );
 }

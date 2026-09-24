@@ -4,31 +4,55 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 
+import { FAB_SIZE } from '../../../components/app-shell/floating-layout';
 import { useEventEditorStore } from '../../../store/event-editor.store';
 import { useQuickAddStore } from '../../../store/quick-add.store';
 import { useTaskEditorStore } from '../../../store/task-editor.store';
-import { FindTimeBox } from '../../scheduling';
+import { FindTimeBar } from '../../scheduling';
 import { useTaskActions } from '../../tasks/hooks/useTaskActions';
-import { BentoCard, type BentoPillTone } from '../components/BentoCard';
-import { TodayHero } from '../components/TodayHero';
-import { TodayPanel } from '../components/TodayPanel';
+import { TodayHeader } from '../components/TodayHeader';
+import { TodaySchedule } from '../components/TodaySchedule';
 import { TodayTasksPanel } from '../components/TodayTasksPanel';
-import { TodayTimeline } from '../components/TodayTimeline';
-import { useTodaySummary } from '../hooks/useTodaySummary';
+import { UpNextCard } from '../components/UpNextCard';
+import { useTodaySummary, type TodaySummary } from '../hooks/useTodaySummary';
+import { buildDayBar } from '../utils/day-bar';
 
-/** A standard workday, used to express remaining free time as a percentage. */
-const WORKDAY_MINUTES = 480;
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+/** Free working time for the card's summary line. */
+function describeCapacity(
+  summary: TodaySummary,
+  now: Date,
+): { capacity: string; detail: string | null } {
+  const { freeTime, workdayEndsAt, timeZone, hourCycle } = summary;
+  if (workdayEndsAt === null) return { capacity: 'Day off', detail: 'no working hours set' };
+  if (now.getTime() >= workdayEndsAt) {
+    return {
+      capacity: 'Workday done',
+      detail: `ended ${formatTimeOfDay(new Date(workdayEndsAt), timeZone, hourCycle)}`,
+    };
+  }
+  if (freeTime.freeMinutes > 0) {
+    return {
+      capacity: `${formatDuration(freeTime.freeMinutes)} free`,
+      detail: plural(freeTime.intervals.length, 'open block'),
+    };
+  }
+  return { capacity: 'Fully booked', detail: null };
+}
 
 /**
- * The morning check-in surface, laid out to match the web client's Today page:
- * a command hero, the Find Time box, three metric tiles, then the schedule and
- * task panels — which the web sits side by side and a phone has to stack.
+ * The home screen. Top to bottom: what is next and the shape of the day, a
+ * way to find time, today's schedule, and today's tasks — so the day itself
+ * is on the first screen rather than below a stack of summary cards.
  */
 export function TodayScreen() {
   const theme = useTheme();
   const summary = useTodaySummary();
   const openQuickAdd = useQuickAddStore((state) => state.open);
-  const openNewEvent = useEventEditorStore((state) => state.openNew);
+  const openNewEventOnDay = useEventEditorStore((state) => state.openNewOnDay);
   const openEvent = useEventEditorStore((state) => state.openEvent);
   const openTask = useTaskEditorStore((state) => state.openTask);
   const actions = useTaskActions();
@@ -41,7 +65,6 @@ export function TodayScreen() {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-        year: 'numeric',
         timeZone,
       }).format(now),
     [now, timeZone],
@@ -53,6 +76,49 @@ export function TodayScreen() {
     const firstName = fullName?.trim().split(' ')[0];
     return firstName ? `${timeOfDay}, ${firstName}` : timeOfDay;
   }, [now, timeZone, fullName]);
+
+  const timed = useMemo(
+    () => summary.eventOccurrences.filter((item) => !item.event.allDay),
+    [summary.eventOccurrences],
+  );
+  const allDay = useMemo(
+    () => summary.eventOccurrences.filter((item) => item.event.allDay),
+    [summary.eventOccurrences],
+  );
+  const scheduleItems = useMemo(
+    () => summary.timeline.filter((item) => item.kind === 'task' || !item.occurrence.event.allDay),
+    [summary.timeline],
+  );
+
+  const dayBar = useMemo(
+    () =>
+      buildDayBar({
+        dayStart: summary.dayStart,
+        dayEnd: summary.dayEnd,
+        now,
+        timeZone,
+        workdayStartsAt: summary.workdayStartsAt,
+        workdayEndsAt: summary.workdayEndsAt,
+        busy: timed.map((item) => ({
+          key: item.key,
+          start: item.start,
+          end: item.end,
+          color: resolveEventColor(item.event.color, item.calendar?.color, theme.colors.accent),
+        })),
+        free: summary.freeTime.intervals,
+      }),
+    [
+      now,
+      summary.dayEnd,
+      summary.dayStart,
+      summary.freeTime.intervals,
+      summary.workdayEndsAt,
+      summary.workdayStartsAt,
+      theme.colors.accent,
+      timeZone,
+      timed,
+    ],
+  );
 
   if (summary.isLoading) return <LoadingState fullScreen label="Getting your day ready" />;
 
@@ -66,140 +132,82 @@ export function TodayScreen() {
     );
   }
 
-  const timed = summary.eventOccurrences.filter((item) => !item.event.allDay);
-  const allDay = summary.eventOccurrences.filter((item) => item.event.allDay);
-
   const relevantCount =
     summary.buckets.overdue.length + summary.buckets.dueToday.length + summary.unscheduled.length;
-  const totalTasks = relevantCount + summary.completedToday.length;
-  const completionPercent =
-    totalTasks > 0 ? Math.round((summary.completedToday.length / totalTasks) * 100) : 100;
-  const capacityPercent = Math.min(
-    100,
-    Math.round((summary.freeTime.freeMinutes / WORKDAY_MINUTES) * 100),
-  );
+  const tasksTotal = relevantCount + summary.completedToday.length;
 
   const next = timed.find((item) => item.end > now.getTime()) ?? null;
-  const nextIsActive = next ? now.getTime() >= next.start && now.getTime() < next.end : false;
+  // With nothing timed left, today's all-day event is still the thing "on".
+  const headline = next ?? allDay[0] ?? null;
+  const live = next ? now.getTime() >= next.start : false;
   const minutesUntilNext = next ? Math.max(0, Math.round((next.start - now.getTime()) / 60000)) : 0;
+  const time = (ms: number) => formatTimeOfDay(new Date(ms), timeZone, hourCycle);
 
-  const upNextPill: { label: string; tone: BentoPillTone } | undefined = !next
-    ? undefined
-    : nextIsActive
-      ? { label: 'Happening Now', tone: 'active' }
-      : minutesUntilNext <= 60
-        ? { label: `In ${minutesUntilNext}m`, tone: 'soon' }
-        : undefined;
-
-  const taskPill: { label: string; tone: BentoPillTone } | undefined =
-    summary.buckets.overdue.length > 0
-      ? { label: `${summary.buckets.overdue.length} Overdue`, tone: 'overdue' }
-      : totalTasks > 0 && summary.completedToday.length === totalTasks
-        ? { label: 'All Caught Up', tone: 'done' }
-        : undefined;
+  const eyebrow = next
+    ? live
+      ? `Now · ends ${time(next.end)}`
+      : minutesUntilNext === 0
+        ? 'Up next · starting now'
+        : `Up next · in ${formatDuration(minutesUntilNext)}`
+    : headline
+      ? 'Today'
+      : 'Up next';
+  const meta = next
+    ? [`${time(next.start)} – ${time(next.end)}`, next.event.location ?? next.calendar?.name]
+        .filter(Boolean)
+        .join(' · ')
+    : headline
+      ? ['All day', headline.event.location].filter(Boolean).join(' · ')
+      : 'Your calendar is clear for the rest of today';
+  const { capacity, detail } = describeCapacity(summary, now);
 
   return (
-    <View style={{ gap: theme.spacing.lg }}>
-      <TodayHero
+    <View style={{ gap: theme.spacing.xl }}>
+      <TodayHeader
         dateLabel={dateLabel}
         greeting={greeting}
-        subtitle={
-          timed.length > 0 || relevantCount > 0
-            ? `You have ${timed.length} event${timed.length === 1 ? '' : 's'} and ${relevantCount} active task${relevantCount === 1 ? '' : 's'} today.`
-            : 'Your schedule is clear and you have no pending tasks for today.'
-        }
-        onNewTask={() => openQuickAdd('task')}
-        onNewEvent={() => openNewEvent(summary.dayStart)}
         onSearch={() => router.push('/search', { dangerouslySingular: true })}
       />
 
-      <FindTimeBox timeZone={timeZone} />
-
       <View style={{ gap: theme.spacing.md }}>
-        <BentoCard
-          eyebrow="Up Next"
-          pill={upNextPill}
-          icon="time-outline"
-          iconTone="accent"
-          highlighted={nextIsActive}
-          value={next?.event.title ?? 'No upcoming events'}
-          meta={
-            next
-              ? `${formatTimeOfDay(new Date(next.start), timeZone, hourCycle)} – ${formatTimeOfDay(
-                  new Date(next.end),
-                  timeZone,
-                  hourCycle,
-                )}${next.event.location ? ` · ${next.event.location}` : ''}`
-              : 'Schedule is open for deep work'
-          }
+        <UpNextCard
+          eyebrow={eyebrow}
+          title={headline?.event.title ?? 'Nothing else scheduled'}
+          meta={meta}
           metaDotColor={
-            next
-              ? resolveEventColor(next.event.color, next.calendar?.color, theme.colors.accent)
+            headline
+              ? resolveEventColor(
+                  headline.event.color,
+                  headline.calendar?.color,
+                  theme.colors.accent,
+                )
               : undefined
           }
-          onPress={next ? () => openEvent(next.event.id) : undefined}
+          live={live}
+          onPress={headline ? () => openEvent(headline.event.id) : undefined}
+          tasksDone={summary.completedToday.length}
+          tasksTotal={tasksTotal}
+          capacity={capacity}
+          capacityDetail={detail}
+          allDayCount={allDay.length}
+          dayBar={dayBar}
+          hourCycle={hourCycle}
         />
 
-        <BentoCard
-          eyebrow="Focus Capacity"
-          icon="disc-outline"
-          iconTone="focus"
-          value={
-            summary.freeTime.freeMinutes > 0
-              ? `${formatDuration(summary.freeTime.freeMinutes)} free`
-              : 'Fully booked'
-          }
-          meta={
-            summary.freeTime.intervals.length > 0
-              ? `${summary.freeTime.intervals.length} open block${
-                  summary.freeTime.intervals.length === 1 ? '' : 's'
-                } inside working hours`
-              : 'No remaining open windows today'
-          }
-          progress={{ percent: capacityPercent, label: `${capacityPercent}% open`, tone: 'focus' }}
-        />
-
-        <BentoCard
-          eyebrow="Task Pulse"
-          pill={taskPill}
-          icon="checkmark-circle-outline"
-          iconTone="success"
-          value={
-            totalTasks > 0 ? `${summary.completedToday.length} of ${totalTasks} done` : 'No tasks'
-          }
-          meta={
-            summary.buckets.dueToday.length > 0
-              ? `${summary.buckets.dueToday.length} due today`
-              : summary.buckets.overdue.length > 0
-                ? `${summary.buckets.overdue.length} needing attention`
-                : totalTasks > 0
-                  ? 'All daily commitments completed!'
-                  : 'Clear task queue'
-          }
-          progress={{
-            percent: completionPercent,
-            label: `${completionPercent}%`,
-            tone: 'success',
-          }}
-        />
+        <FindTimeBar timeZone={timeZone} />
       </View>
 
-      <TodayPanel
-        title="Schedule"
-        count={allDay.length + timed.length}
-        actionLabel="Full calendar →"
-        onAction={() => router.push('/(tabs)/calendar')}
-      >
-        <TodayTimeline
-          items={timed}
-          allDay={allDay}
-          timeZone={timeZone}
-          hourCycle={hourCycle}
-          now={now}
-          onOpenEvent={openEvent}
-          onAddEvent={() => openNewEvent(summary.dayStart)}
-        />
-      </TodayPanel>
+      <TodaySchedule
+        allDay={allDay}
+        items={scheduleItems}
+        timeZone={timeZone}
+        hourCycle={hourCycle}
+        now={now}
+        onOpenEvent={openEvent}
+        onOpenTask={openTask}
+        onOpenCalendar={() => router.push('/(tabs)/calendar')}
+        onPlan={() => openNewEventOnDay(summary.todayKey)}
+      />
 
       <TodayTasksPanel
         overdue={summary.buckets.overdue}
@@ -215,7 +223,11 @@ export function TodayScreen() {
         onToggleComplete={actions.onToggleComplete}
         onSnooze={actions.onSnooze}
         onDelete={actions.onDelete}
+        onMoveToToday={actions.onMoveToToday}
       />
+
+      {/* Keeps the last row scrollable clear of the floating add button. */}
+      <View style={{ height: FAB_SIZE + theme.spacing.xxl }} />
     </View>
   );
 }

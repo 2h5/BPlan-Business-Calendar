@@ -4,6 +4,7 @@ import {
   MIN_VISUAL_MINUTES,
   minuteOfDay,
   toZonedDateKey,
+  zonedWallClockToUtc,
 } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
@@ -31,6 +32,8 @@ export interface WeekGridProps {
   weekStartsOn: number;
   onSelectDate: (dateKey: string) => void;
   onPressOccurrence: (occurrence: EventOccurrence) => void;
+  /** Tapping an empty hour starts a new event there, as in the day view. */
+  onPressSlot?: (start: Date) => void;
   /** Called once a swipe has finished, with how many weeks it moved. */
   onChangeWeek: (delta: number) => void;
   /** Re-time an event dragged to another hour or day. Resolves once it settles. */
@@ -60,6 +63,7 @@ export function WeekGrid({
   weekStartsOn,
   onSelectDate,
   onPressOccurrence,
+  onPressSlot,
   onChangeWeek,
   onMoveOccurrence,
 }: WeekGridProps) {
@@ -167,6 +171,9 @@ export function WeekGrid({
 
   const renderDayColumn = (dateKey: string, columnIndex: number) => {
     const dayStartMs = dateKeyToInstant(dateKey, timeZone).getTime();
+    const [year = 1970, month = 1, day = 1] = dateKey.split('-').map(Number);
+    const slotStart = (hour: number) =>
+      zonedWallClockToUtc({ year, month, day, hour, minute: 0 }, timeZone);
     const timed = (byDateKey.get(dateKey) ?? []).filter((o) => !o.event.allDay);
 
     const laidOut = layoutOverlappingEvents(timed, (occurrence) => ({
@@ -196,10 +203,15 @@ export function WeekGrid({
               borderTopWidth: 1,
               borderTopColor: theme.colors.gridLine,
             }}
+            onStartShouldSetResponder={() => !!onPressSlot}
+            onResponderRelease={() => onPressSlot?.(slotStart(hour))}
           />
         ))}
 
-        <View style={{ position: 'absolute', top: 0, left: 1, right: 1, bottom: 0 }}>
+        <View
+          pointerEvents="box-none"
+          style={{ position: 'absolute', top: 0, left: 1, right: 1, bottom: 0 }}
+        >
           {laidOut.map((placed) => {
             const top = ((placed.interval.start - dayStartMs) / 3_600_000) * HOUR_HEIGHT;
             const height =
@@ -243,7 +255,10 @@ export function WeekGrid({
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={{ flex: 1 }}>
+      {/* The hour labels are short and right-aligned, so the screen's margin
+          left of them was empty space. Letting the timeline run into it gives
+          the day columns that width instead. */}
+      <View style={{ flex: 1, marginLeft: -(theme.screenPadding - theme.spacing.xs) }}>
         <View style={{ flexDirection: 'row' }}>
           <View style={{ width: GUTTER_WIDTH }} />
           <View style={{ flex: 1, overflow: 'hidden' }} onLayout={onLayout}>

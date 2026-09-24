@@ -1,6 +1,8 @@
 import { Text, useTheme } from '@cal/ui';
 import { View } from 'react-native';
 
+import { APP_NAME } from '../../../lib/brand';
+
 export interface AuthHeaderProps {
   /** Small accent line above the title. */
   eyebrow: string;
@@ -32,7 +34,7 @@ export function AuthHeader({ eyebrow, title, subtitle }: AuthHeaderProps) {
             B
           </Text>
         </View>
-        <Text variant="headline">BCal</Text>
+        <Text variant="headline">{APP_NAME}</Text>
       </View>
 
       <View style={{ gap: theme.spacing.xs, alignItems: 'center' }}>

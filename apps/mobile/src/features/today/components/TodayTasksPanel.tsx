@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Fragment, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { PanelSectionHeader, TodayPanel } from './TodayPanel';
 import { TaskRow } from '../../tasks/components/TaskRow';
 
 export interface TodayTasksPanelProps {
@@ -21,12 +20,14 @@ export interface TodayTasksPanelProps {
   onToggleComplete: (task: Task, completed: boolean) => void;
   onSnooze: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onMoveToToday: (tasks: readonly Task[]) => void;
 }
 
 /**
- * The web's "Today's Tasks" panel: overdue, due today, and flexible work as
- * labelled sections inside one container, with today's completed tasks folded
- * away underneath.
+ * Today's work as one group: overdue first, then due today, then flexible
+ * tasks with an estimate. Each row already says why it is here ("3 days
+ * overdue", "Today"), so the group needs no sub-headings; overdue work gets a
+ * one-tap way back onto today instead.
  */
 export function TodayTasksPanel({
   overdue,
@@ -42,11 +43,12 @@ export function TodayTasksPanel({
   onToggleComplete,
   onSnooze,
   onDelete,
+  onMoveToToday,
 }: TodayTasksPanelProps) {
   const theme = useTheme();
   const [showCompleted, setShowCompleted] = useState(false);
 
-  const relevantCount = overdue.length + dueToday.length + unscheduled.length;
+  const open = [...overdue, ...dueToday, ...unscheduled];
   const listById = new Map(lists.map((list) => [list.id, list]));
 
   const renderTasks = (tasks: readonly Task[]) =>
@@ -73,128 +75,94 @@ export function TodayTasksPanel({
     });
 
   return (
-    <TodayPanel
-      title="Today's Tasks"
-      count={relevantCount}
-      actionLabel="+ Quick Add"
-      onAction={onQuickAdd}
-    >
-      {relevantCount === 0 ? (
-        <EmptyTasks onQuickAdd={onQuickAdd} />
-      ) : (
-        <View>
-          {overdue.length > 0 ? (
-            <>
-              <PanelSectionHeader
-                label="Overdue"
-                count={overdue.length}
-                tone="danger"
-                icon={<Ionicons name="warning" size={12} color={theme.colors.danger} />}
-              />
-              {renderTasks(overdue)}
-            </>
-          ) : null}
-
-          {dueToday.length > 0 ? (
-            <>
-              <PanelSectionHeader label="Due Today" count={dueToday.length} />
-              {renderTasks(dueToday)}
-            </>
-          ) : null}
-
-          {unscheduled.length > 0 ? (
-            <>
-              <PanelSectionHeader label="Flexible Focus" count={unscheduled.length} />
-              {renderTasks(unscheduled)}
-            </>
-          ) : null}
-        </View>
-      )}
-
-      {completedToday.length > 0 ? (
-        <View
-          style={{
-            borderTopWidth: theme.borderWidth.hairline,
-            borderTopColor: theme.colors.borderSubtle,
-          }}
-        >
+    <View style={{ gap: theme.spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm }}>
+        <Text variant="title3" accessibilityRole="header" style={{ flex: 1 }}>
+          Tasks
+        </Text>
+        {overdue.length > 0 ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ expanded: showCompleted }}
-            accessibilityLabel={`Completed today, ${completedToday.length}`}
-            onPress={() => setShowCompleted((open) => !open)}
+            accessibilityLabel={`${overdue.length} overdue. Move to today`}
+            onPress={() => onMoveToToday(overdue)}
+            hitSlop={theme.spacing.sm}
+          >
+            <Text variant="footnote" color="danger">
+              {`${overdue.length} overdue · `}
+              <Text variant="footnote" color="accent">
+                Move to today
+              </Text>
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View
+        style={{
+          overflow: 'hidden',
+          borderRadius: theme.radius.lg,
+          borderWidth: theme.borderWidth.hairline,
+          borderColor: theme.colors.borderSubtle,
+          backgroundColor: theme.colors.surface,
+        }}
+      >
+        {open.length === 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onQuickAdd}
             style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              paddingVertical: theme.spacing.md,
-              paddingHorizontal: theme.spacing.lg,
+              gap: 2,
+              padding: theme.spacing.lg,
               backgroundColor: pressed ? theme.colors.hover : 'transparent',
             })}
           >
-            <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
-            <Text variant="footnote" color="secondary" style={{ flex: 1 }}>
-              Completed today
+            <Text variant="callout">Nothing due today</Text>
+            <Text variant="footnote" color="accent">
+              Add a task
             </Text>
-            <Text variant="footnote" color="tertiary">
-              {completedToday.length}
-            </Text>
-            <Ionicons
-              name={showCompleted ? 'chevron-up' : 'chevron-down'}
-              size={14}
-              color={theme.colors.textTertiary}
-            />
           </Pressable>
+        ) : (
+          renderTasks(open)
+        )}
 
-          {showCompleted ? <View>{renderTasks(completedToday)}</View> : null}
-        </View>
-      ) : null}
-    </TodayPanel>
-  );
-}
+        {completedToday.length > 0 ? (
+          <View
+            style={{
+              borderTopWidth: theme.borderWidth.hairline,
+              borderTopColor: theme.colors.borderSubtle,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showCompleted }}
+              accessibilityLabel={`Completed today, ${completedToday.length}`}
+              onPress={() => setShowCompleted((visible) => !visible)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+                paddingVertical: theme.spacing.md,
+                paddingHorizontal: theme.spacing.lg,
+                backgroundColor: pressed ? theme.colors.hover : 'transparent',
+              })}
+            >
+              <Ionicons
+                name={showCompleted ? 'chevron-down' : 'chevron-forward'}
+                size={14}
+                color={theme.colors.textTertiary}
+              />
+              <Text variant="footnote" color="secondary" style={{ flex: 1 }}>
+                Completed today
+              </Text>
+              <Text variant="footnote" color="tertiary">
+                {completedToday.length}
+              </Text>
+            </Pressable>
 
-function EmptyTasks({ onQuickAdd }: { onQuickAdd: () => void }) {
-  const theme = useTheme();
-
-  return (
-    <View
-      style={{
-        alignItems: 'center',
-        gap: theme.spacing.xs,
-        paddingVertical: theme.spacing.xxxl,
-        paddingHorizontal: theme.spacing.lg,
-      }}
-    >
-      <Ionicons name="checkmark-done-outline" size={28} color={theme.colors.textTertiary} />
-      <Text variant="subhead" style={{ marginTop: theme.spacing.sm, fontWeight: '600' }}>
-        No tasks for today
-      </Text>
-      <Text
-        variant="footnote"
-        color="tertiary"
-        align="center"
-        style={{ maxWidth: 260, marginBottom: theme.spacing.md }}
-      >
-        You have no overdue items or tasks due today.
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add a Task"
-        onPress={onQuickAdd}
-        style={({ pressed }) => ({
-          height: theme.controlHeightSm,
-          justifyContent: 'center',
-          paddingHorizontal: theme.spacing.md,
-          borderRadius: theme.radius.sm,
-          borderWidth: theme.borderWidth.hairline,
-          borderColor: theme.colors.border,
-          backgroundColor: pressed ? theme.colors.surfaceElevated : theme.colors.surfaceRaised,
-        })}
-      >
-        <Text variant="footnote" style={{ fontWeight: '500' }}>
-          + Add a Task
-        </Text>
-      </Pressable>
+            {showCompleted ? <View>{renderTasks(completedToday)}</View> : null}
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
