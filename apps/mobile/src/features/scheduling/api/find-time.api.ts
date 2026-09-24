@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
-import { toAppError } from '../../../lib/errors/app-error';
-import { supabase } from '../../../lib/supabase/client';
+import { invokeAiFunction } from './ai-function';
 
 /** Applied when the user named no duration, e.g. "coffee with Priya". */
 export const DEFAULT_MEETING_MINUTES = 30;
@@ -82,10 +81,6 @@ const confirmationSchema = z.object({
 
 export type FindTimeConfirmation = z.infer<typeof confirmationSchema>;
 
-const errorEnvelopeSchema = z.object({
-  error: z.object({ code: z.string(), message: z.string() }),
-});
-
 /**
  * Submits the raw text to the server, which interprets it with Luna, resolves
  * the date window deterministically, verifies real availability, and ranks the
@@ -96,7 +91,7 @@ const errorEnvelopeSchema = z.object({
  * is what previously collapsed "next week" onto the default horizon.
  */
 export async function findTimeForText(text: string, _timeZone?: string): Promise<FindTimeResult> {
-  const response = await invoke('ai-find-time', { text });
+  const response = await invokeAiFunction('ai-find-time', { text });
 
   const clarification = clarificationSchema.safeParse(response);
   if (clarification.success) return clarification.data;
@@ -118,36 +113,5 @@ export async function findTimeForText(text: string, _timeZone?: string): Promise
 export async function confirmFindTimeSuggestion(
   suggestionId: string,
 ): Promise<FindTimeConfirmation> {
-  return confirmationSchema.parse(await invoke('ai-confirm-time', { suggestionId }));
-}
-
-/**
- * Preserve the stable Edge Function error codes (AI_NO_VALID_SLOT,
- * SUBSCRIPTION_REQUIRED, ...) the box needs to explain what happened.
- */
-async function invoke(name: string, body: Record<string, unknown>): Promise<unknown> {
-  const { data, error } = await supabase.functions.invoke<unknown>(name, { body });
-
-  if (error) {
-    const envelope = await readErrorEnvelope(error);
-    throw toAppError(envelope ?? error);
-  }
-
-  const failure = errorEnvelopeSchema.safeParse(data);
-  if (failure.success) throw toAppError(failure.data.error);
-
-  return data;
-}
-
-async function readErrorEnvelope(
-  error: unknown,
-): Promise<{ code: string; message: string } | null> {
-  const response = (error as { context?: Response }).context;
-  if (!response || typeof response.json !== 'function') return null;
-  try {
-    const parsed = errorEnvelopeSchema.safeParse(await response.json());
-    return parsed.success ? parsed.data.error : null;
-  } catch {
-    return null;
-  }
+  return confirmationSchema.parse(await invokeAiFunction('ai-confirm-time', { suggestionId }));
 }

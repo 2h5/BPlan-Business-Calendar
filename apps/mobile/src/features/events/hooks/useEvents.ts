@@ -47,6 +47,19 @@ export function useEvent(id: string | null) {
   });
 }
 
+/**
+ * Loads one event on demand — from the cache when it is fresh — for flows
+ * that hold only an id, such as confirming an AI-proposed move.
+ */
+export function useEventLoader() {
+  const queryClient = useQueryClient();
+  return (id: string) =>
+    queryClient.fetchQuery({
+      queryKey: queryKeys.events.detail(id),
+      queryFn: () => fetchEvent(id),
+    });
+}
+
 /** Any event mutation can affect any cached window, so invalidate them all. */
 function useInvalidateEvents() {
   const queryClient = useQueryClient();
