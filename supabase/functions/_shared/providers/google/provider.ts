@@ -4,7 +4,6 @@ import type {
   ExternalCalendar,
   NormalisedEvent,
   ProviderContext,
-  ProviderEventInput,
   SyncResult,
   WatchRegistration,
   WatchTarget,

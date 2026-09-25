@@ -135,6 +135,7 @@ function requestFromPersistedConstraints(
   };
 }
 
+// deno-lint-ignore require-await -- async turns synchronous throws into rejections for awaiting callers.
 async function finishAttempt(
   input: { userId: string; suggestionId: string },
   persisted: PersistedAiConfirmation,

@@ -53,6 +53,10 @@ jobs:
         with:
           deno-version: 2.9.6
 
+      - name: Lint Edge Functions
+        working-directory: supabase/functions
+        run: deno lint
+
       - name: Typecheck Edge Functions
         working-directory: supabase/functions
         run: deno task check

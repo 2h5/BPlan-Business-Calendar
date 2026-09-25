@@ -68,6 +68,7 @@ export function createMicrosoftProvider(deps: MicrosoftProviderDeps = {}): Calen
       return syncDelta(request, ctx, url.toString(), 'UTC');
     },
 
+    // deno-lint-ignore require-await -- async turns synchronous throws into rejections for awaiting callers.
     async incrementalSync(ctx: ProviderContext, _providerCalendarId: string, cursor: string) {
       return syncDelta(request, ctx, trustedGraphUrl(cursor), 'UTC');
     },

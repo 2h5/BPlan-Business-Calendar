@@ -96,7 +96,7 @@ export async function handleGoogleWebhook(
       idempotencyKey: calendarSyncKey(state.calendar_id, now()),
     });
 
-    await afterResponse(async () => undefined);
+    await afterResponse(() => Promise.resolve());
     return acceptedResponse();
   } catch (error) {
     // Deliberately still a 2xx. Losing one notification costs us until daily

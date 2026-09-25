@@ -212,6 +212,7 @@ export async function recordSyncFailure(
  * fatal: without a provider watch the calendar still converges through the
  * daily reconciliation, just less promptly.
  */
+// deno-lint-ignore require-await -- async turns synchronous throws into rejections for awaiting callers.
 export async function ensureWatch(
   admin: SupabaseClient,
   account: ProviderAccountRow,
