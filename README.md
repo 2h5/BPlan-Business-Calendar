@@ -12,7 +12,7 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ---
 
-## Project checkpoint — 2026-09-22
+## Project checkpoint — 2026-09-25
 
 ```text
 CORE PRODUCT
@@ -24,41 +24,32 @@ CORE PRODUCT
 └─ Microsoft integration .............. IMPLEMENTED / LIVE LIFECYCLE GAPS REMAIN
 
 AI / SCHEDULING
-├─ Deterministic availability engine .. COMPLETE + HARDENED
-├─ Natural-language intent layer ...... COMPLETE + HARDENED
-├─ Find Time backend ................... COMPLETE + HARDENED
-├─ Proposal persistence/ranking ........ COMPLETE + HARDENED
-├─ Confirmation/revalidation ........... COMPLETE + HARDENED
-├─ Live model evaluation ............... PENDING
-└─ Production model selection .......... PENDING EVALUATION
+├─ Deterministic + semantic-time rules . IMPLEMENTED + HARDENED
+├─ Find Time propose/confirm backend .. IMPLEMENTED + HARDENED
+├─ Live Luna Low vs Medium evaluation . COMPLETE
+└─ Intent + ranking model ............. LUNA LOW SELECTED
 
 BILLING / PRO
-├─ RevenueCat webhook + mirror ......... IMPLEMENTED
-├─ Server-side Pro authorization ....... IMPLEMENTED
-├─ Subscription / upgrade page ......... IMPLEMENTED
-├─ Web sandbox checkout ................ CONFIGURED
-├─ Monthly sandbox purchase E2E ........ PROVEN LIVE
-├─ Browser ambiguity reconciliation .... IMPLEMENTED + VERIFIED
-├─ Annual sandbox runner ............... IMPLEMENTED
-├─ Annual live verification ............ PROVEN LIVE / PHASE 3C COMPLETE
-├─ Billing lifecycle verification ....... PHASE 4 COMPLETE
+├─ RevenueCat webhook/mirror/Pro gate . IMPLEMENTED
+├─ Web checkout + subscription UI ..... IMPLEMENTED
+├─ Monthly + annual sandbox chains .... PROVEN LIVE
+├─ Lifecycle + automation Phases 4–6 . COMPLETE
+├─ Convergence hardening on main ...... IMPLEMENTED / VERIFIED LOCALLY
 └─ Production billing .................. INTENTIONALLY DISABLED
 
 RELEASE / EXTERNAL
-├─ Hosted Supabase project ............. CREATED / SCHEMA WIRED
-├─ Google live integration ............. MAJOR FLOWS VERIFIED
 ├─ Microsoft live lifecycle matrix ..... PENDING
-├─ Seller / final legal docs ........... TBD
+├─ Hosted AI config/deployment/E2E ..... PENDING
+├─ RevenueCat convergence rollout ..... PENDING HOSTED DEPLOYMENT
+├─ Seller / final legal docs ........... PENDING
 ├─ Production Stripe / RevenueCat ...... PENDING
-├─ Live AI E2E ......................... PENDING
 └─ Production release hardening ........ PENDING
 
 CURRENT STATE
 ├─ Core mobile/web product and Find Time backend/web UX are implemented.
-├─ Monthly and annual web sandbox billing are proven end to end.
-└─ Remaining work is concentrated in mobile Find Time finalization, live AI
-   evaluation, billing Phase 5 manual CI integration,
-   and release hardening.
+├─ Luna Low is selected; sandbox billing Phases 4–6 and convergence code are complete.
+└─ Open tracks: mobile Find Time, hosted AI E2E, RevenueCat convergence rollout,
+   Microsoft lifecycle verification, release hardening, and legal/billing gates.
 ```
 
 ## Current status
@@ -72,11 +63,14 @@ and intent telemetry are persisted through server-owned paths. Confirmation
 revalidates current availability, rejects stale or conflicting proposals, and
 is idempotent.
 
-The web Find Time propose/confirm experience is implemented. Live model
-evaluation and production model selection remain pending. Mobile Find Time is
-being completed on a separate collaborator track and remains **IN PROGRESS /
-AWAITING PUSHED CHECKPOINT** until that track records an actual pushed
-checkpoint; code presence alone is not treated as completion evidence.
+The web Find Time propose/confirm experience is implemented. Semantic-time
+rules constrain deterministic candidates for breakfast, brunch, lunch, dinner,
+drinks, and morning/afternoon/evening before ranking. The live Luna Low vs
+Medium evaluation is complete, and Luna Low was selected for both intent
+parsing and candidate ranking. Hosted AI configuration, deployment, and
+end-to-end verification remain pending. Mobile Find Time remains **IN PROGRESS /
+AWAITING PUSHED CHECKPOINT** until its separate track records a pushed
+completion checkpoint.
 
 ### Calendar integrations
 
@@ -119,9 +113,11 @@ Pro, the Supabase mirror and ledger, and server authorization. No retry occurred
 Billing Phase 4 is complete: live cancellation retained access through the
 paid period, expiration revoked Pro, and a fresh annual sandbox subscription
 renewed naturally into an extended active period across RevenueCat, the
-Supabase mirror and ledger, and server authorization. Replay and ordering
-behavior passed deterministic webhook and database tests. Phase 5 manual CI
-integration is next. Production billing remains intentionally disabled.
+Supabase mirror and ledger, and server authorization. Billing automation
+Phases 5 and 6 are complete for the reviewed sandbox contract. RevenueCat
+convergence hardening is merged into `main` and verified locally. Its new
+migration and functions have not been deployed to hosted Supabase. Production
+billing remains intentionally disabled.
 
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
@@ -130,26 +126,28 @@ for billing automation. The Sprint 3 and Sprint 4 trackers are closed
 historical records; the Sprint 5 tracker retains Microsoft
 external-verification evidence.
 
-| Area                              | Current state                                    |
-| --------------------------------- | ------------------------------------------------ |
-| Mobile core                       | Complete                                         |
-| Web core                          | Phases 0–6 complete and hardened                 |
-| Tasks/reminders/notifications     | Complete                                         |
-| Calendar CRUD/recurrence          | Complete                                         |
-| Google Calendar                   | Implemented; major live flows verified           |
-| Microsoft Calendar                | Implemented; live lifecycle verification pending |
-| Deterministic scheduling          | Complete and hardened                            |
-| Natural-language scheduling       | Complete and hardened                            |
-| Find Time backend                 | Complete and hardened                            |
-| Find Time web UX                  | Complete; propose + confirm                      |
-| Find Time mobile UX               | In progress; awaiting pushed checkpoint          |
-| RevenueCat backend/webhook/mirror | Implemented                                      |
-| Monthly billing E2E               | Proven live                                      |
-| Annual billing E2E                | Proven live; Phase 3C complete                   |
-| Billing lifecycle                 | Phase 4 complete; live renewal and expiry proven |
-| Live AI evaluation                | Pending                                          |
-| Production billing                | Intentionally disabled                           |
-| Production release hardening      | Pending                                          |
+| Area                                | Current state                                    |
+| ----------------------------------- | ------------------------------------------------ |
+| Mobile core                         | Complete                                         |
+| Web core                            | Phases 0–6 complete and hardened                 |
+| Tasks/reminders/notifications       | Complete                                         |
+| Calendar CRUD/recurrence            | Complete                                         |
+| Google Calendar                     | Implemented; major live flows verified           |
+| Microsoft Calendar                  | Implemented; live lifecycle verification pending |
+| Deterministic scheduling            | Complete and hardened                            |
+| Semantic-time scheduling            | Implemented and hardened                         |
+| Find Time backend                   | Implemented and hardened                         |
+| Find Time web UX                    | Complete; propose + confirm                      |
+| Find Time mobile UX                 | In progress; awaiting pushed checkpoint          |
+| Luna Low vs Medium evaluation       | Complete; Luna Low selected for intent/ranking   |
+| Hosted AI deployment/E2E            | Pending                                          |
+| RevenueCat webhook/mirror/Pro gate  | Implemented                                      |
+| Monthly + annual billing E2E        | Proven live                                      |
+| Billing automation                  | Phases 4–6 complete for sandbox                  |
+| RevenueCat convergence              | Merged into main; verified locally               |
+| Convergence hosted rollout          | Pending                                          |
+| Seller/legal and production billing | Pending; billing intentionally disabled          |
+| Production release hardening        | Pending                                          |
 
 ---
 
