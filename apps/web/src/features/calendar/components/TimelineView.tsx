@@ -82,7 +82,12 @@ export interface TimelineViewProps {
   workingHours?: WorkingHours;
   /** Event the calendar was opened for; the first scroll brings it into view instead of now. */
   revealEventId?: string | null;
+  /** Show the time range and duration inside events long enough to fit them. */
+  showEventDetails?: boolean;
 }
+
+/** Shortest event, in minutes on the grid, that has room for the details line. */
+export const EVENT_DETAILS_MIN_MINUTES = 45;
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
   if (hourCycle === 'h23') return String(hour).padStart(2, '0');
@@ -105,6 +110,8 @@ export interface EventButtonProps {
   timeZone: string;
   hourCycle: HourCycle;
   compact: boolean;
+  /** Time range and duration, shown at rest the way resizing shows them. */
+  showDetails?: boolean;
   style?: React.CSSProperties;
   onSelect: (anchorRect?: AnchorRect) => void;
   onResizePointerDown?: (event: React.PointerEvent<HTMLSpanElement>, edge: ResizeEdge) => void;
@@ -130,6 +137,7 @@ export function EventButton({
   timeZone,
   hourCycle,
   compact,
+  showDetails = false,
   style,
   onSelect,
   onResizePointerDown,
@@ -169,6 +177,8 @@ export function EventButton({
       data-event-id={occurrence.event.id}
       data-occurrence-key={occurrence.key}
       className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${
+        showDetails && !isPreviewing ? styles.timelineEventWithDetails : ''
+      } ${
         isResizing ? styles.timelineEventResizing : ''
       } ${isMoving ? styles.timelineEventMoving : ''} ${
         isShort
@@ -269,6 +279,19 @@ export function EventButton({
               <span className={styles.timelineConflictBadge}>Conflict</span>
             </>
           )}
+        </span>
+      ) : showDetails ? (
+        <span
+          className={`${styles.timelineResizeFeedback} ${styles.timelineResizeFeedbackNormal} ${styles.timelineEventDetails}`}
+        >
+          <span className={styles.timelineResizeSpan}>
+            {formatEventTime(occurrence.start, timeZone, hourCycle)} –{' '}
+            {formatEventTime(occurrence.end, timeZone, hourCycle)}
+          </span>
+          <span className={styles.timelineResizeDivider}>·</span>
+          <span className={styles.timelineResizeDurationBadge}>
+            {formatDuration(Math.round((occurrence.end - occurrence.start) / 60_000))}
+          </span>
         </span>
       ) : !compact ? (
         <span className={styles.timelineEventTime}>
@@ -386,6 +409,7 @@ export function TimelineView({
   defaultDurationMinutes = 60,
   workingHours,
   revealEventId = null,
+  showEventDetails = false,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollKeyRef = useRef<string | null>(null);
@@ -1710,6 +1734,8 @@ export function TimelineView({
                     movePreview.dateKey === dateKey
                       ? movePreview.interval
                       : undefined;
+                  const showDetails =
+                    showEventDetails && endMinute - startMinute >= EVENT_DETAILS_MIN_MINUTES;
                   return (
                     <EventButton
                       key={placed.item.key}
@@ -1717,8 +1743,12 @@ export function TimelineView({
                       timeZone={timeZone}
                       hourCycle={hourCycle}
                       compact={
-                        (isWeek || height < 42) && !activeResizeInterval && !activeMoveInterval
+                        (isWeek || height < 42) &&
+                        !showDetails &&
+                        !activeResizeInterval &&
+                        !activeMoveInterval
                       }
+                      showDetails={showDetails}
                       style={{
                         top,
                         height,

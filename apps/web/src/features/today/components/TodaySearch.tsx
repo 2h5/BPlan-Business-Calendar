@@ -240,28 +240,16 @@ export function TodaySearch({ isOpen, onOpenChange }: TodaySearchProps) {
           </div>
         </div>
 
-        <div className={styles.footer}>
-          <span className={styles.hints} aria-hidden="true">
-            <span>
-              <kbd>↑</kbd>
-              <kbd>↓</kbd> Navigate
-            </span>
-            <span>
-              <kbd>↵</kbd> Open
-            </span>
-            <span>
-              <kbd>Esc</kbd> Close
-            </span>
-          </span>
-          {showResults && (
+        {showResults && (
+          <div className={styles.footer}>
             <button type="button" className={styles.viewAll} onClick={openFullSearch}>
               {status === 'results'
                 ? `View all ${totalMatches >= 40 ? '40+' : totalMatches}`
                 : 'Full search'}
               <span aria-hidden="true">↗</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -8,7 +8,8 @@ import { z } from 'zod';
  * discarding the whole object. Unknown keys are dropped on parse, which makes
  * retiring a preference safe. Add new preferences here, never ad hoc in an app.
  *
- * Web-only today: `accountMenuTrigger` (sidebar) and `calendarHotkeys` (keyboard).
+ * Web-only today: `accountMenuTrigger` and `showPlanInSidebar` (sidebar),
+ * `calendarHotkeys` (keyboard), and `showEventDetails` (calendar).
  */
 
 export type CalendarHotkeyView = 'day' | 'week' | 'month';
@@ -32,7 +33,11 @@ const calendarHotkeysSchema = z
 
 export const appPreferencesSchema = z.object({
   accountMenuTrigger: z.enum(['click', 'hover']).catch('click'),
+  // Hiding the sidebar link keeps the plan reachable from Settings > Plan & billing.
+  showPlanInSidebar: z.boolean().catch(true),
   calendarHotkeys: calendarHotkeysSchema,
+  // Day and week views: time range and duration inside events of 45+ minutes.
+  showEventDetails: z.boolean().catch(false),
 });
 
 export type AppPreferences = z.infer<typeof appPreferencesSchema>;

@@ -1144,3 +1144,67 @@ describe('TimelineView move affordances and live feedback', () => {
     });
   });
 });
+
+describe('TimelineView event details preference', () => {
+  const timedOccurrence = (key: string, startAt: string, endAt: string): EventOccurrence => {
+    const event = makeEvent({ id: key, title: key, startAt, endAt, allDay: false });
+    return {
+      key,
+      occurrenceIndex: 0,
+      start: Date.parse(startAt),
+      end: Date.parse(endAt),
+      event,
+      calendar,
+    };
+  };
+
+  const render = (keys: readonly string[], showEventDetails: boolean) =>
+    renderToStaticMarkup(
+      <TimelineView
+        dateKeys={keys}
+        byDateKey={
+          new Map([
+            [
+              '2026-09-15',
+              [
+                timedOccurrence(
+                  'long-block',
+                  '2026-09-15T13:00:00.000Z',
+                  '2026-09-15T14:30:00.000Z',
+                ),
+                timedOccurrence(
+                  'short-sync',
+                  '2026-09-15T16:00:00.000Z',
+                  '2026-09-15T16:30:00.000Z',
+                ),
+              ],
+            ],
+          ])
+        }
+        selectedDateKey="2026-09-15"
+        timeZone={timeZone}
+        hourCycle="h12"
+        now={mockNow}
+        onSelectDate={vi.fn()}
+        onSelectEvent={vi.fn()}
+        showEventDetails={showEventDetails}
+      />,
+    );
+
+  it('shows time range and duration only on events of 45 minutes or more', () => {
+    for (const keys of [['2026-09-15'], dateKeys]) {
+      const html = render(keys, true);
+      expect(html).toContain('9:00 AM – 10:30 AM');
+      expect(html).toContain('1h 30m');
+      expect(html).not.toContain('12:00 PM – 12:30 PM');
+      expect(html.match(/timelineEventDetails/g)).toHaveLength(1);
+    }
+  });
+
+  it('keeps the existing labels when the preference is off', () => {
+    expect(render(dateKeys, false)).not.toContain('timelineEventDetails');
+    const dayHtml = render(['2026-09-15'], false);
+    expect(dayHtml).not.toContain('timelineEventDetails');
+    expect(dayHtml).toContain('9:00 AM</span>');
+  });
+});

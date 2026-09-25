@@ -102,3 +102,20 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Set for one frame while the theme changes (see useTheme), so colour
+   transitions snap to the new palette instead of animating from the old one. */
+html[data-theme-switching],
+html[data-theme-switching] *,
+html[data-theme-switching] *::before,
+html[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* Theme changes cross-fade the whole page as one layer (see useTheme). Scoped
+   to theme changes so other view transitions keep their own timing. */
+html[data-theme-fading]::view-transition-old(root),
+html[data-theme-fading]::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}

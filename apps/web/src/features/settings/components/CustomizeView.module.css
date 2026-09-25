@@ -32,13 +32,6 @@
   letter-spacing: -0.045em;
   line-height: 1.1;
 }
-.intro p {
-  margin-top: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
-}
-
 .sections {
   display: grid;
 }

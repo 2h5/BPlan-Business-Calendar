@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
-import { FindTimeRotatingPrompt, FIND_TIME_PROMPT_EXAMPLES } from './FindTimeRotatingPrompt';
+import { FindTimeRotatingPrompt } from './FindTimeRotatingPrompt';
 import { useSubscription } from '../../billing/hooks/useBilling';
 import { getSubscriptionStatusInfo } from '../../billing/utils/subscription-display';
 import {
@@ -18,6 +18,7 @@ import {
   saveStoredFindTimeDraft,
   useFindTime,
 } from '../hooks/useFindTime';
+import { FIND_TIME_PLACEHOLDER_EXAMPLE } from '../utils/find-time-prompts';
 
 const BANNER_STORAGE_KEY = 'bplan_recent_scheduled_banner';
 const CONFIRMATION_DISPLAY_DURATION_MS = 5000;
@@ -445,7 +446,7 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
                 disabled
                 readOnly
                 value=""
-                placeholder={`Try ${FIND_TIME_PROMPT_EXAMPLES[0]}`}
+                placeholder={`Try ${FIND_TIME_PLACEHOLDER_EXAMPLE}`}
                 aria-label="Find Time with AI is available on the Pro plan"
               />
             </div>

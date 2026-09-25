@@ -132,7 +132,7 @@ describe('FindTimeBox Pro Gating & Teaser', () => {
     expect(html).toContain('placeholder=""');
     expect(html).toContain('aria-label="Describe what you want to schedule"');
     expect(html).toContain('>Try</span>');
-    expect(html).toContain('“15-minute meeting with Andrew”');
+    expect(html).toMatch(/“[^”]+”/);
     expect(html).toContain('Find time</span>');
   });
 

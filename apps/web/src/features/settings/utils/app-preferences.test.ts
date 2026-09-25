@@ -10,7 +10,9 @@ describe('parseAppPreferences', () => {
     expect(parseAppPreferences([])).toEqual(DEFAULT_APP_PREFERENCES);
     expect(DEFAULT_APP_PREFERENCES).toEqual({
       accountMenuTrigger: 'click',
+      showPlanInSidebar: true,
       calendarHotkeys: { enabled: true, day: 'd', week: 'w', month: 'm' },
+      showEventDetails: false,
     });
   });
 
@@ -27,11 +29,14 @@ describe('parseAppPreferences', () => {
     expect(
       parseAppPreferences({
         accountMenuTrigger: 'hover',
+        showPlanInSidebar: 'no',
         calendarHotkeys: { enabled: true, day: 'x', week: 'Shift', month: 7 },
       }),
     ).toEqual({
       accountMenuTrigger: 'hover',
+      showPlanInSidebar: true,
       calendarHotkeys: { enabled: true, day: 'x', week: 'w', month: 'm' },
+      showEventDetails: false,
     });
     expect(parseAppPreferences({ accountMenuTrigger: 'long-press' }).accountMenuTrigger).toBe(
       'click',

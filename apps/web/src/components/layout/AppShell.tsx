@@ -169,7 +169,7 @@ function isWorkspacePath(pathname: string): boolean {
 export function AppShell() {
   const { email } = useAuth();
   const { data: profile } = useProfile();
-  const { accountMenuTrigger } = useAppPreferences().preferences;
+  const { accountMenuTrigger, showPlanInSidebar } = useAppPreferences().preferences;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -396,22 +396,24 @@ export function AppShell() {
 
           <div className={styles.navSpacer} />
 
-          <div className={styles.navGroup}>
-            <NavLink
-              to="/subscription"
-              className={({ isActive }) =>
-                `${styles.navItem} ${styles.navItemHighlight} ${
-                  isActive ? styles.navItemActive : ''
-                }`
-              }
-            >
-              <span className={`${styles.navIcon} ${styles.navIconHighlight}`}>
-                <SubscriptionIcon />
-              </span>
-              <span className={styles.navLabel}>Plan &amp; Pro</span>
-              <span className={styles.navBadge}>PRO</span>
-            </NavLink>
-          </div>
+          {showPlanInSidebar && (
+            <div className={styles.navGroup}>
+              <NavLink
+                to="/subscription"
+                className={({ isActive }) =>
+                  `${styles.navItem} ${styles.navItemHighlight} ${
+                    isActive ? styles.navItemActive : ''
+                  }`
+                }
+              >
+                <span className={`${styles.navIcon} ${styles.navIconHighlight}`}>
+                  <SubscriptionIcon />
+                </span>
+                <span className={styles.navLabel}>Plan &amp; Pro</span>
+                <span className={styles.navBadge}>PRO</span>
+              </NavLink>
+            </div>
+          )}
         </nav>
 
         <div

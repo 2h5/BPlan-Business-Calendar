@@ -20,13 +20,6 @@ type TodaySearchResultsProps = {
   onOpen: (item: TodaySearchItem) => void;
 };
 
-const SCOPES: { kind: TodaySearchKind; title: string; body: string }[] = [
-  { kind: 'event', title: 'Events', body: 'Titles, notes, places' },
-  { kind: 'task', title: 'Tasks', body: 'Titles and notes' },
-  { kind: 'calendar', title: 'Calendars', body: 'By name' },
-  { kind: 'list', title: 'Lists', body: 'By name' },
-];
-
 /** The body of the Today search panel: one view per search status. */
 export function TodaySearchResults({
   status,
@@ -44,19 +37,6 @@ export function TodaySearchResults({
           <strong>Search your workspace</strong>
           <span>Jump to any event, task, calendar, or list.</span>
         </div>
-        <ul className={styles.scopes} aria-label="What you can search">
-          {SCOPES.map((scope) => (
-            <li key={scope.kind}>
-              <span className={`${styles.kindIcon} ${styles[scope.kind]}`} aria-hidden="true">
-                <KindIcon kind={scope.kind} />
-              </span>
-              <span>
-                <strong>{scope.title}</strong>
-                <small>{scope.body}</small>
-              </span>
-            </li>
-          ))}
-        </ul>
       </div>
     );
   }

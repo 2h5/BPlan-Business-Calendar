@@ -19,7 +19,7 @@ const ACCOUNT_MENU_OPTIONS: { value: AccountMenuTrigger; label: string }[] = [
 
 export function CustomizeView() {
   const { preferences, setPreference, resetPreferences } = useAppPreferences();
-  const { accountMenuTrigger, calendarHotkeys } = preferences;
+  const { accountMenuTrigger, showPlanInSidebar, calendarHotkeys, showEventDetails } = preferences;
 
   // Taking a key another view already uses swaps the two, so a binding is never lost.
   const rebind = (view: CalendarHotkeyView, key: string): string | null => {
@@ -42,9 +42,6 @@ export function CustomizeView() {
       </Link>
       <div className={styles.intro}>
         <h2>Customize</h2>
-        <p>
-          Fine-tune how BPlan behaves. Saved to your account, so they follow you to any browser.
-        </p>
       </div>
 
       <div className={styles.sections}>
@@ -71,6 +68,47 @@ export function CustomizeView() {
                 </button>
               ))}
             </div>
+          </div>
+          <div className={styles.row}>
+            <div className={styles.rowText}>
+              <strong id="show-plan-label">Show Plan &amp; Pro</strong>
+              <span>Your plan stays available under Plan &amp; billing in Settings.</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showPlanInSidebar}
+              aria-labelledby="show-plan-label"
+              className={styles.switch}
+              onClick={() => setPreference('showPlanInSidebar', !showPlanInSidebar)}
+            >
+              <span className={styles.switchThumb} />
+            </button>
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="customize-calendar">
+          <header>
+            <h3 id="customize-calendar">Calendar</h3>
+          </header>
+          <div className={styles.row}>
+            <div className={styles.rowText}>
+              <strong id="event-details-label">Show time and duration on events</strong>
+              <span>
+                In day and week view, events of 45 minutes or longer show their time range and
+                length.
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showEventDetails}
+              aria-labelledby="event-details-label"
+              className={styles.switch}
+              onClick={() => setPreference('showEventDetails', !showEventDetails)}
+            >
+              <span className={styles.switchThumb} />
+            </button>
           </div>
         </section>
 

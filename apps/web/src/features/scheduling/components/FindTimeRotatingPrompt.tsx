@@ -1,21 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import styles from './FindTimeRotatingPrompt.module.css';
-
-export const FIND_TIME_PROMPT_EXAMPLES: readonly string[] = [
-  '“15-minute meeting with Andrew”',
-  '“lunch next Friday around noon”',
-  '“90 minutes of deep work next week”',
-  '“dentist Tuesday at 2”',
-  '“hike this Saturday morning”',
-  '“dinner Friday at 8”',
-] as const;
+import {
+  createCyclingSequence,
+  createFindTimePromptSequence,
+  type Random,
+} from '../utils/find-time-prompts';
 
 export interface PromptRotationControllerOptions {
-  totalCount: number;
   intervalMs: number;
   transitionMs: number;
-  onAdvance: (nextIndex: number, prevIndex: number) => void;
+  onAdvance: () => void;
   onTransitionEnd: () => void;
   isDocumentHidden?: () => boolean;
 }
@@ -25,16 +20,12 @@ export interface PromptRotationControllerOptions {
  * and timer cleanup without tight coupling to the DOM rendering engine.
  */
 export function startPromptRotation({
-  totalCount,
   intervalMs,
   transitionMs,
   onAdvance,
   onTransitionEnd,
   isDocumentHidden = () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
 }: PromptRotationControllerOptions): () => void {
-  if (totalCount <= 1) return () => {};
-
-  let currentIndex = 0;
   let transitionTimer: ReturnType<typeof setTimeout> | null = null;
 
   const intervalTimer = setInterval(() => {
@@ -42,9 +33,7 @@ export function startPromptRotation({
       return;
     }
 
-    const prev = currentIndex;
-    currentIndex = (currentIndex + 1) % totalCount;
-    onAdvance(currentIndex, prev);
+    onAdvance();
 
     if (transitionTimer) {
       clearTimeout(transitionTimer);
@@ -65,25 +54,39 @@ export function startPromptRotation({
 }
 
 export interface FindTimeRotatingPromptProps {
+  /** A fixed list to cycle instead of the generated examples. */
   examples?: readonly string[];
   intervalMs?: number;
   transitionMs?: number;
+  random?: Random;
 }
+
+type PromptState = { step: number; current: string; previous: string | null };
 
 /**
  * A calm, rotating suggestion prompt for the empty Find Time input.
- * "Try" remains fixed as the lead-in while realistic examples rotate smoothly.
+ * "Try" remains fixed as the lead-in while generated examples rotate smoothly.
  * Pointer-events are disabled so clicks pass through seamlessly to the real input.
  * Decorative only; aria-hidden ensures screen readers rely on the input's stable accessible name.
  */
 export function FindTimeRotatingPrompt({
-  examples = FIND_TIME_PROMPT_EXAMPLES,
+  examples,
   intervalMs = 3600,
   transitionMs = 260,
+  random,
 }: FindTimeRotatingPromptProps) {
-  const [index, setIndex] = useState(0);
-  const [prevIndex, setPrevIndex] = useState<number | null>(null);
+  const nextRef = useRef<(() => string) | null>(null);
+  nextRef.current ??= examples
+    ? createCyclingSequence(examples)
+    : createFindTimePromptSequence(random);
+
+  const [prompt, setPrompt] = useState<PromptState>(() => ({
+    step: 0,
+    current: nextRef.current?.() ?? '',
+    previous: null,
+  }));
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const canRotate = !examples || examples.length > 1;
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
@@ -100,41 +103,40 @@ export function FindTimeRotatingPrompt({
   }, []);
 
   useEffect(() => {
-    if (prefersReducedMotion || examples.length <= 1) return;
+    if (prefersReducedMotion || !canRotate) return;
 
     return startPromptRotation({
-      totalCount: examples.length,
       intervalMs,
       transitionMs,
-      onAdvance: (next, prev) => {
-        setPrevIndex(prev);
-        setIndex(next);
+      onAdvance: () => {
+        const next = nextRef.current?.() ?? '';
+        setPrompt((state) => ({ step: state.step + 1, current: next, previous: state.current }));
       },
       onTransitionEnd: () => {
-        setPrevIndex(null);
+        setPrompt((state) => ({ ...state, previous: null }));
       },
     });
-  }, [examples.length, intervalMs, prefersReducedMotion, transitionMs]);
+  }, [canRotate, intervalMs, prefersReducedMotion, transitionMs]);
 
-  if (examples.length === 0) return null;
+  if (!prompt.current) return null;
 
   return (
     <div className={styles.promptOverlay} aria-hidden="true">
       <span className={styles.promptPrefix}>Try</span>
       <span className={styles.promptPhraseTrack}>
-        {prevIndex !== null && (
+        {prompt.previous !== null && (
           <span
-            key={`prev-${prevIndex}`}
+            key={`prev-${prompt.step}`}
             className={`${styles.promptPhrase} ${styles.promptPhraseExit}`}
           >
-            {examples[prevIndex]}
+            {prompt.previous}
           </span>
         )}
         <span
-          key={`curr-${index}`}
-          className={`${styles.promptPhrase} ${prevIndex !== null ? styles.promptPhraseEnter : ''}`}
+          key={`curr-${prompt.step}`}
+          className={`${styles.promptPhrase} ${prompt.previous !== null ? styles.promptPhraseEnter : ''}`}
         >
-          {examples[index]}
+          {prompt.current}
         </span>
       </span>
     </div>
