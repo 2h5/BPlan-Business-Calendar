@@ -1,3 +1,4 @@
+import { clientAppEnvSchema, refinePublicSupabaseConfig } from '@cal/schemas';
 import { z } from 'zod';
 
 /**
@@ -5,12 +6,19 @@ import { z } from 'zod';
  * network call. Only EXPO_PUBLIC_* values may appear here — anything secret
  * belongs in an Edge Function, never in the bundle.
  */
-const envSchema = z.object({
-  supabaseUrl: z.string().url('EXPO_PUBLIC_SUPABASE_URL must be a valid URL'),
-  supabaseAnonKey: z.string().min(20, 'EXPO_PUBLIC_SUPABASE_ANON_KEY is missing'),
-  appEnv: z.enum(['development', 'preview', 'production']).default('development'),
-  sentryDsn: z.string().optional(),
-});
+const envSchema = z
+  .object({
+    supabaseUrl: z.string().url('EXPO_PUBLIC_SUPABASE_URL must be a valid URL'),
+    supabaseAnonKey: z.string().min(20, 'EXPO_PUBLIC_SUPABASE_ANON_KEY is missing'),
+    appEnv: clientAppEnvSchema.default('development'),
+    sentryDsn: z.string().optional(),
+  })
+  .superRefine((value, ctx) =>
+    refinePublicSupabaseConfig(value, ctx, {
+      url: 'EXPO_PUBLIC_SUPABASE_URL',
+      key: 'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+    }),
+  );
 
 const parsed = envSchema.safeParse({
   supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,

@@ -8,3 +8,4 @@ export * from './scheduling.schema';
 export * from './intent.schema';
 export * from './subscription.schema';
 export * from './preferences.schema';
+export * from './client-env.schema';

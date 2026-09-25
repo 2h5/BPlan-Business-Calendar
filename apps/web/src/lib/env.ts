@@ -1,3 +1,4 @@
+import { clientAppEnvSchema, refinePublicSupabaseConfig } from '@cal/schemas';
 import { z } from 'zod';
 
 const optionalUrl = z.preprocess(
@@ -15,18 +16,25 @@ const booleanFlag = z
  * Only VITE_* variables are exposed to the browser client.
  * Server secrets, service-role keys, and OAuth client secrets MUST NEVER be loaded here.
  */
-const envSchema = z.object({
-  supabaseUrl: z.string().url('VITE_SUPABASE_URL must be a valid URL'),
-  supabaseAnonKey: z.string().min(20, 'VITE_SUPABASE_ANON_KEY is missing or invalid'),
-  appEnv: z.enum(['development', 'preview', 'production']).default('development'),
-  billingMode: z.enum(['disabled', 'sandbox', 'production']).default('disabled'),
-  revenueCatWebPurchaseUrl: optionalUrl,
-  revenueCatBillingManagementUrl: optionalUrl,
-  billingSellerIdentityConfirmed: booleanFlag,
-  billingLegalDocsFinal: booleanFlag,
-  billingTermsUrl: optionalUrl,
-  billingPrivacyUrl: optionalUrl,
-});
+const envSchema = z
+  .object({
+    supabaseUrl: z.string().url('VITE_SUPABASE_URL must be a valid URL'),
+    supabaseAnonKey: z.string().min(20, 'VITE_SUPABASE_ANON_KEY is missing or invalid'),
+    appEnv: clientAppEnvSchema.default('development'),
+    billingMode: z.enum(['disabled', 'sandbox', 'production']).default('disabled'),
+    revenueCatWebPurchaseUrl: optionalUrl,
+    revenueCatBillingManagementUrl: optionalUrl,
+    billingSellerIdentityConfirmed: booleanFlag,
+    billingLegalDocsFinal: booleanFlag,
+    billingTermsUrl: optionalUrl,
+    billingPrivacyUrl: optionalUrl,
+  })
+  .superRefine((value, ctx) =>
+    refinePublicSupabaseConfig(value, ctx, {
+      url: 'VITE_SUPABASE_URL',
+      key: 'VITE_SUPABASE_ANON_KEY',
+    }),
+  );
 
 const parsed = envSchema.safeParse({
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
