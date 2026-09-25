@@ -1,11 +1,4 @@
-import {
-  DURATION_PRESETS,
-  addZonedDays,
-  formatDuration,
-  getZonedParts,
-  startOfZonedDay,
-  zonedWallClockToUtc,
-} from '@cal/domain';
+import { DURATION_PRESETS, formatDuration } from '@cal/domain';
 import type { TaskPriority } from '@cal/schemas';
 import { Button, Chip, Text, TextField, useTheme } from '@cal/ui';
 import { useState } from 'react';
@@ -14,8 +7,7 @@ import { View } from 'react-native';
 import { useTaskEditorStore } from '../../../store/task-editor.store';
 import { useUserTimeZone } from '../../settings/hooks/useProfile';
 import { useCreateTask } from '../hooks/useTasks';
-
-type DuePreset = 'none' | 'today' | 'tomorrow' | 'next-week';
+import { DUE_PRESET_LABELS, type DuePreset, resolveDuePreset } from '../utils/due-presets';
 
 export interface QuickAddTaskFormProps {
   /** Called after a successful capture so the sheet can dismiss itself. */
@@ -43,24 +35,7 @@ export function QuickAddTaskForm({ onCaptured, onHandOff, seedDateKey }: QuickAd
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const resolveDueAt = (): string | null => {
-    if (duePreset === 'none') return null;
-
-    const startOfToday = startOfZonedDay(new Date(), timeZone);
-    const offsets: Record<Exclude<DuePreset, 'none'>, number> = {
-      today: 0,
-      tomorrow: 1,
-      'next-week': 7,
-    };
-
-    const day = addZonedDays(startOfToday, offsets[duePreset], timeZone);
-    const parts = getZonedParts(day, timeZone);
-    // Local noon, so a later time-zone change cannot slide it into another day.
-    return zonedWallClockToUtc(
-      { year: parts.year, month: parts.month, day: parts.day, hour: 12, minute: 0 },
-      timeZone,
-    ).toISOString();
-  };
+  const resolveDueAt = () => resolveDuePreset(duePreset, timeZone);
 
   const handleSubmit = async () => {
     const trimmed = title.trim();
@@ -110,17 +85,10 @@ export function QuickAddTaskForm({ onCaptured, onHandOff, seedDateKey }: QuickAd
           When
         </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-          {(
-            [
-              ['none', 'Someday'],
-              ['today', 'Today'],
-              ['tomorrow', 'Tomorrow'],
-              ['next-week', 'Next week'],
-            ] as const
-          ).map(([value, label]) => (
+          {(Object.keys(DUE_PRESET_LABELS) as DuePreset[]).map((value) => (
             <Chip
               key={value}
-              label={label}
+              label={DUE_PRESET_LABELS[value]}
               selected={duePreset === value}
               onPress={() => setDuePreset(value)}
             />

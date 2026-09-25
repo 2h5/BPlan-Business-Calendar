@@ -15,6 +15,8 @@ import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
 
+import { SwipeAction } from './SwipeAction';
+
 export interface TaskRowProps {
   task: Task;
   /** Name of the list the task belongs to, if any. */
@@ -236,42 +238,6 @@ function Badge({ label, fg, bg }: { label: string; fg: string; bg: string }) {
         {label}
       </Text>
     </View>
-  );
-}
-
-function SwipeAction({
-  icon,
-  label,
-  background,
-  tint,
-  onPress,
-}: {
-  icon: 'time-outline' | 'trash-outline' | 'checkmark-circle-outline' | 'arrow-undo-outline';
-  label: string;
-  background: string;
-  tint: string;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      style={{
-        width: 76,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: theme.spacing.xxs,
-        backgroundColor: background,
-      }}
-    >
-      <Ionicons name={icon} size={20} color={tint} />
-      <Text variant="caption" style={{ color: tint }}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
