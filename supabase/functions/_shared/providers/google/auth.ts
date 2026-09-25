@@ -1,4 +1,4 @@
-import { EdgeError } from '../../errors/index.ts';
+import { EdgeError, describeError } from '../../errors/index.ts';
 import type { ProviderAuth, TokenSet } from '../types.ts';
 
 import {
@@ -120,7 +120,9 @@ export function createGoogleAuth(deps: GoogleAuthDeps = {}): ProviderAuth {
           body: new URLSearchParams({ token }).toString(),
         });
       } catch (cause) {
-        console.error(JSON.stringify({ code: 'GOOGLE_REVOKE_FAILED', detail: String(cause) }));
+        console.error(
+          JSON.stringify({ code: 'GOOGLE_REVOKE_FAILED', error: describeError(cause) }),
+        );
       }
     },
   };

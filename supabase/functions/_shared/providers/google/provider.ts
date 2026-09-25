@@ -1,4 +1,4 @@
-import { EdgeError } from '../../errors/index.ts';
+import { EdgeError, describeError } from '../../errors/index.ts';
 import type {
   CalendarProvider,
   ExternalCalendar,
@@ -217,7 +217,9 @@ export function createGoogleProvider(deps: GoogleProviderDeps = {}): CalendarPro
       } catch (cause) {
         // A channel we cannot stop expires on its own within the week. Never let
         // this fail a disconnect.
-        console.error(JSON.stringify({ code: 'GOOGLE_UNWATCH_FAILED', detail: String(cause) }));
+        console.error(
+          JSON.stringify({ code: 'GOOGLE_UNWATCH_FAILED', error: describeError(cause) }),
+        );
       }
     },
   };

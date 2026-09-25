@@ -1,5 +1,6 @@
 import { adminClient } from '../_shared/auth/index.ts';
 import { constantTimeEqual } from '../_shared/billing/constant-time.ts';
+import { describeError } from '../_shared/errors/safe-error.ts';
 import { runAfterResponse } from '../_shared/http/background.ts';
 import { JOB_KINDS, calendarSyncKey, enqueue } from '../_shared/sync/jobs.ts';
 import { drainQueue } from '../_shared/sync/worker.ts';
@@ -100,7 +101,7 @@ export async function handleGoogleWebhook(
   } catch (error) {
     // Deliberately still a 2xx. Losing one notification costs us until daily
     // reconciliation; teaching Google to stop delivering costs the channel.
-    console.error(JSON.stringify({ code: 'WEBHOOK_FAILED', detail: String(error) }));
+    console.error(JSON.stringify({ code: 'WEBHOOK_FAILED', error: describeError(error) }));
     return acceptedResponse();
   }
 }

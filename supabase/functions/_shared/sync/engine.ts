@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { EdgeError } from '../errors/index.ts';
+import { EdgeError, describeError } from '../errors/index.ts';
 import { markAccount, touchSynced, type ProviderAccountRow } from '../providers/accounts.ts';
 import { providerFor } from '../providers/registry.ts';
 import type {
@@ -392,7 +392,7 @@ async function discardNewWatch(
     await provider.unwatch(ctx, registration);
   } catch (cause) {
     console.error(
-      JSON.stringify({ code: 'UNWATCH_NEW_REGISTRATION_FAILED', detail: String(cause) }),
+      JSON.stringify({ code: 'UNWATCH_NEW_REGISTRATION_FAILED', error: describeError(cause) }),
     );
   }
 }

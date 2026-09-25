@@ -1,12 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { requireEnv } from '../env.ts';
 import { EdgeError } from '../errors/index.ts';
-
-const requireEnv = (name: string): string => {
-  const value = Deno.env.get(name);
-  if (!value) throw new EdgeError('UNKNOWN', `Missing ${name}`, 500);
-  return value;
-};
 
 /**
  * A client scoped to the caller. RLS applies, so this is the safe default for

@@ -8,6 +8,8 @@
  * tests) the work is simply awaited, which is slower but never silently lost.
  */
 
+import { describeError } from '../errors/safe-error.ts';
+
 interface EdgeRuntimeLike {
   waitUntil?: (promise: Promise<unknown>) => void;
 }
@@ -18,7 +20,7 @@ export async function runAfterResponse(work: () => Promise<void>): Promise<void>
   const guarded = work().catch((error: unknown) => {
     // A background failure has no response to attach itself to, so logging is
     // the only place it can surface. The queue records it separately.
-    console.error(JSON.stringify({ code: 'BACKGROUND_TASK_FAILED', detail: String(error) }));
+    console.error(JSON.stringify({ code: 'BACKGROUND_TASK_FAILED', error: describeError(error) }));
   });
 
   if (typeof runtime?.waitUntil === 'function') {

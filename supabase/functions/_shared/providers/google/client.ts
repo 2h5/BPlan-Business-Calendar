@@ -1,4 +1,4 @@
-import { EdgeError } from '../../errors/index.ts';
+import { EdgeError, describeError } from '../../errors/index.ts';
 import { googleApiErrorSchema } from './schemas.ts';
 
 /**
@@ -88,7 +88,7 @@ async function sendWithRetry(
       // cold socket. Never repeat an unsafe write without an idempotency key.
       lastError = new EdgeError('NETWORK_UNAVAILABLE', 'Could not reach Google.', 503);
       console.error(
-        JSON.stringify({ code: 'NETWORK_UNAVAILABLE', attempt, detail: String(cause) }),
+        JSON.stringify({ code: 'NETWORK_UNAVAILABLE', attempt, error: describeError(cause) }),
       );
       if (!replaySafe || attempt === MAX_ATTEMPTS) throw lastError;
       await backoff(attempt, null, now, random, sleep);
