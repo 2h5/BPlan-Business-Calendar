@@ -20,11 +20,13 @@ import {
   useUpdateCalendar,
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
+import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,
   setLastCalendarView,
+  viewForLinkedEvent,
 } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
 import {
@@ -130,7 +132,8 @@ export function CalendarView() {
       setLastCalendarView(viewParam);
       return viewParam;
     }
-    return getActiveCalendarView();
+    const activeView = getActiveCalendarView();
+    return searchParams.has('event') ? viewForLinkedEvent(activeView) : activeView;
   });
   const [transitionState, setTransitionState] = useState<ViewTransitionState | null>(null);
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -414,6 +417,11 @@ export function CalendarView() {
       setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
     [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys],
+  );
+
+  useCalendarViewHotkeys(
+    changeMode,
+    quickCreateState.isOpen || !!selectedOccurrence || isDraft || calendarEditorOpen,
   );
 
   const viewParam = searchParams.get('view');
@@ -773,6 +781,7 @@ export function CalendarView() {
                   draftEvent={activeDraftEvent}
                   defaultDurationMinutes={result.defaultEventMinutes}
                   workingHours={result.workingHours}
+                  revealEventId={requestedEventId}
                 />
               )}
             </div>

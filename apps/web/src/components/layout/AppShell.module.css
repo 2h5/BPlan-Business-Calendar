@@ -102,16 +102,6 @@
   color: var(--color-accent);
 }
 
-.navItemActive::before {
-  position: absolute;
-  left: -12px;
-  width: 3px;
-  height: 20px;
-  border-radius: 0 var(--radius-full) var(--radius-full) 0;
-  background: var(--color-accent);
-  content: '';
-}
-
 .navItemActive:hover {
   background: var(--color-accent-subtle);
   color: var(--color-accent-hover);
@@ -134,17 +124,6 @@
   background: var(--color-accent-subtle);
   pointer-events: none;
   z-index: 0;
-}
-
-.workspaceHighlight::before {
-  position: absolute;
-  left: -12px;
-  top: calc(50% - 10px);
-  width: 3px;
-  height: 20px;
-  border-radius: 0 var(--radius-full) var(--radius-full) 0;
-  background: var(--color-accent);
-  content: '';
 }
 
 .modeSliding {
@@ -186,10 +165,6 @@
   transition:
     color var(--transition-fast),
     background-color var(--transition-fast);
-}
-
-.workspaceNavItem::before {
-  display: none !important;
 }
 
 .workspaceNavItemActive {
@@ -442,11 +417,6 @@
 
   .navItem {
     padding: 0;
-  }
-
-  .navItemActive::before,
-  .workspaceHighlight::before {
-    left: -8px;
   }
 
   .sidebarFooter {

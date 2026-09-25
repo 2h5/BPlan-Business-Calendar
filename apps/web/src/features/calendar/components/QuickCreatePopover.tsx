@@ -21,6 +21,7 @@ import {
 import styles from './QuickCreatePopover.module.css';
 import { Select } from '../../../components/forms/Select';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
+import { useFollowAnchorMotion } from '../hooks/useFollowAnchorMotion';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
 import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
 import {
@@ -325,6 +326,19 @@ export function QuickCreatePopover({
     maxHeight: null,
   });
 
+  /** The on-screen block the card points at: the edited event, or the new-event draft. */
+  const getAnchorElement = useCallback((): HTMLElement | null => {
+    if (editingOccurrence) {
+      const eventElements = document.querySelectorAll<HTMLElement>('[data-occurrence-key]');
+      return (
+        Array.from(eventElements).find(
+          (element) => element.dataset.occurrenceKey === editingOccurrence.key,
+        ) ?? null
+      );
+    }
+    return document.querySelector<HTMLElement>('[data-quick-create-draft="true"]');
+  }, [editingOccurrence]);
+
   const updatePosition = useCallback(() => {
     if (!isOpen) return;
 
@@ -333,10 +347,7 @@ export function QuickCreatePopover({
 
     let currentAnchorRect = anchorRect;
     if (editingOccurrence) {
-      const eventElements = document.querySelectorAll<HTMLElement>('[data-occurrence-key]');
-      const eventElement = Array.from(eventElements).find(
-        (element) => element.dataset.occurrenceKey === editingOccurrence.key,
-      );
+      const eventElement = getAnchorElement();
       if (eventElement) {
         const rect = eventElement.getBoundingClientRect();
         currentAnchorRect = {
@@ -349,16 +360,20 @@ export function QuickCreatePopover({
         };
       }
     } else {
-      const draftElement = document.querySelector<HTMLElement>('[data-quick-create-draft="true"]');
+      const draftElement = getAnchorElement();
       if (draftElement) {
+        // The draft grows in from scaleY(0) with a top origin, so its transformed rect is
+        // collapsed on the first frame. Use its layout size so the card clears the whole block.
         const rect = draftElement.getBoundingClientRect();
+        const width = draftElement.offsetWidth || rect.width;
+        const height = draftElement.offsetHeight || rect.height;
         currentAnchorRect = {
           top: rect.top,
-          bottom: rect.bottom,
+          bottom: rect.top + height,
           left: rect.left,
-          right: rect.right,
-          width: rect.width,
-          height: rect.height,
+          right: rect.left + width,
+          width,
+          height,
         };
       }
     }
@@ -394,7 +409,7 @@ export function QuickCreatePopover({
       arrowLeft: result.arrowLeft,
       maxHeight: result.maxHeight,
     });
-  }, [anchorRect, editingOccurrence, isOpen]);
+  }, [anchorRect, editingOccurrence, getAnchorElement, isOpen]);
 
   useLayoutEffect(() => {
     updatePosition();
@@ -409,6 +424,9 @@ export function QuickCreatePopover({
       window.removeEventListener('scroll', updatePosition, true);
     };
   }, [isOpen, updatePosition]);
+
+  // The page entrance and calendar view changes slide the event while the card is open.
+  useFollowAnchorMotion(isOpen, getAnchorElement, updatePosition);
 
   const [isClosing, setIsClosing] = useState(false);
 

@@ -83,6 +83,8 @@ export function TodayView() {
     return firstName ? `${timeOfDay}, ${firstName}` : timeOfDay;
   }, [localParts.hour, today.profile?.fullName]);
 
+  const isDaytime = localParts.hour >= 5 && localParts.hour < 17;
+
   const fullDateString = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
       weekday: 'long',
@@ -204,7 +206,14 @@ export function TodayView() {
           <div className={styles.heroDateRow}>
             <span className={styles.dateBadge}>{fullDateString}</span>
           </div>
-          <h1 className={styles.heroTitle}>{greeting}</h1>
+          <h1 className={styles.heroTitle}>
+            {greeting}
+            {isDaytime ? (
+              <SunIcon className={`${styles.timeOfDayIcon} ${styles.timeOfDayIconSun}`} />
+            ) : (
+              <MoonIcon className={`${styles.timeOfDayIcon} ${styles.timeOfDayIconMoon}`} />
+            )}
+          </h1>
           <p className={styles.heroSubtitle}>
             {today.timed.length > 0 || relevantCount > 0
               ? `You have ${today.timed.length} event${today.timed.length === 1 ? '' : 's'} and ${relevantCount} active task${relevantCount === 1 ? '' : 's'} today.`
@@ -786,6 +795,38 @@ function TodayTaskRow({
 }
 
 // Sleek SVG Icons
+function SunIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4.5" stroke="none" />
+      <line x1="12" y1="1.8" x2="12" y2="4" />
+      <line x1="12" y1="20" x2="12" y2="22.2" />
+      <line x1="1.8" y1="12" x2="4" y2="12" />
+      <line x1="20" y1="12" x2="22.2" y2="12" />
+      <line x1="4.8" y1="4.8" x2="6.35" y2="6.35" />
+      <line x1="17.65" y1="17.65" x2="19.2" y2="19.2" />
+      <line x1="4.8" y1="19.2" x2="6.35" y2="17.65" />
+      <line x1="17.65" y1="6.35" x2="19.2" y2="4.8" />
+    </svg>
+  );
+}
+
+function MoonIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M20.2 14.6A8.5 8.5 0 0 1 9.4 3.8a8.5 8.5 0 1 0 10.8 10.8Z" />
+    </svg>
+  );
+}
+
 function PlusIcon() {
   return (
     <svg

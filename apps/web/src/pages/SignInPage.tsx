@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './pages.module.css';
 import { SignInForm, useAuth } from '../features/auth';
-import { PublicHeader } from '../features/public-site';
+import { PricingDecals, PublicHeader, usePricingDecalsExit } from '../features/public-site';
 
 type PreviewEventTone = 'sky' | 'blue' | 'lavender' | 'green';
 
@@ -46,6 +46,7 @@ export function SignInPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const pricingDecals = usePricingDecalsExit();
 
   const destination =
     (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/today';
@@ -63,6 +64,9 @@ export function SignInPage() {
   return (
     <div className={styles.loginPage}>
       <PublicHeader />
+      {pricingDecals.isExiting ? (
+        <PricingDecals mode="exit" onExited={pricingDecals.onExited} />
+      ) : null}
 
       <main className={styles.loginLayout}>
         <section className={styles.loginHero} aria-labelledby="login-hero-title">

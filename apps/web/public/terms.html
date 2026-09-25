@@ -10,148 +10,367 @@
     <title>BPlan — Terms and Conditions (Draft)</title>
     <style>
       :root {
+        --ink: #0b1433;
+        --heading: #070e29;
+        --muted: #647091;
+        --blue: #1768f2;
+        --line: #dce5f3;
+        --gutter: clamp(1.15rem, 3.33vw, 4rem);
         color-scheme: light;
-        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
       }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
       body {
+        min-height: 100dvh;
         margin: 0;
-        color: #172033;
-        background: #f5f7fb;
-        line-height: 1.6;
+        background:
+          radial-gradient(circle at 76% 12%, rgba(216, 234, 255, 0.48), transparent 32%),
+          radial-gradient(circle at 18% 60%, rgba(235, 244, 255, 0.62), transparent 35%),
+          linear-gradient(135deg, #fbfdff 0%, #f7faff 54%, #f9fcff 100%);
+        background-attachment: fixed;
+        color: var(--ink);
+        line-height: 1.65;
       }
+
+      a {
+        color: var(--blue);
+        text-underline-offset: 2px;
+      }
+
+      .site-header {
+        width: min(100%, 1460px);
+        min-height: 72px;
+        margin: 0 auto;
+        padding: 14px var(--gutter);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.65rem;
+        color: var(--ink);
+        font-size: 1.6rem;
+        font-weight: 750;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+
+      .brand svg {
+        width: 38px;
+        height: 38px;
+        color: var(--blue);
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 1.9rem;
+        font-size: 0.95rem;
+        font-weight: 550;
+      }
+
+      .actions a {
+        color: var(--ink);
+        text-decoration: none;
+      }
+
+      .actions .get-started {
+        min-width: 122px;
+        height: 46px;
+        padding: 0 1.35rem;
+        border: 1.5px solid var(--blue);
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--blue);
+        transition:
+          background-color 160ms ease,
+          color 160ms ease,
+          box-shadow 160ms ease;
+      }
+
+      .actions .get-started:hover {
+        background: var(--blue);
+        color: #ffffff;
+        box-shadow: 0 10px 24px rgba(23, 104, 242, 0.2);
+      }
+
       main {
-        width: min(760px, calc(100% - 32px));
-        margin: 40px auto;
-        padding: 32px;
-        background: #fff;
-        border: 1px solid #dfe4ee;
-        border-radius: 18px;
+        width: min(100% - 2 * var(--gutter), 820px);
+        margin: 0 auto;
+        padding: clamp(1.5rem, 4vw, 3.5rem) 0 4rem;
       }
+
+      .hero {
+        text-align: center;
+        animation: legal-enter 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .eyebrow {
+        margin: 0 0 0.9rem;
+        color: #627092;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.25em;
+        text-transform: uppercase;
+      }
+
       h1 {
-        margin-top: 0;
-        letter-spacing: -0.03em;
+        margin: 0;
+        color: var(--heading);
+        font-size: clamp(2.2rem, 4.6vw, 3.4rem);
+        font-weight: 750;
+        letter-spacing: -0.055em;
+        line-height: 1.02;
       }
-      h2 {
-        margin-top: 32px;
-        font-size: 1.15rem;
+
+      h1 span {
+        color: var(--blue);
       }
+
+      .card {
+        margin-top: 2rem;
+        padding: clamp(1.4rem, 4vw, 2.6rem);
+        border: 1px solid rgba(211, 224, 242, 0.9);
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 22px 58px rgba(64, 100, 155, 0.1);
+        backdrop-filter: blur(12px);
+        animation: legal-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
+      }
+
       .draft {
-        padding: 14px 16px;
-        border: 1px solid #e4b55f;
+        margin: 0 0 1.25rem;
+        padding: 0.8rem 1rem;
+        border: 1px solid #f0d49a;
         border-radius: 12px;
         background: #fff8e7;
         color: #694b0b;
+        font-size: 0.88rem;
         font-weight: 600;
       }
+
       .meta {
-        color: #5d687d;
-        font-size: 0.92rem;
+        margin: 0.25rem 0;
+        color: var(--muted);
+        font-size: 0.88rem;
       }
-      a {
-        color: #3756c7;
+
+      h2 {
+        margin: 2.1rem 0 0.5rem;
+        color: var(--heading);
+        font-size: 1.12rem;
+        letter-spacing: -0.02em;
       }
-      li {
-        margin: 8px 0;
+
+      .card p,
+      .card li {
+        color: #263657;
+        font-size: 0.95rem;
       }
+
+      .card ul {
+        padding-left: 1.2rem;
+      }
+
+      .card li {
+        margin: 0.5rem 0;
+      }
+
+      .card li::marker {
+        color: var(--blue);
+      }
+
+      .card strong {
+        color: var(--ink);
+      }
+
       footer {
-        margin-top: 36px;
-        padding-top: 18px;
-        border-top: 1px solid #e5e9f0;
-        color: #5d687d;
-        font-size: 0.9rem;
+        margin-top: 2.25rem;
+        padding-top: 1.1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.85rem;
       }
+
+      @keyframes legal-enter {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
       @media (max-width: 540px) {
-        main {
-          margin: 16px auto;
-          padding: 22px;
+        .site-header {
+          min-height: 68px;
+        }
+
+        .brand {
+          font-size: 1.2rem;
+        }
+
+        .brand svg {
+          width: 30px;
+          height: 30px;
+        }
+
+        .actions {
+          gap: 1rem;
+        }
+
+        .actions .get-started {
+          min-width: 0;
+          height: 40px;
+          padding: 0 0.9rem;
+        }
+
+        .eyebrow {
+          font-size: 0.64rem;
+          letter-spacing: 0.18em;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .hero,
+        .card {
+          animation: none;
         }
       }
     </style>
   </head>
   <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="BPlan home"
+        ><svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <rect x="4" y="5" width="20" height="19" rx="4" fill="currentColor" />
+          <path d="M9 3v5M19 3v5M4 10h20" stroke="white" stroke-width="2" stroke-linecap="round" />
+          <path
+            d="m10 17 2.3 2.2L18 14"
+            stroke="white"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          /></svg
+        >BPlan</a
+      >
+      <nav class="actions" aria-label="Account actions">
+        <a href="/login">Sign in</a>
+        <a class="get-started" href="/login">Get started</a>
+      </nav>
+    </header>
+
     <main>
-      <p class="draft">DRAFT — NOT FINAL. Do not use this page for production paid checkout.</p>
-      <h1>BPlan: Business Calendar Terms and Conditions</h1>
-      <p class="meta">Effective date: TBD — use the launch date once known.</p>
-      <p class="meta">
-        Seller: TBD — founder business-entity decision pending. This draft does not claim that an
-        LLC or other entity currently exists.
-      </p>
+      <section class="hero">
+        <p class="eyebrow">BPlan: Business Calendar</p>
+        <h1>Terms and <span>Conditions</span></h1>
+      </section>
 
-      <h2>1. The service</h2>
-      <p>
-        BPlan is a calendar and task-planning service. The current product includes internal
-        calendar and task tools, optional Google and Microsoft calendar connections, and an
-        AI-assisted Find Time workflow where enabled.
-      </p>
+      <article class="card">
+        <p class="draft">DRAFT — NOT FINAL. Do not use this page for production paid checkout.</p>
+        <p class="meta">Effective date: TBD — use the launch date once known.</p>
+        <p class="meta">
+          Seller: TBD — founder business-entity decision pending. This draft does not claim that an
+          LLC or other entity currently exists.
+        </p>
 
-      <h2>2. Accounts and age</h2>
-      <p>
-        You must be at least 18 years old to use the service. Keep your account information accurate
-        and protect your account credentials.
-      </p>
+        <h2>1. The service</h2>
+        <p>
+          BPlan is a calendar and task-planning service. The current product includes internal
+          calendar and task tools, optional Google and Microsoft calendar connections, and an
+          AI-assisted Find Time workflow where enabled.
+        </p>
 
-      <h2>3. Pro plans</h2>
-      <p>
-        The current Pro feature is Find Time with AI. The service first calculates available time
-        deterministically; an AI provider may rank and explain the resulting candidates. AI
-        suggestions are assistance, not a guarantee that a calendar remains unchanged or
-        conflict-free after the suggestion is made.
-      </p>
-      <p>
-        Launch pricing is $4.99 per month or $49.99 per year, in USD. There is no free trial or
-        introductory discount currently planned. Plans renew automatically until cancelled, subject
-        to the final checkout disclosure.
-      </p>
+        <h2>2. Accounts and age</h2>
+        <p>
+          You must be at least 18 years old to use the service. Keep your account information
+          accurate and protect your account credentials.
+        </p>
 
-      <h2>4. Cancellation and refunds</h2>
-      <p>
-        Users can cancel through the available billing-management flow. A cancellation stops future
-        renewals, and access continues through the current paid billing period. Charges are
-        generally non-refundable except where required by law or where BPlan chooses to provide a
-        refund.
-      </p>
+        <h2>3. Pro plans</h2>
+        <p>
+          The current Pro feature is Find Time with AI. The service first calculates available time
+          deterministically; an AI provider may rank and explain the resulting candidates. AI
+          suggestions are assistance, not a guarantee that a calendar remains unchanged or
+          conflict-free after the suggestion is made.
+        </p>
+        <p>
+          Launch pricing is $4.99 per month or $49.99 per year, in USD. There is no free trial or
+          introductory discount currently planned. Plans renew automatically until cancelled,
+          subject to the final checkout disclosure.
+        </p>
 
-      <h2>5. User data</h2>
-      <p>
-        You retain ownership of your calendar, task, and other user-created data. You grant BPlan
-        only the rights needed to process that data to provide the service. The separate
-        <a href="/privacy.html">Privacy Policy</a> draft describes the current data flows.
-      </p>
+        <h2>4. Cancellation and refunds</h2>
+        <p>
+          Users can cancel through the available billing-management flow. A cancellation stops
+          future renewals, and access continues through the current paid billing period. Charges are
+          generally non-refundable except where required by law or where BPlan chooses to provide a
+          refund.
+        </p>
 
-      <h2>6. Acceptable use and termination</h2>
-      <p>
-        Do not use BPlan for abuse, fraud, attacks, unlawful activity, or activity that compromises
-        another person’s data or service. BPlan may suspend or terminate access for abuse, fraud,
-        security issues, or Terms violations.
-      </p>
+        <h2>5. User data</h2>
+        <p>
+          You retain ownership of your calendar, task, and other user-created data. You grant BPlan
+          only the rights needed to process that data to provide the service. The separate
+          <a href="/privacy.html">Privacy Policy</a> draft describes the current data flows.
+        </p>
 
-      <h2>7. Account deletion</h2>
-      <p>
-        Users may request deletion through the account controls. The current implementation revokes
-        connected calendar grants before deleting the authenticated account. Exact backup and
-        third-party retention details remain a launch decision and must be added before this
-        document is final.
-      </p>
+        <h2>6. Acceptable use and termination</h2>
+        <p>
+          Do not use BPlan for abuse, fraud, attacks, unlawful activity, or activity that
+          compromises another person’s data or service. BPlan may suspend or terminate access for
+          abuse, fraud, security issues, or Terms violations.
+        </p>
 
-      <h2>8. Governing-law working assumption</h2>
-      <p>
-        The current working assumption is New Jersey, United States, with initial sales limited to
-        the United States. The seller identity, final governing law, and dispute terms remain
-        subject to founder and legal review.
-      </p>
+        <h2>7. Account deletion</h2>
+        <p>
+          Users may request deletion through the account controls. The current implementation
+          revokes connected calendar grants before deleting the authenticated account. Exact backup
+          and third-party retention details remain a launch decision and must be added before this
+          document is final.
+        </p>
 
-      <h2>9. Contact</h2>
-      <p>
-        Email <a href="mailto:info.bplanai@gmail.com">info.bplanai@gmail.com</a>. Public business
-        address: TBD.
-      </p>
+        <h2>8. Governing-law working assumption</h2>
+        <p>
+          The current working assumption is New Jersey, United States, with initial sales limited to
+          the United States. The seller identity, final governing law, and dispute terms remain
+          subject to founder and legal review.
+        </p>
 
-      <footer>
-        <a href="/privacy.html">Privacy Policy draft</a> · <a href="/terms.html">Terms draft</a
-        ><br />
-        This is an implementation draft, not legal advice or legal sign-off.
-      </footer>
+        <h2>9. Contact</h2>
+        <p>
+          Email <a href="mailto:info.bplanai@gmail.com">info.bplanai@gmail.com</a>. Public business
+          address: TBD.
+        </p>
+
+        <footer>
+          <a href="/privacy.html">Privacy Policy draft</a> · <a href="/terms.html">Terms draft</a
+          ><br />
+          This is an implementation draft, not legal advice or legal sign-off.
+        </footer>
+      </article>
     </main>
   </body>
 </html>

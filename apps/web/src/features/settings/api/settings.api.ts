@@ -1,4 +1,7 @@
 import {
+  type AppPreferences,
+  appPreferencesSchema,
+  parseAppPreferences,
   type CalendarSyncHealth,
   type ExternalCalendar,
   type Profile,
@@ -130,4 +133,24 @@ async function readErrorEnvelope(
   } catch {
     return null;
   }
+}
+
+export async function fetchAppPreferences(): Promise<AppPreferences> {
+  const { data, error } = await supabase.from('profiles').select('preferences').single();
+  if (error) throw toAppError(error);
+  return parseAppPreferences(data.preferences);
+}
+
+export async function updateAppPreferences(
+  id: string,
+  preferences: AppPreferences,
+): Promise<AppPreferences> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ preferences: appPreferencesSchema.parse(preferences) })
+    .eq('id', id)
+    .select('preferences')
+    .single();
+  if (error) throw toAppError(error);
+  return parseAppPreferences(data.preferences);
 }

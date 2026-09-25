@@ -30,6 +30,10 @@ vi.mock('./AccountPanel', () => ({
   AccountPanel: () => <div data-testid="account-panel" />,
 }));
 
+vi.mock('./ProfilePhotoField', () => ({
+  ProfilePhotoField: () => <div data-testid="profile-photo-field" />,
+}));
+
 const mockProfile: Profile = {
   id: '00000000-0000-0000-0000-000000000001',
   avatarUrl: null,

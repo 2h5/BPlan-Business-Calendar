@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
 import { AuthProvider } from './features/auth';
-import { ThemeProvider } from './features/settings';
+import { AppPreferencesProvider, ThemeProvider } from './features/settings';
 import { queryClient } from './lib/query/query-client';
 import { AppRoutes } from './routes';
 import './styles/global.css';
@@ -20,9 +20,11 @@ ReactDOM.createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ThemeProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
+          <AppPreferencesProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AppPreferencesProvider>
         </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>

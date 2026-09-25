@@ -37,7 +37,23 @@ const handler = withErrorHandling(async (request) => {
     console.log(JSON.stringify({ event: 'provider_released', provider: account.provider }));
   }
 
-  // 2. Delete the auth user. Cascades remove profile, calendars, events,
+  // 2. Remove the profile photo. Storage objects do not cascade from
+  //    auth.users, and the bucket is publicly readable, so a leftover file
+  //    would keep the photo online after the account is gone.
+  const { data: avatarFiles, error: avatarListError } = await admin.storage
+    .from('avatars')
+    .list(user.id);
+  if (avatarListError) throw new EdgeError('UNKNOWN', 'Could not read the profile photo.', 500);
+  if (avatarFiles && avatarFiles.length > 0) {
+    const { error: avatarRemoveError } = await admin.storage
+      .from('avatars')
+      .remove(avatarFiles.map((file) => `${user.id}/${file.name}`));
+    if (avatarRemoveError) {
+      throw new EdgeError('UNKNOWN', 'Could not remove the profile photo.', 500);
+    }
+  }
+
+  // 3. Delete the auth user. Cascades remove profile, calendars, events,
   //    tasks, connections, and subscriptions.
   const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
   if (deleteError) throw new EdgeError('UNKNOWN', 'Could not delete the account.', 500);

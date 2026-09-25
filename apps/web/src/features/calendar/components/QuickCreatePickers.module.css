@@ -16,6 +16,10 @@
     border-color var(--transition-fast);
 }
 
+.pickerInput {
+  cursor: text;
+}
+
 .pickerTrigger:hover:not(:disabled) {
   background: var(--color-hover);
 }

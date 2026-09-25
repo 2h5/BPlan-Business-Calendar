@@ -22,12 +22,24 @@ export interface LaidOutItem<T> {
 /** Minimum visual height, expressed in minutes, so 5-minute events stay tappable. */
 export const MIN_VISUAL_MINUTES = 20;
 
+export interface LayoutOptions<T> {
+  /**
+   * The interval that decides column order inside an overlap cluster. Defaults
+   * to the item's own interval (earlier, then longer, events sit further left).
+   * A view can pass an item's pre-drag interval here so an event being dragged
+   * keeps a stable column instead of swapping sides as it passes its neighbours.
+   */
+  getOrderInterval?: (item: T) => Interval;
+}
+
 export function layoutOverlappingEvents<T>(
   items: readonly T[],
   getInterval: (item: T) => Interval,
+  options: LayoutOptions<T> = {},
 ): LaidOutItem<T>[] {
+  const getOrderInterval = options.getOrderInterval ?? getInterval;
   const entries = items
-    .map((item) => ({ item, interval: getInterval(item) }))
+    .map((item) => ({ item, interval: getInterval(item), order: getOrderInterval(item) }))
     .sort((a, b) => a.interval.start - b.interval.start || b.interval.end - a.interval.end);
 
   const result: LaidOutItem<T>[] = [];
@@ -54,10 +66,17 @@ export function layoutOverlappingEvents<T>(
   return result;
 }
 
-function assignColumns<T>(cluster: { item: T; interval: Interval }[]): LaidOutItem<T>[] {
+function assignColumns<T>(
+  cluster: { item: T; interval: Interval; order: Interval }[],
+): LaidOutItem<T>[] {
   const columns: { item: T; interval: Interval }[][] = [];
+  // Clusters are found by real start time; columns are filled in order-key
+  // order. First-fit stays valid for any order because it checks real overlap.
+  const ordered = [...cluster].sort(
+    (a, b) => a.order.start - b.order.start || b.order.end - a.order.end,
+  );
 
-  for (const entry of cluster) {
+  for (const entry of ordered) {
     const target = columns.find(
       (column) => !column.some((placed) => overlaps(placed.interval, entry.interval)),
     );

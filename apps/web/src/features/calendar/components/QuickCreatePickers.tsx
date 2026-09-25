@@ -276,6 +276,7 @@ export function QuickCreateTimePicker({
   ariaLabel,
   disabled = false,
   menuWidth = 164,
+  parseTypedValue,
 }: {
   value: string;
   options: readonly TimePickerOption[];
@@ -283,13 +284,22 @@ export function QuickCreateTimePicker({
   ariaLabel: string;
   disabled?: boolean;
   menuWidth?: number;
+  /** Opt-in: render a text field so the time can also be typed. Returns "HH:MM" or null. */
+  parseTypedValue?: (text: string) => string | null;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [typedText, setTypedText] = useState<string | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = parseTypedValue ? inputRef : buttonRef;
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const position = useAnchoredPosition(isOpen, triggerRef, menuWidth, 280);
   const selected = options.find((option) => option.value === value);
+  const isEditable = parseTypedValue !== undefined;
+  // While typing, the list marks the typed time (or nothing, if the text is not a time yet).
+  const highlightedValue =
+    typedText !== null && parseTypedValue ? parseTypedValue(typedText) : value;
 
   useDismissPicker(isOpen, triggerRef, menuRef, () => setIsOpen(false));
 
@@ -298,14 +308,15 @@ export function QuickCreateTimePicker({
     const frame = requestAnimationFrame(() => {
       const selectedOption = selectedRef.current;
       const menu = menuRef.current;
-      selectedOption?.focus({ preventScroll: true });
+      // A typed field keeps focus so the user can carry on typing.
+      if (!isEditable) selectedOption?.focus({ preventScroll: true });
       if (selectedOption && menu) {
         menu.scrollTop =
           selectedOption.offsetTop - menu.clientHeight / 2 + selectedOption.offsetHeight / 2;
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen]);
+  }, [isEditable, isOpen]);
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
@@ -325,21 +336,104 @@ export function QuickCreateTimePicker({
     buttons[nextIndex]?.focus();
   };
 
+  const commitTypedText = () => {
+    if (typedText === null || !parseTypedValue) return;
+    const parsed = parseTypedValue(typedText);
+    setTypedText(null);
+    if (parsed && parsed !== value) onChange(parsed);
+  };
+
+  const scrollOptionIntoView = (optionValue: string) => {
+    const menu = menuRef.current;
+    const option = Array.from(
+      menu?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [],
+    ).find((button) => button.dataset.value === optionValue);
+    if (menu && option) {
+      menu.scrollTop = option.offsetTop - menu.clientHeight / 2 + option.offsetHeight / 2;
+    }
+  };
+
+  const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitTypedText();
+      setIsOpen(false);
+      return;
+    }
+    if (event.key === 'Escape' && (isOpen || typedText !== null)) {
+      event.stopPropagation();
+      setTypedText(null);
+      setIsOpen(false);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      // Step into the list at the typed time when there is one, otherwise at the saved time.
+      const startValue = highlightedValue ?? value;
+      setTypedText(null);
+      setIsOpen(true);
+      requestAnimationFrame(() => {
+        const optionButtons = Array.from(
+          menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? [],
+        );
+        const target =
+          optionButtons.find((button) => button.dataset.value === startValue) ?? optionButtons[0];
+        target?.focus({ preventScroll: true });
+      });
+    }
+  };
+
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={styles.pickerTrigger}
-        aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        disabled={disabled}
-        data-value={value}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        {selected?.label ?? value}
-      </button>
+      {isEditable ? (
+        <input
+          ref={inputRef}
+          type="text"
+          role="combobox"
+          className={`${styles.pickerTrigger} ${styles.pickerInput}`}
+          aria-label={ariaLabel}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-autocomplete="none"
+          autoComplete="off"
+          spellCheck={false}
+          disabled={disabled}
+          data-value={value}
+          value={typedText ?? selected?.label ?? value}
+          onClick={() => setIsOpen(true)}
+          onFocus={(event) => event.target.select()}
+          onChange={(event) => {
+            setTypedText(event.target.value);
+            setIsOpen(true);
+            const parsed = parseTypedValue?.(event.target.value);
+            if (parsed) scrollOptionIntoView(parsed);
+          }}
+          onKeyDown={handleInputKeyDown}
+          onBlur={(event) => {
+            // Moving into the menu means the user is picking from the list instead.
+            if (menuRef.current?.contains(event.relatedTarget as Node | null)) {
+              setTypedText(null);
+              return;
+            }
+            commitTypedText();
+            setIsOpen(false);
+          }}
+        />
+      ) : (
+        <button
+          ref={buttonRef}
+          type="button"
+          className={styles.pickerTrigger}
+          aria-label={ariaLabel}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          disabled={disabled}
+          data-value={value}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          {selected?.label ?? value}
+        </button>
+      )}
 
       {isOpen
         ? createPortal(
@@ -352,7 +446,7 @@ export function QuickCreateTimePicker({
               onKeyDown={handleMenuKeyDown}
             >
               {options.map((option) => {
-                const isSelected = option.value === value;
+                const isSelected = option.value === highlightedValue;
                 return (
                   <button
                     key={option.value}
@@ -360,10 +454,12 @@ export function QuickCreateTimePicker({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
+                    data-value={option.value}
                     className={`${styles.timeOption} ${
                       isSelected ? styles.timeOptionSelected : ''
                     }`}
                     onClick={() => {
+                      setTypedText(null);
                       onChange(option.value);
                       setIsOpen(false);
                       triggerRef.current?.focus();

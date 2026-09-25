@@ -54,6 +54,43 @@ describe('layoutOverlappingEvents', () => {
   });
 });
 
+describe('layoutOverlappingEvents with an order interval', () => {
+  // 'drag' was at 13:00–14:00 before the gesture; 'lunch' sits at 11:00–12:00.
+  const hours = (h: number) => at(Math.floor(h), (h % 1) * 60);
+  const evh = (id: string, from: number, to: number) => ({
+    id,
+    interval: { start: hours(from), end: hours(to) },
+  });
+  const lunch = evh('lunch', 11, 12);
+  const orderOf = (e: { id: string; interval: Interval }): Interval =>
+    e.id === 'drag' ? { start: at(13), end: at(14) } : e.interval;
+  const columnsFor = (dragFrom: number, dragTo: number) =>
+    Object.fromEntries(
+      layoutOverlappingEvents([lunch, evh('drag', dragFrom, dragTo)], intervalOf, {
+        getOrderInterval: orderOf,
+      }).map((l) => [l.item.id, l.column]),
+    );
+
+  it('keeps a dragged event in the same column however far it passes its neighbour', () => {
+    expect(columnsFor(11.5, 12.5)).toEqual({ lunch: 0, drag: 1 });
+    expect(columnsFor(11, 12)).toEqual({ lunch: 0, drag: 1 });
+    expect(columnsFor(10.5, 11.5)).toEqual({ lunch: 0, drag: 1 });
+    expect(columnsFor(10, 13)).toEqual({ lunch: 0, drag: 1 });
+  });
+
+  it('still separates clusters by the real intervals', () => {
+    expect(columnsFor(9, 10)).toEqual({ lunch: 0, drag: 0 });
+  });
+
+  it('orders by real start without the option, so an earlier event moves left', () => {
+    const laid = layoutOverlappingEvents([lunch, evh('drag', 10.5, 11.5)], intervalOf);
+    expect(Object.fromEntries(laid.map((l) => [l.item.id, l.column]))).toEqual({
+      drag: 0,
+      lunch: 1,
+    });
+  });
+});
+
 describe('verticalPlacement', () => {
   it('places an event proportionally inside the visible band', () => {
     expect(verticalPlacement({ start: at(12), end: at(18) }, at(0), at(24))).toEqual({

@@ -30,96 +30,6 @@
   animation: pricing-glow-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
 }
 
-.leftShapes,
-.rightShapes,
-.leftShapes::before,
-.leftShapes::after,
-.rightShapes::before,
-.rightShapes::after {
-  position: absolute;
-  z-index: 0;
-  border: 1px solid rgba(126, 176, 244, 0.16);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(160, 199, 250, 0.2), rgba(236, 245, 255, 0.05));
-  content: '';
-  pointer-events: none;
-}
-
-.leftShapes {
-  --shape-opacity: 1;
-
-  width: 150px;
-  height: 420px;
-  top: 180px;
-  left: -78px;
-  opacity: var(--shape-opacity);
-  transform: rotate(43deg);
-  animation: pricing-left-shapes-enter 680ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
-}
-
-.leftShapes::before {
-  --shape-enter-x: -16px;
-  --shape-enter-y: 10px;
-  --shape-opacity: 1;
-
-  width: 120px;
-  height: 330px;
-  top: 210px;
-  left: 130px;
-  animation: pricing-shape-detail-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both;
-}
-
-.leftShapes::after {
-  --shape-enter-x: -12px;
-  --shape-enter-y: 14px;
-  --shape-opacity: 0.62;
-
-  width: 70px;
-  height: 230px;
-  top: 590px;
-  left: 72px;
-  opacity: var(--shape-opacity);
-  animation: pricing-shape-detail-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 250ms both;
-}
-
-.rightShapes {
-  --shape-opacity: 1;
-
-  width: 160px;
-  height: 460px;
-  top: 280px;
-  right: -96px;
-  opacity: var(--shape-opacity);
-  transform: rotate(43deg);
-  animation: pricing-right-shapes-enter 760ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
-}
-
-.rightShapes::before {
-  --shape-enter-x: 22px;
-  --shape-enter-y: -8px;
-  --shape-opacity: 0.6;
-
-  width: 104px;
-  height: 310px;
-  right: 120px;
-  bottom: -220px;
-  opacity: var(--shape-opacity);
-  animation: pricing-shape-detail-enter 660ms cubic-bezier(0.22, 1, 0.36, 1) 220ms both;
-}
-
-.rightShapes::after {
-  --shape-enter-x: 28px;
-  --shape-enter-y: -10px;
-  --shape-opacity: 0.42;
-
-  width: 88px;
-  height: 270px;
-  right: -10px;
-  bottom: -530px;
-  opacity: var(--shape-opacity);
-  animation: pricing-shape-detail-enter 660ms cubic-bezier(0.22, 1, 0.36, 1) 310ms both;
-}
-
 @keyframes pricing-glow-enter {
   from {
     opacity: 0;
@@ -132,57 +42,8 @@
   }
 }
 
-@keyframes pricing-left-shapes-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(-34px, 10px, 0) rotate(39deg);
-  }
-
-  to {
-    opacity: var(--shape-opacity);
-    transform: rotate(43deg);
-  }
-}
-
-@keyframes pricing-right-shapes-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(52px, -8px, 0) rotate(47deg);
-  }
-
-  to {
-    opacity: var(--shape-opacity);
-    transform: rotate(43deg);
-  }
-}
-
-@keyframes pricing-shape-detail-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(var(--shape-enter-x), var(--shape-enter-y), 0) scale(0.96);
-  }
-
-  to {
-    opacity: var(--shape-opacity);
-    transform: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .leftShapes,
-  .rightShapes {
-    --shape-opacity: 0.45;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .page::before,
-  .leftShapes,
-  .leftShapes::before,
-  .leftShapes::after,
-  .rightShapes,
-  .rightShapes::before,
-  .rightShapes::after {
+  .page::before {
     animation: none;
   }
 }

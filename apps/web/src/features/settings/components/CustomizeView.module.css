@@ -1,0 +1,323 @@
+.page {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding-bottom: var(--space-8);
+}
+
+.backLink {
+  margin-left: calc(var(--space-2) * -1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+.backLink:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.intro {
+  margin: var(--space-3) 0 var(--space-2);
+}
+.intro h2 {
+  font-size: clamp(1.65rem, 3vw, 2rem);
+  letter-spacing: -0.045em;
+  line-height: 1.1;
+}
+.intro p {
+  margin-top: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+}
+
+.sections {
+  display: grid;
+}
+
+/* Sections sit directly on the page, separated by hairlines rather than cards. */
+.section {
+  padding: var(--space-6) 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.section + .section {
+  border-top: 1px solid var(--color-border-subtle);
+}
+.section h3 {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+.rowText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.rowText strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.rowText span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
+}
+
+/* Segmented control, matching the Calendar's Day / Week / Month switcher */
+.segmented {
+  flex-shrink: 0;
+  height: var(--control-height-sm);
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-bg-input);
+}
+.segmented button {
+  height: 100%;
+  min-width: 60px;
+  padding: 0 var(--space-3);
+  border-radius: calc(var(--radius-sm) - 1px);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.segmented button:hover:not(.segmentActive) {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+.segmented .segmentActive {
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Switch */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transition: background-color var(--transition-fast);
+}
+.switch[aria-checked='true'] {
+  background: var(--color-accent);
+}
+.switchThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform var(--transition-fast);
+}
+.switch[aria-checked='true'] .switchThumb {
+  transform: translateX(16px);
+}
+
+.segmented button:focus-visible,
+.switch:focus-visible,
+.keycapButton:focus-visible,
+.textButton:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Hotkey bindings, revealed when shortcuts are on */
+/* Animating 0fr -> 1fr grows the real height, so the divider and footer below glide down. */
+.bindingsReveal {
+  /* Closing: ease-in-out so the collapse starts gently and settles instead of halting.
+     The fade and slide run the full length, so rows never vanish before the space does. */
+  --reveal-close: 300ms cubic-bezier(0.65, 0, 0.35, 1);
+  margin-top: calc(var(--space-3) * -1);
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--reveal-close),
+    margin-top var(--reveal-close),
+    opacity 260ms cubic-bezier(0.4, 0, 1, 1);
+}
+.bindingsOpen {
+  /* Opening: quick start, long soft landing. */
+  --reveal-open: 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  margin-top: 0;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--reveal-open),
+    margin-top var(--reveal-open),
+    opacity 240ms ease-out 40ms;
+}
+.bindings {
+  min-height: 0;
+  padding-top: var(--space-1);
+  display: grid;
+  overflow: hidden;
+  transform: translateY(-6px);
+  transition: transform 300ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+.bindingsOpen .bindings {
+  transform: none;
+  transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.bindingRow {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.bindingLabel {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+}
+.bindingNote,
+.bindingError {
+  font-size: var(--font-size-xs);
+}
+.bindingNote {
+  color: var(--color-text-secondary);
+}
+.bindingError {
+  color: var(--color-danger);
+}
+
+.keycapButton {
+  flex-shrink: 0;
+  min-width: 118px;
+  min-height: 32px;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: transparent;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.keycapButton:hover {
+  background: var(--color-hover);
+}
+.keycapRecording {
+  justify-content: center;
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+.keycap {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  display: inline-grid;
+  place-items: center;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+.keycapAction {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+.keycapButton:hover .keycapAction {
+  color: var(--color-text-secondary);
+}
+.keycapPrompt {
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.bindingsFooter {
+  padding-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
+.textButton {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+.textButton:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.pageFooter {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 540px) {
+  .bindingsFooter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bindingsReveal,
+  .bindingsOpen,
+  .bindings,
+  .bindingsOpen .bindings {
+    transition: none;
+  }
+  .switchThumb {
+    transition: none;
+  }
+}

@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppShell } from './components/layout/AppShell';
 import { useAuth } from './features/auth';
 import { CalendarPage } from './pages/CalendarPage';
+import { CustomizePage } from './pages/CustomizePage';
 import { IntegrationsCallbackPage } from './pages/IntegrationsCallbackPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PricingPage } from './pages/PricingPage';
@@ -41,6 +42,7 @@ export function AppRoutes() {
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/upgrade" element={<Navigate to="/subscription" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/customize" element={<CustomizePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

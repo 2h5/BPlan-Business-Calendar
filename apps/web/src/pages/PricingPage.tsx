@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import styles from './PricingPage.module.css';
 import { PublicPricingView } from '../features/billing/components/PublicPricingView';
-import { PublicHeader } from '../features/public-site';
+import { PricingDecals, PublicHeader } from '../features/public-site';
 
 export function PricingPage() {
   useEffect(() => {
@@ -12,8 +12,7 @@ export function PricingPage() {
   return (
     <div className={styles.page}>
       <PublicHeader activePage="pricing" />
-      <div className={styles.leftShapes} aria-hidden="true" />
-      <div className={styles.rightShapes} aria-hidden="true" />
+      <PricingDecals mode="enter" />
       <PublicPricingView />
     </div>
   );

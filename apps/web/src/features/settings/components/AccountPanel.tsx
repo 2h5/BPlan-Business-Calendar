@@ -1,10 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { ProfileAvatar } from './ProfileAvatar';
 import styles from './SettingsView.module.css';
 import { deleteAccount, signOut, useAuth } from '../../auth';
 
-export function AccountPanel({ fullName }: { fullName: string | null }) {
+export function AccountPanel({
+  fullName,
+  avatarUrl,
+}: {
+  fullName: string | null;
+  avatarUrl: string | null;
+}) {
   const { email } = useAuth();
   const navigate = useNavigate();
   const [dangerBusy, setDangerBusy] = useState(false);
@@ -19,9 +26,7 @@ export function AccountPanel({ fullName }: { fullName: string | null }) {
       </header>
       <div className={styles.accountBody}>
         <div className={styles.accountIdentity}>
-          <span className={styles.avatar}>
-            {(fullName || email || 'B').slice(0, 1).toUpperCase()}
-          </span>
+          <ProfileAvatar label={fullName || email} imageUrl={avatarUrl} className={styles.avatar} />
           <div className={styles.accountCopy}>
             <strong>{fullName ?? 'Your account'}</strong>
             <small>{email}</small>

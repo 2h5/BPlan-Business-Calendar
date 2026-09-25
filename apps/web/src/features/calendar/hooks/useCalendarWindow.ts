@@ -2,9 +2,10 @@ import type { Calendar, HourCycle, WorkingHours } from '@cal/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { useCalendars } from './useCalendars';
 import { queryKeys } from '../../../lib/query/query-client';
 import { useAuth } from '../../auth';
-import { fetchCalendarProfile, fetchCalendars, fetchEventsInWindow } from '../api/calendar.api';
+import { fetchCalendarProfile, fetchEventsInWindow } from '../api/calendar.api';
 import { buildCalendarOccurrences, type EventOccurrence } from '../utils/calendar-occurrences';
 import {
   type CalendarViewMode,
@@ -54,12 +55,7 @@ export function useCalendarWindow(
   const startIso = window.start.toISOString();
   const endIso = window.end.toISOString();
 
-  const calendarsQuery = useQuery({
-    queryKey: queryKeys.calendars.all(),
-    queryFn: fetchCalendars,
-    enabled: isAuthenticated,
-    staleTime: 5 * 60_000,
-  });
+  const calendarsQuery = useCalendars();
   const eventsQuery = useQuery({
     queryKey: queryKeys.events.window(startIso, endIso),
     queryFn: () => fetchEventsInWindow(new Date(startIso), new Date(endIso)),

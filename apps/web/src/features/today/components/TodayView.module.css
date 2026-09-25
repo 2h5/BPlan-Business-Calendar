@@ -88,6 +88,24 @@
   color: var(--color-text-primary);
 }
 
+/* Centred on the cap height (~0.73em for Inter) rather than the line box, so
+   the icon sits level with the capitals instead of the descenders. */
+.timeOfDayIcon {
+  display: inline-block;
+  width: 0.86em;
+  height: 0.86em;
+  margin-left: 0.28em;
+  vertical-align: -0.07em;
+}
+
+.timeOfDayIconSun {
+  color: var(--color-warning);
+}
+
+.timeOfDayIconMoon {
+  color: var(--color-moon);
+}
+
 .heroSubtitle {
   margin: 0;
   color: var(--color-text-secondary);

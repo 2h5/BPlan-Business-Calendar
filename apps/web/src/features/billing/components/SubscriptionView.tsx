@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import styles from './SubscriptionView.module.css';
 import { env } from '../../../lib/env';
@@ -27,6 +27,8 @@ const billingConfig: BillingConfig = {
   privacyUrl: env.billingPrivacyUrl,
 };
 
+type BillingInterval = 'monthly' | 'annual';
+
 interface RollingPriceProps {
   value: string;
   numericValue: number;
@@ -38,16 +40,12 @@ function RollingPrice({ value, numericValue }: RollingPriceProps) {
   const [direction, setDirection] = useState<'up' | 'down'>('up');
 
   useEffect(() => {
-    if (numericValue !== display.numericValue) {
-      setPrevious(display);
-      setDisplay({ value, numericValue });
-      setDirection(numericValue > display.numericValue ? 'up' : 'down');
-    }
-  }, [value, numericValue, display]);
+    if (numericValue === display.numericValue) return;
 
-  const handleAnimationEnd = () => {
-    setPrevious(null);
-  };
+    setPrevious(display);
+    setDisplay({ value, numericValue });
+    setDirection(numericValue > display.numericValue ? 'up' : 'down');
+  }, [display, numericValue, value]);
 
   return (
     <span className={styles.rollerViewport}>
@@ -56,13 +54,13 @@ function RollingPrice({ value, numericValue }: RollingPriceProps) {
         className={`${styles.rollItem} ${
           previous ? (direction === 'up' ? styles.rollInUp : styles.rollInDown) : ''
         }`}
-        onAnimationEnd={handleAnimationEnd}
+        onAnimationEnd={() => setPrevious(null)}
       >
         {display.value}
       </span>
-      {previous && (
+      {previous ? (
         <span
-          key={`prev-${previous.value}`}
+          key={`previous-${previous.value}`}
           className={`${styles.rollItem} ${styles.rollItemOutgoing} ${
             direction === 'up' ? styles.rollOutUp : styles.rollOutDown
           }`}
@@ -70,7 +68,7 @@ function RollingPrice({ value, numericValue }: RollingPriceProps) {
         >
           {previous.value}
         </span>
-      )}
+      ) : null}
     </span>
   );
 }
@@ -78,295 +76,156 @@ function RollingPrice({ value, numericValue }: RollingPriceProps) {
 export function SubscriptionView() {
   const { userId } = useAuth();
   const subscription = useSubscription();
-  const [interval, setInterval] = useState<'monthly' | 'annual'>('annual');
-
-  const monthlyBtnRef = useRef<HTMLButtonElement>(null);
-  const annualBtnRef = useRef<HTMLButtonElement>(null);
-  const [bubbleStyle, setBubbleStyle] = useState<{ left: number; width: number } | null>(null);
-
-  useEffect(() => {
-    const target = interval === 'monthly' ? monthlyBtnRef.current : annualBtnRef.current;
-    if (target) {
-      setBubbleStyle({
-        left: target.offsetLeft,
-        width: target.offsetWidth,
-      });
-    }
-  }, [interval]);
-
-  useEffect(() => {
-    function updateBubble() {
-      const target = interval === 'monthly' ? monthlyBtnRef.current : annualBtnRef.current;
-      if (target) {
-        setBubbleStyle({
-          left: target.offsetLeft,
-          width: target.offsetWidth,
-        });
-      }
-    }
-    window.addEventListener('resize', updateBubble);
-    return () => window.removeEventListener('resize', updateBubble);
-  }, [interval]);
+  const [interval, setInterval] = useState<BillingInterval>('annual');
 
   const availability = checkoutAvailability(billingConfig);
   const checkoutUrl = revenueCatCheckoutUrl(billingConfig, userId);
   const statusInfo = getSubscriptionStatusInfo(subscription.data);
-
   const savings = calculateBillingIntervalSavings(PRO_PLAN.monthlyPrice, PRO_PLAN.annualPrice);
+  const displayedPrice = interval === 'annual' ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice;
 
   const isProActive = statusInfo.state === 'active';
   const isFree = statusInfo.state === 'free';
 
   return (
     <div className={styles.container}>
-      <section className={styles.heroBanner} aria-labelledby="plans-heading">
-        <header className={styles.header}>
-          <span className={styles.eyebrow}>Plan today. A brighter tomorrow.</span>
-          <h1 id="plans-heading" className={styles.title}>
-            Choose a plan that keeps you <span>on schedule.</span>
-          </h1>
-          <p className={styles.subtitle}>
-            Start with the essentials, then unlock smarter scheduling when your workflow is ready.
-          </p>
-          <ul className={styles.heroProof} aria-label="Every plan includes">
-            <li>
-              <CheckIcon /> Calendar planning
-            </li>
-            <li>
-              <CheckIcon /> Task organization
-            </li>
-            <li>
-              <CheckIcon /> Secure access
-            </li>
-          </ul>
-        </header>
+      <header className={styles.header}>
+        <h1 className={styles.title}>
+          Plans &amp; <span>Pro</span>
+        </h1>
+        <p className={styles.subtitle}>
+          Start with the essentials, then unlock AI scheduling when you&apos;re ready.
+        </p>
 
-        <div className={styles.heroControlCard}>
-          <span className={styles.heroControlEyebrow}>Simple billing</span>
-          <h2>Choose your rhythm</h2>
-          <p>See Pro pricing monthly or annually. Your current access stays visible below.</p>
-
-          <div className={styles.intervalPicker} role="radiogroup" aria-label="Billing frequency">
-            <div className={styles.toggleContainer} data-ready={bubbleStyle !== null}>
-              {bubbleStyle && (
-                <span
-                  className={styles.toggleBubble}
-                  style={{
-                    transform: `translateX(${bubbleStyle.left}px)`,
-                    width: `${bubbleStyle.width}px`,
-                  }}
-                  aria-hidden="true"
-                />
-              )}
-              <button
-                ref={monthlyBtnRef}
-                type="button"
-                role="radio"
-                aria-checked={interval === 'monthly'}
-                className={`${styles.toggleOption} ${
-                  interval === 'monthly' ? styles.toggleOptionActive : ''
-                }`}
-                onClick={() => setInterval('monthly')}
-              >
-                Monthly
-              </button>
-              <button
-                ref={annualBtnRef}
-                type="button"
-                role="radio"
-                aria-checked={interval === 'annual'}
-                className={`${styles.toggleOption} ${
-                  interval === 'annual' ? styles.toggleOptionActive : ''
-                }`}
-                onClick={() => setInterval('annual')}
-              >
-                <span>Annual</span>
-                <span className={styles.savingsPill}>Save {savings.savingsPercentage}%</span>
-              </button>
-            </div>
-          </div>
+        <div className={styles.intervalControl} role="radiogroup" aria-label="Billing frequency">
+          <span
+            className={`${styles.intervalIndicator} ${
+              interval === 'annual' ? styles.intervalIndicatorAnnual : ''
+            }`}
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            role="radio"
+            aria-checked={interval === 'monthly'}
+            className={`${styles.intervalOption} ${
+              interval === 'monthly' ? styles.intervalOptionActive : ''
+            }`}
+            onClick={() => setInterval('monthly')}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={interval === 'annual'}
+            className={`${styles.intervalOption} ${
+              interval === 'annual' ? styles.intervalOptionActive : ''
+            }`}
+            onClick={() => setInterval('annual')}
+          >
+            <span>Annual</span>
+            <span className={styles.savingsBadge}>Save {savings.savingsPercentage}%</span>
+          </button>
         </div>
-      </section>
+      </header>
 
-      {/* Comparison Cards Grid */}
-      <div className={styles.cardsGrid}>
-        {/* Free Plan Card */}
-        <section className={styles.card} aria-label="Free plan">
-          <div className={styles.cardHeader}>
-            <h2 className={styles.planName}>{FREE_PLAN.name}</h2>
-            <p className={styles.planTagline}>{FREE_PLAN.tagline}</p>
-            <div className={styles.priceBlock}>
-              <span className={styles.currencySymbol}>$</span>
-              <span className={styles.priceAmount}>0</span>
-              <span className={styles.priceInterval}>/ month</span>
-            </div>
-            <span className={styles.priceNote}>{FREE_PLAN.priceNote}</span>
+      <section className={styles.cards} aria-label="BPlan plans">
+        <article className={styles.card}>
+          <div>
+            <h2>{FREE_PLAN.name}</h2>
+            <p className={styles.tagline}>{FREE_PLAN.tagline}</p>
+            <p className={styles.price}>
+              <span className={styles.priceAmount}>$0</span>
+              <small>/ forever</small>
+            </p>
           </div>
-
-          <ul className={styles.featureList}>
+          <ul className={styles.features}>
             {FREE_PLAN.features.map((feature) => (
-              <li key={feature.id} className={styles.featureItem}>
-                <CheckIcon />
-                <div>
-                  <strong>{feature.name}</strong>
-                  <span>{feature.description}</span>
-                </div>
+              <li key={feature.id}>
+                <CheckIcon /> {feature.name}
               </li>
             ))}
           </ul>
-
-          <div className={styles.cardAction}>
-            <div className={`${styles.ctaButton} ${styles.ctaCurrent}`}>
-              {isFree ? 'Current Plan' : 'Free Included'}
-            </div>
+          <div className={`${styles.cta} ${styles.ctaMuted}`}>
+            {isFree ? 'Current plan' : 'Included'}
           </div>
-        </section>
+        </article>
 
-        {/* Pro Plan Card */}
-        <section className={`${styles.card} ${styles.cardPro}`} aria-label="Pro plan">
-          {PRO_PLAN.badge && <span className={styles.cardBadge}>{PRO_PLAN.badge}</span>}
-
-          <div className={styles.cardHeader}>
-            <h2 className={styles.planName}>{PRO_PLAN.name}</h2>
-            <p className={styles.planTagline}>{PRO_PLAN.tagline}</p>
-            <div className={styles.priceBlock}>
-              <span className={styles.currencySymbol}>$</span>
+        <article className={`${styles.card} ${styles.cardPro}`}>
+          {PRO_PLAN.badge ? <span className={styles.badge}>{PRO_PLAN.badge}</span> : null}
+          <div>
+            <h2>{PRO_PLAN.name}</h2>
+            <p className={styles.tagline}>{PRO_PLAN.tagline}</p>
+            <p className={styles.price} aria-live="polite">
               <span className={styles.priceAmount}>
-                <RollingPrice
-                  value={interval === 'annual' ? '49.99' : '4.99'}
-                  numericValue={interval === 'annual' ? 49.99 : 4.99}
-                />
+                $<RollingPrice value={displayedPrice.toFixed(2)} numericValue={displayedPrice} />
               </span>
-              <span key={interval} className={styles.priceInterval}>
-                {interval === 'annual' ? '/ year' : '/ month'}
-              </span>
-            </div>
-            <span key={interval} className={styles.priceNote}>
-              {interval === 'annual'
-                ? `Billed annually ($4.17/mo). Save $${savings.savingsDollars.toFixed(2)}/year.`
-                : 'Billed monthly. Cancel anytime with no long-term commitment.'}
-            </span>
-          </div>
-
-          {/* Hero Feature Box: Find Time with AI */}
-          <div className={styles.heroFeatureBox}>
-            <div className={styles.heroFeatureHeader}>
-              <div className={styles.heroFeatureTitle}>
-                <StarIcon />
-                <span>Find Time with AI</span>
-              </div>
-              <span className={styles.heroFeatureTag}>HERO FEATURE</span>
-            </div>
-            <p className={styles.heroFeatureDescription}>
-              Describe your meeting in plain English. The server deterministically calculates valid,
-              unconflicted slots so times are never hallucinated, then AI ranks and explains the
-              best open opportunities for you.
+              <small key={interval} className={styles.priceDetail}>
+                / {interval === 'annual' ? 'year' : 'month'}
+              </small>
             </p>
-            <div className={styles.heroPillList}>
-              <span className={styles.heroPill}>✦ Deterministic verification</span>
-              <span className={styles.heroPill}>✦ 1-click slot booking</span>
-              <span className={styles.heroPill}>✦ Timezone aware</span>
-            </div>
+            <p key={interval} className={`${styles.billingNote} ${styles.priceDetail}`}>
+              {interval === 'annual'
+                ? `Billed annually ($${(PRO_PLAN.annualPrice / 12).toFixed(2)}/month).`
+                : 'Billed monthly. Cancel anytime.'}
+            </p>
           </div>
-
-          <ul className={styles.featureList}>
+          <ul className={styles.features}>
+            <li>
+              <CheckIcon /> Everything in Free
+            </li>
             {PRO_PLAN.features
-              .filter((f) => !f.isHero)
+              .filter((feature) => feature.id !== 'all-free-features')
               .map((feature) => (
-                <li key={feature.id} className={styles.featureItem}>
-                  <CheckIcon />
-                  <div>
-                    <strong>{feature.name}</strong>
-                    <span>{feature.description}</span>
-                  </div>
+                <li key={feature.id}>
+                  <CheckIcon /> {feature.name}
                 </li>
               ))}
           </ul>
-
-          {/* Extensible Future Pro Capabilities */}
-          {PRO_PLAN.futureFeatures && PRO_PLAN.futureFeatures.length > 0 && (
-            <div className={styles.futureSection}>
-              <h3 className={styles.futureHeading}>Upcoming Pro capabilities</h3>
-              <ul className={styles.futureList}>
-                {PRO_PLAN.futureFeatures.map((item, index) => (
-                  <li key={index} className={styles.futureItem}>
-                    <span className={styles.sparkleDot} aria-hidden="true" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {isProActive ? (
+            <div className={`${styles.cta} ${styles.ctaActive}`}>Current plan</div>
+          ) : checkoutUrl ? (
+            <a
+              href={checkoutUrl}
+              target="_blank"
+              rel="noreferrer"
+              referrerPolicy="no-referrer"
+              className={`${styles.cta} ${styles.ctaPrimary}`}
+            >
+              {availability === 'sandbox' ? 'Open sandbox checkout' : 'Upgrade to Pro'}
+            </a>
+          ) : (
+            <>
+              <div className={`${styles.cta} ${styles.ctaMuted}`}>Checkout unavailable</div>
+              <p className={styles.guardNotice} role="status">
+                {availabilityMessage(availability)}
+              </p>
+            </>
           )}
+        </article>
+      </section>
 
-          <div className={styles.cardAction}>
-            {isProActive ? (
-              <div className={`${styles.ctaButton} ${styles.ctaActivePro}`}>
-                Current Plan (Active)
-              </div>
-            ) : checkoutUrl ? (
-              <a
-                href={checkoutUrl}
-                target="_blank"
-                rel="noreferrer"
-                referrerPolicy="no-referrer"
-                className={`${styles.ctaButton} ${styles.ctaPrimary}`}
-              >
-                {availability === 'sandbox' ? 'Open sandbox checkout' : 'Upgrade to Pro'}
-              </a>
-            ) : (
-              <div>
-                <div className={`${styles.ctaButton} ${styles.ctaCurrent}`}>
-                  Checkout Currently Unavailable
-                </div>
-                <p
-                  className={`${styles.guardNotice} ${
-                    availability === 'production-blocked' || availability === 'disabled'
-                      ? styles.guardWarning
-                      : styles.guardNote
-                  }`}
-                  role="status"
-                >
-                  {availabilityMessage(availability)}
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Feature Comparison Matrix */}
-      <section className={styles.comparisonSection} aria-label="Feature comparison">
-        <div className={styles.comparisonHeader}>
-          <h2 className={styles.comparisonTitle}>Detailed Plan Comparison</h2>
-          <p className={styles.comparisonSubtitle}>
-            Review the exact differences and capabilities included in each tier.
-          </p>
-        </div>
-
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
+      <section className={styles.comparison} aria-labelledby="comparison-title">
+        <h2 id="comparison-title">Plan comparison</h2>
+        <div className={styles.tableScroller}>
+          <table>
             <thead>
               <tr>
-                <th className={styles.tableColFeature}>Capability</th>
-                <th className={styles.tableColFree}>Free</th>
-                <th className={styles.tableColPro}>Pro</th>
+                <th>Feature</th>
+                <th>Free</th>
+                <th>Pro</th>
               </tr>
             </thead>
             <tbody>
               {PLAN_COMPARISON.map((row) => (
                 <tr key={row.id}>
-                  <td className={styles.tableColFeature}>{row.capability}</td>
-                  <td className={styles.tableColFree}>
-                    {row.inFree ? (
-                      <span className={styles.checkYes}>✓</span>
-                    ) : (
-                      <span className={styles.checkNo}>—</span>
-                    )}
+                  <td>{row.capability}</td>
+                  <td>
+                    <ComparisonValue available={row.inFree} />
                   </td>
-                  <td className={styles.tableColPro}>
-                    <span className={styles.checkYes}>
-                      {row.proLabel ? `✓ ${row.proLabel}` : '✓'}
-                    </span>
+                  <td>
+                    <ComparisonValue available label={row.proLabel} />
                   </td>
                 </tr>
               ))}
@@ -375,22 +234,15 @@ export function SubscriptionView() {
         </div>
       </section>
 
-      {/* Trust & Safeguard Footer */}
-      <footer className={styles.trustFooter}>
-        <p>
-          Payments are securely processed via <strong>RevenueCat Billing</strong> and{' '}
-          <strong>Stripe</strong>. After checkout, click <em>Refresh access status</em> to
-          immediately sync your subscription entitlement while webhooks finish processing.
-        </p>
-        <div className={styles.legalLinks}>
-          <a href="/terms.html" target="_blank" rel="noreferrer" className={styles.legalLink}>
-            Terms &amp; Conditions
-          </a>
-          <span>·</span>
-          <a href="/privacy.html" target="_blank" rel="noreferrer" className={styles.legalLink}>
-            Privacy Policy
-          </a>
-        </div>
+      <footer className={styles.footer}>
+        Payments processed by RevenueCat and Stripe ·{' '}
+        <a href="/terms.html" target="_blank" rel="noreferrer">
+          Terms
+        </a>{' '}
+        ·{' '}
+        <a href="/privacy.html" target="_blank" rel="noreferrer">
+          Privacy
+        </a>
       </footer>
     </div>
   );
@@ -413,25 +265,27 @@ function availabilityMessage(availability: CheckoutAvailability): string {
 
 function CheckIcon() {
   return (
-    <svg
-      className={styles.checkIcon}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="20 6 9 17 4 12" />
+    <svg viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="m3.5 9.2 3.2 3.1 7.8-7.6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
-function StarIcon() {
+function ComparisonValue({ available, label }: { available: boolean; label?: string | null }) {
+  if (!available) {
+    return <span className={styles.unavailable}>—</span>;
+  }
+
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2l2.85 7.15L22 12l-7.15 2.85L12 22l-2.85-7.15L2 12l7.15-2.85L12 2z" />
-    </svg>
+    <span className={styles.available} aria-label={label ?? 'Included'}>
+      <CheckIcon />
+      {label ? <small>{label}</small> : null}
+    </span>
   );
 }

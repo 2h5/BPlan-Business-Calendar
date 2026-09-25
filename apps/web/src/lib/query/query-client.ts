@@ -43,6 +43,7 @@ export const queryKeys = {
     session: () => ['auth', 'session'] as const,
   },
   profile: () => ['profile'] as const,
+  preferences: (userId: string) => ['preferences', userId] as const,
   calendars: {
     all: () => ['calendars'] as const,
   },

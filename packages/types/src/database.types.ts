@@ -524,6 +524,7 @@ export type Database = {
           full_name: string | null
           hour_cycle: string
           id: string
+          preferences: Json
           timezone: string
           updated_at: string
           week_starts_on: number
@@ -537,6 +538,7 @@ export type Database = {
           full_name?: string | null
           hour_cycle?: string
           id: string
+          preferences?: Json
           timezone?: string
           updated_at?: string
           week_starts_on?: number
@@ -550,6 +552,7 @@ export type Database = {
           full_name?: string | null
           hour_cycle?: string
           id?: string
+          preferences?: Json
           timezone?: string
           updated_at?: string
           week_starts_on?: number

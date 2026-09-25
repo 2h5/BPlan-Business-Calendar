@@ -76,6 +76,15 @@ export function getActiveCalendarView(): CalendarViewMode {
   return getLastCalendarView() ?? getDefaultCalendarView();
 }
 
+/**
+ * The view to open a linked event in (for example from Today). Month cells collapse busy
+ * days into "+N more", which can hide the event the card should point at, so a linked event
+ * opens in Week instead. This is for that visit only; the user's saved view is not changed.
+ */
+export function viewForLinkedEvent(view: CalendarViewMode): CalendarViewMode {
+  return view === 'month' ? 'week' : view;
+}
+
 export function useCalendarViewPreference() {
   const [defaultView, setDefaultViewState] = useState<CalendarViewMode>(getDefaultCalendarView);
 

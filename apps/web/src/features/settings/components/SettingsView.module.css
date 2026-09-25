@@ -244,24 +244,12 @@
   gap: var(--space-2);
   animation: scheduleControlsIn 180ms ease-out both;
 }
-.timeInput {
-  width: 94px;
-  height: 32px;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  outline: 0;
-  background: var(--color-bg-input);
-  color: var(--color-text-primary);
-  font-family: inherit;
-  font-size: var(--font-size-xs);
+/* Sizes the shared quick-create time field for the schedule rows. */
+.timePickerSlot > input {
+  width: 88px;
   font-variant-numeric: tabular-nums;
 }
-.timeInput:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px var(--color-focus-ring);
-}
-.timeInput:disabled {
+.timePickerSlot > input:disabled {
   opacity: 0.45;
   background: var(--color-bg-surface-raised);
 }
@@ -918,8 +906,8 @@
   .schedulePresets button {
     flex: 1;
   }
-  .timeInput {
-    width: 88px;
+  .timePickerSlot > input {
+    width: 82px;
   }
   .endOfDayLabel {
     width: 100%;
@@ -932,4 +920,50 @@
   .connectionActions {
     grid-column: 1 / -1;
   }
+}
+
+/* Entry point to Settings → Customize */
+.customizeLink {
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.customizeLink:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg-surface-raised);
+  color: var(--color-text-primary);
+}
+.customizeLink:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.customizeLink svg {
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+.customizeLink:hover svg {
+  transform: translateX(2px);
+}
+.customizeText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.customizeText strong {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.customizeText span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }

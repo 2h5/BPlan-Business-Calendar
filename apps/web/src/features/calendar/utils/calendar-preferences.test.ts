@@ -10,6 +10,7 @@ import {
   LAST_CALENDAR_VIEW_STORAGE_KEY,
   setDefaultCalendarView,
   setLastCalendarView,
+  viewForLinkedEvent,
 } from './calendar-preferences';
 
 const mockLocalStore: Record<string, string> = {};
@@ -118,5 +119,16 @@ describe('calendar-preferences', () => {
     // 4. If last view is cleared (e.g. brand new session): returns to default
     clearLastCalendarView();
     expect(getActiveCalendarView()).toBe('month');
+  });
+});
+
+describe('viewForLinkedEvent', () => {
+  it('opens a linked event in Week when Month could hide it behind "+N more"', () => {
+    expect(viewForLinkedEvent('month')).toBe('week');
+  });
+
+  it('keeps Day and Week, which always show the event', () => {
+    expect(viewForLinkedEvent('week')).toBe('week');
+    expect(viewForLinkedEvent('day')).toBe('day');
   });
 });

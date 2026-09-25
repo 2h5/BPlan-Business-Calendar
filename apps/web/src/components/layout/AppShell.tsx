@@ -4,7 +4,12 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import styles from './AppShell.module.css';
 import { PageTransition } from './PageTransition';
 import { signOut, useAuth } from '../../features/auth';
+import { ProfileAvatar } from '../../features/settings/components/ProfileAvatar';
+import { useAppPreferences } from '../../features/settings/hooks/useAppPreferences';
 import { useProfile } from '../../features/settings/hooks/useSettings';
+
+/** Grace period so the pointer can cross the gap between the account button and its menu. */
+const HOVER_CLOSE_DELAY_MS = 180;
 
 interface NavItemConfig {
   to: string;
@@ -164,6 +169,7 @@ function isWorkspacePath(pathname: string): boolean {
 export function AppShell() {
   const { email } = useAuth();
   const { data: profile } = useProfile();
+  const { accountMenuTrigger } = useAppPreferences().preferences;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -175,9 +181,10 @@ export function AppShell() {
   const [metrics, setMetrics] = useState<{ top: number; height: number } | null>(null);
   const [mode, setMode] = useState<'sliding' | 'entering' | 'exiting' | 'hidden'>('hidden');
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const opensOnHover = accountMenuTrigger === 'hover';
 
   const accountName = profile?.fullName?.trim() || 'Your account';
-  const accountInitial = (profile?.fullName || email || 'B').slice(0, 1).toUpperCase();
 
   useLayoutEffect(() => {
     const contentArea = contentAreaRef.current;
@@ -263,6 +270,34 @@ export function AppShell() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isAccountMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    };
+  }, []);
+
+  function cancelHoverClose() {
+    if (!hoverCloseTimerRef.current) return;
+    clearTimeout(hoverCloseTimerRef.current);
+    hoverCloseTimerRef.current = null;
+  }
+
+  // Touch and pen have no hover, so they keep using tap to open.
+  function handleFooterPointerEnter(event: React.PointerEvent) {
+    if (!opensOnHover || event.pointerType !== 'mouse') return;
+    cancelHoverClose();
+    setIsAccountMenuOpen(true);
+  }
+
+  function handleFooterPointerLeave(event: React.PointerEvent) {
+    if (!opensOnHover || event.pointerType !== 'mouse') return;
+    cancelHoverClose();
+    hoverCloseTimerRef.current = setTimeout(() => {
+      hoverCloseTimerRef.current = null;
+      setIsAccountMenuOpen(false);
+    }, HOVER_CLOSE_DELAY_MS);
+  }
 
   async function handleSignOut() {
     setIsAccountMenuOpen(false);
@@ -379,7 +414,12 @@ export function AppShell() {
           </div>
         </nav>
 
-        <div ref={accountMenuRef} className={styles.sidebarFooter}>
+        <div
+          ref={accountMenuRef}
+          className={styles.sidebarFooter}
+          onPointerEnter={handleFooterPointerEnter}
+          onPointerLeave={handleFooterPointerLeave}
+        >
           {isAccountMenuOpen && (
             <div className={styles.accountMenu} role="menu" aria-label="Account menu">
               <NavLink
@@ -408,15 +448,22 @@ export function AppShell() {
             className={`${styles.accountButton} ${
               isAccountMenuOpen ? styles.accountButtonOpen : ''
             }`}
-            onClick={() => setIsAccountMenuOpen((open) => !open)}
+            onClick={(event) => {
+              // A mouse click on a hover-opened menu keeps it open instead of
+              // toggling it shut; keyboard activation (detail 0) still toggles.
+              if (opensOnHover && event.detail > 0 && isAccountMenuOpen) return;
+              setIsAccountMenuOpen((open) => !open);
+            }}
             aria-label="Open account menu"
             aria-haspopup="menu"
             aria-expanded={isAccountMenuOpen}
             title={email ?? accountName}
           >
-            <span className={styles.userAvatar} aria-hidden="true">
-              {accountInitial}
-            </span>
+            <ProfileAvatar
+              label={profile?.fullName || email}
+              imageUrl={profile?.avatarUrl}
+              className={styles.userAvatar}
+            />
             <span className={styles.userMeta}>
               <span className={styles.userName}>{accountName}</span>
               {email && <span className={styles.userEmail}>{email}</span>}

@@ -11,5 +11,8 @@ export function useSearch(query: string) {
     queryKey: queryKeys.search(normalized),
     queryFn: () => searchEverything(normalized),
     enabled: isAuthenticated && normalized.length >= 2,
+    // Keep the last results on screen while the next query loads, so result
+    // panels resize once instead of collapsing to a loading state per keystroke.
+    placeholderData: (previous) => previous,
   });
 }

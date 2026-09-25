@@ -1,25 +1,37 @@
 import type { HourCycle, Profile, WorkingHours } from '@cal/schemas';
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AccountPanel } from './AccountPanel';
 import { ConnectionsSection } from './ConnectionsSection';
+import { ProfilePhotoField } from './ProfilePhotoField';
 import styles from './SettingsView.module.css';
 import { Select } from '../../../components/forms/Select';
 import { useAuth } from '../../auth';
 import { BillingSection } from '../../billing/components/BillingSection';
+import { QuickCreateTimePicker } from '../../calendar/components/QuickCreatePickers';
 import { useCalendarViewPreference } from '../../calendar/utils/calendar-preferences';
 import type { CalendarViewMode } from '../../calendar/utils/calendar-window';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';
 import { useTheme } from '../hooks/useTheme';
 import { callbackResultFromNavigationState, oauthCallbackMessage } from '../utils/oauth-callback';
 import { buildTimezoneOptions } from '../utils/timezone-options';
-import { minuteOfDayToTimeInput, timeInputToMinute } from '../utils/working-hours-time';
+import {
+  buildWorkingHourOptions,
+  minuteOfDayToTimeInput,
+  parseTypedWorkingHour,
+  timeInputToMinute,
+} from '../utils/working-hours-time';
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const SAVED_NOTICE_MS = 3000;
 
 type SaveNotice = { tone: 'success' | 'error'; text: string };
+
+function isPhotoOnlyChange(previous: Profile, next: Profile): boolean {
+  const strip = ({ avatarUrl: _avatarUrl, updatedAt: _updatedAt, ...rest }: Profile) => rest;
+  return JSON.stringify(strip(previous)) === JSON.stringify(strip(next));
+}
 
 export function SettingsView() {
   const { email } = useAuth();
@@ -38,8 +50,20 @@ export function SettingsView() {
     [location.state],
   );
 
+  const syncedProfileRef = useRef<Profile | null>(null);
   useEffect(() => {
-    if (profile.data) setDraft(profile.data);
+    const next = profile.data;
+    if (!next) return;
+    const previous = syncedProfileRef.current;
+    syncedProfileRef.current = next;
+    // The photo saves on its own; merge it in so unsaved form edits survive an upload.
+    if (previous && isPhotoOnlyChange(previous, next)) {
+      setDraft((current) =>
+        current ? { ...current, avatarUrl: next.avatarUrl, updatedAt: next.updatedAt } : next,
+      );
+      return;
+    }
+    setDraft(next);
   }, [profile.data]);
 
   // Success confirmations fade out on their own; errors stay until the next save.
@@ -127,6 +151,10 @@ export function SettingsView() {
                 <p>The identity shown across your BPlan workspace.</p>
               </div>
             </header>
+            <ProfilePhotoField
+              label={draft.fullName || email}
+              imageUrl={profile.data?.avatarUrl ?? null}
+            />
             <div className={styles.formGrid}>
               <Field label="Full name">
                 <input
@@ -213,6 +241,14 @@ export function SettingsView() {
               </button>
             </div>
           </section>
+
+          <Link to="/settings/customize" className={`${styles.section} ${styles.customizeLink}`}>
+            <span className={styles.customizeText}>
+              <strong>Customize behavior</strong>
+              <span>Menus, keyboard shortcuts, and the small details of how BPlan works.</span>
+            </span>
+            <ChevronRightIcon />
+          </Link>
 
           <section className={styles.section}>
             <header className={styles.sectionHeader}>
@@ -349,6 +385,8 @@ export function SettingsView() {
                 {WEEKDAYS.map((day, weekday) => {
                   const window = byDay.get(weekday);
                   const isEnabled = !!window;
+                  const startValue = window ? minuteOfDayToTimeInput(window.startMinute) : '';
+                  const endValue = window ? minuteOfDayToTimeInput(window.endMinute) : '';
                   return (
                     <div
                       className={`${styles.scheduleRow} ${isEnabled ? styles.scheduleRowActive : ''}`}
@@ -382,38 +420,42 @@ export function SettingsView() {
                       <div className={styles.timeCol}>
                         {window ? (
                           <div className={styles.timeRangeBox}>
-                            <input
-                              aria-label={`${day} start`}
-                              type="time"
-                              className={styles.timeInput}
-                              value={minuteOfDayToTimeInput(window.startMinute)}
-                              onChange={(e) =>
-                                updateWorking(
-                                  draft.workingHours.map((item) =>
-                                    item.weekday === weekday
-                                      ? { ...item, startMinute: timeInputToMinute(e.target.value) }
-                                      : item,
-                                  ),
-                                )
-                              }
-                            />
+                            <div className={styles.timePickerSlot}>
+                              <QuickCreateTimePicker
+                                ariaLabel={`${day} start`}
+                                value={startValue}
+                                options={buildWorkingHourOptions(draft.hourCycle, startValue)}
+                                parseTypedValue={parseTypedWorkingHour}
+                                onChange={(value) =>
+                                  updateWorking(
+                                    draft.workingHours.map((item) =>
+                                      item.weekday === weekday
+                                        ? { ...item, startMinute: timeInputToMinute(value) }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                            </div>
                             <span className={styles.timeSeparator}>→</span>
-                            <input
-                              aria-label={`${day} end${window.endMinute === 1440 ? ' (end of day)' : ''}`}
-                              type="time"
-                              className={styles.timeInput}
-                              value={minuteOfDayToTimeInput(window.endMinute)}
-                              disabled={window.endMinute === 1440}
-                              onChange={(e) =>
-                                updateWorking(
-                                  draft.workingHours.map((item) =>
-                                    item.weekday === weekday
-                                      ? { ...item, endMinute: timeInputToMinute(e.target.value) }
-                                      : item,
-                                  ),
-                                )
-                              }
-                            />
+                            <div className={styles.timePickerSlot}>
+                              <QuickCreateTimePicker
+                                ariaLabel={`${day} end${window.endMinute === 1440 ? ' (end of day)' : ''}`}
+                                value={endValue}
+                                options={buildWorkingHourOptions(draft.hourCycle, endValue)}
+                                parseTypedValue={parseTypedWorkingHour}
+                                disabled={window.endMinute === 1440}
+                                onChange={(value) =>
+                                  updateWorking(
+                                    draft.workingHours.map((item) =>
+                                      item.weekday === weekday
+                                        ? { ...item, endMinute: timeInputToMinute(value) }
+                                        : item,
+                                    ),
+                                  )
+                                }
+                              />
+                            </div>
                             <label className={styles.endOfDayLabel}>
                               <input
                                 type="checkbox"
@@ -474,7 +516,7 @@ export function SettingsView() {
 
           <ConnectionsSection notice={integrationMessage} />
 
-          <AccountPanel fullName={draft.fullName} />
+          <AccountPanel fullName={draft.fullName} avatarUrl={profile.data?.avatarUrl ?? null} />
         </div>
       </div>
     </div>
@@ -574,6 +616,24 @@ function MoonIcon({ className }: { className?: string }) {
       aria-hidden="true"
     >
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }

@@ -34,6 +34,7 @@ import {
   type MinuteInterval,
   type ResizeEdge,
 } from '../utils/event-resize';
+import { initialScrollHour } from '../utils/timeline-initial-scroll';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const HOLD_DELAY_MS = 180;
@@ -79,6 +80,8 @@ export interface TimelineViewProps {
   draftEvent?: DraftEventState | null;
   defaultDurationMinutes?: number;
   workingHours?: WorkingHours;
+  /** Event the calendar was opened for; the first scroll brings it into view instead of now. */
+  revealEventId?: string | null;
 }
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
@@ -353,6 +356,19 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
+/**
+ * Keeps event buttons in one fixed DOM order. Layout output is grouped by
+ * column, so rendering it directly makes React move nodes whenever columns
+ * change, and moving a node drops its pointer capture in the middle of a drag.
+ */
+function sortByRenderOrder<T extends { item: { key: string } }>(
+  laidOut: T[],
+  source: readonly { key: string }[],
+): T[] {
+  const rank = new Map(source.map((item, index) => [item.key, index]));
+  return [...laidOut].sort((a, b) => (rank.get(a.item.key) ?? 0) - (rank.get(b.item.key) ?? 0));
+}
+
 export function TimelineView({
   dateKeys,
   byDateKey,
@@ -369,6 +385,7 @@ export function TimelineView({
   draftEvent,
   defaultDurationMinutes = 60,
   workingHours,
+  revealEventId = null,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollKeyRef = useRef<string | null>(null);
@@ -995,7 +1012,10 @@ export function TimelineView({
     checkAndTriggerAutoScroll();
   };
 
-  const finishResize = (e: React.PointerEvent<HTMLSpanElement>, cancelled: boolean) => {
+  const finishResize = (
+    e: React.PointerEvent<HTMLSpanElement> | PointerEvent,
+    cancelled: boolean,
+  ) => {
     stopAutoScroll();
     const active = resizeRef.current;
     if (!active || active.pointerId !== e.pointerId) return;
@@ -1185,21 +1205,46 @@ export function TimelineView({
 
   const moveHandlersRef = useRef({
     applyMovePosition,
+    applyResizePosition,
     checkAndTriggerAutoScroll,
     finishMove,
+    finishResize,
   });
   useEffect(() => {
     moveHandlersRef.current = {
       applyMovePosition,
+      applyResizePosition,
       checkAndTriggerAutoScroll,
       finishMove,
+      finishResize,
     };
   });
 
   useEffect(() => {
+    // The event element normally holds pointer capture and handles these itself
+    // (stopping propagation). These window listeners take over if capture is
+    // lost, so a gesture can never outlive the mouse button being held.
     const onWindowPointerMove = (e: PointerEvent) => {
+      const resize = resizeRef.current;
+      if (resize && resize.pointerId === e.pointerId) {
+        if (e.buttons === 0) {
+          // The release happened somewhere we never heard about.
+          moveHandlersRef.current.finishResize(e, false);
+          return;
+        }
+        lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+        const scrollTop = scrollRef.current?.scrollTop ?? resize.initialScrollTop;
+        moveHandlersRef.current.applyResizePosition(e.clientY, scrollTop);
+        moveHandlersRef.current.checkAndTriggerAutoScroll();
+        return;
+      }
+
       const active = moveRef.current;
       if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+      if (e.buttons === 0) {
+        moveHandlersRef.current.finishMove(e, false);
+        return;
+      }
       lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
       const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
       moveHandlersRef.current.applyMovePosition(e.clientX, e.clientY, currentScrollTop);
@@ -1207,12 +1252,20 @@ export function TimelineView({
     };
 
     const onWindowPointerUp = (e: PointerEvent) => {
+      if (resizeRef.current?.pointerId === e.pointerId) {
+        moveHandlersRef.current.finishResize(e, false);
+        return;
+      }
       const active = moveRef.current;
       if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
       moveHandlersRef.current.finishMove(e, false);
     };
 
     const onWindowPointerCancel = (e: PointerEvent) => {
+      if (resizeRef.current?.pointerId === e.pointerId) {
+        moveHandlersRef.current.finishResize(e, true);
+        return;
+      }
       const active = moveRef.current;
       if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
       moveHandlersRef.current.finishMove(e, true);
@@ -1296,12 +1349,17 @@ export function TimelineView({
     if (initialScrollKeyRef.current === scrollKey) return;
     initialScrollKeyRef.current = scrollKey;
 
-    const initialHour =
-      todayKey && dateKeys.includes(todayKey)
-        ? Math.max(0, minuteOfDay(now, timeZone) / 60 - 2)
-        : 7;
+    // Runs before the parent opens a linked event's card, so the card measures an on-screen block.
+    const initialHour = initialScrollHour({
+      dateKeys,
+      byDateKey,
+      revealEventId,
+      todayKey,
+      now,
+      timeZone,
+    });
     scrollRef.current?.scrollTo({ top: initialHour * hourHeight });
-  }, [dateKeys, hourHeight, now, timeZone, todayKey]);
+  }, [byDateKey, dateKeys, hourHeight, now, revealEventId, timeZone, todayKey]);
 
   const allDayByDate = useMemo(
     () =>
@@ -1495,13 +1553,39 @@ export function TimelineView({
                 }
                 return optimistic ? { ...item, ...optimistic } : item;
               });
-            const laidOut = layoutOverlappingEvents(timed, (item) => ({
+            const visibleInterval = (item: { start: number; end: number }) => ({
               start: Math.max(item.start, dayStart.getTime()),
               end: Math.max(
                 Math.min(item.end, dayEnd.getTime()),
                 Math.max(item.start, dayStart.getTime()) + MIN_VISUAL_MINUTES * 60_000,
               ),
-            }));
+            });
+            // While an event is being resized or dragged, order columns by where it
+            // started, not where the pointer has taken it. Otherwise it swaps sides
+            // each time it passes a neighbour's start (and flickers when a magnetic
+            // snap makes the two starts equal). The normal order returns on drop.
+            const gesture = activeResize
+              ? { key: activeResize.occurrence.key, minutes: activeResize.originalMinutes }
+              : isDraggingMove
+                ? { key: activeMove.occurrence.key, minutes: activeMove.originalMinutes }
+                : null;
+            const gestureStart = gesture
+              ? dateMinuteToInstant(dateKey, gesture.minutes.startMinute, timeZone)
+              : null;
+            const gestureEnd = gesture
+              ? dateMinuteToInstant(dateKey, gesture.minutes.endMinute, timeZone)
+              : null;
+            const gestureOrder =
+              gestureStart && gestureEnd
+                ? visibleInterval({ start: gestureStart.getTime(), end: gestureEnd.getTime() })
+                : null;
+            const laidOut = sortByRenderOrder(
+              layoutOverlappingEvents(timed, visibleInterval, {
+                getOrderInterval: (item) =>
+                  gestureOrder && item.key === gesture?.key ? gestureOrder : visibleInterval(item),
+              }),
+              timed,
+            );
             const nowTop =
               dateKey === todayKey ? (minuteOfDay(now, timeZone) / 60) * hourHeight : null;
 
