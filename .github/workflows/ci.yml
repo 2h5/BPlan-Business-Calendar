@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history for the migration immutability check.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -26,6 +29,18 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Hosted projects have already applied merged migrations; an edit would
+      # silently diverge fresh and hosted databases.
+      - name: Migration rules
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "::notice::No comparable base revision; skipping migration rules."
+            exit 0
+          fi
+          node tools/release/check-migrations.mjs "$BASE"
 
       - name: Format
         run: pnpm format:check
@@ -39,7 +54,8 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      # Every workspace build plus the billing CLI compile, as in `pnpm verify`.
+      # Every workspace build, the billing CLI compile, and the client-bundle
+      # secret scan, as in `pnpm verify`.
       - name: Build
         run: pnpm build
 
