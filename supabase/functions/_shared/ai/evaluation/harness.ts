@@ -1,17 +1,62 @@
 import { aiScheduleProposalSchema } from '@cal/schemas/scheduling';
 
 import { EdgeError, type EdgeErrorCode } from '../../errors/index.ts';
+import type { OpenAiReasoningEffort } from '../openai.ts';
 import type { AiRankingProvider, AiRankingResult } from '../ranking.ts';
 import { AI_EVALUATION_FIXTURES, type AiEvaluationFixture } from './fixtures.ts';
 
+/** The production model family is fixed; evaluations only choose its reasoning effort. */
+export const AI_EVALUATION_MODEL = 'gpt-5.6-luna';
+
 export const AI_EVALUATION_PRICE_SNAPSHOT = {
-  capturedAt: '2026-09-01',
-  source: 'https://developers.openai.com/api/docs/models',
+  capturedAt: '2026-09-24',
+  source: 'https://developers.openai.com/api/docs/models/gpt-5.6-luna',
+  // Standard short-context (<=272K input) rates. Cached-input discounts are
+  // ignored so estimates stay conservative. Reasoning tokens bill as output.
   perMillionTokensUsd: {
-    'gpt-5.6-luna': { input: 0.2, output: 1.2 },
-    'gpt-5.6-terra': { input: 2, output: 12 },
+    [AI_EVALUATION_MODEL]: { input: 0.2, output: 1.2 },
   },
 } as const;
+
+export interface AiEvaluationVariant {
+  label: string;
+  model: typeof AI_EVALUATION_MODEL;
+  reasoningEffort: OpenAiReasoningEffort;
+}
+
+export const AI_EVALUATION_LUNA_VARIANTS = [
+  {
+    label: 'gpt-5.6-luna-low',
+    model: AI_EVALUATION_MODEL,
+    reasoningEffort: 'low',
+  },
+  {
+    label: 'gpt-5.6-luna-medium',
+    model: AI_EVALUATION_MODEL,
+    reasoningEffort: 'medium',
+  },
+] as const satisfies readonly AiEvaluationVariant[];
+
+export function findEvaluationVariant(label: string): AiEvaluationVariant {
+  const variant = AI_EVALUATION_LUNA_VARIANTS.find((candidate) => candidate.label === label);
+  if (!variant) throw new Error(`Unknown evaluation variant: ${label}`);
+  return variant;
+}
+
+/** Prices a run by its variant label or bare model id; unknown models are unpriced. */
+export function estimateEvaluationCostUsd(
+  label: string,
+  inputTokens: number | null,
+  outputTokens: number | null,
+): number | null {
+  const model =
+    AI_EVALUATION_LUNA_VARIANTS.find((variant) => variant.label === label)?.model ?? label;
+  const prices: Readonly<Record<string, { input: number; output: number }>> =
+    AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd;
+  const price = prices[model];
+  if (!price || inputTokens === null || outputTokens === null) return null;
+  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
+}
 
 export interface AiEvaluationGrade {
   completed: boolean;
@@ -45,7 +90,9 @@ export interface AiEvaluationSummary {
   schemaValidRate: number;
   candidateSafetyRate: number;
   invariantPassRate: number;
+  passRate: number;
   averageLatencyMs: number | null;
+  p95LatencyMs: number | null;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalReasoningTokens: number;
@@ -105,7 +152,11 @@ async function evaluateFixture(
       inputTokens: result.metadata.usage.inputTokens,
       outputTokens: result.metadata.usage.outputTokens,
       reasoningTokens: result.metadata.usage.reasoningTokens,
-      estimatedCostUsd: estimateCost(model, result),
+      estimatedCostUsd: estimateEvaluationCostUsd(
+        model,
+        result.metadata.usage.inputTokens,
+        result.metadata.usage.outputTokens,
+      ),
       errorCode: null,
       grade,
     };
@@ -185,10 +236,12 @@ function summarizeModel(
     schemaValidRate: rate(attempted, (record) => record.grade.schemaValid),
     candidateSafetyRate: rate(attempted, (record) => record.grade.candidateSafetyPassed),
     invariantPassRate: rate(attempted, (record) => record.grade.invariantPassed),
+    passRate: rate(attempted, (record) => record.grade.passed),
     averageLatencyMs:
       latencies.length === 0
         ? null
         : latencies.reduce((total, latency) => total + latency, 0) / latencies.length,
+    p95LatencyMs: percentile(latencies, 0.95),
     totalInputTokens: sumNullable(attempted.map((record) => record.inputTokens)),
     totalOutputTokens: sumNullable(attempted.map((record) => record.outputTokens)),
     totalReasoningTokens: sumNullable(attempted.map((record) => record.reasoningTokens)),
@@ -197,18 +250,6 @@ function summarizeModel(
       0,
     ),
   };
-}
-
-function estimateCost(model: string, result: AiRankingResult): number | null {
-  if (!(model in AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd)) return null;
-  const price =
-    AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd[
-      model as keyof typeof AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd
-    ];
-  const inputTokens = result.metadata.usage.inputTokens;
-  const outputTokens = result.metadata.usage.outputTokens;
-  if (inputTokens === null || outputTokens === null) return null;
-  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
 }
 
 function emptyRecord(
@@ -234,6 +275,14 @@ function emptyRecord(
     errorCode,
     grade,
   };
+}
+
+/** Nearest-rank percentile; null when there are no samples. */
+export function percentile(values: readonly number[], fraction: number): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(fraction * sorted.length) - 1));
+  return sorted[index] ?? null;
 }
 
 function rate<T>(values: readonly T[], predicate: (value: T) => boolean): number {

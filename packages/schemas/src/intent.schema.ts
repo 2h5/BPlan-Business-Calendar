@@ -219,6 +219,13 @@ export const timeIntentSchema = z
 export type TimeIntent = z.infer<typeof timeIntentSchema>;
 
 /**
+ * A named occasion that implies a part of the day ("dinner", "drinks").
+ * Deterministic code maps it to a local time window; the model only names it.
+ */
+export const occasionIntentSchema = z.enum(['breakfast', 'brunch', 'lunch', 'dinner', 'drinks']);
+export type OccasionIntent = z.infer<typeof occasionIntentSchema>;
+
+/**
  * Strict production-quality structured intent contract returned by Luna intent parsing.
  * Validated with Zod before touching any domain availability or persistence code.
  */
@@ -228,6 +235,8 @@ export const schedulingIntentSchema = z
     duration: durationIntentSchema.nullable(),
     date: dateIntentSchema,
     time: timeIntentSchema,
+    /** Optional so intents persisted before occasions existed still parse. */
+    occasion: occasionIntentSchema.nullable().optional(),
     location: z.string().trim().min(1).max(200).nullable(),
     description: z.string().trim().min(1).max(500).nullable(),
     requiresClarification: z.boolean(),

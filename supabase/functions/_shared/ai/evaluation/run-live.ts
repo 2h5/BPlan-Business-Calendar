@@ -1,16 +1,31 @@
 import { createOpenAiRankingProvider, openAiRankingConfigFromEnv } from '../openai.ts';
-import { AI_EVALUATION_PRICE_SNAPSHOT, runAiRankingEvaluation } from './harness.ts';
+import {
+  AI_EVALUATION_LUNA_VARIANTS,
+  AI_EVALUATION_PRICE_SNAPSHOT,
+  findEvaluationVariant,
+  runAiRankingEvaluation,
+} from './harness.ts';
 
 if (import.meta.main) {
   if (Deno.env.get('RUN_LIVE_AI_EVAL') !== 'true') {
     throw new Error('Set RUN_LIVE_AI_EVAL=true to acknowledge live API usage and cost.');
   }
 
-  const config = openAiRankingConfigFromEnv();
+  const baseConfig = openAiRankingConfigFromEnv();
+
+  // Evaluates Luna Low (default) vs Luna Medium. The model family is fixed, so
+  // AI_MODEL and AI_REASONING_EFFORT are deliberately overridden per variant.
   const result = await runAiRankingEvaluation({
-    models: ['gpt-5.6-luna', 'gpt-5.6-terra'],
+    models: AI_EVALUATION_LUNA_VARIANTS.map((variant) => variant.label),
     repetitions: 5,
-    createProvider: (model) => createOpenAiRankingProvider({ ...config, model }),
+    createProvider: (label) => {
+      const variant = findEvaluationVariant(label);
+      return createOpenAiRankingProvider({
+        ...baseConfig,
+        model: variant.model,
+        reasoningEffort: variant.reasoningEffort,
+      });
+    },
   });
 
   // Deliberately emit aggregate metrics and failure classes only. Prompts,

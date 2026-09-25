@@ -54,7 +54,7 @@ Implemented and hardened the AI-first natural-language intent layer for Web Find
   - `components/FindTimeBox.tsx` & `.module.css`: Displays readback chips and clarification notices for Pro users. For Free/expired users, renders a locked teaser state with disabled input and a direct link to `/subscription` (no enabled input or failing requests), while preserving confirmation cards and banners.
   - `components/FindTimeBox.test.tsx`: Unit tests verifying Free locked teaser and Pro interactive flow.
 - **Evaluation Suite (`supabase/functions/_shared/ai/evaluation`)**:
-  - `intent-fixtures.ts`: 18 comprehensive fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, descriptions, adversarial prompt injections, and impossible/past date clarifications.
+  - `intent-fixtures.ts`: 28 fixtures covering core phrases, duration ranges, weekend/week placement preferences, exact time with ranges, descriptions, semantic-time occasions (breakfast, lunch, dinner, drinks, explicit-time precedence, scheduling-hours exclusion), adversarial prompt injections, and impossible/past date clarifications.
   - `intent-harness.ts`: Evaluates schema validity, extraction accuracy, clarification pass rate, latency, and tokens/cost.
   - `intent-harness.test.ts`: Automated tests for intent evaluation harness.
   - `run-live-intent.ts`: Live CLI runner for comparing Luna Low vs Luna Medium.
@@ -766,14 +766,57 @@ Record result summary here.
 ### Evaluation result
 
 The provider abstraction, strict OpenAI Responses adapter, offline fixtures,
-and fixture grader are implemented in checkpoint `4678adc`. The live Luna /
-Terra comparison has not run because it requires an authorized server-side
-`OPENAI_API_KEY` and explicit cost authorization. No production model is
-selected yet.
+and fixture grader are implemented in checkpoint `4678adc`.
+
+**Live evaluation, 2026-09-24 — Luna Low vs Luna Medium.** By product
+decision the comparison was scoped to `gpt-5.6-luna` only; Terra and
+High/XHigh/Max were not evaluated. Prompt versions: ranking
+`find-time-ranker-v2`, intent `find-time-intent-v2`. 309 paid calls in total:
+the 308 planned, plus one discarded call from a launcher restart. Measured
+estimated cost was about **$0.16**, against $0.36 expected and a $1.14 cap.
+There were no provider errors, rate limits, timeouts, or truncated outputs.
+
+| Suite (fixtures × reps) | Metric                   | Low          | Medium       |
+| ----------------------- | ------------------------ | ------------ | ------------ |
+| Ranking (14 × 5)        | pass / invariant         | 85.7%        | 81.4%        |
+|                         | schema-valid / safety    | 100% / 100%  | 100% / 100%  |
+|                         | avg / p95 latency        | 2.63 / 3.61s | 3.34 / 5.41s |
+|                         | reasoning tokens         | 5,551        | 10,293       |
+|                         | cost                     | $0.029       | $0.035       |
+| Intent (28 × 3)         | pass / accuracy          | 91.7%        | 85.7%        |
+|                         | schema-valid             | 95.2%        | 92.9%        |
+|                         | semantic / clarification | 95.2%        | 92.9%        |
+|                         | avg / p95 latency        | 1.98 / 2.85s | 1.95 / 3.15s |
+|                         | reasoning tokens         | 1,980        | 4,556        |
+|                         | cost                     | $0.048       | $0.050       |
+
+Every semantic-time fixture passed 3/3 under both efforts (dinner, lunch,
+breakfast, drinks tonight, dinner at 3 PM, breakfast meeting at 1 PM, dinner
+outside 9–5 hours, and "before lunch"). `placementPreference` and
+`allowedDurationsMinutes` ranking fixtures passed 5/5 under both. Medium was
+slower, more expensive, and less reliable: it spent about 2× the reasoning
+tokens without improving any fixture.
+
+Every remaining failure was an offline issue and was fixed without another
+paid run:
+
+- Ranking fixtures that encoded "earliest"/"latest" in the free-text note now
+  use structured `placementPreference`. The `deadline` fixture accepts every
+  slot that finishes before the deadline instead of forcing the earliest one.
+- The intent validator turns a well-formed but nonexistent date ("February
+  30th") into the clarification flow instead of `AI_INVALID_OUTPUT`. An
+  hour-only time ("after 4") with a null minute resolves to minute 0.
+- The intent grader ignores case, spacing, and hyphen differences in titles.
+
+The raw provider bodies for the two `AI_INVALID_OUTPUT` fixtures were not
+captured by design, so those causes are inferred from the validator paths.
 
 ### Selected production default
 
-TBD pending the live Luna / Terra comparison.
+`gpt-5.6-luna` at reasoning effort **`low`** for both intent parsing and
+candidate ranking. These are already the code defaults for `AI_REASONING_EFFORT`
+and `AI_INTENT_REASONING_EFFORT`. **No production deployment or hosted
+configuration change has been made yet.**
 
 ## Exit criteria
 
@@ -2375,15 +2418,53 @@ Verification:
 
 ---
 
+### 2026-09-24 — Semantic-time intent and live Luna Low vs Medium evaluation
+
+Starting HEAD: `4c74b948bf3143e24e01dc090412c24a2a053fa5`
+
+Implemented:
+
+- Semantic-time policy (`packages/domain/src/scheduling/semantic-time.ts`).
+  Luna names an `occasion`, and deterministic code maps it, or a time of day,
+  to a hard window before ranking. The window intersects scheduling hours and
+  never widens them. Explicit clock times take precedence. Zero overlap
+  returns `clarification_required`. The intent prompt is now
+  `find-time-intent-v2`.
+- Evaluation harness: Luna Low vs Luna Medium for both suites (Terra
+  removed). Adds pass rate, p95 latency, semantic grading, 8 semantic intent
+  fixtures, and `placementPreference`/`allowedDurationsMinutes` ranking
+  fixtures.
+- Live evaluation: see "Evaluation result" under Phase 2. Low was selected
+  for intent and ranking. Measured cost was about $0.16, and every
+  semantic-time fixture passed.
+- Offline follow-ups from the live run, with no further paid calls:
+  - placement ranking fixtures use structured `placementPreference`, not note text
+  - the deadline fixture accepts any slot that ends before the deadline
+  - impossible dates go to clarification
+  - an hour-only time gets minute 0
+  - the title grader normalizes case, spacing, and hyphens
+
+Verification:
+
+- `pnpm verify` — PASS (345 domain tests, 303 web tests, 194 billing tests)
+- `(cd supabase/functions && deno task check)` — PASS
+- `(cd supabase/functions && deno task test)` — PASS (263 tests)
+
+Not done: no Edge Function deployment, no hosted secret or configuration
+change, and no further live evaluation against the post-evaluation validator
+and fixture fixes.
+
+---
+
 # Current Decisions
 
 | Decision                                     | Status   | Choice                                                   |
 | -------------------------------------------- | -------- | -------------------------------------------------------- |
 | AI provider                                  | evaluate | OpenAI                                                   |
 | AI API                                       | final    | Responses API                                            |
-| default AI model                             | evaluate | `gpt-5.6-luna`                                           |
-| comparison model                             | evaluate | `gpt-5.6-terra`                                          |
-| reasoning effort                             | final    | `low` initially; server-configurable                     |
+| default AI model                             | final    | `gpt-5.6-luna` (live eval 2026-09-24; not yet deployed)  |
+| comparison model                             | dropped  | Terra not evaluated, by product decision                 |
+| reasoning effort                             | final    | `low` for intent and ranking (Low beat Medium live)      |
 | OpenAI response storage                      | final    | `store: false`                                           |
 | AI availability authority                    | final    | deterministic engine only                                |
 | AI output                                    | final    | opaque generated slot IDs + rank/score/reason            |
@@ -2566,9 +2647,10 @@ Current pending gates:
 
 `Annual Phase 3C and billing Phases 4 through 6 are engineering-complete for
 the reviewed sandbox contract. The protected lifecycle-read-only workflow
-passed after the hosted atomic deployment. Live Luna/Terra evaluation still
-needs an authorized server-side OpenAI key and explicit cost authorization.
-Production billing stays disabled until seller identity and final legal
+passed after the hosted atomic deployment. The live Luna Low vs Medium
+evaluation ran on 2026-09-24 and selected Luna Low for intent and ranking.
+Deploying the semantic-time Edge Functions and confirming the hosted AI
+configuration are still pending. Production billing stays disabled until seller identity and final legal
 documents are confirmed.`
 
 Next exact action:

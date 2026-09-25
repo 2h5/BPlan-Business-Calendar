@@ -16,7 +16,8 @@
   },
   "tasks": {
     "test": "deno test --allow-env",
-    "check": "deno check **/index.ts _shared/ai/evaluation/run-live.ts",
-    "eval:ai": "deno run --allow-env=RUN_LIVE_AI_EVAL,AI_PROVIDER,AI_MODEL,AI_REASONING_EFFORT,AI_TIMEOUT_MS,OPENAI_API_KEY --allow-net=api.openai.com _shared/ai/evaluation/run-live.ts"
+    "check": "deno check **/index.ts _shared/ai/evaluation/run-live.ts _shared/ai/evaluation/run-live-intent.ts",
+    "eval:ai": "deno run --allow-env=RUN_LIVE_AI_EVAL,AI_PROVIDER,AI_MODEL,AI_REASONING_EFFORT,AI_TIMEOUT_MS,OPENAI_API_KEY --allow-net=api.openai.com _shared/ai/evaluation/run-live.ts",
+    "eval:ai:intent": "deno run --allow-env=RUN_LIVE_AI_EVAL,AI_PROVIDER,AI_INTENT_MODEL,AI_MODEL,AI_INTENT_REASONING_EFFORT,AI_REASONING_EFFORT,AI_INTENT_TIMEOUT_MS,AI_TIMEOUT_MS,OPENAI_API_KEY --allow-net=api.openai.com _shared/ai/evaluation/run-live-intent.ts"
   }
 }

@@ -1,3 +1,14 @@
+import type { OccasionIntent } from '@cal/schemas/scheduling';
+
+/**
+ * What the deterministic semantic-time policy does with the parsed intent:
+ * - 'none': no semantic window (nothing named, or an explicit clock time wins)
+ * - 'overlap' / 'no_overlap': a window applies and does / does not intersect
+ *   the fixture's scheduling hours
+ * - 'contradictory': two named parts of the day that cannot both hold
+ */
+export type ExpectedSemanticOutcome = 'none' | 'overlap' | 'no_overlap' | 'contradictory';
+
 export interface ExpectedIntent {
   titleContains?: string;
   duration?:
@@ -32,6 +43,9 @@ export interface ExpectedIntent {
   timeEndMinute?: number;
   locationContains?: string;
   descriptionContains?: string;
+  /** null asserts that no occasion was extracted. */
+  occasion?: OccasionIntent | null;
+  semanticOutcome?: ExpectedSemanticOutcome;
   requiresClarification: boolean;
   clarificationQuestionContains?: string;
 }
@@ -45,6 +59,11 @@ export interface AiIntentEvaluationFixture {
     currentLocalDate: string;
     currentLocalTime: string;
   };
+  /**
+   * Local scheduling hours used only to grade `semanticOutcome`; the model
+   * never sees them. Defaults to 09:00-17:00.
+   */
+  schedulingHours?: { startMinute: number; endMinute: number };
   expected: ExpectedIntent;
 }
 
@@ -189,12 +208,15 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
       titleContains: 'coffee with Sarah',
       dateType: 'weekday',
       dateWeekday: 'thursday',
+      // Coffee is deliberately not an occasion, so no window is imposed.
+      occasion: null,
+      semanticOutcome: 'none',
       requiresClarification: false,
     },
   },
   {
     id: 'lunch-team-next-week',
-    description: 'Lunch with team with midday/lunch preference.',
+    description: 'Lunch with the team is a lunch occasion, not an invented afternoon preference.',
     input: {
       ...DEFAULT_CONTEXT,
       rawText: 'lunch next week with the team',
@@ -203,7 +225,9 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
       titleContains: 'lunch',
       dateType: 'relative_week',
       dateModifier: 'next',
-      timePreference: 'afternoon',
+      timeType: 'unconstrained',
+      occasion: 'lunch',
+      semanticOutcome: 'overlap',
       requiresClarification: false,
     },
   },
@@ -267,6 +291,119 @@ export const AI_INTENT_EVALUATION_FIXTURES: readonly AiIntentEvaluationFixture[]
       duration: { type: 'exact', minutes: 60 },
       dateType: 'unconstrained',
       descriptionContains: 'work on my resume',
+      requiresClarification: false,
+    },
+  },
+  // Semantic occasions: the model names them, deterministic code bounds them.
+  {
+    id: 'dinner-no-time',
+    description: 'Dinner with no clock time names the occasion and invents no time.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'dinner with Andrew tomorrow' },
+    schedulingHours: { startMinute: 9 * 60, endMinute: 21 * 60 },
+    expected: {
+      titleContains: 'Andrew',
+      dateType: 'tomorrow',
+      timeType: 'unconstrained',
+      occasion: 'dinner',
+      semanticOutcome: 'overlap',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'lunch-no-time',
+    description: 'Lunch with no clock time names the occasion.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'lunch with the design team on Friday' },
+    expected: {
+      titleContains: 'design team',
+      dateType: 'weekday',
+      dateWeekday: 'friday',
+      timeType: 'unconstrained',
+      occasion: 'lunch',
+      semanticOutcome: 'overlap',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'breakfast-no-time',
+    description: 'Breakfast with no clock time names the occasion.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'breakfast with Priya on Thursday' },
+    schedulingHours: { startMinute: 7 * 60, endMinute: 15 * 60 },
+    expected: {
+      titleContains: 'Priya',
+      dateType: 'weekday',
+      dateWeekday: 'thursday',
+      timeType: 'unconstrained',
+      occasion: 'breakfast',
+      semanticOutcome: 'overlap',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'dinner-explicit-3pm',
+    description: 'An explicit clock time is kept even when unusual for the occasion.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'dinner with Andrew at 3 PM tomorrow' },
+    expected: {
+      titleContains: 'Andrew',
+      dateType: 'tomorrow',
+      timeType: 'exact_time',
+      timeHour: 15,
+      timeMinute: 0,
+      occasion: 'dinner',
+      semanticOutcome: 'none',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'breakfast-meeting-1pm',
+    description: 'A breakfast meeting at 1 PM keeps 1 PM.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'breakfast meeting at 1 PM on Thursday' },
+    expected: {
+      titleContains: 'breakfast meeting',
+      dateType: 'weekday',
+      dateWeekday: 'thursday',
+      timeType: 'exact_time',
+      timeHour: 13,
+      timeMinute: 0,
+      semanticOutcome: 'none',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'dinner-outside-hours',
+    description: 'Dinner with 9-5 scheduling hours resolves to no overlap, not a daytime slot.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'dinner with Andrew tomorrow' },
+    schedulingHours: { startMinute: 9 * 60, endMinute: 17 * 60 },
+    expected: {
+      dateType: 'tomorrow',
+      occasion: 'dinner',
+      semanticOutcome: 'no_overlap',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'drinks-tonight',
+    description: 'Drinks tonight is today, evening, and the drinks occasion.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'drinks with Sam tonight' },
+    schedulingHours: { startMinute: 9 * 60, endMinute: 22 * 60 },
+    expected: {
+      titleContains: 'Sam',
+      dateType: 'today',
+      occasion: 'drinks',
+      semanticOutcome: 'overlap',
+      requiresClarification: false,
+    },
+  },
+  {
+    id: 'before-lunch-reference',
+    description: 'A meal used only as a reference point is a clock bound, not an occasion.',
+    input: { ...DEFAULT_CONTEXT, rawText: 'call with Maya tomorrow before lunch' },
+    expected: {
+      titleContains: 'Maya',
+      dateType: 'tomorrow',
+      timeType: 'before_time',
+      timeHour: 12,
+      occasion: null,
+      semanticOutcome: 'none',
       requiresClarification: false,
     },
   },

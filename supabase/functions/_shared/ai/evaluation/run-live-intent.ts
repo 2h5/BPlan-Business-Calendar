@@ -1,5 +1,9 @@
 import { createOpenAiIntentProvider, openAiIntentConfigFromEnv } from '../openai-intent.ts';
-import { AI_EVALUATION_PRICE_SNAPSHOT } from './harness.ts';
+import {
+  AI_EVALUATION_LUNA_VARIANTS,
+  AI_EVALUATION_PRICE_SNAPSHOT,
+  findEvaluationVariant,
+} from './harness.ts';
 import { runAiIntentEvaluation } from './intent-harness.ts';
 
 if (import.meta.main) {
@@ -9,16 +13,17 @@ if (import.meta.main) {
 
   const baseConfig = openAiIntentConfigFromEnv();
 
-  // Evaluates Luna Low (default) vs Luna Medium
+  // Evaluates Luna Low (default) vs Luna Medium. The model family is fixed, so
+  // model and reasoning-effort environment overrides are ignored per variant.
   const result = await runAiIntentEvaluation({
-    models: ['gpt-5.6-luna-low', 'gpt-5.6-luna-medium'],
+    models: AI_EVALUATION_LUNA_VARIANTS.map((variant) => variant.label),
     repetitions: 3,
-    createProvider: (variant) => {
-      const isMedium = variant.endsWith('-medium');
+    createProvider: (label) => {
+      const variant = findEvaluationVariant(label);
       return createOpenAiIntentProvider({
         ...baseConfig,
-        model: 'gpt-5.6-luna',
-        reasoningEffort: isMedium ? 'medium' : 'low',
+        model: variant.model,
+        reasoningEffort: variant.reasoningEffort,
       });
     },
   });

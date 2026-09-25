@@ -3,6 +3,9 @@ import {
   resolveIntentDateWindow,
   resolveIntentDuration,
   resolveIntentTimeBounds,
+  resolveSemanticTimeWindow,
+  semanticWindowContradictionQuestion,
+  semanticWindowOutsideHoursQuestion,
 } from '@cal/domain/scheduling';
 import { getZonedParts } from '@cal/domain/time';
 import type {
@@ -338,7 +341,39 @@ async function generateAiFindTimeProposalFromText(
     }
 
     const resolvedTimeBounds = resolveIntentTimeBounds(parsedIntent.time);
+    const semanticWindow = resolveSemanticTimeWindow(parsedIntent.time, parsedIntent.occasion);
     const readback = generateIntentReadback(parsedIntent);
+    const intentTelemetry = {
+      intentProvider: intentResult.metadata.provider,
+      intentModel: intentResult.metadata.model,
+      intentPromptVersion: intentResult.metadata.promptVersion,
+      intentLatencyMs: intentResult.metadata.latencyMs,
+      intentInputTokens: intentResult.metadata.usage.inputTokens,
+      intentOutputTokens: intentResult.metadata.usage.outputTokens,
+      intentReasoningTokens: intentResult.metadata.usage.reasoningTokens,
+      intentTotalTokens: intentResult.metadata.usage.totalTokens,
+    };
+
+    // Two named parts of the day that cannot both hold ("breakfast this
+    // evening") are asked about, never resolved by picking one.
+    if (semanticWindow.kind === 'contradictory') {
+      await deps.repository.updateRequest(input.userId, requestId, {
+        status: 'failed',
+        rawText: null,
+        errorCode: 'AI_CLARIFICATION_REQUIRED',
+        ...intentTelemetry,
+        parsedIntent,
+        completedAt: (deps.clock ?? (() => new Date()))().toISOString(),
+      });
+      requestMarkedFailed = true;
+
+      return {
+        status: 'clarification_required',
+        requestId,
+        clarificationQuestion: semanticWindowContradictionQuestion(semanticWindow.label),
+        intent: parsedIntent,
+      };
+    }
 
     const normalizedRequest: AiScheduleRequest = {
       title: parsedIntent.title,
@@ -389,6 +424,13 @@ async function generateAiFindTimeProposalFromText(
         allowedDurationsMinutes: resolvedDuration.allowedDurationsMinutes,
         placementPreference: resolvedWindow.placementPreference,
         dateIntent: parsedIntent.date,
+        semanticWindow:
+          semanticWindow.kind === 'window'
+            ? {
+                earliestMinute: semanticWindow.earliestMinute,
+                latestMinute: semanticWindow.latestMinute,
+              }
+            : undefined,
       },
       deps.dataSource,
       deps.candidateIdFactory,
@@ -396,6 +438,35 @@ async function generateAiFindTimeProposalFromText(
 
     const snapshot = requestSnapshot(result);
     const completedAt = (deps.clock ?? (() => new Date()))().toISOString();
+
+    // The named part of the day never overlaps the scheduling hours. Widening
+    // would offer a semantically wrong time and overriding would ignore the
+    // user's hours, so ask instead.
+    if (
+      result.candidates.length === 0 &&
+      result.semanticWindowExcluded &&
+      semanticWindow.kind === 'window'
+    ) {
+      await deps.repository.updateRequest(input.userId, requestId, {
+        status: 'failed',
+        constraints: snapshot.constraints,
+        targetCalendarId: snapshot.targetCalendarId,
+        taskVersion: snapshot.taskVersion,
+        profileVersion: snapshot.profileVersion,
+        targetCalendarVersion: snapshot.targetCalendarVersion,
+        candidateCount: 0,
+        errorCode: 'AI_CLARIFICATION_REQUIRED',
+        completedAt,
+      });
+      requestMarkedFailed = true;
+
+      return {
+        status: 'clarification_required',
+        requestId,
+        clarificationQuestion: semanticWindowOutsideHoursQuestion(semanticWindow),
+        intent: parsedIntent,
+      };
+    }
 
     if (result.candidates.length === 0) {
       await deps.repository.updateRequest(input.userId, requestId, {

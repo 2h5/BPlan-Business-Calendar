@@ -1,3 +1,4 @@
+import { intersectWindows, resolveSemanticTimeWindow } from '@cal/domain/scheduling';
 import { schedulingIntentSchema, type SchedulingIntent } from '@cal/schemas/scheduling';
 
 import { EdgeError, type EdgeErrorCode } from '../../errors/index.ts';
@@ -5,15 +6,17 @@ import type { AiIntentProvider, AiIntentResult } from '../intent.ts';
 import {
   AI_INTENT_EVALUATION_FIXTURES,
   type AiIntentEvaluationFixture,
-  type ExpectedIntent,
+  type ExpectedSemanticOutcome,
 } from './intent-fixtures.ts';
-import { AI_EVALUATION_PRICE_SNAPSHOT } from './harness.ts';
+import { estimateEvaluationCostUsd, percentile } from './harness.ts';
 
 export interface AiIntentEvaluationGrade {
   completed: boolean;
   schemaValid: boolean;
   accuracyPassed: boolean;
   clarificationPassed: boolean;
+  /** Occasion and deterministic semantic-window outcome; true when not asserted. */
+  semanticPassed: boolean;
   passed: boolean;
 }
 
@@ -40,7 +43,10 @@ export interface AiIntentEvaluationSummary {
   schemaValidRate: number;
   accuracyRate: number;
   clarificationPassRate: number;
+  semanticPassRate: number;
+  passRate: number;
   averageLatencyMs: number | null;
+  p95LatencyMs: number | null;
   totalInputTokens: number;
   totalOutputTokens: number;
   totalReasoningTokens: number;
@@ -54,9 +60,10 @@ export interface RunAiIntentEvaluationOptions {
   fixtures?: readonly AiIntentEvaluationFixture[];
 }
 
-export async function runAiIntentEvaluation(
-  options: RunAiIntentEvaluationOptions,
-): Promise<{ records: AiIntentEvaluationRecord[]; summaries: AiIntentEvaluationSummary[] }> {
+export async function runAiIntentEvaluation(options: RunAiIntentEvaluationOptions): Promise<{
+  records: AiIntentEvaluationRecord[];
+  summaries: AiIntentEvaluationSummary[];
+}> {
   const fixtures = options.fixtures ?? AI_INTENT_EVALUATION_FIXTURES;
   const records: AiIntentEvaluationRecord[] = [];
 
@@ -85,10 +92,10 @@ async function evaluateIntentFixture(
     const result = await provider.parseSchedulingIntent(fixture.input);
     const grade = gradeIntentFixture(fixture, result);
 
-    const cost = estimateCost(
+    const cost = estimateEvaluationCostUsd(
       model,
-      result.metadata.usage.inputTokens ?? 0,
-      result.metadata.usage.outputTokens ?? 0,
+      result.metadata.usage.inputTokens,
+      result.metadata.usage.outputTokens,
     );
 
     return {
@@ -125,6 +132,7 @@ async function evaluateIntentFixture(
         schemaValid: false,
         accuracyPassed: false,
         clarificationPassed: false,
+        semanticPassed: false,
         passed: false,
       },
       parsedIntent: null,
@@ -151,7 +159,7 @@ function gradeIntentFixture(
   if (!expected.requiresClarification) {
     if (
       expected.titleContains &&
-      !actual.title.toLowerCase().includes(expected.titleContains.toLowerCase())
+      !normalizeTitle(actual.title).includes(normalizeTitle(expected.titleContains))
     ) {
       accuracyPassed = false;
     }
@@ -278,15 +286,45 @@ function gradeIntentFixture(
     }
   }
 
-  const passed = schemaValid && clarificationPassed && accuracyPassed;
+  const semanticPassed =
+    expected.requiresClarification ||
+    ((expected.occasion === undefined || (actual.occasion ?? null) === expected.occasion) &&
+      (expected.semanticOutcome === undefined ||
+        semanticOutcome(fixture, actual) === expected.semanticOutcome));
+
+  const passed = schemaValid && clarificationPassed && accuracyPassed && semanticPassed;
 
   return {
     completed: true,
     schemaValid,
     accuracyPassed,
     clarificationPassed,
+    semanticPassed,
     passed,
   };
+}
+
+/** Ignores case, spacing, and punctuation so "Catch-up" matches "catchup". */
+export function normalizeTitle(title: string): string {
+  return title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+const DEFAULT_SCHEDULING_HOURS = { startMinute: 9 * 60, endMinute: 17 * 60 };
+
+/** Runs the parsed intent through the same deterministic policy production uses. */
+export function semanticOutcome(
+  fixture: AiIntentEvaluationFixture,
+  intent: SchedulingIntent,
+): ExpectedSemanticOutcome {
+  const window = resolveSemanticTimeWindow(intent.time, intent.occasion);
+  if (window.kind !== 'window') return window.kind;
+  const hours = fixture.schedulingHours ?? DEFAULT_SCHEDULING_HOURS;
+  return intersectWindows(window, {
+    earliestMinute: hours.startMinute,
+    latestMinute: hours.endMinute,
+  })
+    ? 'overlap'
+    : 'no_overlap';
 }
 
 function summarizeIntentModel(
@@ -300,6 +338,8 @@ function summarizeIntentModel(
   const validCount = modelRecords.filter((r) => r.grade.schemaValid).length;
   const accuracyCount = modelRecords.filter((r) => r.grade.accuracyPassed).length;
   const clarCount = modelRecords.filter((r) => r.grade.clarificationPassed).length;
+  const semanticCount = modelRecords.filter((r) => r.grade.semanticPassed).length;
+  const passCount = modelRecords.filter((r) => r.grade.passed).length;
 
   const latencies = modelRecords
     .map((r) => r.latencyMs)
@@ -321,24 +361,13 @@ function summarizeIntentModel(
     schemaValidRate: attempted > 0 ? validCount / attempted : 0,
     accuracyRate: attempted > 0 ? accuracyCount / attempted : 0,
     clarificationPassRate: attempted > 0 ? clarCount / attempted : 0,
+    semanticPassRate: attempted > 0 ? semanticCount / attempted : 0,
+    passRate: attempted > 0 ? passCount / attempted : 0,
     averageLatencyMs: avgLatency,
+    p95LatencyMs: percentile(latencies, 0.95),
     totalInputTokens,
     totalOutputTokens,
     totalReasoningTokens,
     estimatedCostUsd: totalCost,
   };
-}
-
-function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
-  const prices =
-    (
-      AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd as Record<
-        string,
-        { input: number; output: number }
-      >
-    )[model] ?? AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd['gpt-5.6-luna'];
-
-  const inputCost = (inputTokens / 1_000_000) * prices.input;
-  const outputCost = (outputTokens / 1_000_000) * prices.output;
-  return Number((inputCost + outputCost).toFixed(6));
 }

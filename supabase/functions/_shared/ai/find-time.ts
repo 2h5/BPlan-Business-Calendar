@@ -2,6 +2,7 @@ import {
   generateCandidateSlots,
   resolveEffectiveWorkingHours,
   schedulingEventsToBusyIntervals,
+  type LocalMinuteWindow,
   type SchedulingCalendarEvent,
 } from '@cal/domain/scheduling';
 import { addZonedDays, startOfZonedDay } from '@cal/domain/time';
@@ -95,6 +96,13 @@ export interface DeterministicFindTimeResult {
   targetCalendar: FindTimeTargetCalendar;
   constraints: ScheduleConstraints;
   candidates: DeterministicCandidate[];
+  /**
+   * True when a semantic window ("dinner") left no candidates even on an
+   * empty calendar that would otherwise have had some: the named part of the
+   * day and the scheduling hours do not overlap. The caller asks the user
+   * rather than widening to a semantically wrong time.
+   */
+  semanticWindowExcluded: boolean;
 }
 
 export type CandidateIdFactory = (index: number) => string;
@@ -119,6 +127,13 @@ export async function prepareDeterministicFindTime(
      * profile (e.g. during revalidation of an already-resolved request).
      */
     workingHours?: WorkingHours;
+    /**
+     * A hard local-time window implied by a named part of the day ("dinner",
+     * "morning"). It narrows candidates but, unlike an explicit clock time,
+     * never opens a named day beyond its scheduling hours. Ignored when the
+     * request already carries explicit clock bounds, which take precedence.
+     */
+    semanticWindow?: LocalMinuteWindow;
   },
   source: FindTimeDataSource,
   candidateIdFactory: CandidateIdFactory = opaqueCandidateId,
@@ -157,6 +172,11 @@ export async function prepareDeterministicFindTime(
   }
 
   const window = resolveWindow(task, input.request, profile.timezone, now);
+  const hasExplicitClockBounds =
+    input.request.earliestMinute !== undefined ||
+    input.request.latestMinute !== undefined ||
+    input.request.exactStartMinute !== undefined;
+  const semanticWindow = hasExplicitClockBounds ? undefined : input.semanticWindow;
   const constraints = parseConstraints({
     durationMinutes,
     allowedDurationsMinutes: input.allowedDurationsMinutes,
@@ -178,8 +198,8 @@ export async function prepareDeterministicFindTime(
         : profile.workingHours),
     timezone: profile.timezone,
     bufferMinutes: input.request.bufferMinutes ?? 0,
-    earliestMinute: input.request.earliestMinute,
-    latestMinute: input.request.latestMinute,
+    earliestMinute: semanticWindow?.earliestMinute ?? input.request.earliestMinute,
+    latestMinute: semanticWindow?.latestMinute ?? input.request.latestMinute,
     exactStartMinute: input.request.exactStartMinute,
     granularityMinutes: GRANULARITY_MINUTES,
     splittable: false,
@@ -203,6 +223,15 @@ export async function prepareDeterministicFindTime(
       422,
     );
   }
+
+  const semanticWindowExcluded =
+    generated.length === 0 &&
+    semanticWindow !== undefined &&
+    generateCandidateSlots({ constraints, busy: [] }).length === 0 &&
+    generateCandidateSlots({
+      constraints: { ...constraints, earliestMinute: undefined, latestMinute: undefined },
+      busy: [],
+    }).length > 0;
 
   const ids = new Set<string>();
   const candidates = generated.map((slot, index) => {
@@ -235,6 +264,7 @@ export async function prepareDeterministicFindTime(
     targetCalendar,
     constraints,
     candidates,
+    semanticWindowExcluded,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { ScheduleConstraints, WorkingHours } from '@cal/schemas/scheduling';
 
+import { TIME_OF_DAY_WINDOWS, type LocalMinuteWindow } from './semantic-time.ts';
 import { MINUTE_MS, type Interval, intersect, normalize, pad, subtract } from '../time/interval.ts';
 import {
   addZonedDays,
@@ -28,13 +29,6 @@ export interface AvailabilityInput {
   /** Every busy interval already known for the window (events, time blocks). */
   busy: readonly Interval[];
 }
-
-const TIME_OF_DAY_RANGES: Record<string, { from: number; to: number } | null> = {
-  morning: { from: 5 * 60, to: 12 * 60 },
-  afternoon: { from: 12 * 60, to: 17 * 60 },
-  evening: { from: 17 * 60, to: 22 * 60 },
-  any: null,
-};
 
 /**
  * Expand per-weekday working windows into concrete UTC intervals covering
@@ -315,7 +309,10 @@ export function rankSlotsHeuristically(
   slots: readonly CandidateSlot[],
   constraints: ScheduleConstraints,
 ): CandidateSlot[] {
-  const preferred = TIME_OF_DAY_RANGES[constraints.preferredTimeOfDay] ?? null;
+  const preferred =
+    constraints.preferredTimeOfDay === 'any'
+      ? null
+      : TIME_OF_DAY_WINDOWS[constraints.preferredTimeOfDay];
 
   return [...slots].sort((a, b) => {
     if (preferred) {
@@ -329,12 +326,12 @@ export function rankSlotsHeuristically(
 
 function fitsPreferredBand(
   slot: CandidateSlot,
-  band: { from: number; to: number },
+  band: LocalMinuteWindow,
   timeZone: string,
 ): boolean {
   const parts = getZonedParts(new Date(slot.start), timeZone);
   const minute = parts.hour * 60 + parts.minute;
-  return minute >= band.from && minute < band.to;
+  return minute >= band.earliestMinute && minute < band.latestMinute;
 }
 
 /** True when `candidate` collides with anything in `busy`. */
