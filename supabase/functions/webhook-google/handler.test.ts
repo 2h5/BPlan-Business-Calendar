@@ -72,6 +72,11 @@ Deno.test('forged or incomplete Google proofs acknowledge without enqueueing', a
     },
     {
       'X-Goog-Channel-ID': state.id,
+      'X-Goog-Channel-Token': 'channel-toke',
+      'X-Goog-Resource-ID': 'resource-1',
+    },
+    {
+      'X-Goog-Channel-ID': state.id,
       'X-Goog-Channel-Token': 'channel-token',
       'X-Goog-Resource-ID': 'wrong',
     },

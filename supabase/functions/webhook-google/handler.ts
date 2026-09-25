@@ -1,4 +1,5 @@
 import { adminClient } from '../_shared/auth/index.ts';
+import { constantTimeEqual } from '../_shared/billing/constant-time.ts';
 import { runAfterResponse } from '../_shared/http/background.ts';
 import { JOB_KINDS, calendarSyncKey, enqueue } from '../_shared/sync/jobs.ts';
 import { drainQueue } from '../_shared/sync/worker.ts';
@@ -75,7 +76,8 @@ export async function handleGoogleWebhook(
       !state.provider_account_id ||
       !token ||
       !resourceId ||
-      token !== state.webhook_token ||
+      !state.webhook_token ||
+      !constantTimeEqual(token, state.webhook_token) ||
       resourceId !== state.webhook_resource_id
     ) {
       console.warn(JSON.stringify({ code: 'WEBHOOK_TOKEN_OR_RESOURCE_MISMATCH' }));
