@@ -1,6 +1,8 @@
 import { clientAppEnvSchema, refinePublicSupabaseConfig } from '@cal/schemas';
 import { z } from 'zod';
 
+import { billingEnvIssues } from '../features/billing/utils/billing-checkout';
+
 const optionalUrl = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
   z.string().url().optional(),
@@ -29,12 +31,24 @@ const envSchema = z
     billingTermsUrl: optionalUrl,
     billingPrivacyUrl: optionalUrl,
   })
-  .superRefine((value, ctx) =>
+  .superRefine((value, ctx) => {
     refinePublicSupabaseConfig(value, ctx, {
       url: 'VITE_SUPABASE_URL',
       key: 'VITE_SUPABASE_ANON_KEY',
-    }),
-  );
+    });
+    const billing = {
+      mode: value.billingMode,
+      purchaseUrl: value.revenueCatWebPurchaseUrl,
+      managementUrl: value.revenueCatBillingManagementUrl,
+      sellerIdentityConfirmed: value.billingSellerIdentityConfirmed,
+      legalDocsFinal: value.billingLegalDocsFinal,
+      termsUrl: value.billingTermsUrl,
+      privacyUrl: value.billingPrivacyUrl,
+    };
+    for (const issue of billingEnvIssues(billing, value.appEnv)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [issue.path], message: issue.message });
+    }
+  });
 
 const parsed = envSchema.safeParse({
   supabaseUrl: import.meta.env.VITE_SUPABASE_URL,

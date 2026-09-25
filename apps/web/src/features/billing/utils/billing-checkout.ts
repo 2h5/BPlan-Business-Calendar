@@ -50,3 +50,45 @@ export function revenueCatCheckoutUrl(config: BillingConfig, userId: string | nu
   url.pathname = `${url.pathname.replace(/\/$/, '')}/${encodeURIComponent(parsedUserId.data)}`;
   return url.toString();
 }
+
+export interface BillingEnvConfig extends BillingConfig {
+  managementUrl?: string;
+}
+
+/**
+ * Deployment mistakes the checkout guard cannot see at run time.
+ *
+ * A production site must never offer sandbox checkout: purchases would look
+ * real to the customer and grant nothing durable. Outside development every
+ * billing link a customer follows must be HTTPS.
+ */
+export function billingEnvIssues(
+  config: BillingEnvConfig,
+  appEnv: 'development' | 'preview' | 'production',
+): Array<{ path: keyof BillingEnvConfig; message: string }> {
+  const issues: Array<{ path: keyof BillingEnvConfig; message: string }> = [];
+
+  if (appEnv === 'production' && config.mode === 'sandbox') {
+    issues.push({
+      path: 'mode',
+      message: 'VITE_BILLING_MODE=sandbox is not allowed when VITE_APP_ENV=production',
+    });
+  }
+
+  if (appEnv !== 'development') {
+    const links = [
+      ['purchaseUrl', 'VITE_REVENUECAT_WEB_PURCHASE_URL'],
+      ['managementUrl', 'VITE_REVENUECAT_BILLING_MANAGEMENT_URL'],
+      ['termsUrl', 'VITE_BILLING_TERMS_URL'],
+      ['privacyUrl', 'VITE_BILLING_PRIVACY_URL'],
+    ] as const;
+    for (const [path, name] of links) {
+      const value = config[path];
+      if (value && !value.startsWith('https://')) {
+        issues.push({ path, message: `${name} must use https outside development` });
+      }
+    }
+  }
+
+  return issues;
+}
