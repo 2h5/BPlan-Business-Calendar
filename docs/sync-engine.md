@@ -217,6 +217,22 @@ than the one notification daily reconciliation would have caught anyway.
 
 ## Cron jobs
 
+The jobs are installed by an operator, not by a migration: enable `pg_cron`
+and `pg_net`, store the function URL and the `SYNC_CRON_SECRET` value in Vault,
+then run the idempotent installer as `postgres`. Each job reads both secrets
+from Vault at run time, so neither is copied into `cron.job`.
+
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/sync-cron', 'sync_cron_url');
+select vault.create_secret('<same value as SYNC_CRON_SECRET>', 'sync_cron_secret');
+select public.ensure_sync_schedules();
+```
+
+It returns `INSTALLED`, or `EXTENSIONS_UNAVAILABLE`, `VAULT_UNAVAILABLE`,
+`MISSING_VAULT_SECRETS`, or `INVALID_SYNC_CRON_URL`. The `app.settings.*`
+path in migration 0007 cannot be configured on hosted Postgres 15+ and is
+superseded.
+
 | Job                    | Cadence      | Purpose                                                                |
 | ---------------------- | ------------ | ---------------------------------------------------------------------- |
 | Renew webhooks         | hourly       | Recreate Google channels / renew Graph subscriptions before expiry     |
