@@ -46,6 +46,7 @@ function deterministicResult(candidateCount = 2): DeterministicFindTimeResult {
       minutesFromPreviousBusy: index === 0 ? 60 : null,
       minutesUntilNextBusy: index === candidateCount - 1 ? 30 : null,
     })),
+    semanticWindowExcluded: false,
   };
 }
 

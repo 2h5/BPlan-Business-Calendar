@@ -1,18 +1,27 @@
-import { assertAlmostEquals, assertEquals } from 'jsr:@std/assert@^1.0.0';
+import { assertAlmostEquals, assertEquals, assertThrows } from 'jsr:@std/assert@^1.0.0';
 import { aiRankCandidateSlotsInputSchema } from '@cal/schemas/scheduling';
 
 import { EdgeError } from '../../errors/index.ts';
 import type { AiRankingProvider, AiRankingResult } from '../ranking.ts';
 import { AI_EVALUATION_FIXTURES } from './fixtures.ts';
-import { gradeFixture, runAiRankingEvaluation } from './harness.ts';
+import {
+  AI_EVALUATION_LUNA_VARIANTS,
+  AI_EVALUATION_MODEL,
+  AI_EVALUATION_PRICE_SNAPSHOT,
+  estimateEvaluationCostUsd,
+  findEvaluationVariant,
+  gradeFixture,
+  percentile,
+  runAiRankingEvaluation,
+} from './harness.ts';
 
 Deno.test(
   'fixtures cover required preferences, adversarial text, opaque ids, and zero candidates',
   () => {
     const ids = new Set(AI_EVALUATION_FIXTURES.map((fixture) => fixture.id));
     for (const required of [
-      'earliest',
-      'latest',
+      'placement-early',
+      'placement-late',
       'morning',
       'afternoon',
       'evening',
@@ -23,6 +32,7 @@ Deno.test(
       'irrelevant-instructions',
       'override-attempt',
       'opaque-ids',
+      'allowed-durations',
       'zero-candidates',
     ]) {
       assertEquals(ids.has(required), true);
@@ -42,12 +52,32 @@ Deno.test(
   },
 );
 
+Deno.test('placement comes from structured input, never from free-text notes', () => {
+  for (const fixture of AI_EVALUATION_FIXTURES) {
+    assertEquals(/\b(earliest|latest)\b/i.test(fixture.input.note ?? ''), false);
+  }
+  const placement = (id: string) =>
+    AI_EVALUATION_FIXTURES.find((fixture) => fixture.id === id)?.input.placementPreference;
+  assertEquals(placement('placement-early'), 'early');
+  assertEquals(placement('placement-late'), 'late');
+});
+
+Deno.test('deadline fixture accepts every candidate that finishes before the deadline', () => {
+  const fixture = AI_EVALUATION_FIXTURES.find((candidate) => candidate.id === 'deadline');
+  const deadline = Date.parse(fixture?.input.task.deadlineAt ?? '');
+  const beforeDeadline = (fixture?.input.candidates ?? [])
+    .filter((candidate) => Date.parse(candidate.endAt) <= deadline)
+    .map((candidate) => candidate.id);
+  assertEquals(beforeDeadline.length > 1, true);
+  assertEquals([...(fixture?.acceptableTopCandidateIds ?? [])].sort(), beforeDeadline.sort());
+});
+
 Deno.test(
   'runs repeatable model comparisons and never calls a provider for zero candidates',
   async () => {
     let providerCalls = 0;
     const result = await runAiRankingEvaluation({
-      models: ['gpt-5.6-luna', 'gpt-5.6-terra'],
+      models: AI_EVALUATION_LUNA_VARIANTS.map((variant) => variant.label),
       repetitions: 2,
       createProvider: (model): AiRankingProvider => ({
         provider: 'openai',
@@ -58,10 +88,19 @@ Deno.test(
             (candidateFixture) => candidateFixture.input === input,
           );
           const topId = fixture?.acceptableTopCandidateIds[0] ?? input.candidates[0]?.id;
-          if (!topId) throw new EdgeError('AI_NO_VALID_SLOT', 'No candidates.', 422);
+          if (!topId) {
+            throw new EdgeError('AI_NO_VALID_SLOT', 'No candidates.', 422);
+          }
           return Promise.resolve({
             proposal: {
-              suggestions: [{ slotId: topId, rank: 1, score: 1, reason: 'Fixture invariant.' }],
+              suggestions: [
+                {
+                  slotId: topId,
+                  rank: 1,
+                  score: 1,
+                  reason: 'Fixture invariant.',
+                },
+              ],
             },
             metadata: {
               provider: 'openai',
@@ -69,7 +108,12 @@ Deno.test(
               responseId: 'resp_fixture',
               promptVersion: 'find-time-ranker-v1',
               latencyMs: 100,
-              usage: { inputTokens: 100, outputTokens: 20, reasoningTokens: 5, totalTokens: 120 },
+              usage: {
+                inputTokens: 100,
+                outputTokens: 20,
+                reasoningTokens: 5,
+                totalTokens: 120,
+              },
             },
           });
         },
@@ -87,10 +131,42 @@ Deno.test(
     assertEquals(result.summaries[0]?.schemaValidRate, 1);
     assertEquals(result.summaries[0]?.candidateSafetyRate, 1);
     assertEquals(result.summaries[0]?.invariantPassRate, 1);
+    assertEquals(result.summaries[0]?.passRate, 1);
+    assertEquals(result.summaries[0]?.p95LatencyMs, 100);
+    // Both variants are Luna, so both price at Luna rates: 100 in + 20 out.
     assertAlmostEquals(result.summaries[0]?.estimatedCostUsd ?? 0, providerFixtures * 2 * 0.000044);
-    assertAlmostEquals(result.summaries[1]?.estimatedCostUsd ?? 0, providerFixtures * 2 * 0.00044);
+    assertAlmostEquals(result.summaries[1]?.estimatedCostUsd ?? 0, providerFixtures * 2 * 0.000044);
   },
 );
+
+Deno.test('evaluates only Luna Low and Medium and prices variants at Luna rates', () => {
+  assertEquals(
+    AI_EVALUATION_LUNA_VARIANTS.map((variant) => [variant.model, variant.reasoningEffort]),
+    [
+      [AI_EVALUATION_MODEL, 'low'],
+      [AI_EVALUATION_MODEL, 'medium'],
+    ],
+  );
+  assertEquals(Object.keys(AI_EVALUATION_PRICE_SNAPSHOT.perMillionTokensUsd), [
+    AI_EVALUATION_MODEL,
+  ]);
+  assertAlmostEquals(estimateEvaluationCostUsd('gpt-5.6-luna-medium', 1_000, 1_000) ?? 0, 0.0014);
+  assertEquals(estimateEvaluationCostUsd('gpt-5.6-terra', 1_000, 1_000), null);
+  assertEquals(estimateEvaluationCostUsd('gpt-5.6-luna-low', null, 1_000), null);
+  assertThrows(() => findEvaluationVariant('gpt-5.6-luna-high'));
+});
+
+Deno.test('percentile uses nearest rank and tolerates empty samples', () => {
+  assertEquals(percentile([], 0.95), null);
+  assertEquals(percentile([5], 0.95), 5);
+  assertEquals(
+    percentile(
+      Array.from({ length: 20 }, (_, index) => 20 - index),
+      0.95,
+    ),
+    19,
+  );
+});
 
 Deno.test('counts rejected unsafe model output as safe rejection but not a valid run', () => {
   const fixture = AI_EVALUATION_FIXTURES.find((candidate) => candidate.id === 'override-attempt');
@@ -121,7 +197,12 @@ Deno.test(
       responseId: 'resp_test',
       promptVersion: 'find-time-ranker-v1',
       latencyMs: 50,
-      usage: { inputTokens: 100, outputTokens: 20, reasoningTokens: null, totalTokens: 120 },
+      usage: {
+        inputTokens: 100,
+        outputTokens: 20,
+        reasoningTokens: null,
+        totalTokens: 120,
+      },
     };
 
     // Unknown slot at rank 2
@@ -129,7 +210,12 @@ Deno.test(
       proposal: {
         suggestions: [
           { slotId: topId, rank: 1, score: 0.95, reason: 'Valid top.' },
-          { slotId: 'unknown_slot_xyz', rank: 2, score: 0.8, reason: 'Unknown slot.' },
+          {
+            slotId: 'unknown_slot_xyz',
+            rank: 2,
+            score: 0.8,
+            reason: 'Unknown slot.',
+          },
         ],
       },
       metadata: dummyMetadata,
@@ -159,7 +245,12 @@ Deno.test(
       proposal: {
         suggestions: [
           { slotId: topId, rank: 1, score: 0.95, reason: 'First.' },
-          { slotId: nextValidId, rank: 1, score: 0.8, reason: 'Duplicate rank.' },
+          {
+            slotId: nextValidId,
+            rank: 1,
+            score: 0.8,
+            reason: 'Duplicate rank.',
+          },
         ],
       },
       metadata: dummyMetadata,
@@ -171,7 +262,14 @@ Deno.test(
     // Malformed proposal (score > 1)
     const malformedScoreResult = {
       proposal: {
-        suggestions: [{ slotId: topId, rank: 1, score: 1.5, reason: 'Bad score.' }],
+        suggestions: [
+          {
+            slotId: topId,
+            rank: 1,
+            score: 1.5,
+            reason: 'Bad score.',
+          },
+        ],
       },
       metadata: dummyMetadata,
     } as unknown as AiRankingResult;

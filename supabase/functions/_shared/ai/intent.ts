@@ -1,5 +1,6 @@
 import {
   isValidCalendarDate,
+  occasionIntentSchema,
   schedulingIntentSchema,
   type SchedulingIntent,
   type WeekdayName,
@@ -7,7 +8,9 @@ import {
 
 import { EdgeError } from '../errors/index.ts';
 
-export const AI_INTENT_PROMPT_VERSION = 'find-time-intent-v1';
+export const AI_INTENT_PROMPT_VERSION = 'find-time-intent-v2';
+
+const IMPOSSIBLE_DATE_QUESTION = "That date doesn't exist. Which date did you mean?";
 
 export interface AiIntentUsage {
   inputTokens: number | null;
@@ -48,6 +51,7 @@ const INTENT_KEYS = [
   'duration',
   'date',
   'time',
+  'occasion',
   'location',
   'description',
   'requiresClarification',
@@ -177,6 +181,14 @@ export const AI_INTENT_JSON_SCHEMA = {
       ],
       additionalProperties: false,
     },
+    occasion: {
+      anyOf: [
+        { type: 'string', enum: ['breakfast', 'brunch', 'lunch', 'dinner', 'drinks'] },
+        { type: 'null' },
+      ],
+      description:
+        'The meal or social occasion the event itself is, if named (e.g. "dinner with Sam"), or null.',
+    },
     location: {
       anyOf: [{ type: 'string', maxLength: 200 }, { type: 'null' }],
       description:
@@ -202,6 +214,7 @@ export const AI_INTENT_JSON_SCHEMA = {
     'duration',
     'date',
     'time',
+    'occasion',
     'location',
     'description',
     'requiresClarification',
@@ -262,7 +275,16 @@ RULES:
    - "between_times": "between 2 and 4pm" -> startHour, startMinute, endHour, endMinute.
    - "time_of_day": "morning", "afternoon", "evening".
      - Note: "toward the end of this weekend" is a date preference (weekend late), NOT a time_of_day preference.
+     - "tonight" -> date "today" with time_of_day "evening".
    - "unconstrained": no time specified.
+   - Never invent a clock time from a meal or occasion: "dinner tomorrow" has time "unconstrained" (or time_of_day only if the user also said morning/afternoon/evening/tonight).
+   - A clock time the user states is always kept exactly as stated, even if it is unusual for the occasion: "dinner with Andrew at 3 PM" -> exact_time 15:00; "breakfast meeting at 1 PM" -> exact_time 13:00. Do not correct or reinterpret it, and do not ask for clarification because of it.
+
+4b. Occasion:
+   - "occasion": "breakfast", "brunch", "lunch", "dinner", or "drinks" when the event itself is that meal or occasion ("dinner with Andrew", "lunch meeting", "grab drinks tonight", "coffee and breakfast with Priya" -> breakfast).
+   - Keep the occasion even when a clock time is also given ("dinner at 3 PM" -> occasion "dinner", exact_time 15:00).
+   - A meal used only as a reference point is NOT an occasion: "before lunch" -> before_time 12:00 with occasion null.
+   - Otherwise occasion must be null. Only these five values exist; do not map other words (e.g. "coffee" alone) onto them.
 
 5. Location & Description:
    - "location": physical or virtual location (e.g. "Paramus office", "Zoom", "Starbucks").
@@ -370,6 +392,7 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
 
   // Convert and strictly validate date
   let date: SchedulingIntent['date'];
+  let impossibleDate = false;
   const d = requireRecord(raw.date, 'Date intent');
   rejectUnexpectedKeys(d, DATE_KEYS, 'date');
   validateOptionalEnum(d, 'weekday', [
@@ -440,24 +463,24 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
       modifier,
       preference,
     };
-  } else if (d.type === 'explicit_date') {
-    if (typeof d.date !== 'string' || !isValidCalendarDate(d.date)) {
+  } else if (d.type === 'explicit_date' || d.type === 'week_of') {
+    if (typeof d.date !== 'string') {
       throw new EdgeError(
         'AI_INVALID_OUTPUT',
-        'Explicit date intent requires a valid calendar date in YYYY-MM-DD format.',
+        'Explicit date intent requires a calendar date in YYYY-MM-DD format.',
         502,
       );
     }
-    date = { type: 'explicit_date', date: d.date };
-  } else if (d.type === 'week_of') {
-    if (typeof d.date !== 'string' || !isValidCalendarDate(d.date)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Week-of date intent requires a valid calendar date in YYYY-MM-DD format.',
-        502,
-      );
+    if (!isValidCalendarDate(d.date)) {
+      // A well-formed but nonexistent date ("February 30th") is a user error,
+      // not a model failure: ask which date was meant instead of failing.
+      impossibleDate = true;
+      date = { type: 'unconstrained' };
+    } else if (d.type === 'explicit_date') {
+      date = { type: 'explicit_date', date: d.date };
+    } else {
+      date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
     }
-    date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
   } else {
     throw new EdgeError(
       'AI_INVALID_OUTPUT',
@@ -466,10 +489,27 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
+  const rawOccasion = raw.occasion;
+  const occasion = rawOccasion === null ? null : occasionIntentSchema.safeParse(rawOccasion);
+  if (occasion !== null && !occasion.success) {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Intent field occasion is invalid.', 502);
+  }
+
   // Convert and strictly validate time
   let time: SchedulingIntent['time'];
-  const t = requireRecord(raw.time, 'Time intent');
+  const t = { ...requireRecord(raw.time, 'Time intent') };
   rejectUnexpectedKeys(t, TIME_KEYS, 'time');
+  // An hour-only phrase ("after 4") means on the hour; the flattened schema
+  // lets the model emit a null minute, which is not a reason to fail.
+  for (const [hourKey, minuteKey] of [
+    ['hour', 'minute'],
+    ['startHour', 'startMinute'],
+    ['endHour', 'endMinute'],
+  ] as const) {
+    if (typeof t[hourKey] === 'number' && (t[minuteKey] === null || t[minuteKey] === undefined)) {
+      t[minuteKey] = 0;
+    }
+  }
   for (const key of [
     'hour',
     'minute',
@@ -568,11 +608,15 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  const requiresClarification = raw.requiresClarification;
-  const clarificationQuestion =
+  const requiresClarification = raw.requiresClarification || impossibleDate;
+  const modelQuestion =
     typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
       ? raw.clarificationQuestion.trim()
       : null;
+  const clarificationQuestion =
+    impossibleDate && !(raw.requiresClarification && modelQuestion)
+      ? IMPOSSIBLE_DATE_QUESTION
+      : modelQuestion;
 
   if (requiresClarification && !clarificationQuestion) {
     throw new EdgeError(
@@ -587,6 +631,7 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     duration,
     date,
     time,
+    occasion: occasion === null ? null : occasion.data,
     location: typeof raw.location === 'string' && raw.location.trim() ? raw.location.trim() : null,
     description:
       typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null,

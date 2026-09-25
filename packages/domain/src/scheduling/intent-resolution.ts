@@ -8,6 +8,7 @@ import {
   type WorkingHours,
 } from '@cal/schemas/scheduling';
 
+import { formatClockTime, OCCASION_LABELS } from './semantic-time.ts';
 import {
   addZonedDays,
   getZonedParts,
@@ -353,13 +354,6 @@ export function timeOfDayFromHour(hour: number): TimeOfDayPreference {
   return 'evening';
 }
 
-function formatClockTime(hour: number, minute: number): string {
-  const period = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  const displayMinute = minute.toString().padStart(2, '0');
-  return `${displayHour}:${displayMinute} ${period}`;
-}
-
 /** Formats a duration into human text (e.g. "1 hr 30 min", "45 min", "1 hr – 2 hr"). */
 export function formatIntentDurationLabel(duration: DurationIntent | null): string {
   if (!duration) return '30 min';
@@ -470,6 +464,14 @@ export function formatIntentTimeLabel(timeIntent: TimeIntent): string | null {
   }
 }
 
+/** "Dinner", "At 3:00 PM", or both when an occasion comes with a clock time. */
+function formatReadbackTimeLabel(intent: SchedulingIntent): string | null {
+  const timeLabel = formatIntentTimeLabel(intent.time);
+  const occasionLabel = intent.occasion ? OCCASION_LABELS[intent.occasion] : null;
+  if (occasionLabel && timeLabel) return `${occasionLabel} · ${timeLabel}`;
+  return occasionLabel ?? timeLabel;
+}
+
 /** Generates clean readback metadata for the UI from interpreted intent. */
 export function generateIntentReadback(intent: SchedulingIntent): {
   title: string;
@@ -485,7 +487,7 @@ export function generateIntentReadback(intent: SchedulingIntent): {
     durationMinutes: intent.duration ? resolvedDuration.durationMinutes : null,
     durationLabel: formatIntentDurationLabel(intent.duration),
     dateLabel: formatIntentDateLabel(intent.date),
-    timeLabel: formatIntentTimeLabel(intent.time),
+    timeLabel: formatReadbackTimeLabel(intent),
     location: intent.location,
   };
 }

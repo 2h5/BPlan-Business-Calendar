@@ -22,6 +22,12 @@ const IDS = {
   spacious: 'candidate_64c98bd1',
   crowded: 'candidate_aa7205e4',
   long: 'candidate_4e1fb890',
+  monday: 'candidate_9c21e7b4',
+  wednesday: 'candidate_2f8d06ac',
+  friday: 'candidate_d35b1e97',
+  morningDefault: 'candidate_71e0c4a2',
+  afternoonLong: 'candidate_e58a93f0',
+  afternoonMid: 'candidate_0b6fd27c',
 } as const;
 
 const standardCandidates = [
@@ -34,19 +40,36 @@ const standardCandidates = [
 ];
 
 export const AI_EVALUATION_FIXTURES: readonly AiEvaluationFixture[] = [
-  fixture('earliest', 'Choose the obvious earliest valid slot.', 'any', [IDS.early], {
-    note: 'Choose the earliest valid option.',
-  }),
-  fixture('latest', 'Honor an explicit latest-valid preference.', 'any', [IDS.late], {
-    note: 'Choose the latest valid option.',
-  }),
+  {
+    id: 'placement-early',
+    description: 'Honor an early placement preference across an otherwise equal week.',
+    input: input({
+      placementPreference: 'early',
+      deadlineAt: null,
+      priority: 'normal',
+      candidates: [
+        candidate(IDS.monday, '2026-09-14', 10 * 60, 60, 60, 60),
+        candidate(IDS.wednesday, '2026-09-16', 10 * 60, 60, 60, 60),
+        candidate(IDS.friday, '2026-09-18', 10 * 60, 60, 60, 60),
+      ],
+    }),
+    acceptableTopCandidateIds: [IDS.monday],
+  },
   fixture('morning', 'Prefer a morning slot.', 'morning', [IDS.early, IDS.morning]),
   fixture('afternoon', 'Prefer an afternoon slot.', 'afternoon', [IDS.noon, IDS.afternoon]),
   fixture('evening', 'Prefer an evening slot.', 'evening', [IDS.evening, IDS.late]),
-  fixture('deadline', 'Prioritize urgency near the deadline.', 'any', [IDS.early], {
-    deadlineAt: '2026-09-08T11:00:00.000Z',
-    priority: 'urgent',
-  }),
+  // Urgency means finishing before the deadline, not "as early as possible":
+  // both slots that end by 11:00 are acceptable, so gaps may break the tie.
+  fixture(
+    'deadline',
+    'Prefer any slot that finishes before an urgent deadline.',
+    'any',
+    [IDS.early, IDS.morning],
+    {
+      deadlineAt: '2026-09-08T11:00:00.000Z',
+      priority: 'urgent',
+    },
+  ),
   fixture('equivalent', 'Allow several equally strong candidates.', 'any', [
     IDS.early,
     IDS.morning,
@@ -100,6 +123,36 @@ export const AI_EVALUATION_FIXTURES: readonly AiEvaluationFixture[] = [
     IDS.morning,
   ]),
   {
+    id: 'placement-late',
+    description: 'Honor a late placement preference across an otherwise equal week.',
+    input: input({
+      placementPreference: 'late',
+      deadlineAt: null,
+      priority: 'normal',
+      candidates: [
+        candidate(IDS.monday, '2026-09-14', 10 * 60, 60, 60, 60),
+        candidate(IDS.wednesday, '2026-09-16', 10 * 60, 60, 60, 60),
+        candidate(IDS.friday, '2026-09-18', 10 * 60, 60, 60, 60),
+      ],
+    }),
+    acceptableTopCandidateIds: [IDS.friday],
+  },
+  {
+    id: 'allowed-durations',
+    description: 'Do not reject supplied longer duration choices in favor of the default.',
+    input: input({
+      preferredTimeOfDay: 'afternoon',
+      durationMinutes: 60,
+      allowedDurationsMinutes: [60, 90, 120],
+      candidates: [
+        candidate(IDS.morningDefault, '2026-09-08', 9 * 60, 60, 60, 60),
+        candidate(IDS.afternoonLong, '2026-09-08', 14 * 60, 120, 60, 60),
+        candidate(IDS.afternoonMid, '2026-09-08', 14 * 60, 90, 60, 90),
+      ],
+    }),
+    acceptableTopCandidateIds: [IDS.afternoonLong, IDS.afternoonMid],
+  },
+  {
     id: 'zero-candidates',
     description: 'Make no provider request when deterministic generation found no candidates.',
     input: input({ candidates: [] }),
@@ -143,8 +196,15 @@ function input(
       title: overrides.title ?? 'Prepare the launch plan',
       priority: overrides.priority ?? 'high',
       durationMinutes: overrides.durationMinutes ?? 60,
-      deadlineAt: overrides.deadlineAt ?? '2026-09-09T21:00:00.000Z',
+      deadlineAt:
+        overrides.deadlineAt === undefined ? '2026-09-09T21:00:00.000Z' : overrides.deadlineAt,
     },
+    ...(overrides.allowedDurationsMinutes
+      ? { allowedDurationsMinutes: overrides.allowedDurationsMinutes }
+      : {}),
+    ...(overrides.placementPreference
+      ? { placementPreference: overrides.placementPreference }
+      : {}),
     note: overrides.note ?? null,
     timezone: overrides.timezone ?? 'UTC',
     preferredTimeOfDay: overrides.preferredTimeOfDay ?? 'any',
