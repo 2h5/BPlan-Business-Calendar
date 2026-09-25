@@ -108,3 +108,14 @@ jobs:
             diff /tmp/database.types.ts packages/types/src/database.types.ts || true
             exit 1
           fi
+
+      # plpgsql_check follows the scheduled-job installers' constant EXECUTE
+      # strings into the cron schema. Hosted projects enable pg_cron/pg_net
+      # before installing schedules, so lint against the same shape. Last step:
+      # it changes the throwaway CI database.
+      - name: Lint database functions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 \
+            -c 'create extension if not exists pg_cron' \
+            -c 'create extension if not exists pg_net'
+          supabase db lint --level warning --fail-on warning
