@@ -12,14 +12,10 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-import {
-  formatDurationBetweenTimes,
-  QuickCreateDatePicker,
-  QuickCreateTimePicker,
-  type TimePickerOption,
-} from './QuickCreatePickers';
+import { QuickCreateEventFields } from './QuickCreateEventFields';
+import { formatDurationBetweenTimes, type TimePickerOption } from './QuickCreatePickers';
 import styles from './QuickCreatePopover.module.css';
-import { Select } from '../../../components/forms/Select';
+import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
 import { useFollowAnchorMotion } from '../hooks/useFollowAnchorMotion';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
@@ -801,320 +797,49 @@ export function QuickCreatePopover({
           )}
 
           {mode === 'event' ? (
-            <>
-              {/* Event Date & Time */}
-              <div className={styles.fieldRowTopAligned}>
-                <span className={styles.fieldIconTop} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </span>
-
-                <div className={styles.dateTimeContainer}>
-                  <div className={styles.dateTimeRow}>
-                    <QuickCreateDatePicker
-                      value={startDate}
-                      displayValue={formatDateDisplay(startDate)}
-                      onChange={(value) => {
-                        setStartDate(value);
-                        if (endDate < value) setEndDate(value);
-                      }}
-                      ariaLabel={`Date: ${formatDateDisplay(startDate)}`}
-                    />
-
-                    <div
-                      className={`${styles.timeRange} ${allDay ? styles.timeRangeHidden : ''}`}
-                      aria-hidden={allDay}
-                    >
-                      <div className={styles.timeBoxWrapper}>
-                        <QuickCreateTimePicker
-                          value={startTime}
-                          options={startTimeOptions}
-                          onChange={handleStartTimeChange}
-                          ariaLabel="Start time"
-                          disabled={allDay}
-                        />
-                      </div>
-
-                      <span className={styles.timeSeparator}>–</span>
-
-                      <div className={styles.timeBoxWrapper}>
-                        <QuickCreateTimePicker
-                          value={endTime}
-                          options={endTimePickerOptions}
-                          onChange={setEndTime}
-                          ariaLabel="End time"
-                          disabled={allDay}
-                          menuWidth={188}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.allDayRow}>
-                    <label className={styles.allDayCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={allDay}
-                        onChange={(e) => setAllDay(e.target.checked)}
-                      />
-                      <span>All day</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Calendar Selector */}
-              <div className={styles.fieldRow}>
-                <span
-                  className={styles.fieldIcon}
-                  aria-hidden="true"
-                  style={{ color: selectedCalendar?.color ?? undefined }}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                </span>
-
-                <div className={styles.calendarSelect}>
-                  <Select
-                    id="quick-create-calendar"
-                    value={calendarId || defaultCalendar?.id || ''}
-                    options={writableCals.map((cal) => ({
-                      value: cal.id,
-                      label: cal.name,
-                      color: cal.color,
-                    }))}
-                    onChange={(val) => setCalendarId(val)}
-                    size="sm"
-                    ariaLabel="Choose calendar"
-                  />
-                </div>
-              </div>
-
-              {/* Location (always opened by default) */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  placeholder="Add location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  aria-label="Location"
-                />
-              </div>
-
-              {/* Description (always opened by default) */}
-              <div className={styles.fieldRowTopAligned}>
-                <span className={styles.fieldIconTop} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <line x1="3" y1="12" x2="21" y2="12" />
-                    <line x1="3" y1="18" x2="15" y2="18" />
-                  </svg>
-                </span>
-                <textarea
-                  className={styles.textareaInput}
-                  placeholder="Add description"
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  aria-label="Description"
-                />
-              </div>
-            </>
+            <QuickCreateEventFields
+              startDate={startDate}
+              startDateDisplay={formatDateDisplay(startDate)}
+              onStartDateChange={(value) => {
+                setStartDate(value);
+                if (endDate < value) setEndDate(value);
+              }}
+              startTime={startTime}
+              startTimeOptions={startTimeOptions}
+              onStartTimeChange={handleStartTimeChange}
+              endTime={endTime}
+              endTimePickerOptions={endTimePickerOptions}
+              onEndTimeChange={setEndTime}
+              allDay={allDay}
+              onAllDayChange={setAllDay}
+              writableCalendars={writableCals}
+              selectedCalendarColor={selectedCalendar?.color}
+              calendarId={calendarId}
+              defaultCalendarId={defaultCalendar?.id ?? ''}
+              onCalendarChange={setCalendarId}
+              location={location}
+              onLocationChange={setLocation}
+              description={description}
+              onDescriptionChange={setDescription}
+            />
           ) : (
-            <>
-              {/* Task Mode Details */}
-              <div className={styles.fieldRowTopAligned}>
-                <span className={styles.fieldIconTop} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                </span>
-
-                <div className={styles.dateTimeContainer}>
-                  <div className={styles.dateTimeRow}>
-                    <QuickCreateDatePicker
-                      value={startDate}
-                      displayValue={formatDateDisplay(startDate)}
-                      onChange={setStartDate}
-                      ariaLabel={`Due date: ${formatDateDisplay(startDate)}`}
-                    />
-
-                    {taskHasTime ? (
-                      <div className={styles.timeBoxWrapper}>
-                        <QuickCreateTimePicker
-                          value={startTime}
-                          options={startTimeOptions}
-                          onChange={setStartTime}
-                          ariaLabel="Due time"
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className={styles.allDayRow}>
-                    <label className={styles.allDayCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={taskHasTime}
-                        onChange={(e) => setTaskHasTime(e.target.checked)}
-                      />
-                      <span>Set time</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Task List Selector */}
-              {taskLists && taskLists.length > 0 && (
-                <div className={styles.fieldRow}>
-                  <span
-                    className={styles.fieldIcon}
-                    aria-hidden="true"
-                    style={{
-                      color:
-                        taskLists.find((l) => l.id === (selectedListId || taskLists[0]?.id))
-                          ?.color ?? undefined,
-                    }}
-                  >
-                    <svg
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <line x1="8" y1="6" x2="21" y2="6" />
-                      <line x1="8" y1="12" x2="21" y2="12" />
-                      <line x1="8" y1="18" x2="21" y2="18" />
-                      <line x1="3" y1="6" x2="3.01" y2="6" />
-                      <line x1="3" y1="12" x2="3.01" y2="12" />
-                      <line x1="3" y1="18" x2="3.01" y2="18" />
-                    </svg>
-                  </span>
-
-                  <div className={styles.calendarSelect}>
-                    <Select
-                      id="quick-create-task-list"
-                      value={selectedListId || taskLists[0]?.id || ''}
-                      options={taskLists.map((list) => ({
-                        value: list.id,
-                        label: list.name,
-                        color: list.color,
-                      }))}
-                      onChange={(val) => setSelectedListId(val)}
-                      size="sm"
-                      ariaLabel="Choose task list"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Priority */}
-              <div className={styles.fieldRow}>
-                <span className={styles.fieldIcon} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-                    <line x1="4" y1="22" x2="4" y2="15" />
-                  </svg>
-                </span>
-
-                <div className={styles.priorityGroup} role="group" aria-label="Task priority">
-                  {(['low', 'normal', 'high', 'urgent'] as const).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`${styles.priorityButton} ${taskPriority === p ? styles.priorityButtonActive : ''}`}
-                      onClick={() => setTaskPriority(p)}
-                    >
-                      {p.charAt(0).toUpperCase() + p.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Task Description (always opened by default) */}
-              <div className={styles.fieldRowTopAligned}>
-                <span className={styles.fieldIconTop} aria-hidden="true">
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <line x1="3" y1="12" x2="21" y2="12" />
-                    <line x1="3" y1="18" x2="15" y2="18" />
-                  </svg>
-                </span>
-                <textarea
-                  className={styles.textareaInput}
-                  placeholder="Add description"
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  aria-label="Description"
-                />
-              </div>
-            </>
+            <QuickCreateTaskFields
+              startDate={startDate}
+              startDateDisplay={formatDateDisplay(startDate)}
+              onStartDateChange={setStartDate}
+              startTime={startTime}
+              startTimeOptions={startTimeOptions}
+              onStartTimeChange={setStartTime}
+              taskHasTime={taskHasTime}
+              onTaskHasTimeChange={setTaskHasTime}
+              taskLists={taskLists}
+              selectedListId={selectedListId}
+              onSelectedListChange={setSelectedListId}
+              taskPriority={taskPriority}
+              onTaskPriorityChange={setTaskPriority}
+              description={description}
+              onDescriptionChange={setDescription}
+            />
           )}
         </form>
 
