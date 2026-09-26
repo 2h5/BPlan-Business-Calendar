@@ -6,6 +6,8 @@ import styles from './CalendarView.module.css';
 import { EventButton } from './EventButton';
 import { OriginGhost } from './OriginGhost';
 import type { AnchorRect } from './QuickCreatePopover';
+import { TimelineAllDayRow } from './TimelineAllDayRow';
+import { TimelineDraftEvent } from './TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { dateKeyToInstant } from '../utils/calendar-window';
 import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
@@ -1148,64 +1150,15 @@ export function TimelineView({
         </div>
 
         {hasAllDay ? (
-          <>
-            <div className={styles.allDayLabel}>all-day</div>
-            <div className={styles.allDayGrid}>
-              {dateKeys.map((dateKey) => (
-                <div
-                  key={dateKey}
-                  className={styles.allDayColumn}
-                  onClick={(e) => {
-                    if ((e.target as HTMLElement).closest(`.${styles.timelineEvent}`)) return;
-                    if (onSelectSlot) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      onSelectSlot({
-                        dateKey,
-                        allDay: true,
-                        anchorRect: {
-                          top: rect.top,
-                          bottom: rect.bottom,
-                          left: rect.left,
-                          right: rect.right,
-                          width: rect.width,
-                          height: rect.height,
-                        },
-                      });
-                    }
-                  }}
-                >
-                  {(allDayByDate.get(dateKey) ?? []).map((occurrence) => (
-                    <EventButton
-                      key={occurrence.key}
-                      occurrence={occurrence}
-                      timeZone={timeZone}
-                      hourCycle={hourCycle}
-                      compact
-                      onSelect={(anchorRect) => onSelectEvent(occurrence, anchorRect)}
-                    />
-                  ))}
-                  {draftEvent && draftEvent.dateKey === dateKey && draftEvent.allDay && (
-                    <div
-                      className={`${styles.timelineEvent} ${styles.timelineEventCompact} ${styles.monthEventDraft} ${
-                        draftEvent.isClosing
-                          ? styles.monthEventDraftClosing
-                          : styles.monthEventDraftEntering
-                      }`}
-                      style={
-                        {
-                          '--event-color': draftEvent.calendarColor || 'var(--color-accent)',
-                        } as React.CSSProperties
-                      }
-                    >
-                      <span className={styles.timelineEventTitle}>
-                        {draftEvent.title || '(New event)'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
+          <TimelineAllDayRow
+            dateKeys={dateKeys}
+            allDayByDate={allDayByDate}
+            timeZone={timeZone}
+            hourCycle={hourCycle}
+            draftEvent={draftEvent}
+            onSelectEvent={onSelectEvent}
+            onSelectSlot={onSelectSlot}
+          />
         ) : null}
 
         <div className={styles.hourLabels}>
@@ -1304,37 +1257,16 @@ export function TimelineView({
                   draftEvent.startMinute !== undefined &&
                   draftEvent.endMinute !== undefined &&
                   !dragSelection && (
-                    <div
-                      data-quick-create-draft="true"
-                      className={`${styles.draftTimelineEvent} ${
-                        draftEvent.isClosing
-                          ? styles.draftTimelineEventBubbleExit
-                          : styles.draftTimelineEventBubbleEnter
-                      }`}
-                      style={
-                        {
-                          top: (draftEvent.startMinute / 60) * hourHeight,
-                          ...(draftPlacement && {
-                            left: `calc(${draftPlacement.left * 100}% + 2px)`,
-                            width: `calc(${draftPlacement.width * 100}% - 4px)`,
-                            right: 'auto',
-                          }),
-                          height: Math.max(
-                            22,
-                            ((draftEvent.endMinute - draftEvent.startMinute) / 60) * hourHeight - 2,
-                          ),
-                          '--event-color': draftEvent.calendarColor || 'var(--color-accent)',
-                        } as React.CSSProperties
-                      }
-                    >
-                      <span className={styles.draftTimelineEventTitle}>
-                        {draftEvent.title || '(New event)'}
-                      </span>
-                      <span className={styles.draftTimelineEventTime}>
-                        {formatMinute(draftEvent.startMinute, hourCycle)} –{' '}
-                        {formatMinute(draftEvent.endMinute, hourCycle)}
-                      </span>
-                    </div>
+                    <TimelineDraftEvent
+                      startMinute={draftEvent.startMinute}
+                      endMinute={draftEvent.endMinute}
+                      placement={draftPlacement}
+                      hourHeight={hourHeight}
+                      hourCycle={hourCycle}
+                      title={draftEvent.title}
+                      calendarColor={draftEvent.calendarColor}
+                      isClosing={draftEvent.isClosing}
+                    />
                   )}
                 {((isDraggingMove && activeMove && activeMove.originalDateKey === dateKey) ||
                   (exitingGhost && exitingGhost.dateKey === dateKey)) && (

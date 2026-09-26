@@ -89,8 +89,8 @@ All paths are under `apps/web/src/features/calendar/`.
 | `components/EventButton.tsx`          | `EventButton` + `EventButtonProps` — event block presentation (resp. 3).                                                                                                                                                                        | 1 ✅  |
 | `components/OriginGhost.tsx`          | `OriginGhost` + `OriginGhostProps` (resp. 4).                                                                                                                                                                                                   | 1 ✅  |
 | `utils/timeline-day-layout.ts`        | Pure per-day layout (resp. 10): day filtering, override/preview projection, visible interval, gesture ordering, draft slot, `layoutOverlappingEvents`, `sortByRenderOrder`, per-event minute geometry. Takes gesture snapshots as plain inputs. | 2 ✅  |
-| `components/TimelineDraftEvent.tsx`   | Timed draft block and all-day draft chip (resp. 9) — both render `DraftEventState` with the same colour/title fallback.                                                                                                                         | 3     |
-| `components/TimelineAllDayRow.tsx`    | All-day label + grid, click-to-create all-day slot, compact `EventButton`s, draft chip (resp. 8).                                                                                                                                               | 3     |
+| `components/TimelineDraftEvent.tsx`   | Timed draft block and all-day draft chip (resp. 9) — both render `DraftEventState` with the same colour/title fallback.                                                                                                                         | 3 ✅  |
+| `components/TimelineAllDayRow.tsx`    | All-day label + grid, click-to-create all-day slot, compact `EventButton`s, draft chip (resp. 8).                                                                                                                                               | 3 ✅  |
 | `hooks/useTimelineSlotSelection.ts`   | `dragSelection` state, press/hold timer, column pointer handlers, anchor rect (resp. 11). Pure snapping maths goes to `utils/slot-selection.ts` so `slot-selection.test.ts` can test the production code.                                       | 4     |
 | `hooks/useTimelineInitialScroll.ts`   | Scroll-key memo + `initialScrollHour` effect (resp. 6). Only if still worth a file after phase 4; otherwise stays inline.                                                                                                                       | 4     |
 | `hooks/useTimelineGestureFeedback.ts` | Magnetic snap, conflict flag, snap direction, settle timer, exiting-ghost timer, click-suppression ref + release, their unmount cleanup (resp. 14). Shared by move and resize.                                                                  | 5     |
@@ -164,7 +164,7 @@ everything.
 | --- | ---------------------------------------------------------------- | -------- |
 | 1   | Presentational extraction: formatters, `EventButton`, ghost      | complete |
 | 2   | Pure per-day layout (`timeline-day-layout.ts`) + unit tests      | complete |
-| 3   | Draft event + all-day row components                             | pending  |
+| 3   | Draft event + all-day row components                             | complete |
 | 4   | Slot selection hook (+ pure `slot-selection.ts`), initial scroll | pending  |
 | 5   | Shared gesture feedback hook                                     | pending  |
 | 6   | Shared auto-scroll hook                                          | pending  |
@@ -293,19 +293,148 @@ Verification:
 
 Discoveries: see item 7 below (cross-day ordering uses original minutes).
 
-### Phase 3 — Draft + all-day row components · pending
+### Phase 3 — Draft + all-day row components · complete
 
-`TimelineDraftEvent.tsx` (timed draft block, all-day draft chip) and
-`TimelineAllDayRow.tsx`. Pure props-in rendering; `onSelectSlot` /
-`onSelectEvent` passed through.
+Commit: `refactor(web): extract TimelineView draft and all-day row (phase 3)`
+on `refactor/timeline-view` (the commit that adds this section).
 
-### Phase 4 — Slot selection · pending
+Moved the remaining draft and all-day JSX out of `TimelineView`'s render into
+two props-driven components (no hooks, no context, no state):
 
-`useTimelineSlotSelection(hourHeight, defaultDurationMinutes, onSelectSlot)`
-returning `dragSelection` and `getColumnHandlers(dateKey)` (or the four
-handlers). Keep reading `dragSelection` from the render closure exactly as now.
-Move `snapToSlot`/range maths into `utils/slot-selection.ts` and point
-`slot-selection.test.ts` at it. Hold-timer cleanup moves into the hook.
+- `components/TimelineDraftEvent.tsx`
+  - `TimelineDraftEvent` — the timed quick-create block. Props: `startMinute`,
+    `endMinute`, `placement` (`layoutTimelineDay`'s `draftPlacement`, passed
+    through untouched), `hourHeight`, `hourCycle`, `title`, `calendarColor`,
+    `isClosing`. Owns `data-quick-create-draft="true"`, the
+    `draftTimelineEvent` + `BubbleEnter`/`BubbleExit` classes, top/height
+    (22 px minimum), the column `left`/`width`/`right: auto` override, the
+    `--event-color` fallback (`var(--color-accent)`), the `(New event)` title
+    fallback and the `start – end` time label.
+  - `TimelineAllDayDraft` — the all-day chip: `timelineEvent` +
+    `timelineEventCompact` + `monthEventDraft` + `Entering`/`Closing`, same
+    colour and title fallbacks.
+- `components/TimelineAllDayRow.tsx` — `TimelineAllDayRow` renders the
+  `all-day` label and `allDayGrid` as a fragment (both stay direct children of
+  the canvas grid), one `allDayColumn` per date key with compact
+  `EventButton`s (`onSelectEvent(occurrence, anchorRect)` unchanged), the
+  all-day draft chip, and the column click handler: the
+  `closest(\`.${styles.timelineEvent}\`)`guard, then`onSelectSlot({ dateKey,
+  allDay: true, anchorRect })` from the column's bounding rect.
+
+Responsibility removed from `TimelineView`: resp. 8 (all-day row) and the
+presentation half of resp. 9 (draft block/chip markup, fallbacks, classes,
+geometry). `TimelineView` still owns `allDayByDate`/`hasAllDay` (they also
+drive the canvas class), the `hasAllDay` gate around the row, and the timed
+draft visibility condition (`dateKey` match, not all-day, both minutes
+defined, no `dragSelection`). The draft's layout column still comes only from
+`layoutTimelineDay`.
+
+Design decisions:
+
+- **Visibility stays in the caller.** The timed draft's condition depends on
+  `dragSelection` (phase 4 state) and repeats the one inside
+  `layoutTimelineDay`; moving it into the component or sharing a predicate
+  with the layout would couple presentation to layout inputs. The component
+  takes already-narrowed `startMinute`/`endMinute: number`. The all-day chip's
+  condition (`dateKey` match and `allDay`) moved with the row, verbatim.
+- **Fields, not the whole `DraftEventState`,** are passed to the draft
+  components so they cannot render a draft the caller decided to hide.
+- Both draft variants share one file (and a private `DraftAppearance` props
+  type) because they share the fallbacks; the all-day chip is exported
+  separately for `TimelineAllDayRow`.
+- `TimelineAllDayRow` imports the `DraftEventState`/`SlotSelection` types from
+  `TimelineView` (type-only, same pattern as `MonthView`), so the public types
+  stay where consumers import them.
+- Prettier folded the time label's `–{' '}` line break into one `–` text
+  literal. Server markup is byte-identical (the existing `TimelineView` draft
+  tests and the new ones assert the exact text); on the client the label is
+  one fewer text node, with identical `textContent`.
+
+Files changed:
+
+- added `apps/web/src/features/calendar/components/TimelineDraftEvent.tsx`
+- added `apps/web/src/features/calendar/components/TimelineDraftEvent.test.tsx`
+  (4 tests: exact class/style/`data-quick-create-draft` markup with placement
+  and colour, fallback title/colour + no placement + 22 px minimum + exit
+  class + h23 label, all-day chip exact markup, all-day chip fallbacks while
+  closing)
+- added `apps/web/src/features/calendar/components/TimelineAllDayRow.tsx`
+- added `apps/web/src/features/calendar/components/TimelineAllDayRow.test.tsx`
+  (5 tests: label + one column per day + compact buttons, draft chip only in
+  its column and never for a timed draft, empty-space click → all-day slot
+  with the column's anchor rect and the exact `.timelineEvent` selector, click
+  inside `.timelineEvent` creates nothing, no `onSelectSlot` is a no-op). The
+  click tests call the column's `onClick` from the rendered element tree with
+  a stub event, because the web Vitest setup has no DOM environment.
+- changed `apps/web/src/features/calendar/components/TimelineView.tsx`
+  (1,498 → 1,430 lines): renders `<TimelineAllDayRow>` and
+  `<TimelineDraftEvent>`; no other change.
+- changed this tracker.
+
+Verification:
+
+- `vitest run` on the two new test files: 9/9.
+- `vitest run src/features/calendar`: 29 files / 252 tests pass (243 + 9).
+- web `tsc --noEmit`: clean (after typing a CSS-module key in a test regex).
+- `eslint apps/web/src/features/calendar`: clean. `prettier --check`: clean.
+- `pnpm verify`: pass — apps/web 59 test files / 431 tests, domain 22 / 348,
+  mobile 2 / 11, billing 10 / 201; web build succeeds.
+- Browser: not run (calendar route requires sign-in; see phase 1).
+
+Discoveries: see item 8 below (all-day draft hidden without all-day events).
+
+### Phase 4 — Slot selection · next
+
+Scope: resp. 11 (slot selection) and, conditionally, resp. 6 (initial scroll).
+No change to gestures, layout, drafts or the all-day row.
+
+1. **`utils/slot-selection.ts`** — pure maths lifted verbatim from the column
+   handlers, one function per expression so the handlers read the same:
+   - `pressStartMinute(offsetY, hourHeight)` —
+     `max(0, min(23*60+45, floor((y / hourHeight * 60) / 15) * 15))`.
+   - `dragMinute(offsetY, columnHeight, hourHeight)` — clamps `y` to
+     `[0, columnHeight]`, then `max(0, min(24*60, floor(raw / 15) * 15))`.
+   - `dragRange(startMinute, currentMinute)` — `{ startMinute: min, endMinute:
+min(24*60, max + 15) }`.
+   - `hasPointerMoved(dx, dy)` — `dx >= 6 || dy >= 6` (the click check is its
+     negation, as now: `< 6 && < 6`).
+   - `clickRange(startMinute, defaultDurationMinutes)` — end clamped to 24:00.
+   - `slotAnchorRect(colRect, startMinute, endMinute, hourHeight)` — 20 px
+     minimum height.
+   - Export `SLOT_HOLD_DELAY_MS = 180` (moved from `HOLD_DELAY_MS`).
+2. **Point `utils/slot-selection.test.ts` at production code** (discovery 5):
+   replace its private `snapToSlot`/`computeDragRange`/`formatMinute` copies
+   with the new exports and `timeline-format`'s `formatMinute`; keep every
+   existing expectation that still describes production behaviour, and add the
+   `24:00` label case. Any expectation that only held for the private copy is
+   recorded as a discovery, not "fixed" in production.
+3. **`hooks/useTimelineSlotSelection.ts`** —
+   `useTimelineSlotSelection({ hourHeight, defaultDurationMinutes,
+onSelectSlot })` returning `{ dragSelection, handleColumnPointerDown,
+handleColumnPointerMove, handleColumnPointerUp, handleColumnPointerCancel }`
+   with the current `(e, dateKey)` signatures. Owns `dragSelection` state,
+   `dragRef`, `holdTimerRef` and the hold timer's unmount cleanup (split out
+   of `TimelineView`'s shared unmount effect; the other three cleanups stay).
+   Handlers stay plain functions recreated each render — no `useCallback` —
+   so they keep reading `dragSelection` from the render closure (discovery 2).
+   The `.timelineEvent` `closest` guard, `e.button !== 0` check, pointer
+   capture/release (`try/catch`), and the `setDragSelection(null)` before
+   `onSelectSlot` stay in the same order.
+4. **`TimelineView`** calls the hook, keeps wiring the four handlers on each
+   `dayColumn`, keeps rendering the `dragSelectionIndicator` (not moved), and
+   keeps passing `hasDragSelection: Boolean(dragSelection)` to
+   `layoutTimelineDay` and the `!dragSelection` draft condition.
+5. **Initial scroll (conditional)** — move the scroll-key effect into
+   `hooks/useTimelineInitialScroll(scrollRef, { dateKeys, byDateKey,
+revealEventId, todayKey, now, timeZone, hourHeight })` only as a verbatim
+   move with the same dependency array and `initialScrollKeyRef`; it must stay
+   declared after the window-listener/Escape effects so effect order is
+   unchanged. If that ordering cannot be kept cleanly, leave it inline and
+   record why.
+6. **Tests/verification** — new `slot-selection` tests against production
+   code; all calendar tests; web `tsc`/eslint/prettier; `pnpm verify`. The
+   hook itself has no DOM test harness (no jsdom); its behaviour is covered by
+   the pure helpers plus the unchanged handler wiring, and any gap is recorded.
 
 ### Phases 5–9 — Gesture machinery · pending
 
@@ -358,6 +487,12 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
    ordered as if it started at its original time (e.g. a 9:30 event dragged to
    14:30 next to a 14:00 event keeps the left column). Pinned by a
    `timeline-day-layout` test; not changed.
+8. **An all-day draft is invisible when the view has no all-day events.**
+   The all-day row (and so the draft chip) only renders when `hasAllDay`, which
+   counts real all-day events only. Choosing "all-day" in quick create on a
+   week with no all-day events shows no chip. The draft chip also carries
+   `timelineEvent`, so clicking it never starts a second all-day slot (pinned
+   by a `TimelineAllDayRow` test). Not changed.
 
 ## Verification log
 
@@ -366,23 +501,23 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 | base  | `vitest run src/features/calendar`                                                                                                              | 25 files / 228 tests pass     |
 | 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline | all pass (232 calendar tests) |
 | 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                   | all pass (243 calendar tests) |
+| 3     | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                            | all pass (252 calendar tests) |
 
 ## Current checkpoint
 
-Phase 2 complete on `refactor/timeline-view`, replayed after the completed
-`web` work was merged into `main`. The old `web-refactor/timeline-view` branch
-remains a recovery reference. `TimelineView.tsx` is 1,498 lines and still owns responsibilities
-1, 5–9, 11–16 plus the render-side half of 10.
+Phase 3 complete on `refactor/timeline-view` (branched from merged `main`;
+phases 1–2 were replayed there, and the old `web-refactor/timeline-view`
+branch remains a recovery reference). `TimelineView.tsx` is 1,430 lines
+(1,916 at baseline) and still owns responsibilities 1, 5–7, 11–16, the
+render-side half of 10, and the draft visibility condition of 9.
 
 ## Next step
 
-Start **Phase 3**: extract `components/TimelineDraftEvent.tsx` (the timed
-draft block rendered in each day column, and the all-day draft chip) and
-`components/TimelineAllDayRow.tsx` (all-day label + grid, click-to-create
-all-day slot, compact `EventButton`s, draft chip). Pure props-in rendering;
-keep class names, `data-quick-create-draft`, and the `.timelineEvent`
-`closest` check on the all-day column exactly as they are. The timed draft
-takes `draftPlacement` from `layoutTimelineDay`.
+Start **Phase 4** exactly as planned under
+[Phase 4 — Slot selection](#phase-4--slot-selection--next): pure
+`utils/slot-selection.ts` + retargeted `slot-selection.test.ts`, then
+`hooks/useTimelineSlotSelection.ts`, then (conditionally) the initial-scroll
+hook.
 
 ---
 
