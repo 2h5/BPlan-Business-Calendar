@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './pages.module.css';
@@ -47,6 +47,28 @@ export function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const pricingDecals = usePricingDecalsExit();
+  const signInPanelRef = useRef<HTMLElement>(null);
+
+  const scrollToSignIn = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      !window.matchMedia('(max-width: 920px)').matches ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const panel = signInPanelRef.current;
+    if (!panel) return;
+
+    window.scrollTo({
+      top: window.scrollY + panel.getBoundingClientRect().top - 16,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  };
 
   const destination =
     (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/today';
@@ -63,7 +85,7 @@ export function SignInPage() {
 
   return (
     <div className={styles.loginPage}>
-      <PublicHeader />
+      <PublicHeader onAccountAction={scrollToSignIn} />
       {pricingDecals.isExiting ? (
         <PricingDecals mode="exit" onExited={pricingDecals.onExited} />
       ) : null}
@@ -97,7 +119,7 @@ export function SignInPage() {
           <CalendarPreview />
         </section>
 
-        <section className={styles.loginPanel} aria-label="Sign in to BPlan">
+        <section ref={signInPanelRef} className={styles.loginPanel} aria-label="Sign in to BPlan">
           <SignInForm onSuccess={() => navigate(destination, { replace: true })} />
 
           <div className={styles.providerStrip} aria-label="Supported calendar providers">

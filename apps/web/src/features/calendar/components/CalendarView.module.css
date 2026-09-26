@@ -2362,11 +2362,9 @@
 
   .toolbarControls {
     width: 100%;
-    justify-content: space-between;
-  }
-
-  .newEventButton {
-    order: 3;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: var(--space-2);
   }
 
   .rangeHeading {

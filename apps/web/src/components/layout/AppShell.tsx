@@ -376,6 +376,8 @@ export function AppShell() {
                 <NavLink
                   key={item.to}
                   to={item.to}
+                  aria-label={item.label}
+                  data-tooltip={item.label}
                   ref={(el) => {
                     itemRefs.current[index] = el;
                   }}
@@ -400,6 +402,8 @@ export function AppShell() {
             <div className={styles.navGroup}>
               <NavLink
                 to="/subscription"
+                aria-label="Plan & Pro"
+                data-tooltip="Plan & Pro"
                 className={({ isActive }) =>
                   `${styles.navItem} ${styles.navItemHighlight} ${
                     isActive ? styles.navItemActive : ''

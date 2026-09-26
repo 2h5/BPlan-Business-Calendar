@@ -1,9 +1,11 @@
+import type { MouseEventHandler } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './PublicHeader.module.css';
 
 interface PublicHeaderProps {
   activePage?: 'pricing';
+  onAccountAction?: MouseEventHandler<HTMLAnchorElement>;
 }
 
 const PREVIEW_NAV_ITEMS = [
@@ -12,7 +14,7 @@ const PREVIEW_NAV_ITEMS = [
   { label: 'Resources', hasMenu: true },
 ] as const;
 
-export function PublicHeader({ activePage }: PublicHeaderProps) {
+export function PublicHeader({ activePage, onAccountAction }: PublicHeaderProps) {
   return (
     <header className={styles.header}>
       <Link className={styles.brand} to="/" aria-label="BPlan home">
@@ -35,10 +37,10 @@ export function PublicHeader({ activePage }: PublicHeaderProps) {
       </nav>
 
       <div className={styles.actions} aria-label="Account actions">
-        <Link className={styles.signIn} to="/login">
+        <Link className={styles.signIn} to="/login" onClick={onAccountAction}>
           Sign in
         </Link>
-        <Link className={styles.getStarted} to="/login">
+        <Link className={styles.getStarted} to="/login" onClick={onAccountAction}>
           Get started
         </Link>
       </div>
