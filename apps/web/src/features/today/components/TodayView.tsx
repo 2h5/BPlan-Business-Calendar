@@ -199,7 +199,7 @@ export function TodayView() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${isDaytime ? styles.day : styles.night}`}>
       {/* Dynamic Command Hero */}
       <header className={styles.hero}>
         <div className={styles.heroMain}>
@@ -208,11 +208,15 @@ export function TodayView() {
           </div>
           <h1 className={styles.heroTitle}>
             {greeting}
-            {isDaytime ? (
-              <SunIcon className={`${styles.timeOfDayIcon} ${styles.timeOfDayIconSun}`} />
-            ) : (
-              <MoonIcon className={`${styles.timeOfDayIcon} ${styles.timeOfDayIconMoon}`} />
-            )}
+            <span
+              className={`${styles.timeOfDay} ${isDaytime ? styles.timeOfDaySun : styles.timeOfDayMoon}`}
+            >
+              {isDaytime ? (
+                <SunIcon className={styles.timeOfDayIcon} />
+              ) : (
+                <MoonIcon className={styles.timeOfDayIcon} />
+              )}
+            </span>
           </h1>
           <p className={styles.heroSubtitle}>
             {today.timed.length > 0 || relevantCount > 0

@@ -2,13 +2,20 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom';
 
 import styles from './TodaySearch.module.css';
-import { TodaySearchResults, type TodaySearchStatus } from './TodaySearchResults';
+import { TodaySearchResults } from './TodaySearchResults';
 import { useCalendars } from '../../calendar/hooks/useCalendars';
+import { useMeasuredHeight } from '../../search/hooks/useMeasuredHeight';
 import { useSearch } from '../../search/hooks/useSearch';
+import {
+  buildSearchSections,
+  resolveSearchStatus,
+  type SearchResultItem,
+} from '../../search/utils/search-results';
 import { useProfile } from '../../settings/hooks/useSettings';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
-import { useMeasuredHeight } from '../hooks/useMeasuredHeight';
-import { buildTodaySearchSections, type TodaySearchItem } from '../utils/today-search';
+
+// The Today panel is a quick jump; "View all" opens the full Search page.
+const TODAY_SECTION_LIMITS = { event: 4, task: 4, calendar: 2, list: 2 };
 
 type TodaySearchProps = {
   isOpen: boolean;
@@ -94,20 +101,21 @@ export function TodaySearch({ isOpen, onOpenChange }: TodaySearchProps) {
   const sections = useMemo(
     () =>
       search.data
-        ? buildTodaySearchSections(search.data, {
+        ? buildSearchSections(search.data, {
             query: debouncedQuery,
             now: new Date(),
             timeZone,
             hourCycle,
             calendars: calendars.data ?? [],
             lists: lists.data ?? [],
+            limits: TODAY_SECTION_LIMITS,
           })
         : [],
     [calendars.data, debouncedQuery, hourCycle, lists.data, search.data, timeZone],
   );
   const items = useMemo(() => sections.flatMap((section) => section.items), [sections]);
 
-  const openItem = (item: TodaySearchItem) => {
+  const openItem = (item: SearchResultItem) => {
     closeSearch(false);
     navigate(item.href);
   };
@@ -134,7 +142,7 @@ export function TodaySearch({ isOpen, onOpenChange }: TodaySearchProps) {
 
   const showResults = normalizedQuery.length >= 2;
   const isSearching = showResults && (debouncedQuery !== normalizedQuery || search.isFetching);
-  const status = resolveStatus({
+  const status = resolveSearchStatus({
     query: normalizedQuery,
     isSearching,
     isError: search.isError,
@@ -240,51 +248,19 @@ export function TodaySearch({ isOpen, onOpenChange }: TodaySearchProps) {
           </div>
         </div>
 
-        <div className={styles.footer}>
-          <span className={styles.hints} aria-hidden="true">
-            <span>
-              <kbd>↑</kbd>
-              <kbd>↓</kbd> Navigate
-            </span>
-            <span>
-              <kbd>↵</kbd> Open
-            </span>
-            <span>
-              <kbd>Esc</kbd> Close
-            </span>
-          </span>
-          {showResults && (
+        {showResults && (
+          <div className={styles.footer}>
             <button type="button" className={styles.viewAll} onClick={openFullSearch}>
               {status === 'results'
                 ? `View all ${totalMatches >= 40 ? '40+' : totalMatches}`
                 : 'Full search'}
               <span aria-hidden="true">↗</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
-}
-
-function resolveStatus({
-  query,
-  isSearching,
-  isError,
-  itemCount,
-}: {
-  query: string;
-  isSearching: boolean;
-  isError: boolean;
-  itemCount: number;
-}): TodaySearchStatus {
-  if (!query) return 'idle';
-  if (query.length < 2) return 'short';
-  // Keep earlier results on screen while the next query loads; only show the
-  // skeleton when there is nothing useful to show yet.
-  if (isSearching) return itemCount > 0 ? 'results' : 'loading';
-  if (isError) return 'error';
-  return itemCount > 0 ? 'results' : 'empty';
 }
 
 function SearchIcon() {

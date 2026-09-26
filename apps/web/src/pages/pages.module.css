@@ -223,9 +223,42 @@
   width: min(100%, 820px);
   margin-top: clamp(0.9rem, 1.7vh, 1.35rem);
   padding: 4px 14px 16px 0;
-  perspective: 1350px;
-  perspective-origin: 22% 50%;
   animation: homepage-calendar-enter 620ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
+}
+
+/*
+ * The preview is tilted with a real 3D perspective, which browsers render by
+ * painting the element into a bitmap and then warping that bitmap on the GPU.
+ * At 1x that warp resamples every glyph and hairline, so the whole preview
+ * looks soft. To keep it crisp, the preview is laid out at 2x (`zoom: 2`) and
+ * the tilt scales it back down by half: the bitmap then holds two pixels for
+ * every one on screen, and the warp downsamples instead of smearing. The
+ * on-screen size, slant and depth are exactly those of the 1x layout.
+ *
+ * The frame reserves the preview's 1x footprint in the page flow: half the
+ * measured height of the 2x tilt (`--tilt-height`, set from the component;
+ * the aspect ratio only covers the first measurement). It owns the
+ * perspective because perspective only reaches an element's direct children.
+ * Its origin matches the old stage-level `22% 50%` (the stage adds 14px right
+ * and 4px + 16px vertical padding around the frame).
+ */
+.calendarFrame {
+  position: relative;
+  /* Explicit, so the aspect ratio can never derive the width from the height. */
+  width: 100%;
+  height: calc(var(--tilt-height) / 2);
+  aspect-ratio: 1.76 / 1;
+  perspective: 1350px;
+  perspective-origin: calc(22% + 3px) calc(50% + 6px);
+}
+
+.calendarTilt {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  transform: rotateY(12deg) scale(0.5);
+  transform-origin: 0 0;
 }
 
 @keyframes homepage-hero-enter {
@@ -265,6 +298,8 @@
 }
 
 .calendarPreview {
+  /* Everything inside is sized in 1x units; see `.calendarFrame`. */
+  zoom: 2;
   width: 100%;
   aspect-ratio: 1.76 / 1;
   border: 8px solid rgba(220, 234, 252, 0.86);
@@ -277,9 +312,6 @@
     0 40px 70px rgba(75, 116, 177, 0.2),
     0 10px 26px rgba(71, 115, 180, 0.12),
     0 0 0 1px rgba(169, 202, 245, 0.3);
-  transform: rotateY(12deg);
-  transform-origin: left center;
-  transform-style: preserve-3d;
 }
 
 .previewSidebar {
@@ -758,11 +790,23 @@
   .calendarStage {
     margin-inline: auto;
     padding: 0 0 1rem;
+  }
+
+  /* Flat here, so it paints directly at 1x with no supersampling needed. */
+  .calendarFrame {
+    height: auto;
+    aspect-ratio: auto;
     perspective: none;
   }
 
-  .calendarPreview {
+  .calendarTilt {
+    position: static;
+    width: auto;
     transform: none;
+  }
+
+  .calendarPreview {
+    zoom: 1;
   }
 }
 

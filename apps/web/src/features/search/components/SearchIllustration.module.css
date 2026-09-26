@@ -1,0 +1,168 @@
+.art {
+  --art-blob: color-mix(in srgb, var(--color-text-tertiary) 11%, var(--color-bg-surface));
+  --art-card-back: color-mix(in srgb, var(--color-text-tertiary) 24%, var(--color-bg-surface));
+  --art-line-back: color-mix(in srgb, var(--color-text-tertiary) 55%, var(--color-bg-surface));
+  --art-card-front: #e9eef6;
+  --art-line-front: #a9b3c2;
+  --art-dot: color-mix(in srgb, var(--color-text-tertiary) 60%, transparent);
+
+  display: block;
+  width: min(var(--art-width, 240px), 100%);
+  height: auto;
+  overflow: visible;
+}
+
+:global(:root[data-theme='light']) .art {
+  --art-blob: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  --art-card-back: #ffffff;
+  --art-line-back: #d5deea;
+  --art-card-front: #ffffff;
+  --art-line-front: #c3cedd;
+}
+
+@media (prefers-color-scheme: light) {
+  :global(:root:not([data-theme])) .art {
+    --art-blob: color-mix(in srgb, var(--color-accent) 7%, transparent);
+    --art-card-back: #ffffff;
+    --art-line-back: #d5deea;
+    --art-card-front: #ffffff;
+    --art-line-front: #c3cedd;
+  }
+}
+
+.blob {
+  fill: var(--art-blob);
+}
+.cardBack {
+  fill: var(--art-card-back);
+  stroke: var(--color-border-subtle);
+}
+.lineBack {
+  fill: var(--art-line-back);
+}
+.cardFront {
+  fill: var(--art-card-front);
+}
+.lineFront {
+  fill: var(--art-line-front);
+}
+.accentFill {
+  fill: var(--color-accent);
+}
+.dot {
+  fill: var(--art-dot);
+}
+.calendarIcon {
+  fill: none;
+  stroke: var(--color-text-tertiary);
+  stroke-width: 1.6;
+}
+.calendarLines {
+  stroke: var(--color-text-tertiary);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.lens {
+  fill: color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+.rim {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 6.5;
+}
+.handle {
+  stroke: var(--color-accent);
+  stroke-width: 10;
+  stroke-linecap: round;
+  filter: brightness(0.85);
+}
+.glint {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.spark {
+  stroke: var(--color-text-tertiary);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* Gentle idle motion: the cards bob and the glass drifts over them. */
+.float {
+  animation: bob 4.8s ease-in-out infinite;
+}
+.floatSlow {
+  animation: bob 6s ease-in-out infinite reverse;
+}
+/* The glass scans a small loop across the task card, tilting as it goes. */
+.magnifier {
+  transform-box: view-box;
+  transform-origin: 160px 70px;
+  animation: scan 6s ease-in-out infinite;
+}
+.spark {
+  animation: flicker 3s ease-in-out infinite;
+}
+.twinkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+.pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pulse 3.2s ease-in-out infinite;
+}
+.pulse + .pulse {
+  animation-delay: -1.6s;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes scan {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  30% {
+    transform: translate(-12px, 4px) rotate(-6deg);
+  }
+  60% {
+    transform: translate(-5px, 9px) rotate(-2deg);
+  }
+  80% {
+    transform: translate(3px, 3px) rotate(3deg);
+  }
+}
+@keyframes flicker {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes twinkle {
+  50% {
+    opacity: 0.4;
+    transform: scale(0.55) rotate(45deg);
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float,
+  .floatSlow,
+  .magnifier,
+  .spark,
+  .twinkle,
+  .pulse {
+    animation: none;
+  }
+}

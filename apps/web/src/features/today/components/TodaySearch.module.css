@@ -265,8 +265,16 @@
 
 .intro {
   display: grid;
+  align-content: center;
+  justify-items: center;
   gap: 3px;
-  padding: 10px 10px 12px;
+  min-height: 220px;
+  padding: 14px 10px 18px;
+  text-align: center;
+}
+
+.intro svg {
+  margin-bottom: 8px;
 }
 
 .intro strong,
@@ -280,44 +288,6 @@
 .state span {
   color: var(--color-text-tertiary);
   font-size: var(--font-size-xs);
-}
-
-.scopes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0;
-  padding: 0 4px 4px;
-  list-style: none;
-}
-
-.scopes li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-surface);
-}
-
-.scopes li > span:last-child {
-  display: grid;
-  min-width: 0;
-  gap: 1px;
-}
-
-.scopes strong {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-}
-
-.scopes small {
-  overflow: hidden;
-  color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* States */
@@ -629,37 +599,6 @@
   padding: 0 6px 0 12px;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface);
-}
-
-.hints {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
-  white-space: nowrap;
-}
-
-.hints > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.hints kbd {
-  display: inline-grid;
-  place-items: center;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 4px;
-  border: 1px solid var(--color-border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--color-bg-surface-raised);
-  color: var(--color-text-secondary);
-  font-family: inherit;
-  font-size: 0.625rem;
-  line-height: 1;
 }
 
 .viewAll {

@@ -1,5 +1,6 @@
 import {
   addZonedDays,
+  type LaidOutItem,
   layoutOverlappingEvents,
   MIN_VISUAL_MINUTES,
   minuteOfDay,
@@ -35,6 +36,7 @@ import {
   type ResizeEdge,
 } from '../utils/event-resize';
 import { initialScrollHour } from '../utils/timeline-initial-scroll';
+import { offHoursBands } from '../utils/working-hours-bands';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const HOLD_DELAY_MS = 180;
@@ -82,7 +84,14 @@ export interface TimelineViewProps {
   workingHours?: WorkingHours;
   /** Event the calendar was opened for; the first scroll brings it into view instead of now. */
   revealEventId?: string | null;
+  /** Show the time range and duration inside events long enough to fit them. */
+  showEventDetails?: boolean;
+  /** Shade the time outside `workingHours`. Snapping to working hours applies either way. */
+  showWorkingHours?: boolean;
 }
+
+/** Shortest event, in minutes on the grid, that has room for the details line. */
+export const EVENT_DETAILS_MIN_MINUTES = 45;
 
 function formatHour(hour: number, hourCycle: HourCycle): string {
   if (hourCycle === 'h23') return String(hour).padStart(2, '0');
@@ -105,6 +114,8 @@ export interface EventButtonProps {
   timeZone: string;
   hourCycle: HourCycle;
   compact: boolean;
+  /** Time range and duration, shown at rest the way resizing shows them. */
+  showDetails?: boolean;
   style?: React.CSSProperties;
   onSelect: (anchorRect?: AnchorRect) => void;
   onResizePointerDown?: (event: React.PointerEvent<HTMLSpanElement>, edge: ResizeEdge) => void;
@@ -130,6 +141,7 @@ export function EventButton({
   timeZone,
   hourCycle,
   compact,
+  showDetails = false,
   style,
   onSelect,
   onResizePointerDown,
@@ -169,6 +181,8 @@ export function EventButton({
       data-event-id={occurrence.event.id}
       data-occurrence-key={occurrence.key}
       className={`${styles.timelineEvent} ${compact ? styles.timelineEventCompact : ''} ${
+        showDetails && !isPreviewing ? styles.timelineEventWithDetails : ''
+      } ${
         isResizing ? styles.timelineEventResizing : ''
       } ${isMoving ? styles.timelineEventMoving : ''} ${
         isShort
@@ -270,6 +284,19 @@ export function EventButton({
             </>
           )}
         </span>
+      ) : showDetails ? (
+        <span
+          className={`${styles.timelineResizeFeedback} ${styles.timelineResizeFeedbackNormal} ${styles.timelineEventDetails}`}
+        >
+          <span className={styles.timelineResizeSpan}>
+            {formatEventTime(occurrence.start, timeZone, hourCycle)} –{' '}
+            {formatEventTime(occurrence.end, timeZone, hourCycle)}
+          </span>
+          <span className={styles.timelineResizeDivider}>·</span>
+          <span className={styles.timelineResizeDurationBadge}>
+            {formatDuration(Math.round((occurrence.end - occurrence.start) / 60_000))}
+          </span>
+        </span>
       ) : !compact ? (
         <span className={styles.timelineEventTime}>
           {formatEventTime(occurrence.start, timeZone, hourCycle)}
@@ -356,6 +383,19 @@ function formatDuration(minutes: number): string {
   return `${hours}h ${remainingMinutes}m`;
 }
 
+const DRAFT_LAYOUT_KEY = '__quick-create-draft__';
+
+/** The unsaved quick-create draft, placed alongside real events in the overlap layout. */
+interface DraftLayoutSlot {
+  key: typeof DRAFT_LAYOUT_KEY;
+  start: number;
+  end: number;
+}
+
+function isOccurrence(item: EventOccurrence | DraftLayoutSlot): item is EventOccurrence {
+  return 'event' in item;
+}
+
 /**
  * Keeps event buttons in one fixed DOM order. Layout output is grouped by
  * column, so rendering it directly makes React move nodes whenever columns
@@ -386,6 +426,8 @@ export function TimelineView({
   defaultDurationMinutes = 60,
   workingHours,
   revealEventId = null,
+  showEventDetails = false,
+  showWorkingHours = true,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialScrollKeyRef = useRef<string | null>(null);
@@ -1388,7 +1430,7 @@ export function TimelineView({
   }, [byDateKey]);
 
   return (
-    <div className={styles.timelineViewport} ref={scrollRef}>
+    <div className={styles.timelineViewport} ref={scrollRef} data-timeline-viewport="true">
       <div
         className={`${styles.timelineCanvas} ${isWeek ? styles.weekCanvas : styles.dayCanvas} ${hasAllDay ? styles.timelineCanvasWithAllDay : ''}`}
         style={
@@ -1579,11 +1621,45 @@ export function TimelineView({
               gestureStart && gestureEnd
                 ? visibleInterval({ start: gestureStart.getTime(), end: gestureEnd.getTime() })
                 : null;
+            // The quick-create draft takes a real layout column so events it
+            // overlaps shift aside instead of being hidden underneath it.
+            const draftStart =
+              draftEvent &&
+              draftEvent.dateKey === dateKey &&
+              !draftEvent.allDay &&
+              draftEvent.startMinute !== undefined &&
+              draftEvent.endMinute !== undefined &&
+              !dragSelection
+                ? dateMinuteToInstant(dateKey, draftEvent.startMinute, timeZone)
+                : null;
+            const draftEnd =
+              draftStart && draftEvent?.endMinute !== undefined
+                ? dateMinuteToInstant(dateKey, draftEvent.endMinute, timeZone)
+                : null;
+            const draftSlot: DraftLayoutSlot | null =
+              draftStart && draftEnd
+                ? { key: DRAFT_LAYOUT_KEY, start: draftStart.getTime(), end: draftEnd.getTime() }
+                : null;
+            const layout = layoutOverlappingEvents<EventOccurrence | DraftLayoutSlot>(
+              draftSlot ? [...timed, draftSlot] : timed,
+              visibleInterval,
+              {
+                getOrderInterval: (item) => {
+                  // Keep the draft in the rightmost column it can take.
+                  if (item === draftSlot) {
+                    return { start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER };
+                  }
+                  return gestureOrder && item.key === gesture?.key
+                    ? gestureOrder
+                    : visibleInterval(item);
+                },
+              },
+            );
+            const draftPlacement = layout.find((placed) => placed.item === draftSlot);
             const laidOut = sortByRenderOrder(
-              layoutOverlappingEvents(timed, visibleInterval, {
-                getOrderInterval: (item) =>
-                  gestureOrder && item.key === gesture?.key ? gestureOrder : visibleInterval(item),
-              }),
+              layout.filter((placed): placed is LaidOutItem<EventOccurrence> =>
+                isOccurrence(placed.item),
+              ),
               timed,
             );
             const nowTop =
@@ -1599,6 +1675,19 @@ export function TimelineView({
                 onPointerUp={(e) => handleColumnPointerUp(e, dateKey)}
                 onPointerCancel={(e) => handleColumnPointerCancel(e, dateKey)}
               >
+                {offHoursBands(dateKey, showWorkingHours ? (workingHours ?? []) : []).map(
+                  (band) => (
+                    <span
+                      key={band.startMinute}
+                      aria-hidden="true"
+                      className={styles.offHoursBand}
+                      style={{
+                        top: (band.startMinute / 60) * hourHeight,
+                        height: ((band.endMinute - band.startMinute) / 60) * hourHeight,
+                      }}
+                    />
+                  ),
+                )}
                 {HOURS.map((hour) => (
                   <span key={hour} className={styles.hourLine} style={{ top: hour * hourHeight }} />
                 ))}
@@ -1636,6 +1725,11 @@ export function TimelineView({
                       style={
                         {
                           top: (draftEvent.startMinute / 60) * hourHeight,
+                          ...(draftPlacement && {
+                            left: `calc(${draftPlacement.left * 100}% + 2px)`,
+                            width: `calc(${draftPlacement.width * 100}% - 4px)`,
+                            right: 'auto',
+                          }),
                           height: Math.max(
                             22,
                             ((draftEvent.endMinute - draftEvent.startMinute) / 60) * hourHeight - 2,
@@ -1710,6 +1804,8 @@ export function TimelineView({
                     movePreview.dateKey === dateKey
                       ? movePreview.interval
                       : undefined;
+                  const showDetails =
+                    showEventDetails && endMinute - startMinute >= EVENT_DETAILS_MIN_MINUTES;
                   return (
                     <EventButton
                       key={placed.item.key}
@@ -1717,8 +1813,12 @@ export function TimelineView({
                       timeZone={timeZone}
                       hourCycle={hourCycle}
                       compact={
-                        (isWeek || height < 42) && !activeResizeInterval && !activeMoveInterval
+                        (isWeek || height < 42) &&
+                        !showDetails &&
+                        !activeResizeInterval &&
+                        !activeMoveInterval
                       }
+                      showDetails={showDetails}
                       style={{
                         top,
                         height,

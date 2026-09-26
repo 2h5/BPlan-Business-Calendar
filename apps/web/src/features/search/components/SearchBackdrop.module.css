@@ -1,0 +1,139 @@
+/*
+ * Fills the whole content area behind the Search page, bleeding out through
+ * the page gutter so the marks reach the edges.
+ */
+.backdrop {
+  --mark: color-mix(in srgb, var(--color-text-tertiary) 70%, transparent);
+  --mark-accent: color-mix(in srgb, var(--color-accent) 80%, transparent);
+  --sketch: color-mix(in srgb, var(--color-text-tertiary) 42%, transparent);
+
+  position: absolute;
+  inset: calc(-1 * var(--content-gutter));
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* A soft pool of light behind the search field. */
+  background: radial-gradient(
+    ellipse 60% 45% at 50% 0%,
+    color-mix(in srgb, var(--color-accent) 6%, transparent),
+    transparent 70%
+  );
+  animation: fadeIn 600ms ease both;
+}
+
+.star {
+  position: absolute;
+  display: block;
+  color: var(--mark);
+  translate: -50% -50%;
+  animation: twinkle var(--duration, 5s) ease-in-out var(--delay, 0s) infinite;
+}
+.accent {
+  color: var(--mark-accent);
+}
+.star svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: currentColor;
+}
+.star .outline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The sketch in the bottom-right. */
+.art {
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  width: clamp(240px, 24vw, 360px);
+  height: auto;
+  overflow: visible;
+  stroke: var(--sketch);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.faint {
+  opacity: 0.6;
+}
+.check {
+  stroke: color-mix(in srgb, var(--color-text-tertiary) 55%, transparent);
+}
+.dash {
+  stroke-dasharray: 3 6;
+  animation: dashFlow 14s linear infinite;
+}
+.artDot {
+  fill: var(--sketch);
+  stroke: none;
+}
+
+.driftA,
+.driftB,
+.driftC {
+  animation: drift 9s ease-in-out infinite;
+}
+.driftB {
+  animation-duration: 11s;
+  animation-delay: -4s;
+}
+.driftC {
+  animation-duration: 8s;
+  animation-delay: -2s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+  50% {
+    opacity: 0.35;
+    scale: 0.7;
+  }
+}
+@keyframes drift {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -90;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+/* On narrow screens the column fills the width, so keep only the edge marks. */
+@media (max-width: 1000px) {
+  .wide {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .art {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .star,
+  .dash,
+  .driftA,
+  .driftB,
+  .driftC {
+    animation: none;
+  }
+}

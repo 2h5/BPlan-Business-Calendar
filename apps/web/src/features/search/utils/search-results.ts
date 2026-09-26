@@ -10,60 +10,55 @@ import {
 } from '@cal/domain';
 import type { Calendar, CalendarEvent, HourCycle, TaskList } from '@cal/schemas';
 
-import type { SearchResults } from '../../search/api/search.api';
+import type { SearchResults } from '../api/search.api';
 
-export type TodaySearchKind = 'event' | 'task' | 'calendar' | 'list';
-export type TodaySearchTone = 'accent' | 'warning' | 'danger' | 'success' | 'neutral';
+export type SearchResultKind = 'event' | 'task' | 'calendar' | 'list';
+export type SearchResultTone = 'accent' | 'warning' | 'danger' | 'success' | 'neutral';
 
-export interface TodaySearchBadge {
+export interface SearchResultBadge {
   label: string;
-  tone: TodaySearchTone;
+  tone: SearchResultTone;
 }
 
-export interface TodaySearchItem {
+export interface SearchResultItem {
   key: string;
-  kind: TodaySearchKind;
+  kind: SearchResultKind;
   title: string;
   href: string;
   /** Calendar or list colour, used for the row's swatch. */
   color: string | null;
   /** The most useful fact: when an event happens, when a task is due. */
   primary: string;
-  primaryTone: TodaySearchTone;
+  primaryTone: SearchResultTone;
   /** Supporting facts such as location, calendar, list, or estimate. */
   details: string[];
   /** An excerpt of the notes when the match is not in the title. */
   snippet: string | null;
-  badges: TodaySearchBadge[];
+  badges: SearchResultBadge[];
   /** Completed tasks and past events read as secondary. */
   isMuted: boolean;
 }
 
-export interface TodaySearchSection {
-  kind: TodaySearchKind;
+export interface SearchResultSection {
+  kind: SearchResultKind;
   title: string;
   /** Matches returned by the server, which may exceed the rows shown. */
   total: number;
-  items: TodaySearchItem[];
+  items: SearchResultItem[];
 }
 
-export interface TodaySearchContext {
+export interface SearchResultContext {
   query: string;
   now: Date;
   timeZone: string;
   hourCycle: HourCycle;
   calendars: readonly Calendar[];
   lists: readonly TaskList[];
+  /** Most rows to show per section; a missing kind shows every match. */
+  limits?: Partial<Record<SearchResultKind, number>>;
 }
 
-const SECTION_LIMITS: Record<TodaySearchKind, number> = {
-  event: 4,
-  task: 4,
-  calendar: 2,
-  list: 2,
-};
-
-const DUE_TONES: Record<DueTone, TodaySearchTone> = {
+const DUE_TONES: Record<DueTone, SearchResultTone> = {
   overdue: 'danger',
   today: 'warning',
   soon: 'accent',
@@ -78,20 +73,21 @@ const SOURCE_LABELS: Record<Calendar['sourceType'], string> = {
   device: 'Device calendar',
 };
 
-export function buildTodaySearchSections(
+export function buildSearchSections(
   data: SearchResults,
-  context: TodaySearchContext,
-): TodaySearchSection[] {
+  context: SearchResultContext,
+): SearchResultSection[] {
   const calendarsById = new Map(context.calendars.map((calendar) => [calendar.id, calendar]));
   const listsById = new Map(context.lists.map((list) => [list.id, list]));
+  const limits = context.limits ?? {};
 
-  const sections: TodaySearchSection[] = [
+  const sections: SearchResultSection[] = [
     {
       kind: 'event',
       title: 'Events',
       total: data.events.length,
       items: sortEventsForSearch(data.events, context.now)
-        .slice(0, SECTION_LIMITS.event)
+        .slice(0, limits.event)
         .map((event) => describeEvent(event, calendarsById.get(event.calendarId), context)),
     },
     {
@@ -100,12 +96,12 @@ export function buildTodaySearchSections(
       total: data.tasks.length,
       items: [...data.tasks]
         .sort((a, b) => Number(a.status === 'completed') - Number(b.status === 'completed'))
-        .slice(0, SECTION_LIMITS.task)
+        .slice(0, limits.task)
         .map((task) => {
           const list = task.listId ? listsById.get(task.listId) : undefined;
           const isCompleted = task.status === 'completed';
           const due = describeTaskDue(task, context);
-          const badges: TodaySearchBadge[] = [];
+          const badges: SearchResultBadge[] = [];
           if (isCompleted) badges.push({ label: 'Done', tone: 'success' });
           else if (task.status === 'scheduled') badges.push({ label: 'Scheduled', tone: 'accent' });
           if (!isCompleted && isNotablePriority(task.priority)) {
@@ -138,7 +134,7 @@ export function buildTodaySearchSections(
       kind: 'calendar',
       title: 'Calendars',
       total: data.calendars.length,
-      items: data.calendars.slice(0, SECTION_LIMITS.calendar).map((calendar) => ({
+      items: data.calendars.slice(0, limits.calendar).map((calendar) => ({
         key: `calendar:${calendar.id}`,
         kind: 'calendar' as const,
         title: calendar.name,
@@ -159,7 +155,7 @@ export function buildTodaySearchSections(
       kind: 'list',
       title: 'Lists',
       total: data.lists.length,
-      items: data.lists.slice(0, SECTION_LIMITS.list).map((list) => ({
+      items: data.lists.slice(0, limits.list).map((list) => ({
         key: `list:${list.id}`,
         kind: 'list' as const,
         title: list.name,
@@ -193,8 +189,8 @@ export function sortEventsForSearch(events: readonly CalendarEvent[], now: Date)
 function describeEvent(
   event: CalendarEvent,
   calendar: Calendar | undefined,
-  context: TodaySearchContext,
-): TodaySearchItem {
+  context: SearchResultContext,
+): SearchResultItem {
   const { now, timeZone, hourCycle } = context;
   const start = new Date(event.startAt);
   const end = new Date(event.endAt);
@@ -205,7 +201,7 @@ function describeEvent(
     ? 'All day'
     : `${formatTimeOfDay(start, timeZone, hourCycle)} – ${formatTimeOfDay(end, timeZone, hourCycle)}`;
 
-  const badges: TodaySearchBadge[] = [];
+  const badges: SearchResultBadge[] = [];
   if (isNow) badges.push({ label: 'Now', tone: 'accent' });
   if (event.status === 'tentative') badges.push({ label: 'Tentative', tone: 'warning' });
 
@@ -302,4 +298,28 @@ function describeDuePrimary(text: string): string {
     ? text.charAt(0).toLowerCase() + text.slice(1)
     : text;
   return `Due ${softened}`;
+}
+
+export type SearchStatus = 'idle' | 'short' | 'loading' | 'error' | 'empty' | 'results';
+
+/**
+ * Which view a search surface shows. Earlier results stay on screen while the
+ * next query loads; the skeleton appears only when there is nothing to show yet.
+ */
+export function resolveSearchStatus({
+  query,
+  isSearching,
+  isError,
+  itemCount,
+}: {
+  query: string;
+  isSearching: boolean;
+  isError: boolean;
+  itemCount: number;
+}): SearchStatus {
+  if (!query) return 'idle';
+  if (query.length < 2) return 'short';
+  if (isSearching) return itemCount > 0 ? 'results' : 'loading';
+  if (isError) return 'error';
+  return itemCount > 0 ? 'results' : 'empty';
 }

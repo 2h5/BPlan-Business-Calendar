@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 /**
  * Per-user app behavior preferences, stored in `profiles.preferences`.
@@ -8,7 +8,10 @@ import { z } from 'zod';
  * discarding the whole object. Unknown keys are dropped on parse, which makes
  * retiring a preference safe. Add new preferences here, never ad hoc in an app.
  *
- * Web-only today: `accountMenuTrigger` (sidebar) and `calendarHotkeys` (keyboard).
+ * Web-only today: `accountMenuTrigger`, `showPlanInSidebar`,
+ * `showSearchInSidebar`, `workspaceOrder`, and `sidebarOnLaunch` (sidebar),
+ * `calendarHotkeys` (keyboard), and `showEventDetails` and `showWorkingHours`
+ * (calendar).
  */
 
 export type CalendarHotkeyView = 'day' | 'week' | 'month';
@@ -30,13 +33,45 @@ const calendarHotkeysSchema = z
   })
   .catch({ enabled: true, ...DEFAULT_CALENDAR_HOTKEYS });
 
+export const WORKSPACE_TABS = ['today', 'calendar', 'tasks', 'search'] as const;
+export type WorkspaceTab = (typeof WORKSPACE_TABS)[number];
+
+/**
+ * Keeps known tabs in the stored order, drops unknown or repeated ones, and
+ * appends any tab the stored order is missing, so adding or retiring a tab
+ * never loses one from the sidebar.
+ */
+export function normalizeWorkspaceOrder(value: readonly unknown[]): WorkspaceTab[] {
+  const known = new Set<string>(WORKSPACE_TABS);
+  const order: WorkspaceTab[] = [];
+  for (const tab of value) {
+    if (typeof tab === 'string' && known.has(tab) && !order.includes(tab as WorkspaceTab)) {
+      order.push(tab as WorkspaceTab);
+    }
+  }
+  return [...order, ...WORKSPACE_TABS.filter((tab) => !order.includes(tab))];
+}
+
 export const appPreferencesSchema = z.object({
   accountMenuTrigger: z.enum(['click', 'hover']).catch('click'),
+  // Hiding the sidebar link keeps the plan reachable from Settings > Plan & billing.
+  showPlanInSidebar: z.boolean().catch(true),
+  // Hiding the Workspace link leaves the /search route reachable by URL.
+  showSearchInSidebar: z.boolean().catch(true),
+  // Order of the sidebar's Workspace links, set in Customize or by dragging them.
+  workspaceOrder: z.array(z.unknown()).catch([]).transform(normalizeWorkspaceOrder),
+  // How the sidebar starts when the app loads: as it was last left, or always open or collapsed.
+  sidebarOnLaunch: z.enum(['remember', 'open', 'collapsed']).catch('remember'),
   calendarHotkeys: calendarHotkeysSchema,
+  // Day and week views: time range and duration inside events of 45+ minutes.
+  showEventDetails: z.boolean().catch(false),
+  // Day and week views: shade the time outside the user's working hours.
+  showWorkingHours: z.boolean().catch(true),
 });
 
 export type AppPreferences = z.infer<typeof appPreferencesSchema>;
 export type AccountMenuTrigger = AppPreferences['accountMenuTrigger'];
+export type SidebarOnLaunch = AppPreferences['sidebarOnLaunch'];
 export type CalendarHotkeys = AppPreferences['calendarHotkeys'];
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = appPreferencesSchema.parse({});

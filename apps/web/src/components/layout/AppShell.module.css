@@ -15,9 +15,46 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  --sidebar-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  transition: width 320ms var(--sidebar-ease);
+}
+
+/*
+ * Collapsed to the icon rail. Icons already sit on the rail's centre line, so
+ * only the width animates; text fades and shrinks in place instead of moving.
+ */
+.sidebarCollapsed {
+  width: var(--sidebar-width-collapsed);
+}
+
+.sidebarAnimating {
+  overflow: hidden;
+}
+
+.brandName,
+.navGroupLabel,
+.navLabel,
+.navBadge,
+.userMeta,
+.accountChevron {
+  /* Expanding: wait for some width before fading back in. */
+  transition:
+    opacity 200ms ease-out 90ms,
+    visibility 0s linear 0s;
+}
+
+.sidebarCollapsed
+  :is(.brandName, .navGroupLabel, .navLabel, .navBadge, .userMeta, .accountChevron) {
+  opacity: 0;
+  visibility: hidden;
+  /* Collapsing: fade out first, then drop out of hit testing. */
+  transition:
+    opacity 120ms ease-out,
+    visibility 0s linear 120ms;
 }
 
 .brand {
+  position: relative;
   min-height: var(--header-height);
   display: flex;
   align-items: center;
@@ -32,6 +69,55 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--color-accent);
+  transition:
+    opacity 160ms ease-out,
+    transform 220ms var(--sidebar-ease);
+}
+
+.sidebarToggle {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: var(--space-3);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  transform: translateY(-50%);
+  transition:
+    right 320ms var(--sidebar-ease),
+    opacity 160ms ease-out,
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sidebarToggle:hover {
+  background: var(--color-hover);
+  color: var(--color-text-primary);
+}
+
+.sidebarToggle:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* On the rail the toggle sits over the logo and swaps in on hover or focus. */
+.sidebarCollapsed .sidebarToggle {
+  right: calc((var(--sidebar-width-collapsed) - 32px) / 2);
+  opacity: 0;
+}
+
+.sidebarCollapsed .brand:hover .sidebarToggle,
+.sidebarCollapsed .sidebarToggle:focus-visible {
+  opacity: 1;
+}
+
+.sidebarCollapsed .brand:hover .brandLogo,
+.sidebarCollapsed .brand:has(.sidebarToggle:focus-visible) .brandLogo {
+  opacity: 0;
+  transform: scale(0.85);
 }
 
 .brandLogo svg {
@@ -46,6 +132,7 @@
 }
 
 .brandName {
+  white-space: nowrap;
   color: var(--color-text-primary);
   font-size: 1.15rem;
   font-weight: var(--font-weight-bold);
@@ -74,6 +161,11 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.navLabel {
+  white-space: nowrap;
 }
 
 .navItem {
@@ -182,6 +274,34 @@
   color: var(--color-text-primary);
 }
 
+/* Drag to reorder: the held link lifts off the list and the highlight steps aside. */
+.workspaceListDragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.workspaceListDragging .workspaceNavItem {
+  cursor: grabbing;
+}
+
+.workspaceListDragging .workspaceHighlight {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.workspaceListDragging [data-tooltip]::after,
+.workspaceListDragging [data-tooltip]::before {
+  display: none;
+}
+
+.workspaceNavItemDragging,
+.workspaceNavItemDragging:hover {
+  background: var(--color-bg-surface-elevated) !important;
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    var(--shadow-md);
+}
+
 .navItemHighlight:not(.navItemActive) {
   background: rgba(23, 104, 242, 0.06);
   border: 1px solid rgba(23, 104, 242, 0.16);
@@ -231,6 +351,55 @@
   position: relative;
   padding: var(--space-3);
   border-top: 1px solid var(--color-border-subtle);
+  transition: padding 320ms var(--sidebar-ease);
+}
+
+/* Centres the avatar on the rail: 8px padding + 8px button inset + 18px radius = 34px. */
+.sidebarCollapsed .sidebarFooter {
+  padding-inline: var(--space-2);
+}
+
+.sidebarCollapsed .accountMenu {
+  right: auto;
+  bottom: var(--space-2);
+  left: calc(100% + var(--space-2));
+  width: 190px;
+}
+
+/* Rail tooltips: the labels are hidden, so name each item on hover. */
+.navItem[data-tooltip]::after {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  left: calc(100% + var(--space-3));
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  content: attr(data-tooltip);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(calc(-50% + 4px));
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    visibility 0s linear 120ms;
+}
+
+.sidebarCollapsed:not(.sidebarAnimating) .navItem[data-tooltip]:is(:hover, :focus-visible)::after {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(-50%);
+  transition:
+    opacity var(--transition-fast),
+    transform var(--transition-fast),
+    visibility 0s;
 }
 
 .accountButton {
@@ -295,7 +464,17 @@
   margin-left: auto;
   flex: 0 0 auto;
   color: var(--color-text-tertiary);
-  transition: transform var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    opacity 200ms ease-out 90ms,
+    visibility 0s linear 0s;
+}
+
+.sidebarCollapsed .accountChevron {
+  transition:
+    transform var(--transition-fast),
+    opacity 120ms ease-out,
+    visibility 0s linear 120ms;
 }
 
 .accountButtonOpen .accountChevron {
@@ -419,6 +598,27 @@
     padding: 0;
   }
 
+  /* The rail is forced at this width, so there is nothing to toggle. */
+  .sidebarToggle {
+    display: none;
+  }
+
+  .sidebarCollapsed .brand:hover .brandLogo,
+  .sidebarCollapsed .brand:has(.sidebarToggle:focus-visible) .brandLogo {
+    opacity: 1;
+    transform: none;
+  }
+
+  .navItem[data-tooltip]:is(:hover, :focus-visible)::after {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(-50%);
+    transition:
+      opacity var(--transition-fast),
+      transform var(--transition-fast),
+      visibility 0s;
+  }
+
   .sidebarFooter {
     padding-inline: var(--space-2);
   }
@@ -454,7 +654,10 @@
   .modeSliding,
   .modeEntering,
   .modeExiting,
-  .accountMenu {
+  .accountMenu,
+  .sidebar,
+  .sidebarFooter,
+  .sidebarToggle {
     animation: none !important;
     transition: none !important;
   }
