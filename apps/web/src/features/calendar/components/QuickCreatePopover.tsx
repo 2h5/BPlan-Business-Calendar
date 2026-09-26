@@ -1,24 +1,16 @@
-import { zonedWallClockToUtc } from '@cal/domain';
 import type { Calendar, CalendarEvent, CreateTaskInput } from '@cal/schemas';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import { QuickCreateEventFields } from './QuickCreateEventFields';
 import styles from './QuickCreatePopover.module.css';
 import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
+import { useQuickCreateActions } from '../hooks/useQuickCreateActions';
 import { useQuickCreateDraft } from '../hooks/useQuickCreateDraft';
 import { useQuickCreatePosition } from '../hooks/useQuickCreatePosition';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
-import { eventInputFromForm, type EventFormValues } from '../utils/event-form';
+import type { eventInputFromForm, EventFormValues } from '../utils/event-form';
 import type { AnchorRect } from '../utils/popover-position';
 import {
   addMinutesToTime,
@@ -170,16 +162,33 @@ export function QuickCreatePopover({
     [endTime, endTimeOptions, startTime],
   );
 
-  const handleDelete = async () => {
-    if (!editingOccurrence || !onDeleteEvent || isSaving) return;
-    setIsDeleteConfirmOpen(false);
-    try {
-      await onDeleteEvent(editingOccurrence.event);
-      onClose();
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Could not delete event.');
-    }
-  };
+  const { handleSubmit, handleDelete } = useQuickCreateActions({
+    mode,
+    title,
+    startDate,
+    endDate,
+    allDay,
+    startTime,
+    endTime,
+    location,
+    description,
+    calendarId,
+    selectedListId,
+    taskPriority,
+    taskHasTime,
+    editingOccurrence,
+    defaultCalendar,
+    timeZone,
+    isSaving,
+    titleInputRef,
+    setErrorMessage,
+    setIsDeleteConfirmOpen,
+    onClose,
+    onCreateEvent,
+    onUpdateEvent,
+    onDeleteEvent,
+    onCreateTask,
+  });
 
   // Autofocus title input when popover opens
   useEffect(() => {
@@ -285,96 +294,6 @@ export function QuickCreatePopover({
       alerts: editingOccurrence ? [...editingOccurrence.event.alerts] : [],
     });
     onClose();
-  };
-
-  const handleSubmit = async (e?: FormEvent) => {
-    if (e) e.preventDefault();
-    setErrorMessage(null);
-
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      setErrorMessage(mode === 'event' ? 'Give the event a title' : 'What needs doing?');
-      titleInputRef.current?.focus();
-      return;
-    }
-
-    if (mode === 'event') {
-      const activeCalendarId = calendarId || defaultCalendar?.id;
-      if (!activeCalendarId) {
-        setErrorMessage('Select a writable calendar.');
-        return;
-      }
-
-      const formValues: EventFormValues = {
-        title: trimmedTitle,
-        description: description.trim(),
-        location: location.trim(),
-        calendarId: activeCalendarId,
-        startDate,
-        startTime,
-        endDate,
-        endTime,
-        allDay,
-        recurrenceRule: editingOccurrence?.event.recurrenceRule ?? null,
-        alerts: editingOccurrence ? [...editingOccurrence.event.alerts] : [],
-      };
-
-      try {
-        const input = eventInputFromForm(formValues, timeZone);
-        if (editingOccurrence && onUpdateEvent) {
-          await onUpdateEvent(editingOccurrence.event, input);
-        } else {
-          await onCreateEvent(input);
-        }
-        onClose();
-      } catch (err) {
-        setErrorMessage(
-          err instanceof Error
-            ? err.message
-            : editingOccurrence
-              ? 'Could not update event.'
-              : 'Could not create event.',
-        );
-      }
-    } else {
-      // Task creation
-      try {
-        let dueAt: string | null = null;
-        if (startDate) {
-          const [year, month, day] = startDate.split('-').map(Number);
-          const [hour, minute] = (taskHasTime ? startTime : '12:00').split(':').map(Number);
-          if (
-            typeof year === 'number' &&
-            !Number.isNaN(year) &&
-            typeof month === 'number' &&
-            !Number.isNaN(month) &&
-            typeof day === 'number' &&
-            !Number.isNaN(day) &&
-            typeof hour === 'number' &&
-            !Number.isNaN(hour) &&
-            typeof minute === 'number' &&
-            !Number.isNaN(minute)
-          ) {
-            const dueInstant = zonedWallClockToUtc({ year, month, day, hour, minute }, timeZone);
-            dueAt = dueInstant.toISOString();
-          }
-        }
-
-        await onCreateTask({
-          title: trimmedTitle,
-          description: description.trim() || null,
-          listId: selectedListId || null,
-          priority: taskPriority,
-          dueAt,
-          hasDueTime: taskHasTime,
-          isFlexible: true,
-          tagIds: [],
-        });
-        onClose();
-      } catch (err) {
-        setErrorMessage(err instanceof Error ? err.message : 'Could not create task.');
-      }
-    }
   };
 
   const content = (

@@ -29,7 +29,8 @@
 2. **Complete:** Extract anchor lookup, position calculation, viewport listeners, and `useFollowAnchorMotion` integration into `useQuickCreatePosition`. The parent passes `isOpen`, `anchorRect`, `editingOccurrence`, its popover ref, `mode`, and `errorMessage`; it renders from the returned `coords`.
 3. **Complete:** Extract pure date/time display helpers, 15-minute time-option creation, custom time insertion, end-time duration filtering, and the duration formatter into `utils/quick-create-time.ts`. Keep memoization and form behavior in the parent, and preserve picker exports.
 4. **Complete:** Extract form state initialization and the open/edit/reset synchronization effect into `useQuickCreateDraft`. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners.
-5. **Recommended next:** Extract submit/create/update and delete action handling into `useQuickCreateActions`, with explicit draft values, callbacks, timezone, and saving state. Preserve title/calendar validation, error text and focus behavior, event form conversion, task due-time conversion, edit/update routing, and close timing. Leave More options, `handleStartTimeChange`, time-option memoization, positioning, focus trapping, close animation, field components, and CSS in the parent.
+5. **Complete:** Extract submit/create/update and delete action handling into `useQuickCreateActions`, with explicit draft values, callbacks, timezone, and saving state. Preserve title/calendar validation, error text and focus behavior, event form conversion, task due-time conversion, edit/update routing, and close timing. Leave More options, `handleStartTimeChange`, time-option memoization, positioning, focus trapping, close animation, field components, and CSS in the parent.
+6. **Recommended next:** Extract the popover dismissal and keyboard/focus lifecycle into a focused hook. Move the title autofocus timer, `isClosing`/request-close/animation-end flow, and capture-phase Escape/Tab listener together; keep the popover and title refs in the parent and pass them explicitly. Add interaction tests for delete-confirm Escape, saving/closing guards, focus wrap, animation target, and cleanup. Leave More options, start-time handling, draft preview notification, time-option memoization, action hook, position hook, rendering, and CSS in their existing owners.
 
 ## Phase 1 result and discoveries
 
@@ -123,3 +124,25 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                                    | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 583 web (including 404 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Phase 5 result and discoveries
+
+- `QuickCreatePopover.tsx`: **673 → 592 lines**. Added `hooks/useQuickCreateActions.ts` and `hooks/useQuickCreateActions.test.ts`. The hook receives the current draft fields, edit occurrence, default calendar, timezone, saving flag, title input ref, error/delete-confirm setters, and mutation/close callbacks; it returns `handleSubmit` and `handleDelete`. The parent still calls submit from the form, title Enter key, and Save button, and calls delete from the confirmation UI.
+- Event submit still clears the error before validation, trims title/location/description, focuses a blank title, resolves the selected/default calendar, clones edited alerts, and passes the form through `eventInputFromForm`. An editing occurrence without `onUpdateEvent` still calls `onCreateEvent`; its non-Error failure still says `Could not update event.` because the fallback depends on the occurrence, not on which mutation ran. Success closes only after the mutation resolves.
+- Task submit still treats an empty or malformed numeric date/time as null `dueAt`, converts untimed tasks at local noon while sending `hasDueTime: false`, and passes the same trimmed/null fields, list ID, priority, `isFlexible: true`, and empty tags. Delete still guards missing edit/callback or saving, closes confirmation before awaiting, and leaves it closed on failure. The optional form event is prevented before validation; direct calls remain valid.
+- The hook uses no React state or effect itself; it receives the draft hook's current values each render. Moving the handlers required the parent to change `eventInputFromForm` to a type-only import because its callback contract still refers to the function's return type. No mutation contract, event conversion helper, timezone helper, markup, picker, or CSS changed.
+- The remaining parent is mostly composition and dialog markup. The next cohesive behavioral block is the title autofocus, animated dismissal, and capture-phase Escape/Tab focus handling at the top of the component; extracting that block can be tested independently of the field presentation.
+
+## Phase 5 verification log
+
+| Check                              | Result                                                                         |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| New action-hook tests              | PASS: 18 tests                                                                 |
+| Quick Create and positioning tests | PASS: 9 files, 73 tests                                                        |
+| All calendar tests                 | PASS: 41 files, 422 tests                                                      |
+| Web typecheck                      | PASS                                                                           |
+| ESLint, zero warnings              | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                           | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                      | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 601 web (including 422 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
