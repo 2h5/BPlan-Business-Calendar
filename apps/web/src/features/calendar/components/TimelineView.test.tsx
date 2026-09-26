@@ -2,7 +2,9 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { EventButton, OriginGhost, TimelineView } from './TimelineView';
+import { EventButton } from './EventButton';
+import { OriginGhost } from './OriginGhost';
+import { TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
 
