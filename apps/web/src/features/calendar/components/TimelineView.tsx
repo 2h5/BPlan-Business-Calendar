@@ -1086,7 +1086,7 @@ export function TimelineView({
                     }}
                   >
                     <span>
-                      {formatMinute(dragSelection.startMinute, hourCycle)} â€“{' '}
+                      {formatMinute(dragSelection.startMinute, hourCycle)} –{' '}
                       {formatMinute(dragSelection.endMinute, hourCycle)}
                     </span>
                   </div>
