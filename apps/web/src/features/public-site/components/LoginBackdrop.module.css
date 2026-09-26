@@ -1,0 +1,112 @@
+.backdrop {
+  --cell-w: 112px;
+  --cell-h: 48px;
+  /* One row of drift per loop; the events share this period (see .event). */
+  --period: 24s;
+
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Keep the headline on clean paper. */
+  mask-image: radial-gradient(ellipse 40% 34% at 24% 24%, transparent 50%, #000 100%);
+  animation: backdrop-enter 900ms ease both;
+}
+
+/*
+ * One row taller than the page, so sliding it up by a row loops seamlessly.
+ * Columns are centred on the page, so event cells land in the same place
+ * relative to the layout at any width.
+ */
+.grid {
+  position: absolute;
+  inset: 0 0 calc(-1 * var(--cell-h));
+  background-image:
+    linear-gradient(90deg, rgba(23, 104, 242, 0.07) 1px, transparent 1px),
+    linear-gradient(rgba(23, 104, 242, 0.045) 1px, transparent 1px);
+  background-position: 50% 0;
+  background-size: var(--cell-w) var(--cell-h);
+  animation: grid-drift var(--period) linear infinite;
+}
+
+/*
+ * Events ride on the grid, so they stay in their cells. Each runs on the
+ * grid's period with a phase that keeps it invisible at the moment the grid
+ * loops, so the loop's one-row jump is never seen.
+ */
+.event {
+  position: absolute;
+  left: calc(50% - var(--cell-w) / 2 + var(--col) * var(--cell-w) + 5px);
+  top: calc(var(--row) * var(--cell-h) + 4px);
+  width: calc(var(--cell-w) - 10px);
+  height: calc(var(--span) * var(--cell-h) - 8px);
+  border-left: 2px solid rgba(23, 104, 242, 0.3);
+  border-radius: 6px;
+  background: rgba(23, 104, 242, 0.07);
+  opacity: 0;
+  animation: event-fill var(--period) ease-in-out infinite;
+}
+.event::after {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 44%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(23, 104, 242, 0.22);
+  content: '';
+}
+/* Phases (fraction of the period) must sit outside the 8%–47% visible window. */
+.event:nth-child(2) {
+  animation-delay: calc(var(--period) * -0.55);
+}
+.event:nth-child(3) {
+  animation-delay: calc(var(--period) * -0.75);
+}
+.event:nth-child(4) {
+  animation-delay: calc(var(--period) * -0.95);
+}
+
+@keyframes grid-drift {
+  to {
+    transform: translateY(calc(-1 * var(--cell-h)));
+  }
+}
+@keyframes event-fill {
+  0%,
+  8%,
+  47%,
+  100% {
+    opacity: 0;
+    scale: 0.96;
+  }
+  18%,
+  37% {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 920px) {
+  .backdrop {
+    mask-image: linear-gradient(transparent, #000 40%);
+  }
+  /* The events' cells sit under the stacked headline here. */
+  .event {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .grid,
+  .event {
+    animation: none;
+  }
+}

@@ -263,15 +263,18 @@
 
 /* Idle */
 
-/* Keeps the panel the height it had when the idle view carried a footer. */
 .intro {
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 3px;
-  min-height: 100px;
-  padding: 10px;
+  min-height: 220px;
+  padding: 14px 10px 18px;
   text-align: center;
+}
+
+.intro svg {
+  margin-bottom: 8px;
 }
 
 .intro strong,

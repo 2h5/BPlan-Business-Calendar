@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 
 import styles from './CustomizeView.module.css';
 import { HotkeyBindingRow } from './HotkeyBindingRow';
+import { WorkspaceOrderList } from './WorkspaceOrderList';
 import { useAppPreferences } from '../hooks/useAppPreferences';
 import { defaultCalendarHotkeys, hotkeyOwner } from '../utils/app-preferences';
 
@@ -32,6 +33,8 @@ export function CustomizeView() {
   const {
     accountMenuTrigger,
     showPlanInSidebar,
+    showSearchInSidebar,
+    workspaceOrder,
     sidebarOnLaunch,
     calendarHotkeys,
     showEventDetails,
@@ -110,6 +113,31 @@ export function CustomizeView() {
               ))}
             </div>
           </div>
+          <div className={styles.row}>
+            <div className={styles.rowText}>
+              <strong id="show-search-label">Show Search</strong>
+              <span>Adds Search to the Workspace section of the sidebar.</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showSearchInSidebar}
+              aria-labelledby="show-search-label"
+              className={styles.switch}
+              onClick={() => setPreference('showSearchInSidebar', !showSearchInSidebar)}
+            >
+              <span className={styles.switchThumb} />
+            </button>
+          </div>
+          <div className={styles.rowText}>
+            <strong>Workspace order</strong>
+            <span>Drag to choose the order of your Workspace links.</span>
+          </div>
+          <WorkspaceOrderList
+            order={workspaceOrder}
+            hiddenTabs={showSearchInSidebar ? [] : ['search']}
+            onChange={(next) => setPreference('workspaceOrder', next)}
+          />
           <div className={styles.row}>
             <div className={styles.rowText}>
               <strong id="show-plan-label">Show Plan &amp; Pro</strong>

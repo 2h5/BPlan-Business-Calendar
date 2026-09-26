@@ -2,12 +2,12 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildTodaySearchSections,
+  buildSearchSections,
   matchSnippet,
   relativeDayLabel,
   sortEventsForSearch,
   splitHighlight,
-} from './today-search';
+} from './search-results';
 import type { TaskWithTags } from '../../tasks/api/tasks.api';
 
 const TZ = 'America/New_York';
@@ -106,9 +106,9 @@ describe('sortEventsForSearch', () => {
   });
 });
 
-describe('buildTodaySearchSections', () => {
+describe('buildSearchSections', () => {
   it('describes an event with its day, time range, duration, location, and calendar', () => {
-    const [section] = buildTodaySearchSections(
+    const [section] = buildSearchSections(
       {
         events: [
           event('e1', '2026-09-24T14:00:00-04:00', '2026-09-24T15:30:00-04:00', {
@@ -129,7 +129,7 @@ describe('buildTodaySearchSections', () => {
   });
 
   it('flags an in-progress event as Now', () => {
-    const [section] = buildTodaySearchSections(
+    const [section] = buildSearchSections(
       {
         events: [event('e1', '2026-09-23T11:30:00-04:00', '2026-09-23T12:30:00-04:00')],
         tasks: [],
@@ -142,7 +142,7 @@ describe('buildTodaySearchSections', () => {
   });
 
   it('describes overdue, urgent tasks and orders completed tasks last', () => {
-    const [section] = buildTodaySearchSections(
+    const [section] = buildSearchSections(
       {
         events: [],
         tasks: [
@@ -167,6 +167,15 @@ describe('buildTodaySearchSections', () => {
       badges: [{ label: 'Urgent', tone: 'danger' }],
     });
     expect(section?.items[1]).toMatchObject({ primary: 'Completed', isMuted: true });
+  });
+
+  it('shows every match unless a section limit is given, keeping the full total', () => {
+    const tasks = ['a', 'b', 'c'].map((id) => task({ id }));
+    const data = { events: [], tasks, calendars: [], lists: [] };
+    expect(buildSearchSections(data, context)[0]?.items).toHaveLength(3);
+    const [limited] = buildSearchSections(data, { ...context, limits: { task: 2 } });
+    expect(limited?.items).toHaveLength(2);
+    expect(limited?.total).toBe(3);
   });
 });
 

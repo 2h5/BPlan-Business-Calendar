@@ -1,11 +1,48 @@
 /* Container and layout */
 .page {
+  position: relative;
+  isolation: isolate;
   width: min(100%, 1240px);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   padding-bottom: var(--space-12);
+}
+
+/*
+ * A faint wash of light behind the greeting: warm by day, cool by night, with
+ * a touch of the accent. Starts above the page so it bleeds from the top edge.
+ */
+.page::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--content-gutter));
+  /* Reaches into the gutters, with faded sides so it never ends in a hard edge. */
+  right: calc(-1 * var(--content-gutter));
+  left: calc(-1 * var(--content-gutter));
+  z-index: -1;
+  height: 460px;
+  background:
+    radial-gradient(ellipse 38% 70% at 18% 0%, var(--aura-tint), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 62% 0%, var(--aura-accent), transparent 70%);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  pointer-events: none;
+  animation: auraIn 900ms ease both;
+}
+.day {
+  --aura-tint: color-mix(in srgb, var(--color-warning) 7%, transparent);
+  --aura-accent: color-mix(in srgb, var(--color-accent) 4%, transparent);
+}
+.night {
+  --aura-tint: color-mix(in srgb, var(--color-moon) 6%, transparent);
+  --aura-accent: color-mix(in srgb, var(--color-accent) 6%, transparent);
+}
+
+@keyframes auraIn {
+  from {
+    opacity: 0;
+  }
 }
 
 /* Dynamic Command Hero */
@@ -90,7 +127,8 @@
 
 /* Centred on the cap height (~0.73em for Inter) rather than the line box, so
    the icon sits level with the capitals instead of the descenders. */
-.timeOfDayIcon {
+.timeOfDay {
+  position: relative;
   display: inline-block;
   width: 0.86em;
   height: 0.86em;
@@ -98,12 +136,48 @@
   vertical-align: -0.07em;
 }
 
-.timeOfDayIconSun {
+/* A soft halo in the icon's own colour that slowly breathes. */
+.timeOfDay::before {
+  content: '';
+  position: absolute;
+  inset: -70%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, currentColor 26%, transparent) 0%,
+    color-mix(in srgb, currentColor 8%, transparent) 38%,
+    transparent 68%
+  );
+  pointer-events: none;
+  animation: haloBreathe 6s ease-in-out infinite;
+}
+
+.timeOfDayIcon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, currentColor 35%, transparent));
+}
+
+.timeOfDaySun {
   color: var(--color-warning);
 }
 
-.timeOfDayIconMoon {
+.timeOfDayMoon {
   color: var(--color-moon);
+}
+
+@keyframes haloBreathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
 }
 
 .heroSubtitle {
@@ -798,7 +872,9 @@
   .quickAddAccordionOpen {
     transition: none;
   }
-  .timelineCurrent .timelineNode {
+  .timelineCurrent .timelineNode,
+  .page::before,
+  .timeOfDay::before {
     animation: none;
   }
 }

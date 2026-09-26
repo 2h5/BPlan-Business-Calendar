@@ -11,6 +11,8 @@ describe('parseAppPreferences', () => {
     expect(DEFAULT_APP_PREFERENCES).toEqual({
       accountMenuTrigger: 'click',
       showPlanInSidebar: true,
+      showSearchInSidebar: true,
+      workspaceOrder: ['today', 'calendar', 'tasks', 'search'],
       sidebarOnLaunch: 'remember',
       calendarHotkeys: { enabled: true, day: 'd', week: 'w', month: 'm' },
       showEventDetails: false,
@@ -37,6 +39,8 @@ describe('parseAppPreferences', () => {
     ).toEqual({
       accountMenuTrigger: 'hover',
       showPlanInSidebar: true,
+      showSearchInSidebar: true,
+      workspaceOrder: ['today', 'calendar', 'tasks', 'search'],
       sidebarOnLaunch: 'remember',
       calendarHotkeys: { enabled: true, day: 'x', week: 'w', month: 'm' },
       showEventDetails: false,

@@ -274,6 +274,34 @@
   color: var(--color-text-primary);
 }
 
+/* Drag to reorder: the held link lifts off the list and the highlight steps aside. */
+.workspaceListDragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.workspaceListDragging .workspaceNavItem {
+  cursor: grabbing;
+}
+
+.workspaceListDragging .workspaceHighlight {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.workspaceListDragging [data-tooltip]::after,
+.workspaceListDragging [data-tooltip]::before {
+  display: none;
+}
+
+.workspaceNavItemDragging,
+.workspaceNavItemDragging:hover {
+  background: var(--color-bg-surface-elevated) !important;
+  box-shadow:
+    0 0 0 1px var(--color-border),
+    var(--shadow-md);
+}
+
 .navItemHighlight:not(.navItemActive) {
   background: rgba(23, 104, 242, 0.06);
   border: 1px solid rgba(23, 104, 242, 0.16);

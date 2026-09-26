@@ -8,8 +8,8 @@
  * discarding the whole object. Unknown keys are dropped on parse, which makes
  * retiring a preference safe. Add new preferences here, never ad hoc in an app.
  *
- * Web-only today: `accountMenuTrigger`, `showPlanInSidebar`, and
- * `sidebarOnLaunch` (sidebar),
+ * Web-only today: `accountMenuTrigger`, `showPlanInSidebar`,
+ * `showSearchInSidebar`, `workspaceOrder`, and `sidebarOnLaunch` (sidebar),
  * `calendarHotkeys` (keyboard), and `showEventDetails` and `showWorkingHours`
  * (calendar).
  */
@@ -33,10 +33,33 @@ const calendarHotkeysSchema = z
   })
   .catch({ enabled: true, ...DEFAULT_CALENDAR_HOTKEYS });
 
+export const WORKSPACE_TABS = ['today', 'calendar', 'tasks', 'search'] as const;
+export type WorkspaceTab = (typeof WORKSPACE_TABS)[number];
+
+/**
+ * Keeps known tabs in the stored order, drops unknown or repeated ones, and
+ * appends any tab the stored order is missing, so adding or retiring a tab
+ * never loses one from the sidebar.
+ */
+export function normalizeWorkspaceOrder(value: readonly unknown[]): WorkspaceTab[] {
+  const known = new Set<string>(WORKSPACE_TABS);
+  const order: WorkspaceTab[] = [];
+  for (const tab of value) {
+    if (typeof tab === 'string' && known.has(tab) && !order.includes(tab as WorkspaceTab)) {
+      order.push(tab as WorkspaceTab);
+    }
+  }
+  return [...order, ...WORKSPACE_TABS.filter((tab) => !order.includes(tab))];
+}
+
 export const appPreferencesSchema = z.object({
   accountMenuTrigger: z.enum(['click', 'hover']).catch('click'),
   // Hiding the sidebar link keeps the plan reachable from Settings > Plan & billing.
   showPlanInSidebar: z.boolean().catch(true),
+  // Hiding the Workspace link leaves the /search route reachable by URL.
+  showSearchInSidebar: z.boolean().catch(true),
+  // Order of the sidebar's Workspace links, set in Customize or by dragging them.
+  workspaceOrder: z.array(z.unknown()).catch([]).transform(normalizeWorkspaceOrder),
   // How the sidebar starts when the app loads: as it was last left, or always open or collapsed.
   sidebarOnLaunch: z.enum(['remember', 'open', 'collapsed']).catch('remember'),
   calendarHotkeys: calendarHotkeysSchema,

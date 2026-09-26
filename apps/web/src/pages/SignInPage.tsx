@@ -1,9 +1,15 @@
-import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './pages.module.css';
 import { SignInForm, useAuth } from '../features/auth';
-import { PricingDecals, PublicHeader, usePricingDecalsExit } from '../features/public-site';
+import {
+  LoginBackdrop,
+  PricingDecals,
+  PublicHeader,
+  usePricingDecalsExit,
+} from '../features/public-site';
+import { useMeasuredHeight } from '../features/search/hooks/useMeasuredHeight';
 
 type PreviewEventTone = 'sky' | 'blue' | 'lavender' | 'green';
 
@@ -85,6 +91,7 @@ export function SignInPage() {
 
   return (
     <div className={styles.loginPage}>
+      <LoginBackdrop />
       <PublicHeader onAccountAction={scrollToSignIn} />
       {pricingDecals.isExiting ? (
         <PricingDecals mode="exit" onExited={pricingDecals.onExited} />
@@ -152,117 +159,130 @@ export function SignInPage() {
 }
 
 function CalendarPreview() {
+  // The tilt is laid out at 2x and scaled down (see `.calendarFrame`), so the
+  // frame reserves half its measured height to keep the page flow at 1x.
+  const [tiltRef, tiltHeight] = useMeasuredHeight<HTMLDivElement>();
+
   return (
     <div className={styles.calendarStage} aria-hidden="true">
-      <div className={styles.calendarPreview}>
-        <aside className={styles.previewSidebar}>
-          <div className={styles.previewBrand}>
-            <span className={styles.previewBrandLockup}>
-              <CalendarBrandMark />
-              <strong>BPlan</strong>
-            </span>
-            <span className={styles.previewCollapse}>
-              <SidebarIcon name="collapse" />
-            </span>
-          </div>
-          <div className={`${styles.previewNavItem} ${styles.previewNavItemActive}`}>
-            <SidebarIcon name="calendar" /> Calendar
-          </div>
-          <div className={styles.previewNavItem}>
-            <SidebarIcon name="tasks" /> My tasks
-          </div>
-          <div className={styles.previewNavItem}>
-            <SidebarIcon name="meetings" /> Meetings
-          </div>
-          <div className={styles.previewNavItem}>
-            <SidebarIcon name="team" /> Team
-          </div>
-          <div className={styles.previewNavItem}>
-            <SidebarIcon name="analytics" /> Analytics
-          </div>
-          <div className={styles.previewNavItem}>
-            <SidebarIcon name="settings" /> Settings
-          </div>
-          <div className={styles.previewCallout}>
-            <strong>Turn plans into progress</strong>
-            <span>Stay organized. Stay ahead.</span>
-            <svg viewBox="0 0 148 84" fill="none" aria-hidden="true">
-              <rect
-                x="19"
-                y="28"
-                width="44"
-                height="15"
-                rx="7.5"
-                transform="rotate(-48 19 28)"
-                fill="#bad4ff"
-              />
-              <path d="M35 84 81 37c6-6 15-6 21 0l46 47H35Z" fill="#8db8ff" fillOpacity=".76" />
-              <path d="m74 84 46-46c6-6 15-6 21 0l30 31v15H74Z" fill="#2f75ed" fillOpacity=".88" />
-              <path d="m107 84 19-20 20 20h-39Z" fill="#d9e8ff" fillOpacity=".9" />
-            </svg>
-          </div>
-        </aside>
-
-        <div className={styles.previewCalendar}>
-          <div className={styles.previewToolbar}>
-            <span className={styles.previewToday}>Today</span>
-            <span>Week</span>
-            <strong>Month</strong>
-            <span>Agenda</span>
-          </div>
-          <div className={styles.previewMonthRow}>
-            <h2>April 2025</h2>
-            <span className={styles.previewMonthControls}>
-              <i>‹</i>
-              <i>›</i>
-            </span>
-          </div>
-          <div className={styles.previewWeekdays}>
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className={styles.previewGrid}>
-            {CALENDAR_DAYS.map((day) => (
-              <div
-                key={`${day.month}-${day.date}`}
-                className={`${styles.previewDay} ${
-                  day.month !== 'April' ? styles.previewDayMuted : ''
-                }`}
-              >
-                <span>{day.date}</span>
-                {day.event ? (
-                  <span
-                    className={`${styles.previewEvent} ${styles[`previewEvent${day.event.tone}`]}`}
-                  >
-                    <strong>{day.event.title}</strong>
-                    <small>{day.event.time}</small>
-                  </span>
-                ) : null}
+      <div
+        className={styles.calendarFrame}
+        style={
+          tiltHeight === null
+            ? undefined
+            : ({ '--tilt-height': `${tiltHeight}px` } as CSSProperties)
+        }
+      >
+        <div ref={tiltRef} className={styles.calendarTilt}>
+          <div className={styles.calendarPreview}>
+            <aside className={styles.previewSidebar}>
+              <div className={styles.previewBrand}>
+                <span className={styles.previewBrandLockup}>
+                  <CalendarBrandMark />
+                  <strong>BPlan</strong>
+                </span>
+                <span className={styles.previewCollapse}>
+                  <SidebarIcon name="collapse" />
+                </span>
               </div>
-            ))}
-          </div>
-          <div className={styles.previewScribble}>
-            <svg viewBox="0 0 60 72" fill="none" aria-hidden="true">
-              <path
-                d="M51 65C27 67 16 54 20 39c3-12 17-14 23-7 5 6-1 14-10 11C19 38 29 17 47 11"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="m39 10 9-1-2 9"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span>
-              More meetings.
-              <br />
-              Bigger moves.
-            </span>
+              <div className={styles.previewNavItem}>
+                <SidebarIcon name="today" /> Today
+              </div>
+              <div className={`${styles.previewNavItem} ${styles.previewNavItemActive}`}>
+                <SidebarIcon name="calendar" /> Calendar
+              </div>
+              <div className={styles.previewNavItem}>
+                <SidebarIcon name="tasks" /> Tasks
+              </div>
+              <div className={styles.previewNavItem}>
+                <SidebarIcon name="search" /> Search
+              </div>
+              <div className={styles.previewCallout}>
+                <strong>Turn plans into progress</strong>
+                <span>Stay organized. Stay ahead.</span>
+                <svg viewBox="0 0 148 84" fill="none" aria-hidden="true">
+                  <rect
+                    x="19"
+                    y="28"
+                    width="44"
+                    height="15"
+                    rx="7.5"
+                    transform="rotate(-48 19 28)"
+                    fill="#bad4ff"
+                  />
+                  <path d="M35 84 81 37c6-6 15-6 21 0l46 47H35Z" fill="#8db8ff" fillOpacity=".76" />
+                  <path
+                    d="m74 84 46-46c6-6 15-6 21 0l30 31v15H74Z"
+                    fill="#2f75ed"
+                    fillOpacity=".88"
+                  />
+                  <path d="m107 84 19-20 20 20h-39Z" fill="#d9e8ff" fillOpacity=".9" />
+                </svg>
+              </div>
+            </aside>
+
+            <div className={styles.previewCalendar}>
+              <div className={styles.previewToolbar}>
+                <span className={styles.previewToday}>Today</span>
+                <span>Day</span>
+                <span>Week</span>
+                <strong>Month</strong>
+              </div>
+              <div className={styles.previewMonthRow}>
+                <h2>April 2025</h2>
+                <span className={styles.previewMonthControls}>
+                  <i>‹</i>
+                  <i>›</i>
+                </span>
+              </div>
+              <div className={styles.previewWeekdays}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+              <div className={styles.previewGrid}>
+                {CALENDAR_DAYS.map((day) => (
+                  <div
+                    key={`${day.month}-${day.date}`}
+                    className={`${styles.previewDay} ${
+                      day.month !== 'April' ? styles.previewDayMuted : ''
+                    }`}
+                  >
+                    <span>{day.date}</span>
+                    {day.event ? (
+                      <span
+                        className={`${styles.previewEvent} ${styles[`previewEvent${day.event.tone}`]}`}
+                      >
+                        <strong>{day.event.title}</strong>
+                        <small>{day.event.time}</small>
+                      </span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className={styles.previewScribble}>
+                <svg viewBox="0 0 60 72" fill="none" aria-hidden="true">
+                  <path
+                    d="M51 65C27 67 16 54 20 39c3-12 17-14 23-7 5 6-1 14-10 11C19 38 29 17 47 11"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="m39 10 9-1-2 9"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>
+                  More meetings.
+                  <br />
+                  Bigger moves.
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -270,12 +290,14 @@ function CalendarPreview() {
   );
 }
 
-function SidebarIcon({
-  name,
-}: {
-  name: 'calendar' | 'tasks' | 'meetings' | 'team' | 'analytics' | 'settings' | 'collapse';
-}) {
+function SidebarIcon({ name }: { name: 'today' | 'calendar' | 'tasks' | 'search' | 'collapse' }) {
   const paths: Record<typeof name, ReactNode> = {
+    today: (
+      <>
+        <circle cx="10" cy="10" r="7" />
+        <path d="M10 6.5V10l2.5 1.5" />
+      </>
+    ),
     calendar: (
       <>
         <rect x="3" y="5" width="14" height="12" rx="2" />
@@ -288,29 +310,10 @@ function SidebarIcon({
         <path d="m7 10 2 2 4-5" />
       </>
     ),
-    meetings: (
+    search: (
       <>
-        <rect x="3" y="5" width="14" height="12" rx="2" />
-        <path d="M7 3v4M13 3v4" />
-      </>
-    ),
-    team: (
-      <>
-        <circle cx="8" cy="7" r="2.5" />
-        <circle cx="14.5" cy="8" r="2" />
-        <path d="M3.5 17c.4-3.3 2-5 4.5-5s4.1 1.7 4.5 5M12 13c2.8-.7 4.4.6 4.8 3" />
-      </>
-    ),
-    analytics: (
-      <>
-        <path d="M4 16V9M9 16V5M14 16v-4M3 17h14" />
-        <path d="m4 7 4-3 4 3 4-5" />
-      </>
-    ),
-    settings: (
-      <>
-        <circle cx="10" cy="10" r="2.5" />
-        <path d="M10 2.5 11.2 4a6 6 0 0 1 1.7.7l1.9-.3 1.5 2.7-1.2 1.5a6 6 0 0 1 0 2.1l1.2 1.5-1.5 2.7-1.9-.3a6 6 0 0 1-1.7.7L10 17.5 8.8 16a6 6 0 0 1-1.7-.7l-1.9.3-1.5-2.7 1.2-1.5a6 6 0 0 1 0-2.1L3.7 7.8l1.5-2.7 1.9.3A6 6 0 0 1 8.8 4L10 2.5Z" />
+        <circle cx="9" cy="9" r="5.5" />
+        <path d="m13 13 4 4" />
       </>
     ),
     collapse: (

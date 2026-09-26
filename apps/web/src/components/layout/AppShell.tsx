@@ -1,103 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './AppShell.module.css';
 import { PageTransition } from './PageTransition';
 import { initialSidebarCollapsed, writeSidebarCollapsed } from './sidebar-collapse';
+import { WORKSPACE_NAV, type WorkspaceNavItem } from './workspace-nav';
 import { signOut, useAuth } from '../../features/auth';
 import { ProfileAvatar } from '../../features/settings/components/ProfileAvatar';
 import { useAppPreferences } from '../../features/settings/hooks/useAppPreferences';
+import { useDragReorder } from '../../features/settings/hooks/useDragReorder';
 import { useProfile } from '../../features/settings/hooks/useSettings';
+import { mergeVisibleOrder } from '../../features/settings/utils/reorder';
 
 /** Grace period so the pointer can cross the gap between the account button and its menu. */
 const HOVER_CLOSE_DELAY_MS = 180;
 
 /** Matches the sidebar width transition in AppShell.module.css, plus a frame of slack. */
 const SIDEBAR_ANIMATION_MS = 340;
-
-interface NavItemConfig {
-  to: string;
-  label: string;
-  icon: (props: { className?: string }) => React.JSX.Element;
-}
-
-function TodayIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
-}
-
-function TasksIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M9 11l3 3L22 4" />
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
 
 function SettingsIcon() {
   return (
@@ -176,24 +95,38 @@ function SignOutIcon() {
   );
 }
 
-const PRIMARY_NAV: NavItemConfig[] = [
-  { to: '/today', label: 'Today', icon: TodayIcon },
-  { to: '/calendar', label: 'Calendar', icon: CalendarIcon },
-  { to: '/tasks', label: 'Tasks', icon: TasksIcon },
-  { to: '/search', label: 'Search', icon: SearchIcon },
-];
+function matchesPath(pathname: string, path: string): boolean {
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
 
-const WORKSPACE_PATHS = ['/today', '/calendar', '/tasks', '/search'];
-
-function isWorkspacePath(pathname: string): boolean {
-  return WORKSPACE_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+// Only paths with a visible link count, so a hidden Search page gets no highlight.
+function isWorkspacePath(pathname: string, navItems: WorkspaceNavItem[]): boolean {
+  return navItems.some((item) => matchesPath(pathname, item.to));
 }
 
 export function AppShell() {
   const { email } = useAuth();
   const { data: profile } = useProfile();
-  const { accountMenuTrigger, showPlanInSidebar, sidebarOnLaunch } =
-    useAppPreferences().preferences;
+  const { preferences, setPreference } = useAppPreferences();
+  const {
+    accountMenuTrigger,
+    showPlanInSidebar,
+    showSearchInSidebar,
+    sidebarOnLaunch,
+    workspaceOrder,
+  } = preferences;
+  const visibleTabs = useMemo(
+    () => workspaceOrder.filter((tab) => tab !== 'search' || showSearchInSidebar),
+    [workspaceOrder, showSearchInSidebar],
+  );
+  const workspaceDrag = useDragReorder({
+    order: visibleTabs,
+    onReorder: (next) => setPreference('workspaceOrder', mergeVisibleOrder(workspaceOrder, next)),
+  });
+  const navItems = useMemo(
+    () => workspaceDrag.order.map((tab) => WORKSPACE_NAV[tab]),
+    [workspaceDrag.order],
+  );
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -230,13 +163,11 @@ export function AppShell() {
     const currentPath = location.pathname;
     prevPathRef.current = currentPath;
 
-    const wasWorkspace = isWorkspacePath(prevPath);
-    const isWorkspace = isWorkspacePath(currentPath);
+    const wasWorkspace = isWorkspacePath(prevPath, navItems);
+    const isWorkspace = isWorkspacePath(currentPath, navItems);
 
     if (isWorkspace) {
-      const activeIndex = PRIMARY_NAV.findIndex(
-        (item) => item.to === currentPath || currentPath.startsWith(`${item.to}/`),
-      );
+      const activeIndex = navItems.findIndex((item) => matchesPath(currentPath, item.to));
       const el = itemRefs.current[activeIndex];
       if (el) {
         setMetrics({
@@ -261,14 +192,12 @@ export function AppShell() {
         setMode('hidden');
       }
     }
-  }, [location.pathname]);
+  }, [location.pathname, navItems]);
 
   useEffect(() => {
     function handleResize() {
-      if (!isWorkspacePath(location.pathname)) return;
-      const activeIndex = PRIMARY_NAV.findIndex(
-        (item) => item.to === location.pathname || location.pathname.startsWith(`${item.to}/`),
-      );
+      if (!isWorkspacePath(location.pathname, navItems)) return;
+      const activeIndex = navItems.findIndex((item) => matchesPath(location.pathname, item.to));
       const el = itemRefs.current[activeIndex];
       if (el) {
         setMetrics({
@@ -280,7 +209,7 @@ export function AppShell() {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [location.pathname]);
+  }, [location.pathname, navItems]);
 
   useEffect(() => {
     if (!isAccountMenuOpen) return;
@@ -403,7 +332,11 @@ export function AppShell() {
         <nav className={styles.nav} aria-label="Main navigation">
           <div className={styles.navGroup}>
             <span className={styles.navGroupLabel}>Workspace</span>
-            <div className={styles.workspaceList}>
+            <div
+              className={`${styles.workspaceList} ${
+                workspaceDrag.draggingKey ? styles.workspaceListDragging : ''
+              }`}
+            >
               {metrics && mode !== 'hidden' && (
                 <div
                   className={`${styles.workspaceHighlight} ${
@@ -435,19 +368,27 @@ export function AppShell() {
                   aria-hidden="true"
                 />
               )}
-              {PRIMARY_NAV.map((item, index) => (
+              {navItems.map((item, index) => (
                 <NavLink
                   key={item.to}
                   to={item.to}
                   aria-label={item.label}
                   data-tooltip={item.label}
+                  draggable={false}
                   ref={(el) => {
                     itemRefs.current[index] = el;
+                    workspaceDrag.register(item.tab)(el);
                   }}
+                  style={workspaceDrag.itemStyle(item.tab, index)}
+                  // Mouse and pen drag to reorder; touch keeps scrolling and uses Customize.
+                  onPointerDown={(event) => {
+                    if (event.pointerType !== 'touch') workspaceDrag.startDrag(item.tab, event);
+                  }}
+                  onClickCapture={workspaceDrag.suppressClickAfterDrag}
                   className={({ isActive }) =>
                     `${styles.navItem} ${styles.workspaceNavItem} ${
                       isActive ? styles.workspaceNavItemActive : ''
-                    }`
+                    } ${workspaceDrag.draggingKey === item.tab ? styles.workspaceNavItemDragging : ''}`
                   }
                 >
                   <span className={styles.navIcon}>
