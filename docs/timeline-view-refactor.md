@@ -85,7 +85,7 @@ All paths are under `apps/web/src/features/calendar/`.
 | `utils/timeline-format.ts`            | `formatHour`, `formatMinute`, `formatEventTime`, `formatDuration` (pure).                                                                                                                                                                       | 1 ✅  |
 | `components/EventButton.tsx`          | `EventButton` + `EventButtonProps` — event block presentation (resp. 3).                                                                                                                                                                        | 1 ✅  |
 | `components/OriginGhost.tsx`          | `OriginGhost` + `OriginGhostProps` (resp. 4).                                                                                                                                                                                                   | 1 ✅  |
-| `utils/timeline-day-layout.ts`        | Pure per-day layout (resp. 10): day filtering, override/preview projection, visible interval, gesture ordering, draft slot, `layoutOverlappingEvents`, `sortByRenderOrder`, per-event minute geometry. Takes gesture snapshots as plain inputs. | 2     |
+| `utils/timeline-day-layout.ts`        | Pure per-day layout (resp. 10): day filtering, override/preview projection, visible interval, gesture ordering, draft slot, `layoutOverlappingEvents`, `sortByRenderOrder`, per-event minute geometry. Takes gesture snapshots as plain inputs. | 2 ✅  |
 | `components/TimelineDraftEvent.tsx`   | Timed draft block and all-day draft chip (resp. 9) — both render `DraftEventState` with the same colour/title fallback.                                                                                                                         | 3     |
 | `components/TimelineAllDayRow.tsx`    | All-day label + grid, click-to-create all-day slot, compact `EventButton`s, draft chip (resp. 8).                                                                                                                                               | 3     |
 | `hooks/useTimelineSlotSelection.ts`   | `dragSelection` state, press/hold timer, column pointer handlers, anchor rect (resp. 11). Pure snapping maths goes to `utils/slot-selection.ts` so `slot-selection.test.ts` can test the production code.                                       | 4     |
@@ -160,7 +160,7 @@ everything.
 | #   | Phase                                                            | Status   |
 | --- | ---------------------------------------------------------------- | -------- |
 | 1   | Presentational extraction: formatters, `EventButton`, ghost      | complete |
-| 2   | Pure per-day layout (`timeline-day-layout.ts`) + unit tests      | pending  |
+| 2   | Pure per-day layout (`timeline-day-layout.ts`) + unit tests      | complete |
 | 3   | Draft event + all-day row components                             | pending  |
 | 4   | Slot selection hook (+ pure `slot-selection.ts`), initial scroll | pending  |
 | 5   | Shared gesture feedback hook                                     | pending  |
@@ -171,6 +171,8 @@ everything.
 | 10  | CSS module split (conditional)                                   | pending  |
 
 ### Phase 1 — Presentational extraction · complete
+
+Commit: `b1858dea0304011e30719643d7f95e25dd7ac38c`.
 
 Moved verbatim (byte-identical bodies, verified with `diff` against the
 baseline):
@@ -220,20 +222,69 @@ Decisions:
   it is independently tested and phase 5 (exiting-ghost lifecycle) consumes it.
 - Styles stay in `CalendarView.module.css` for now (see phase 10).
 
-### Phase 2 — Pure per-day layout · pending
+### Phase 2 — Pure per-day layout · complete
 
-Extract the body of the `dateKeys.map` column computation into
-`utils/timeline-day-layout.ts`. Inputs: the day's `dateKey`, `dayStart`/`dayEnd`,
-`allTimedOccurrences`, `timingOverrides`, `timeZone`, the active resize
-snapshot (`occurrenceKey`, `currentMinutes`, `originalMinutes`) and active move
-snapshot (`occurrenceKey`, `dateKey` from `movePreview`, `currentMinutes`,
-`originalMinutes`) exactly as read today (refs + preview state), and the draft
-(`draftEvent`, `dragSelection !== null`). Output: `laidOut` (stable order),
-`draftPlacement`, and per-item `startMinute`/`endMinute`. `DRAFT_LAYOUT_KEY`,
-`DraftLayoutSlot`, `isOccurrence`, `sortByRenderOrder` move with it. Rendering,
-capability checks, handler wiring stay in `TimelineView`. Add unit tests that
-pin stable render order across column changes, gesture-original ordering,
-draft-last ordering, override day placement, and cross-day move placement.
+Moved the per-column timed-layout computation out of the `dateKeys.map` render
+body into `layoutTimelineDay(input): TimelineDayLayout` in
+`utils/timeline-day-layout.ts`. Statements are moved as-is; only the names of
+the gesture inputs changed (see API).
+
+API (typed object in, object out):
+
+- `TimelineDayLayoutInput`: `dateKey`, `timeZone`, `occurrences` (all timed
+  occurrences, in render order), `timingOverrides`, `resize`
+  (`TimelineGestureSnapshot | null` — from `resizeRef.current`),
+  `resizePreviewKey` (`resizePreview?.occurrenceKey`), `move`
+  (`TimelineMoveSnapshot | null` — passed only when the move is dragging and
+  its preview matches, i.e. the old `isDraggingMove`; `dateKey` comes from
+  `movePreview.dateKey`), `draft` (`draftEvent`), `hasDragSelection`.
+- `TimelineDayLayout`: `events` (`LaidOutItem<EventOccurrence>` plus visible
+  `startMinute`/`endMinute`, in stable render order) and `draftPlacement`
+  (`{ left, width } | undefined`).
+- `resizePreviewKey` is separate from `resize` on purpose: the old code
+  re-timed the resized event only when `resizePreview`'s key matched, while
+  gesture ordering used the ref alone. Keeping both inputs keeps that exact.
+- The module imports `EventOccurrence` from `utils/calendar-occurrences` and
+  types overrides structurally, so `utils` does not import from
+  `components`/`hooks`.
+
+Responsibility that left `TimelineView` (resp. 10 minus capability/geometry
+rendering): day membership (overrides and live cross-day move), resize/move
+preview projection, visible-interval clamping, gesture-original column
+ordering, draft layout slot + rightmost ordering, `layoutOverlappingEvents`,
+stable render ordering (`sortByRenderOrder`), and visible start/end minutes.
+Still in `TimelineView`: reading the refs/preview state to build the
+snapshots, `sourceOccurrence`, pixel geometry (`top`/`height`),
+`canResize`/`canMove`, preview/feedback props and handler wiring, and draft
+rendering (which still repeats the draft visibility condition — phase 3).
+
+Files changed:
+
+- added `apps/web/src/features/calendar/utils/timeline-day-layout.ts`
+- added `apps/web/src/features/calendar/utils/timeline-day-layout.test.ts`
+  (11 tests: overlap columns, stable render order vs column order, day
+  membership and midnight clamping, timing overrides incl. to another day,
+  resize preview with original-interval ordering (and the contrast without
+  it), resize not re-timed until its preview shows, same-day move, cross-day
+  move placement over an override, draft rightmost column, draft excluded
+  during drag selection / other day / all-day)
+- changed `apps/web/src/features/calendar/components/TimelineView.tsx`
+  (1,628 → 1,498 lines): calls `layoutTimelineDay`; drops
+  `DRAFT_LAYOUT_KEY`, `DraftLayoutSlot`, `isOccurrence`, `sortByRenderOrder`,
+  `dayStart`/`dayEnd` and now-unused `@cal/domain` imports.
+- changed this tracker.
+
+Verification:
+
+- `vitest run src/features/calendar/utils/timeline-day-layout.test.ts`: 11/11.
+- `vitest run src/features/calendar`: 27 files / 243 tests pass (232 + 11).
+- web `tsc --noEmit`, `eslint apps/web/src/features/calendar`, `prettier`:
+  clean (after eslint `--fix` for import order).
+- `pnpm verify`: pass — apps/web 55 test files, domain 22, mobile 2, billing
+  10; web build succeeds.
+- Browser: not re-run (calendar route requires sign-in; see phase 1).
+
+Discoveries: see item 7 below (cross-day ordering uses original minutes).
 
 ### Phase 3 — Draft + all-day row components · pending
 
@@ -294,6 +345,12 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 6. `isSettled` matches either the occurrence key or the event id; `canMove`
    stays true for the event currently being moved even if it would otherwise
    be immovable in the target column.
+7. **Cross-day moves keep original-minute column ordering on the target
+   day.** Gesture ordering projects the dragged event's _original_ wall-clock
+   minutes onto whatever day it is previewed on, so in the target column it is
+   ordered as if it started at its original time (e.g. a 9:30 event dragged to
+   14:30 next to a 14:00 event keeps the left column). Pinned by a
+   `timeline-day-layout` test; not changed.
 
 ## Verification log
 
@@ -301,21 +358,24 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
 | base  | `vitest run src/features/calendar`                                                                                                              | 25 files / 228 tests pass     |
 | 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline | all pass (232 calendar tests) |
+| 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                   | all pass (243 calendar tests) |
 
 ## Current checkpoint
 
-Phase 1 complete and committed on `web-refactor/timeline-view`
-(`refactor(web): extract TimelineView event presentation (phase 1)`).
-`TimelineView.tsx` is 1,628 lines and still owns responsibilities 1, 5–16.
+Phase 2 complete and committed on `web-refactor/timeline-view`
+(`refactor(web): extract TimelineView per-day layout (phase 2)`), pushed to
+`origin`. `TimelineView.tsx` is 1,498 lines and still owns responsibilities
+1, 5–9, 11–16 plus the render-side half of 10.
 
 ## Next step
 
-Start **Phase 2**: create `utils/timeline-day-layout.ts` by moving the
-per-column timed-layout computation (from `const timed = allTimedOccurrences`
-through `const laidOut = sortByRenderOrder(...)`, plus `DRAFT_LAYOUT_KEY`,
-`DraftLayoutSlot`, `isOccurrence`, `sortByRenderOrder`) into a pure function
-with explicit gesture-snapshot inputs, add its unit tests, and keep
-`TimelineView` reading refs/preview state and passing them in unchanged.
+Start **Phase 3**: extract `components/TimelineDraftEvent.tsx` (the timed
+draft block rendered in each day column, and the all-day draft chip) and
+`components/TimelineAllDayRow.tsx` (all-day label + grid, click-to-create
+all-day slot, compact `EventButton`s, draft chip). Pure props-in rendering;
+keep class names, `data-quick-create-draft`, and the `.timelineEvent`
+`closest` check on the all-day column exactly as they are. The timed draft
+takes `draftPlacement` from `layoutTimelineDay`.
 
 ---
 

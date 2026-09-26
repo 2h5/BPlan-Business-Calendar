@@ -1,11 +1,4 @@
-import {
-  addZonedDays,
-  type LaidOutItem,
-  layoutOverlappingEvents,
-  MIN_VISUAL_MINUTES,
-  minuteOfDay,
-  toZonedDateKey,
-} from '@cal/domain';
+import { minuteOfDay, toZonedDateKey } from '@cal/domain';
 import type { HourCycle, WorkingHours } from '@cal/schemas';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -36,6 +29,7 @@ import {
   type MinuteInterval,
   type ResizeEdge,
 } from '../utils/event-resize';
+import { layoutTimelineDay } from '../utils/timeline-day-layout';
 import { formatHour, formatMinute } from '../utils/timeline-format';
 import { initialScrollHour } from '../utils/timeline-initial-scroll';
 import { offHoursBands } from '../utils/working-hours-bands';
@@ -94,32 +88,6 @@ export interface TimelineViewProps {
 
 /** Shortest event, in minutes on the grid, that has room for the details line. */
 export const EVENT_DETAILS_MIN_MINUTES = 45;
-
-const DRAFT_LAYOUT_KEY = '__quick-create-draft__';
-
-/** The unsaved quick-create draft, placed alongside real events in the overlap layout. */
-interface DraftLayoutSlot {
-  key: typeof DRAFT_LAYOUT_KEY;
-  start: number;
-  end: number;
-}
-
-function isOccurrence(item: EventOccurrence | DraftLayoutSlot): item is EventOccurrence {
-  return 'event' in item;
-}
-
-/**
- * Keeps event buttons in one fixed DOM order. Layout output is grouped by
- * column, so rendering it directly makes React move nodes whenever columns
- * change, and moving a node drops its pointer capture in the middle of a drag.
- */
-function sortByRenderOrder<T extends { item: { key: string } }>(
-  laidOut: T[],
-  source: readonly { key: string }[],
-): T[] {
-  const rank = new Map(source.map((item, index) => [item.key, index]));
-  return [...laidOut].sort((a, b) => (rank.get(a.item.key) ?? 0) - (rank.get(b.item.key) ?? 0));
-}
 
 export function TimelineView({
   dateKeys,
@@ -1254,126 +1222,35 @@ export function TimelineView({
 
         <div className={styles.dayColumns}>
           {dateKeys.map((dateKey) => {
-            const dayStart = dateKeyToInstant(dateKey, timeZone);
-            const dayEnd = addZonedDays(dayStart, 1, timeZone);
             const activeResize = resizeRef.current;
             const activeMove = moveRef.current;
             const isDraggingMove =
               activeMove?.status === 'dragging' &&
               movePreview?.occurrenceKey === activeMove.occurrence.key;
-
-            const timed = allTimedOccurrences
-              .filter((item) => {
-                if (isDraggingMove && item.key === activeMove.occurrence.key) {
-                  return movePreview.dateKey === dateKey;
-                }
-                const optimistic = timingOverrides?.get(item.event.id);
-                if (optimistic) {
-                  return toZonedDateKey(new Date(optimistic.start), timeZone) === dateKey;
-                }
-                return toZonedDateKey(new Date(item.start), timeZone) === dateKey;
-              })
-              .map((item) => {
-                const optimistic = timingOverrides?.get(item.event.id);
-                const isThisResizing =
-                  resizePreview?.occurrenceKey === item.key && Boolean(activeResize);
-                const isThisMoving = isDraggingMove && item.key === activeMove.occurrence.key;
-
-                if (isThisResizing && activeResize) {
-                  const start = dateMinuteToInstant(
-                    dateKey,
-                    activeResize.currentMinutes.startMinute,
-                    timeZone,
-                  );
-                  const end = dateMinuteToInstant(
-                    dateKey,
-                    activeResize.currentMinutes.endMinute,
-                    timeZone,
-                  );
-                  if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
-                }
-                if (isThisMoving && activeMove) {
-                  const start = dateMinuteToInstant(
-                    dateKey,
-                    activeMove.currentMinutes.startMinute,
-                    timeZone,
-                  );
-                  const end = dateMinuteToInstant(
-                    dateKey,
-                    activeMove.currentMinutes.endMinute,
-                    timeZone,
-                  );
-                  if (start && end) return { ...item, start: start.getTime(), end: end.getTime() };
-                }
-                return optimistic ? { ...item, ...optimistic } : item;
-              });
-            const visibleInterval = (item: { start: number; end: number }) => ({
-              start: Math.max(item.start, dayStart.getTime()),
-              end: Math.max(
-                Math.min(item.end, dayEnd.getTime()),
-                Math.max(item.start, dayStart.getTime()) + MIN_VISUAL_MINUTES * 60_000,
-              ),
-            });
-            // While an event is being resized or dragged, order columns by where it
-            // started, not where the pointer has taken it. Otherwise it swaps sides
-            // each time it passes a neighbour's start (and flickers when a magnetic
-            // snap makes the two starts equal). The normal order returns on drop.
-            const gesture = activeResize
-              ? { key: activeResize.occurrence.key, minutes: activeResize.originalMinutes }
-              : isDraggingMove
-                ? { key: activeMove.occurrence.key, minutes: activeMove.originalMinutes }
-                : null;
-            const gestureStart = gesture
-              ? dateMinuteToInstant(dateKey, gesture.minutes.startMinute, timeZone)
-              : null;
-            const gestureEnd = gesture
-              ? dateMinuteToInstant(dateKey, gesture.minutes.endMinute, timeZone)
-              : null;
-            const gestureOrder =
-              gestureStart && gestureEnd
-                ? visibleInterval({ start: gestureStart.getTime(), end: gestureEnd.getTime() })
-                : null;
-            // The quick-create draft takes a real layout column so events it
-            // overlaps shift aside instead of being hidden underneath it.
-            const draftStart =
-              draftEvent &&
-              draftEvent.dateKey === dateKey &&
-              !draftEvent.allDay &&
-              draftEvent.startMinute !== undefined &&
-              draftEvent.endMinute !== undefined &&
-              !dragSelection
-                ? dateMinuteToInstant(dateKey, draftEvent.startMinute, timeZone)
-                : null;
-            const draftEnd =
-              draftStart && draftEvent?.endMinute !== undefined
-                ? dateMinuteToInstant(dateKey, draftEvent.endMinute, timeZone)
-                : null;
-            const draftSlot: DraftLayoutSlot | null =
-              draftStart && draftEnd
-                ? { key: DRAFT_LAYOUT_KEY, start: draftStart.getTime(), end: draftEnd.getTime() }
-                : null;
-            const layout = layoutOverlappingEvents<EventOccurrence | DraftLayoutSlot>(
-              draftSlot ? [...timed, draftSlot] : timed,
-              visibleInterval,
-              {
-                getOrderInterval: (item) => {
-                  // Keep the draft in the rightmost column it can take.
-                  if (item === draftSlot) {
-                    return { start: Number.MAX_SAFE_INTEGER, end: Number.MAX_SAFE_INTEGER };
+            const { events: laidOut, draftPlacement } = layoutTimelineDay({
+              dateKey,
+              timeZone,
+              occurrences: allTimedOccurrences,
+              timingOverrides,
+              resize: activeResize
+                ? {
+                    occurrenceKey: activeResize.occurrence.key,
+                    originalMinutes: activeResize.originalMinutes,
+                    currentMinutes: activeResize.currentMinutes,
                   }
-                  return gestureOrder && item.key === gesture?.key
-                    ? gestureOrder
-                    : visibleInterval(item);
-                },
-              },
-            );
-            const draftPlacement = layout.find((placed) => placed.item === draftSlot);
-            const laidOut = sortByRenderOrder(
-              layout.filter((placed): placed is LaidOutItem<EventOccurrence> =>
-                isOccurrence(placed.item),
-              ),
-              timed,
-            );
+                : null,
+              resizePreviewKey: resizePreview?.occurrenceKey ?? null,
+              move: isDraggingMove
+                ? {
+                    occurrenceKey: activeMove.occurrence.key,
+                    dateKey: movePreview.dateKey,
+                    originalMinutes: activeMove.originalMinutes,
+                    currentMinutes: activeMove.currentMinutes,
+                  }
+                : null,
+              draft: draftEvent,
+              hasDragSelection: Boolean(dragSelection),
+            });
             const nowTop =
               dateKey === todayKey ? (minuteOfDay(now, timeZone) / 60) * hourHeight : null;
 
@@ -1489,14 +1366,7 @@ export function TimelineView({
                       : undefined) ??
                     allTimedOccurrences.find((occ) => occ.key === placed.item.key) ??
                     placed.item;
-                  const startMinute =
-                    placed.interval.start <= dayStart.getTime()
-                      ? 0
-                      : minuteOfDay(new Date(placed.interval.start), timeZone);
-                  const endMinute =
-                    placed.interval.end >= dayEnd.getTime()
-                      ? 24 * 60
-                      : minuteOfDay(new Date(placed.interval.end), timeZone);
+                  const { startMinute, endMinute } = placed;
                   const top = (startMinute / 60) * hourHeight;
                   const height = Math.max(
                     ((endMinute - startMinute) / 60) * hourHeight - 2,
