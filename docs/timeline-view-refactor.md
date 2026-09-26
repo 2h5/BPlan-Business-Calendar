@@ -28,7 +28,8 @@ re-implements them.
   (`Merge branch 'web'`)
 - Original baseline: `c58d2238b3f048f0de14e5ea99a02001fe8b3f78`
   (`feat(web): Search page redesign, workspace ordering, and login motion`)
-  on `web`, before `web` was merged into `main`.
+  on `web`, before `web` was merged into `main`. The original phase 1–2
+  commits lived on `web-refactor/timeline-view`, deleted after phase 4.
 - `TimelineView.tsx` at baseline: 1,916 lines, exporting `TimelineView`,
   `EventButton`, `OriginGhost`, `EVENT_DETAILS_MIN_MINUTES` and the types
   `SlotSelection`, `DraftEventState`, `EventTiming`, `TimelineViewProps`,
@@ -91,8 +92,8 @@ All paths are under `apps/web/src/features/calendar/`.
 | `utils/timeline-day-layout.ts`        | Pure per-day layout (resp. 10): day filtering, override/preview projection, visible interval, gesture ordering, draft slot, `layoutOverlappingEvents`, `sortByRenderOrder`, per-event minute geometry. Takes gesture snapshots as plain inputs. | 2 ✅  |
 | `components/TimelineDraftEvent.tsx`   | Timed draft block and all-day draft chip (resp. 9) — both render `DraftEventState` with the same colour/title fallback.                                                                                                                         | 3 ✅  |
 | `components/TimelineAllDayRow.tsx`    | All-day label + grid, click-to-create all-day slot, compact `EventButton`s, draft chip (resp. 8).                                                                                                                                               | 3 ✅  |
-| `hooks/useTimelineSlotSelection.ts`   | `dragSelection` state, press/hold timer, column pointer handlers, anchor rect (resp. 11). Pure snapping maths goes to `utils/slot-selection.ts` so `slot-selection.test.ts` can test the production code.                                       | 4     |
-| `hooks/useTimelineInitialScroll.ts`   | Scroll-key memo + `initialScrollHour` effect (resp. 6). Only if still worth a file after phase 4; otherwise stays inline.                                                                                                                       | 4     |
+| `hooks/useTimelineSlotSelection.ts`   | `dragSelection` state, press/hold timer, column pointer handlers, anchor rect (resp. 11). Pure snapping maths goes to `utils/slot-selection.ts` so `slot-selection.test.ts` can test the production code.                                       | 4 ✅  |
+| `hooks/useTimelineInitialScroll.ts`   | Scroll-key memo + `initialScrollHour` effect (resp. 6). Only if still worth a file after phase 4; otherwise stays inline.                                                                                                                       | 4 ✅  |
 | `hooks/useTimelineGestureFeedback.ts` | Magnetic snap, conflict flag, snap direction, settle timer, exiting-ghost timer, click-suppression ref + release, their unmount cleanup (resp. 14). Shared by move and resize.                                                                  | 5     |
 | `hooks/useTimelineAutoScroll.ts`      | rAF loop, `lastPointerRef`, `stop` / `check` / `step` (resp. 15). Gesture-agnostic: takes the scroll container, an "is a gesture active" probe and an "apply at pointer/scrollTop" callback.                                                    | 6     |
 | `hooks/useTimelineResize.ts`          | Resize ref/preview, handle pointer handlers, `applyResizePosition`, `finishResize`, Escape/window-fallback entry points (resp. 12).                                                                                                             | 7     |
@@ -165,7 +166,7 @@ everything.
 | 1   | Presentational extraction: formatters, `EventButton`, ghost      | complete |
 | 2   | Pure per-day layout (`timeline-day-layout.ts`) + unit tests      | complete |
 | 3   | Draft event + all-day row components                             | complete |
-| 4   | Slot selection hook (+ pure `slot-selection.ts`), initial scroll | pending  |
+| 4   | Slot selection hook (+ pure `slot-selection.ts`), initial scroll | complete |
 | 5   | Shared gesture feedback hook                                     | pending  |
 | 6   | Shared auto-scroll hook                                          | pending  |
 | 7   | Resize hook                                                      | pending  |
@@ -383,60 +384,177 @@ Verification:
 
 Discoveries: see item 8 below (all-day draft hidden without all-day events).
 
-### Phase 4 — Slot selection · next
+### Phase 4 — Slot selection · complete
 
-Scope: resp. 11 (slot selection) and, conditionally, resp. 6 (initial scroll).
-No change to gestures, layout, drafts or the all-day row.
+Commit: `refactor(web): extract TimelineView slot selection (phase 4)` on
+`refactor/timeline-view` (the commit that adds this section).
 
-1. **`utils/slot-selection.ts`** — pure maths lifted verbatim from the column
-   handlers, one function per expression so the handlers read the same:
-   - `pressStartMinute(offsetY, hourHeight)` —
-     `max(0, min(23*60+45, floor((y / hourHeight * 60) / 15) * 15))`.
-   - `dragMinute(offsetY, columnHeight, hourHeight)` — clamps `y` to
-     `[0, columnHeight]`, then `max(0, min(24*60, floor(raw / 15) * 15))`.
-   - `dragRange(startMinute, currentMinute)` — `{ startMinute: min, endMinute:
-min(24*60, max + 15) }`.
-   - `hasPointerMoved(dx, dy)` — `dx >= 6 || dy >= 6` (the click check is its
-     negation, as now: `< 6 && < 6`).
-   - `clickRange(startMinute, defaultDurationMinutes)` — end clamped to 24:00.
-   - `slotAnchorRect(colRect, startMinute, endMinute, hourHeight)` — 20 px
-     minimum height.
-   - Export `SLOT_HOLD_DELAY_MS = 180` (moved from `HOLD_DELAY_MS`).
-2. **Point `utils/slot-selection.test.ts` at production code** (discovery 5):
-   replace its private `snapToSlot`/`computeDragRange`/`formatMinute` copies
-   with the new exports and `timeline-format`'s `formatMinute`; keep every
-   existing expectation that still describes production behaviour, and add the
-   `24:00` label case. Any expectation that only held for the private copy is
-   recorded as a discovery, not "fixed" in production.
-3. **`hooks/useTimelineSlotSelection.ts`** —
-   `useTimelineSlotSelection({ hourHeight, defaultDurationMinutes,
-onSelectSlot })` returning `{ dragSelection, handleColumnPointerDown,
-handleColumnPointerMove, handleColumnPointerUp, handleColumnPointerCancel }`
-   with the current `(e, dateKey)` signatures. Owns `dragSelection` state,
-   `dragRef`, `holdTimerRef` and the hold timer's unmount cleanup (split out
-   of `TimelineView`'s shared unmount effect; the other three cleanups stay).
-   Handlers stay plain functions recreated each render — no `useCallback` —
-   so they keep reading `dragSelection` from the render closure (discovery 2).
-   The `.timelineEvent` `closest` guard, `e.button !== 0` check, pointer
-   capture/release (`try/catch`), and the `setDragSelection(null)` before
-   `onSelectSlot` stay in the same order.
-4. **`TimelineView`** calls the hook, keeps wiring the four handlers on each
-   `dayColumn`, keeps rendering the `dragSelectionIndicator` (not moved), and
-   keeps passing `hasDragSelection: Boolean(dragSelection)` to
-   `layoutTimelineDay` and the `!dragSelection` draft condition.
-5. **Initial scroll (conditional)** — move the scroll-key effect into
-   `hooks/useTimelineInitialScroll(scrollRef, { dateKeys, byDateKey,
-revealEventId, todayKey, now, timeZone, hourHeight })` only as a verbatim
-   move with the same dependency array and `initialScrollKeyRef`; it must stay
-   declared after the window-listener/Escape effects so effect order is
-   unchanged. If that ordering cannot be kept cleanly, leave it inline and
-   record why.
-6. **Tests/verification** — new `slot-selection` tests against production
-   code; all calendar tests; web `tsc`/eslint/prettier; `pnpm verify`. The
-   hook itself has no DOM test harness (no jsdom); its behaviour is covered by
-   the pure helpers plus the unchanged handler wiring, and any gap is recorded.
+Moved resp. 11 (timed-column slot selection) out of `TimelineView`, and resp. 6
+(initial scroll) as a verbatim effect move.
 
-### Phases 5–9 — Gesture machinery · pending
+`utils/slot-selection.ts` — pure maths lifted from the column handlers, same
+expressions and operand order:
+
+- `SLOT_HOLD_DELAY_MS = 180` (was `HOLD_DELAY_MS` in `TimelineView`).
+- `snapSlotStart(rawMinute)` — press start, floored to 15 min, clamped to
+  `[0, 23:45]`.
+- `snapToSlot(rawMinute)` — drag pointer minute, floored to 15 min, clamped to
+  `[0, 24:00]`.
+- `holdSlotRange(start)` — the held 15-minute box, end clamped to 24:00.
+- `dragSlotRange(start, rawMinute)` — snaps, then `min`/`max + 15`, end clamped.
+- `clickSlotRange(start, defaultDurationMinutes)` — end clamped to 24:00.
+- `hasSlotDragStarted(dx, dy)` (`dy >= 6 || dx >= 6`, pointer-move) and
+  `isSlotClick(dx, dy)` (`dy < 6 && dx < 6`, pointer-up). Kept as two
+  functions rather than one negation so each call site evaluates exactly the
+  comparison it did before.
+- `slotAnchorRect(colRect, range, hourHeight)` — popover anchor, 20 px minimum
+  height. Takes `AnchorRect` from `utils/popover-position` (where it is
+  defined), so `utils` still never imports `components`.
+
+`hooks/useTimelineSlotSelection.ts` — API:
+
+```ts
+useTimelineSlotSelection({ hourHeight, defaultDurationMinutes, onSelectSlot })
+  → { dragSelection, handleColumnPointerDown, handleColumnPointerMove,
+      handleColumnPointerUp, handleColumnPointerCancel }
+```
+
+- Owns `dragSelection` state (`TimelineDragSelection`), `dragRef`,
+  `holdTimerRef`, the 180 ms hold timer, pointer capture/release (best-effort
+  `try/catch`), click-vs-drag, 15-minute snapping, range expansion,
+  finalisation, cancel, anchor-rect construction and its own hold-timer
+  unmount cleanup.
+- Handlers keep the `(e, dateKey)` signatures and stay plain functions
+  recreated every render (no `useCallback`), so they read `dragSelection` from
+  their render closure exactly as before (discovery 2). Statement order inside
+  each handler is unchanged, including `setDragSelection(null)` before
+  `onSelectSlot`.
+- The `.timelineEvent` `closest` guard stays the first statement of
+  pointer-down. The hook imports `CalendarView.module.css` for that selector:
+  the column and the event must resolve the same module class (see phase 10),
+  and taking the selector as an option would add API for no caller.
+- `TimelineView` consumes only `dragSelection` (drag indicator,
+  `hasDragSelection` for `layoutTimelineDay`, the `!dragSelection` timed-draft
+  condition) and wires the four handlers onto each `dayColumn` unchanged.
+
+Initial scroll — **extracted** to `hooks/useTimelineInitialScroll.ts`:
+`useTimelineInitialScroll(scrollRef, { dateKeys, byDateKey, revealEventId,
+todayKey, now, timeZone, hourHeight })`. The effect body, scroll key and
+`initialScrollKeyRef` moved verbatim; the hook is called at the exact spot the
+effect was declared (after the window-listener and Escape effects), so effect
+order and timing are unchanged, and it shares nothing with slot selection.
+The only difference is `scrollRef` in the dependency array (required by
+`react-hooks/exhaustive-deps` once the ref arrives as a parameter); it is
+`TimelineView`'s own `useRef` object, so it never changes and never re-runs
+the effect.
+
+Ownership decisions:
+
+- Hook call order in `TimelineView` changed (the slot-selection hook replaces
+  the first `useState`; its refs/effect used to be declared later). Hook order
+  only has to be stable between renders, which it is. The hold-timer cleanup
+  now runs from the hook's own unmount effect instead of the shared one; each
+  cleanup only clears its own timer, so their relative order is irrelevant.
+  `TimelineView`'s shared unmount effect keeps `stopAutoScroll` and the settle
+  and ghost timers (phases 5–6).
+- The drag-selection indicator JSX stays in `TimelineView` (day-column chrome;
+  not in scope).
+
+Files changed:
+
+- added `apps/web/src/features/calendar/utils/slot-selection.ts`
+- changed `apps/web/src/features/calendar/utils/slot-selection.test.ts` — now
+  imports the production helpers and `timeline-format`'s `formatMinute`
+  (12 tests: every previous snapping/range/format/threshold expectation kept,
+  plus press-start clamp to 23:45, hold box, drag end-of-day clamp, click
+  default duration + 24:00 clamp, anchor rect incl. 20 px minimum, the
+  `24:00` label, exactly-6 px is a drag). The private popover-placement copy
+  was removed: it re-implemented an older placement rule, not production;
+  `utils/popover-position.test.ts` covers the real `calculatePopoverPosition`.
+  The two constant-comparison tests now assert the production constant and
+  threshold helpers.
+- added `apps/web/src/features/calendar/hooks/useTimelineSlotSelection.ts`
+- added `apps/web/src/features/calendar/hooks/useTimelineSlotSelection.test.tsx`
+  (8 tests: initial `null`, quick click → default-duration slot + anchor
+  geometry with the hold timer cleared before it fires, capture/release on
+  pointer id, default duration clamped to 24:00, hold timer armed for exactly
+  180 ms, presses on `.timelineEvent` or non-primary buttons ignored (exact
+  selector), pointer-up on another column ignored, cancel releases capture
+  and prevents selection, capture failures tolerated). The hook runs inside a
+  `renderToStaticMarkup` harness (no DOM in web Vitest), so state updates are
+  not observable; drag-range finalisation from `dragSelection` is covered by
+  the pure helpers only.
+- added `apps/web/src/features/calendar/hooks/useTimelineInitialScroll.ts`
+  (no new test: verbatim effect move; `initialScrollHour` keeps its own tests,
+  and effects do not run under static rendering)
+- changed `apps/web/src/features/calendar/components/TimelineView.tsx`
+  (1,430 → 1,270 lines): calls both hooks; drops `HOLD_DELAY_MS`,
+  `dragSelection` state, `dragRef`, `holdTimerRef`, the four column handlers,
+  the hold-timer cleanup, `initialScrollKeyRef`, the initial-scroll effect and
+  the `initialScrollHour` import.
+- changed this tracker.
+
+Verification:
+
+- `vitest run` `slot-selection.test.ts` 12/12, `useTimelineSlotSelection.test.tsx`
+  8/8.
+- `vitest run src/features/calendar`: 30 files / 264 tests pass (252 − 3
+  removed private-copy tests + 15 new).
+- web `tsc --noEmit`: clean. `eslint apps/web/src/features/calendar`: clean
+  (after adding `scrollRef` to the deps, above). `prettier --check`: clean.
+- `pnpm verify`: pass — apps/web 60 files / 443 tests, domain 22 / 348,
+  mobile 2 / 11, billing 10 / 201; web build succeeds (existing chunk-size
+  warning only).
+- Browser: not run (calendar route requires sign-in; see phase 1).
+
+Discoveries: item 5 resolved as planned (test target only; no production
+change). New item 9 below.
+
+### Phase 5 — Shared gesture feedback · next
+
+Scope: resp. 14 only. No change to slot selection, layout, drafts, all-day,
+auto-scroll (phase 6), or the move/resize pointer logic itself (phases 7–8).
+
+1. **`hooks/useTimelineGestureFeedback.ts`** owns, moved verbatim:
+   - `magneticSnap` state, `hasConflict` state, `snapDirection` state;
+   - `settledOccurrenceKey` state, `settleTimerRef`, `SETTLE_ANIMATION_MS`,
+     `triggerSettle(key)`, `clearSettle()`;
+   - `exitingGhost` state, `ghostExitTimerRef`, `GHOST_EXIT_ANIMATION_MS`,
+     `clearExitingGhost()`, plus `showExitingGhost(ghost)` for the
+     set-ghost + restart-140 ms-timer sequence currently written out in both
+     `finishMove` and the Escape listener (same statements, same order);
+   - `suppressedClickKeyRef`, plus `releaseSuppressedClickSoon(key)` for the
+     `setTimeout(0)` release written out in `finishResize`, `finishMove` and
+     twice in Escape, and `shouldSuppressSelect(key)` for the consume-once
+     check passed to `EventButton`;
+   - the settle and ghost timer cleanups, split out of `TimelineView`'s shared
+     unmount effect (which then keeps only `stopAutoScroll`).
+2. **API shape** — return the five display values (`magneticSnap`,
+   `hasConflict`, `snapDirection`, `settledOccurrenceKey`, `exitingGhost`) and
+   named actions. The move/resize code still sets magnetic snap, conflict and
+   snap direction directly, so expose `setMagneticSnap`, `setHasConflict`,
+   `setSnapDirection` as-is rather than inventing a combined reset (a combined
+   reset would reorder or merge calls). Direct `suppressedClickKeyRef.current =
+key` writes (resize pointer-down, move promotion, `finishMove`, Escape) go
+   through a `suppressClick(key)` action so the ref is not exposed.
+3. **Must stay identical:** the Escape listener's effect has `[]` deps and
+   closes over the first render — the hook's actions it calls must therefore
+   only touch refs and state setters (stable), never render values; keep
+   `triggerSettle`'s functional `setSettledOccurrenceKey` update; keep
+   `clearExitingGhost` before `setHasConflict(false)` in move/resize
+   pointer-down; keep `isSettled` matching occurrence key _or_ event id
+   (discovery 6); keep the `hasConflict` gating on `movePreview?.dateKey`
+   (discovery 1 — do not fix).
+4. **`moveHandlersRef`** keeps holding `finishMove`/`finishResize`; nothing in
+   phase 5 changes the window-listener fallback.
+5. **Tests** — hook tests via the same static-render harness where the
+   actions are observable (timers armed/cleared with fake timers, suppression
+   consumed once, released after `setTimeout(0)` only if unchanged); existing
+   `TimelineView`/ghost tests must pass unchanged; all calendar tests, web
+   `tsc`/eslint/prettier, `pnpm verify`. Record that jsdom-level gesture
+   coverage is still absent.
+
+### Phases 6–9 — Gesture machinery · pending
 
 Order is deliberate: shared layers first (feedback, auto-scroll), then the
 two gestures, then recovery. Each phase must re-run the full TimelineView test
@@ -477,7 +595,7 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
    cancelled). Phase 9 must keep both behaviours.
 5. **`slot-selection.test.ts` tests private copies** of the snapping and
    formatting helpers rather than production code (its `formatMinute` copy
-   also lacks the `24:00` branch). Phase 4 fixes the test target.
+   also lacks the `24:00` branch). **Resolved in phase 4** (test target only).
 6. `isSettled` matches either the occurrence key or the event id; `canMove`
    stays true for the event currently being moved even if it would otherwise
    be immovable in the target column.
@@ -493,6 +611,17 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
    week with no all-day events shows no chip. The draft chip also carries
    `timelineEvent`, so clicking it never starts a second all-day slot (pinned
    by a `TimelineAllDayRow` test). Not changed.
+9. **`slot-selection.test.ts` also carried a private popover-placement
+   copy** (left of the anchor, flip right, else centre) that is not the
+   production `calculatePopoverPosition` rule. Removed from that file in
+   phase 4 (it tested nothing real); the production rule is covered by
+   `popover-position.test.ts`. No production change.
+10. **A drag released before a re-render finalises as a click range.**
+    Pointer-up reads `dragSelection` from its render closure; if the pointer
+    moved 6 px or more but no render has happened since the first
+    `setDragSelection`, `!isClick && dragSelection` is false and the default
+    duration from the press minute is selected. Part of discovery 2's closure
+    semantics; preserved by the phase 4 hook. Not changed.
 
 ## Verification log
 
@@ -502,22 +631,25 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 | 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline | all pass (232 calendar tests) |
 | 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                   | all pass (243 calendar tests) |
 | 3     | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                            | all pass (252 calendar tests) |
+| 4     | slot-selection + hook tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                        | all pass (264 calendar tests) |
 
 ## Current checkpoint
 
-Phase 3 complete on `refactor/timeline-view` (branched from merged `main`;
-phases 1–2 were replayed there, and the old `web-refactor/timeline-view`
-branch remains a recovery reference). `TimelineView.tsx` is 1,430 lines
-(1,916 at baseline) and still owns responsibilities 1, 5–7, 11–16, the
-render-side half of 10, and the draft visibility condition of 9.
+Phase 4 complete on `refactor/timeline-view` (branched from merged `main`;
+phases 1–2 were replayed there). The old `web-refactor/timeline-view` branch
+was deleted locally and on `origin` after phase 4: its calendar changes were
+identical to the replayed commits (`git diff a102904 81708a9` touches only
+`main`'s own non-calendar changes). `TimelineView.tsx` is 1,270 lines (1,916
+at baseline) and still owns responsibilities 1, 5, 7, 12–16, the render-side
+half of 10, the draft visibility condition of 9, and the drag-selection
+indicator JSX.
 
 ## Next step
 
-Start **Phase 4** exactly as planned under
-[Phase 4 — Slot selection](#phase-4--slot-selection--next): pure
-`utils/slot-selection.ts` + retargeted `slot-selection.test.ts`, then
-`hooks/useTimelineSlotSelection.ts`, then (conditionally) the initial-scroll
-hook.
+Start **Phase 5** exactly as planned under
+[Phase 5 — Shared gesture feedback](#phase-5--shared-gesture-feedback--next):
+`hooks/useTimelineGestureFeedback.ts` owning magnetic snap, conflict flag,
+snap direction, settle and exiting-ghost timers, and click suppression.
 
 ---
 

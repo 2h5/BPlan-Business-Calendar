@@ -9,6 +9,8 @@ import type { AnchorRect } from './QuickCreatePopover';
 import { TimelineAllDayRow } from './TimelineAllDayRow';
 import { TimelineDraftEvent } from './TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import { useTimelineInitialScroll } from '../hooks/useTimelineInitialScroll';
+import { useTimelineSlotSelection } from '../hooks/useTimelineSlotSelection';
 import { dateKeyToInstant } from '../utils/calendar-window';
 import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
 import {
@@ -33,11 +35,9 @@ import {
 } from '../utils/event-resize';
 import { layoutTimelineDay } from '../utils/timeline-day-layout';
 import { formatHour, formatMinute } from '../utils/timeline-format';
-import { initialScrollHour } from '../utils/timeline-initial-scroll';
 import { offHoursBands } from '../utils/working-hours-bands';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-const HOLD_DELAY_MS = 180;
 const SETTLE_ANIMATION_MS = 180;
 const GHOST_EXIT_ANIMATION_MS = 140;
 
@@ -112,16 +112,17 @@ export function TimelineView({
   showWorkingHours = true,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const initialScrollKeyRef = useRef<string | null>(null);
   const isWeek = dateKeys.length > 1;
   const hourHeight = isWeek ? 54 : 64;
   const todayKey = toZonedDateKey(now, timeZone);
 
-  const [dragSelection, setDragSelection] = useState<{
-    dateKey: string;
-    startMinute: number;
-    endMinute: number;
-  } | null>(null);
+  const {
+    dragSelection,
+    handleColumnPointerDown,
+    handleColumnPointerMove,
+    handleColumnPointerUp,
+    handleColumnPointerCancel,
+  } = useTimelineSlotSelection({ hourHeight, defaultDurationMinutes, onSelectSlot });
   const [resizePreview, setResizePreview] = useState<{
     occurrenceKey: string;
     interval: MinuteInterval;
@@ -224,22 +225,9 @@ export function TimelineView({
     setSettledOccurrenceKey(null);
   };
 
-  const dragRef = useRef<{
-    dateKey: string;
-    startY: number;
-    startX: number;
-    startMinute: number;
-    colRect: DOMRect;
-  } | null>(null);
-
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     return () => {
       stopAutoScroll();
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-      }
       if (settleTimerRef.current) {
         clearTimeout(settleTimerRef.current);
       }
@@ -248,147 +236,6 @@ export function TimelineView({
       }
     };
   }, []);
-
-  const handleColumnPointerDown = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
-    if ((e.target as HTMLElement).closest(`.${styles.timelineEvent}`)) return;
-    if (e.button !== 0) return;
-
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-
-    const colRect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - colRect.top;
-    const rawMinute = (y / hourHeight) * 60;
-    const startMinute = Math.max(0, Math.min(23 * 60 + 45, Math.floor(rawMinute / 15) * 15));
-
-    dragRef.current = {
-      dateKey,
-      startY: e.clientY,
-      startX: e.clientX,
-      startMinute,
-      colRect,
-    };
-
-    // If user holds down the pointer, display the 15-minute selection box after the hold delay.
-    // Quick clicks release before this timer fires, preventing any 1-frame flash before the animation.
-    holdTimerRef.current = setTimeout(() => {
-      holdTimerRef.current = null;
-      if (dragRef.current && dragRef.current.dateKey === dateKey) {
-        setDragSelection({
-          dateKey,
-          startMinute,
-          endMinute: Math.min(24 * 60, startMinute + 15),
-        });
-      }
-    }, HOLD_DELAY_MS);
-
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleColumnPointerMove = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
-    if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
-
-    const distY = Math.abs(e.clientY - dragRef.current.startY);
-    const distX = Math.abs(e.clientX - dragRef.current.startX);
-    const hasMoved = distY >= 6 || distX >= 6;
-
-    if (!hasMoved && !dragSelection) {
-      return;
-    }
-
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-
-    const colRect = dragRef.current.colRect;
-    const y = Math.max(0, Math.min(colRect.height, e.clientY - colRect.top));
-    const rawMinute = (y / hourHeight) * 60;
-    const currentSnapped = Math.max(0, Math.min(24 * 60, Math.floor(rawMinute / 15) * 15));
-
-    const startMin = Math.min(dragRef.current.startMinute, currentSnapped);
-    const endMin = Math.max(dragRef.current.startMinute, currentSnapped) + 15;
-
-    setDragSelection({
-      dateKey,
-      startMinute: startMin,
-      endMinute: Math.min(24 * 60, endMin),
-    });
-  };
-
-  const handleColumnPointerUp = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
-    if (!dragRef.current || dragRef.current.dateKey !== dateKey) return;
-
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    const dragInfo = dragRef.current;
-    dragRef.current = null;
-
-    const distY = Math.abs(e.clientY - dragInfo.startY);
-    const distX = Math.abs(e.clientX - dragInfo.startX);
-    const isClick = distY < 6 && distX < 6;
-
-    let finalStart = dragInfo.startMinute;
-    let finalEnd = Math.min(24 * 60, dragInfo.startMinute + defaultDurationMinutes);
-
-    if (!isClick && dragSelection) {
-      finalStart = dragSelection.startMinute;
-      finalEnd = dragSelection.endMinute;
-    }
-
-    setDragSelection(null);
-
-    if (onSelectSlot) {
-      const slotTop = dragInfo.colRect.top + (finalStart / 60) * hourHeight;
-      const slotHeight = Math.max(20, ((finalEnd - finalStart) / 60) * hourHeight);
-      const anchorRect: AnchorRect = {
-        top: slotTop,
-        bottom: slotTop + slotHeight,
-        left: dragInfo.colRect.left,
-        right: dragInfo.colRect.right,
-        width: dragInfo.colRect.width,
-        height: slotHeight,
-      };
-
-      onSelectSlot({
-        dateKey,
-        startMinute: finalStart,
-        endMinute: finalEnd,
-        anchorRect,
-      });
-    }
-  };
-
-  const handleColumnPointerCancel = (e: React.PointerEvent<HTMLDivElement>, dateKey: string) => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-    if (dragRef.current?.dateKey === dateKey) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        // ignore
-      }
-      dragRef.current = null;
-      setDragSelection(null);
-    }
-  };
 
   const applyResizePosition = (clientY: number, scrollTop: number) => {
     const active = resizeRef.current;
@@ -1068,22 +915,15 @@ export function TimelineView({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const scrollKey = `${dateKeys.join('|')}::${hourHeight}::${timeZone}::${todayKey}`;
-    if (initialScrollKeyRef.current === scrollKey) return;
-    initialScrollKeyRef.current = scrollKey;
-
-    // Runs before the parent opens a linked event's card, so the card measures an on-screen block.
-    const initialHour = initialScrollHour({
-      dateKeys,
-      byDateKey,
-      revealEventId,
-      todayKey,
-      now,
-      timeZone,
-    });
-    scrollRef.current?.scrollTo({ top: initialHour * hourHeight });
-  }, [byDateKey, dateKeys, hourHeight, now, revealEventId, timeZone, todayKey]);
+  useTimelineInitialScroll(scrollRef, {
+    dateKeys,
+    byDateKey,
+    revealEventId,
+    todayKey,
+    now,
+    timeZone,
+    hourHeight,
+  });
 
   const allDayByDate = useMemo(
     () =>
@@ -1246,7 +1086,7 @@ export function TimelineView({
                     }}
                   >
                     <span>
-                      {formatMinute(dragSelection.startMinute, hourCycle)} –{' '}
+                      {formatMinute(dragSelection.startMinute, hourCycle)} â€“{' '}
                       {formatMinute(dragSelection.endMinute, hourCycle)}
                     </span>
                   </div>
