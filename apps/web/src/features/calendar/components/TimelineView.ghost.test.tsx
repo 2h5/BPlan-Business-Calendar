@@ -4,7 +4,8 @@ import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { OriginGhost, TimelineView } from './TimelineView';
+import { OriginGhost } from './OriginGhost';
+import { TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { resolveMoveGesture } from '../utils/event-resize';
 

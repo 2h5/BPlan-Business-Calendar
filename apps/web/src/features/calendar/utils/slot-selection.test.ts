@@ -1,33 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function snapToSlot(minute: number, step = 15): number {
-  return Math.max(0, Math.min(24 * 60, Math.floor(minute / step) * step));
-}
-
-function computeDragRange(
-  startMinute: number,
-  currentMinute: number,
-  step = 15,
-): { startMinute: number; endMinute: number } {
-  const currentSnapped = snapToSlot(currentMinute, step);
-  const startMin = Math.min(startMinute, currentSnapped);
-  const endMin = Math.max(startMinute, currentSnapped) + step;
-  return {
-    startMinute: startMin,
-    endMinute: Math.min(24 * 60, endMin),
-  };
-}
-
-function formatMinute(minute: number, hourCycle: 'h12' | 'h23'): string {
-  const h = Math.floor(minute / 60);
-  const m = minute % 60;
-  if (hourCycle === 'h23') return `${pad(h)}:${pad(m)}`;
-  const period = h >= 12 ? 'PM' : 'AM';
-  const displayH = h % 12 === 0 ? 12 : h % 12;
-  return `${displayH}:${pad(m)} ${period}`;
-}
+import {
+  clickSlotRange,
+  dragSlotRange,
+  hasSlotDragStarted,
+  holdSlotRange,
+  isSlotClick,
+  SLOT_HOLD_DELAY_MS,
+  slotAnchorRect,
+  snapSlotStart,
+  snapToSlot,
+} from './slot-selection';
+import { formatMinute } from './timeline-format';
 
 describe('Calendar slot selection & drag calculations', () => {
   it('snaps arbitrary minutes to 15-minute intervals', () => {
@@ -49,18 +33,41 @@ describe('Calendar slot selection & drag calculations', () => {
     expect(snapToSlot(1500)).toBe(1440);
   });
 
+  it('starts a press on a 15-minute slot that still fits in the day', () => {
+    expect(snapSlotStart(-10)).toBe(0);
+    expect(snapSlotStart(612)).toBe(600);
+    expect(snapSlotStart(1430)).toBe(1425); // 23:50 -> 23:45
+    expect(snapSlotStart(1440)).toBe(1425); // bottom edge -> 23:45
+  });
+
+  it('shows a 15-minute box for a held press', () => {
+    expect(holdSlotRange(600)).toEqual({ startMinute: 600, endMinute: 615 });
+    expect(holdSlotRange(1425)).toEqual({ startMinute: 1425, endMinute: 1440 });
+  });
+
   it('computes drag range downwards correctly', () => {
     // User clicks at 10:00 (minute 600) and drags down to 11:30 (minute 690)
-    const range = computeDragRange(600, 690);
+    const range = dragSlotRange(600, 690);
     expect(range.startMinute).toBe(600); // 10:00
     expect(range.endMinute).toBe(705); // 11:45 (inclusive of 15m slot at 11:30)
   });
 
   it('computes drag range upwards correctly (invert direction)', () => {
     // User clicks at 14:00 (minute 840) and drags upwards to 12:30 (minute 750)
-    const range = computeDragRange(840, 750);
+    const range = dragSlotRange(840, 750);
     expect(range.startMinute).toBe(750); // 12:30
     expect(range.endMinute).toBe(855); // 14:15 (inclusive of 15m slot at 14:00)
+  });
+
+  it('clamps a drag range to the end of the day', () => {
+    expect(dragSlotRange(1380, 1440)).toEqual({ startMinute: 1380, endMinute: 1440 });
+    expect(dragSlotRange(1425, 1439)).toEqual({ startMinute: 1425, endMinute: 1440 });
+  });
+
+  it('selects the default duration on click, clamped to 24:00', () => {
+    expect(clickSlotRange(600, 60)).toEqual({ startMinute: 600, endMinute: 660 });
+    expect(clickSlotRange(600, 30)).toEqual({ startMinute: 600, endMinute: 630 });
+    expect(clickSlotRange(1410, 60)).toEqual({ startMinute: 1410, endMinute: 1440 });
   });
 
   it('formats minute values in 12h and 23h cycles', () => {
@@ -70,71 +77,44 @@ describe('Calendar slot selection & drag calculations', () => {
     expect(formatMinute(570, 'h12')).toBe('9:30 AM');
     expect(formatMinute(720, 'h12')).toBe('12:00 PM');
     expect(formatMinute(870, 'h12')).toBe('2:30 PM');
+    expect(formatMinute(1440, 'h23')).toBe('24:00');
   });
 
-  it('calculates popover placement directly to the left of the anchor slot', () => {
-    function computeHorizontalPlacement(
-      anchorLeft: number,
-      anchorRight: number,
-      popoverWidth = 380,
-      margin = 12,
-      viewportPadding = 16,
-      windowWidth = 1440,
-    ) {
-      let placement: 'right' | 'left' | 'center' = 'left';
-      let left = anchorLeft - margin - popoverWidth;
+  it('anchors the popover to the selected range across the column', () => {
+    const colRect = { top: 100, left: 300, right: 450, width: 150 };
 
-      if (left < viewportPadding) {
-        const rightCandidate = anchorRight + margin;
-        if (rightCandidate + popoverWidth <= windowWidth - viewportPadding) {
-          left = rightCandidate;
-          placement = 'right';
-        } else {
-          left = Math.max(
-            viewportPadding,
-            Math.min(windowWidth - popoverWidth - viewportPadding, anchorLeft),
-          );
-          placement = 'center';
-        }
-      }
-
-      return { placement, left };
-    }
-
-    // Square clicked at x=600..750 on a 1440px screen
-    const normalPlacement = computeHorizontalPlacement(600, 750);
-    expect(normalPlacement.placement).toBe('left');
-    expect(normalPlacement.left).toBe(600 - 12 - 380); // 208px, directly to the left!
-
-    // Square clicked on far left edge (e.g. x=50..200) where left candidate < 16px
-    const edgePlacement = computeHorizontalPlacement(50, 200);
-    expect(edgePlacement.placement).toBe('right');
-    expect(edgePlacement.left).toBe(200 + 12); // Flips to right when left edge has no room
+    expect(slotAnchorRect(colRect, { startMinute: 540, endMinute: 600 }, 64)).toEqual({
+      top: 676,
+      bottom: 740,
+      left: 300,
+      right: 450,
+      width: 150,
+      height: 64,
+    });
+    // A 15-minute slot is still at least 20 px tall.
+    expect(slotAnchorRect(colRect, { startMinute: 540, endMinute: 555 }, 54)).toMatchObject({
+      top: 586,
+      height: 20,
+      bottom: 606,
+    });
   });
 
-  it('distinguishes quick click from hold based on delay threshold', () => {
-    const HOLD_DELAY_MS = 180;
-    const quickClickDuration = 80;
-    const holdDuration = 250;
-
-    // Quick click releases before HOLD_DELAY_MS, preventing the 1-frame flash of the 15-minute selection indicator
-    expect(quickClickDuration >= HOLD_DELAY_MS).toBe(false);
-    // Holding past HOLD_DELAY_MS displays the 15-minute selection indicator
-    expect(holdDuration >= HOLD_DELAY_MS).toBe(true);
+  it('shows the hold box only after the hold delay', () => {
+    expect(SLOT_HOLD_DELAY_MS).toBe(180);
   });
 
   it('distinguishes click from drag based on movement threshold', () => {
-    function isClickGesture(startX: number, startY: number, endX: number, endY: number): boolean {
-      const distX = Math.abs(endX - startX);
-      const distY = Math.abs(endY - startY);
-      return distX < 6 && distY < 6;
-    }
-
     // Micro-jitter during a normal click
-    expect(isClickGesture(100, 200, 102, 203)).toBe(true);
+    expect(isSlotClick(2, 3)).toBe(true);
+    expect(hasSlotDragStarted(2, 3)).toBe(false);
     // Deliberate vertical drag
-    expect(isClickGesture(100, 200, 100, 215)).toBe(false);
+    expect(isSlotClick(0, 15)).toBe(false);
+    expect(hasSlotDragStarted(0, 15)).toBe(true);
     // Deliberate horizontal movement
-    expect(isClickGesture(100, 200, 110, 200)).toBe(false);
+    expect(isSlotClick(10, 0)).toBe(false);
+    expect(hasSlotDragStarted(10, 0)).toBe(true);
+    // Exactly 6 px is a drag
+    expect(isSlotClick(6, 0)).toBe(false);
+    expect(hasSlotDragStarted(0, 6)).toBe(true);
   });
 });
