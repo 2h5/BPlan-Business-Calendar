@@ -1,5 +1,5 @@
-import { getZonedParts, zonedWallClockToUtc } from '@cal/domain';
-import type { Calendar, CalendarEvent, CreateTaskInput, TaskPriority } from '@cal/schemas';
+import { zonedWallClockToUtc } from '@cal/domain';
+import type { Calendar, CalendarEvent, CreateTaskInput } from '@cal/schemas';
 import {
   useCallback,
   useEffect,
@@ -15,16 +15,16 @@ import { QuickCreateEventFields } from './QuickCreateEventFields';
 import styles from './QuickCreatePopover.module.css';
 import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
+import { useQuickCreateDraft } from '../hooks/useQuickCreateDraft';
 import { useQuickCreatePosition } from '../hooks/useQuickCreatePosition';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
-import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
+import { eventInputFromForm, type EventFormValues } from '../utils/event-form';
 import type { AnchorRect } from '../utils/popover-position';
 import {
   addMinutesToTime,
   createEndTimePickerOptions,
   createTimeOptions,
   formatDateDisplay,
-  pad,
   withCustomTimeOption,
 } from '../utils/quick-create-time';
 
@@ -76,41 +76,7 @@ export function QuickCreatePopover({
   onMoreOptions,
   onDraftChange,
 }: QuickCreatePopoverProps) {
-  const initialFormValues = useMemo(
-    () => (editingOccurrence ? eventToFormValues(editingOccurrence.event) : null),
-    [editingOccurrence],
-  );
-
-  const [mode, setMode] = useState<'event' | 'task'>('event');
-  const [title, setTitle] = useState(() => initialFormValues?.title ?? '');
-  const [startDate, setStartDate] = useState(() => initialFormValues?.startDate ?? selectedDateKey);
-  const [endDate, setEndDate] = useState(() => initialFormValues?.endDate ?? selectedDateKey);
-  const [allDay, setAllDay] = useState(() => initialFormValues?.allDay ?? initialAllDay);
-  const [startTime, setStartTime] = useState(() => {
-    if (initialFormValues?.startTime) return initialFormValues.startTime;
-    if (initialStartTime) return initialStartTime;
-    const nowParts = getZonedParts(new Date(), timeZone);
-    const defaultHour = Math.min(23, nowParts.hour + 1);
-    return `${pad(defaultHour)}:00`;
-  });
-  const [endTime, setEndTime] = useState(() => {
-    if (initialFormValues?.endTime) return initialFormValues.endTime;
-    if (initialEndTime) return initialEndTime;
-    const base =
-      initialStartTime || `${pad(Math.min(23, getZonedParts(new Date(), timeZone).hour + 1))}:00`;
-    return addMinutesToTime(base, defaultDurationMinutes);
-  });
-  const [location, setLocation] = useState(() => initialFormValues?.location ?? '');
-  const [description, setDescription] = useState(() => initialFormValues?.description ?? '');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-
-  // Task specific state
   const { data: taskLists } = useTaskLists();
-  const [selectedListId, setSelectedListId] = useState<string>('');
-  const [taskPriority, setTaskPriority] = useState<TaskPriority>('normal');
-  const [taskHasTime, setTaskHasTime] = useState(!initialAllDay);
-
   const writableCals = useMemo(() => calendars.filter((cal) => !cal.isReadOnly), [calendars]);
 
   const defaultCalendar = useMemo(
@@ -118,13 +84,49 @@ export function QuickCreatePopover({
     [writableCals],
   );
 
-  const [calendarId, setCalendarId] = useState<string>(
-    () =>
-      initialFormValues?.calendarId ??
-      editingOccurrence?.event.calendarId ??
-      defaultCalendar?.id ??
-      '',
-  );
+  const {
+    mode,
+    setMode,
+    title,
+    setTitle,
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    allDay,
+    setAllDay,
+    startTime,
+    setStartTime,
+    endTime,
+    setEndTime,
+    location,
+    setLocation,
+    description,
+    setDescription,
+    calendarId,
+    setCalendarId,
+    selectedListId,
+    setSelectedListId,
+    taskPriority,
+    setTaskPriority,
+    taskHasTime,
+    setTaskHasTime,
+    errorMessage,
+    setErrorMessage,
+    isDeleteConfirmOpen,
+    setIsDeleteConfirmOpen,
+  } = useQuickCreateDraft({
+    isOpen,
+    editingOccurrence,
+    selectedDateKey,
+    initialStartTime,
+    initialEndTime,
+    initialAllDay,
+    timeZone,
+    defaultDurationMinutes,
+    defaultCalendar,
+    taskLists,
+  });
 
   const isReadOnly = useMemo(() => {
     if (!editingOccurrence) return false;
@@ -167,56 +169,6 @@ export function QuickCreatePopover({
     () => createEndTimePickerOptions(startTime, endTime, endTimeOptions),
     [endTime, endTimeOptions, startTime],
   );
-
-  // Sync state whenever opening with new initial coordinates, slot, or event
-  useEffect(() => {
-    if (isOpen) {
-      if (editingOccurrence) {
-        setMode('event');
-        const formVals = eventToFormValues(editingOccurrence.event);
-        setTitle(formVals.title);
-        setCalendarId(formVals.calendarId);
-        setStartDate(formVals.startDate);
-        setEndDate(formVals.endDate);
-        setStartTime(formVals.startTime);
-        setEndTime(formVals.endTime);
-        setAllDay(formVals.allDay);
-        setLocation(formVals.location);
-        setDescription(formVals.description);
-      } else {
-        setTitle('');
-        setLocation('');
-        setDescription('');
-        setStartDate(selectedDateKey);
-        setEndDate(selectedDateKey);
-        setAllDay(initialAllDay);
-        if (initialStartTime) {
-          setStartTime(initialStartTime);
-          setEndTime(initialEndTime ?? addMinutesToTime(initialStartTime, defaultDurationMinutes));
-        }
-        if (defaultCalendar && !calendarId) {
-          setCalendarId(defaultCalendar.id);
-        }
-      }
-      setErrorMessage(null);
-      setIsDeleteConfirmOpen(false);
-      if (taskLists && taskLists.length > 0 && !selectedListId && taskLists[0]) {
-        setSelectedListId(taskLists[0].id);
-      }
-    }
-  }, [
-    isOpen,
-    editingOccurrence,
-    selectedDateKey,
-    initialStartTime,
-    initialEndTime,
-    initialAllDay,
-    defaultDurationMinutes,
-    defaultCalendar,
-    calendarId,
-    taskLists,
-    selectedListId,
-  ]);
 
   const handleDelete = async () => {
     if (!editingOccurrence || !onDeleteEvent || isSaving) return;
@@ -307,7 +259,7 @@ export function QuickCreatePopover({
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isDeleteConfirmOpen, isOpen, isSaving, handleRequestClose]);
+  }, [isDeleteConfirmOpen, isOpen, isSaving, handleRequestClose, setIsDeleteConfirmOpen]);
 
   if (!isOpen) return null;
 

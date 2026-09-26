@@ -28,8 +28,8 @@
 1. **Complete:** Extract the event and task field JSX into presentational `QuickCreateEventFields.tsx` and `QuickCreateTaskFields.tsx`, with explicit values and callbacks. Add focused static-render tests. Keep all state and behavior in the parent.
 2. **Complete:** Extract anchor lookup, position calculation, viewport listeners, and `useFollowAnchorMotion` integration into `useQuickCreatePosition`. The parent passes `isOpen`, `anchorRect`, `editingOccurrence`, its popover ref, `mode`, and `errorMessage`; it renders from the returned `coords`.
 3. **Complete:** Extract pure date/time display helpers, 15-minute time-option creation, custom time insertion, end-time duration filtering, and the duration formatter into `utils/quick-create-time.ts`. Keep memoization and form behavior in the parent, and preserve picker exports.
-4. **Recommended next:** Extract form state initialization and the open/edit/reset synchronization effect into a `useQuickCreateDraft` hook. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners. Preserve edit-mode event reset, new-create reset asymmetry (including only updating times when `initialStartTime` exists), calendar fallback, first task-list selection, and existing mode behavior. Test reopen/new-slot/edit transitions and late calendar/task-list data before changing the parent wiring.
-5. Review submit/delete as a separate later seam after Phase 4 verification.
+4. **Complete:** Extract form state initialization and the open/edit/reset synchronization effect into `useQuickCreateDraft`. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners.
+5. **Recommended next:** Extract submit/create/update and delete action handling into `useQuickCreateActions`, with explicit draft values, callbacks, timezone, and saving state. Preserve title/calendar validation, error text and focus behavior, event form conversion, task due-time conversion, edit/update routing, and close timing. Leave More options, `handleStartTimeChange`, time-option memoization, positioning, focus trapping, close animation, field components, and CSS in the parent.
 
 ## Phase 1 result and discoveries
 
@@ -101,3 +101,25 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                                          | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 573 web, 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Phase 4 result and discoveries
+
+- `QuickCreatePopover.tsx`: **721 → 673 lines**. Added `hooks/useQuickCreateDraft.ts` and `hooks/useQuickCreateDraft.test.ts`. The hook owns the initial `eventToFormValues` derivation, all 15 form/draft states (`mode`, `title`, `startDate`, `endDate`, `allDay`, `startTime`, `endTime`, `location`, `description`, `calendarId`, `selectedListId`, `taskPriority`, `taskHasTime`, `errorMessage`, and `isDeleteConfirmOpen`), and the open/edit synchronization effect. It returns each value and setter to the parent. The parent still fetches task lists, filters writable calendars, derives `defaultCalendar`, `selectedCalendar`, and `isReadOnly`, and owns every action, ref, focus/close behavior, position, and render path.
+- Editing still forces event mode and resets only the event fields from `eventToFormValues`; task priority, Set time, and selected task list survive. Fresh open clears title, location, and description; sets both dates to the selected day and All day to its initial flag; preserves mode, task priority, and Set time. Without `initialStartTime`, it preserves start/end times even if an end time is supplied. With a start time, it uses the supplied end or derives one with the default duration. Initial defaults still use the timezone's next hour, clamp at 23, and wrap through `addMinutesToTime`.
+- A fresh open adopts the default calendar only when the current calendar ID is empty, and adopts the first task list only when the selected list ID is empty. Existing selections survive reopening and late data. Every open-sync clears the error and closes delete confirmation. The effect dependency list was carried over exactly, including calendar ID, task lists, and selected list ID; changes to those while open can trigger one more sync, as before. The focused hook harness confirms the update settles rather than looping.
+- Moving setters behind the hook return caused the existing keyboard effect's lint rule to require `setIsDeleteConfirmOpen` in its dependency list. React state setters remain stable, so this adds no reposition or reset trigger. No markup, picker, style, action, or CSS implementation changed. The focused tests were added before the hook extraction and initially failed because the hook module did not exist.
+
+## Phase 4 verification log
+
+| Check                                            | Result                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| New hook tests                                   | PASS: 10 tests                                                                 |
+| Focused Quick Create and positioning tests       | PASS: 7 files, 41 tests                                                        |
+| Popover position and Quick Create position tests | PASS: 2 files, 21 tests                                                        |
+| All calendar tests                               | PASS: 40 files, 403 tests before the final assertion; 404 in `pnpm verify`     |
+| Web typecheck                                    | PASS                                                                           |
+| ESLint, zero warnings                            | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                                         | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                                    | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 583 web (including 404 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
