@@ -1,6 +1,6 @@
 import { minuteOfDay, toZonedDateKey } from '@cal/domain';
 import type { HourCycle, WorkingHours } from '@cal/schemas';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 
 import styles from './CalendarView.module.css';
 import { EventButton } from './EventButton';
@@ -11,6 +11,7 @@ import { TimelineDraftEvent } from './TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { useTimelineAutoScroll } from '../hooks/useTimelineAutoScroll';
 import { useTimelineGestureFeedback } from '../hooks/useTimelineGestureFeedback';
+import { useTimelineGestureRecovery } from '../hooks/useTimelineGestureRecovery';
 import { useTimelineInitialScroll } from '../hooks/useTimelineInitialScroll';
 import { useTimelineMove } from '../hooks/useTimelineMove';
 import { useTimelineResize } from '../hooks/useTimelineResize';
@@ -196,137 +197,26 @@ export function TimelineView({
     clearPointer,
   });
 
-  const moveHandlersRef = useRef({
+  useTimelineGestureRecovery(scrollRef, {
+    resizeRef,
+    moveRef,
+    setResizePreview,
+    setMovePreview,
     applyMovePosition,
     applyResizePosition,
     checkAndTriggerAutoScroll,
     finishMove,
     finishResize,
+    setMagneticSnap,
+    setHasConflict,
+    setSnapDirection,
+    showExitingGhost,
+    suppressClick,
+    releaseSuppressedClickSoon,
+    stopAutoScroll,
+    trackPointer,
+    clearPointer,
   });
-  useEffect(() => {
-    moveHandlersRef.current = {
-      applyMovePosition,
-      applyResizePosition,
-      checkAndTriggerAutoScroll,
-      finishMove,
-      finishResize,
-    };
-  });
-
-  useEffect(() => {
-    // The event element normally holds pointer capture and handles these itself
-    // (stopping propagation). These window listeners take over if capture is
-    // lost, so a gesture can never outlive the mouse button being held.
-    const onWindowPointerMove = (e: PointerEvent) => {
-      const resize = resizeRef.current;
-      if (resize && resize.pointerId === e.pointerId) {
-        if (e.buttons === 0) {
-          // The release happened somewhere we never heard about.
-          moveHandlersRef.current.finishResize(e, false);
-          return;
-        }
-        trackPointer(e.clientX, e.clientY);
-        const scrollTop = scrollRef.current?.scrollTop ?? resize.initialScrollTop;
-        moveHandlersRef.current.applyResizePosition(e.clientY, scrollTop);
-        moveHandlersRef.current.checkAndTriggerAutoScroll();
-        return;
-      }
-
-      const active = moveRef.current;
-      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
-      if (e.buttons === 0) {
-        moveHandlersRef.current.finishMove(e, false);
-        return;
-      }
-      trackPointer(e.clientX, e.clientY);
-      const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
-      moveHandlersRef.current.applyMovePosition(e.clientX, e.clientY, currentScrollTop);
-      moveHandlersRef.current.checkAndTriggerAutoScroll();
-    };
-
-    const onWindowPointerUp = (e: PointerEvent) => {
-      if (resizeRef.current?.pointerId === e.pointerId) {
-        moveHandlersRef.current.finishResize(e, false);
-        return;
-      }
-      const active = moveRef.current;
-      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
-      moveHandlersRef.current.finishMove(e, false);
-    };
-
-    const onWindowPointerCancel = (e: PointerEvent) => {
-      if (resizeRef.current?.pointerId === e.pointerId) {
-        moveHandlersRef.current.finishResize(e, true);
-        return;
-      }
-      const active = moveRef.current;
-      if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
-      moveHandlersRef.current.finishMove(e, true);
-    };
-
-    window.addEventListener('pointermove', onWindowPointerMove);
-    window.addEventListener('pointerup', onWindowPointerUp);
-    window.addEventListener('pointercancel', onWindowPointerCancel);
-
-    return () => {
-      window.removeEventListener('pointermove', onWindowPointerMove);
-      window.removeEventListener('pointerup', onWindowPointerUp);
-      window.removeEventListener('pointercancel', onWindowPointerCancel);
-    };
-    // Registered once; handlers are read from `moveHandlersRef`. `trackPointer` only
-    // writes a ref, so the first render's copy behaves the same as later ones.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        stopAutoScroll();
-        clearPointer();
-        if (moveRef.current?.status === 'dragging') {
-          const active = moveRef.current;
-          try {
-            active.button.releasePointerCapture(active.pointerId);
-          } catch {
-            // ignore
-          }
-          moveRef.current = null;
-          setMovePreview(null);
-          setMagneticSnap(null);
-          setHasConflict(false);
-          setSnapDirection(null);
-          showExitingGhost({
-            occurrence: active.occurrence,
-            dateKey: active.originalDateKey,
-            originalMinutes: active.originalMinutes,
-            originalLayout: active.originalLayout,
-          });
-          const suppressedKey = active.occurrence.key;
-          suppressClick(suppressedKey);
-          releaseSuppressedClickSoon(suppressedKey);
-        } else if (resizeRef.current) {
-          const active = resizeRef.current;
-          try {
-            active.handle.releasePointerCapture(active.pointerId);
-          } catch {
-            // ignore
-          }
-          resizeRef.current = null;
-          setResizePreview(null);
-          setMagneticSnap(null);
-          setHasConflict(false);
-          const suppressedKey = active.occurrence.key;
-          suppressClick(suppressedKey);
-          releaseSuppressedClickSoon(suppressedKey);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-    // Registered once. The gesture-feedback and auto-scroll actions it calls only touch
-    // refs and state setters, so the first render's copies behave the same as later ones.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useTimelineInitialScroll(scrollRef, {
     dateKeys,
