@@ -1,7 +1,7 @@
-import { assert, assertEquals, assertRejects, assertThrows } from 'jsr:@std/assert@^1.0.0';
+import { assertEquals, assertRejects } from 'jsr:@std/assert@^1.0.0';
 import type { SchedulingIntent } from '@cal/schemas/scheduling';
 
-import { EdgeError, type EdgeErrorCode } from '../errors/index.ts';
+import { EdgeError } from '../errors/index.ts';
 import {
   createOpenAiIntentProvider,
   openAiIntentConfigFromEnv,

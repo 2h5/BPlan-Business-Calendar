@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+import { describeError } from '../errors/safe-error.ts';
 import { loadAccount, resolveContext, type ProviderAccountRow } from './accounts.ts';
 import { authFor, isSupportedProvider, providerFor } from './registry.ts';
 import { watchRegistrationFromState, type StoredWatchState } from './watch.ts';
@@ -103,13 +104,13 @@ async function stopChannels(
       } catch (cause) {
         // One stale registration must not prevent the remaining registrations
         // from being stopped during disconnect or account deletion.
-        console.error(JSON.stringify({ code: 'UNWATCH_FAILED', detail: String(cause) }));
+        console.error(JSON.stringify({ code: 'UNWATCH_FAILED', error: describeError(cause) }));
       }
     }
   } catch (cause) {
     // An expired connection cannot stop its own provider watches. They lapse
     // according to provider limits (which may be only a few days), and every
     // delivery until then is dropped as an unknown watch.
-    console.error(JSON.stringify({ code: 'UNWATCH_FAILED', detail: String(cause) }));
+    console.error(JSON.stringify({ code: 'UNWATCH_FAILED', error: describeError(cause) }));
   }
 }

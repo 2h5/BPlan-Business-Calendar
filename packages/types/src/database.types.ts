@@ -1222,6 +1222,7 @@ export type Database = {
         Returns: string
       }
       ensure_revenuecat_reconcile_schedule: { Args: never; Returns: string }
+      ensure_sync_schedules: { Args: never; Returns: string }
       has_active_entitlement: {
         Args: { p_entitlement?: string; p_user_id: string }
         Returns: boolean

@@ -43,7 +43,7 @@ RELEASE / EXTERNAL
 ├─ RevenueCat convergence rollout ..... PENDING HOSTED DEPLOYMENT
 ├─ Seller / final legal docs ........... PENDING
 ├─ Production Stripe / RevenueCat ...... PENDING
-└─ Production release hardening ........ PENDING
+└─ Production release hardening ........ PASS 2 DONE / HOSTED CRON INSTALL PENDING
 
 CURRENT STATE
 ├─ Core mobile/web product and Find Time backend/web UX are implemented.
@@ -122,32 +122,33 @@ billing remains intentionally disabled.
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
 client, and [`docs/revenuecat-automation-plan.md`](docs/revenuecat-automation-plan.md)
-for billing automation. The Sprint 3 and Sprint 4 trackers are closed
+for billing automation, and [`docs/release-hardening.md`](docs/release-hardening.md)
+for release hardening. The Sprint 3 and Sprint 4 trackers are closed
 historical records; the Sprint 5 tracker retains Microsoft
 external-verification evidence.
 
-| Area                                | Current state                                    |
-| ----------------------------------- | ------------------------------------------------ |
-| Mobile core                         | Complete                                         |
-| Web core                            | Phases 0–6 complete and hardened                 |
-| Tasks/reminders/notifications       | Complete                                         |
-| Calendar CRUD/recurrence            | Complete                                         |
-| Google Calendar                     | Implemented; major live flows verified           |
-| Microsoft Calendar                  | Implemented; live lifecycle verification pending |
-| Deterministic scheduling            | Complete and hardened                            |
-| Semantic-time scheduling            | Implemented and hardened                         |
-| Find Time backend                   | Implemented and hardened                         |
-| Find Time web UX                    | Complete; propose + confirm                      |
-| Find Time mobile UX                 | In progress; awaiting pushed checkpoint          |
-| Luna Low vs Medium evaluation       | Complete; Luna Low selected for intent/ranking   |
-| Hosted AI deployment/E2E            | Pending                                          |
-| RevenueCat webhook/mirror/Pro gate  | Implemented                                      |
-| Monthly + annual billing E2E        | Proven live                                      |
-| Billing automation                  | Phases 4–6 complete for sandbox                  |
-| RevenueCat convergence              | Merged into main; verified locally               |
-| Convergence hosted rollout          | Pending                                          |
-| Seller/legal and production billing | Pending; billing intentionally disabled          |
-| Production release hardening        | Pending                                          |
+| Area                                | Current state                                         |
+| ----------------------------------- | ----------------------------------------------------- |
+| Mobile core                         | Complete                                              |
+| Web core                            | Phases 0–6 complete and hardened                      |
+| Tasks/reminders/notifications       | Complete                                              |
+| Calendar CRUD/recurrence            | Complete                                              |
+| Google Calendar                     | Implemented; major live flows verified                |
+| Microsoft Calendar                  | Implemented; live lifecycle verification pending      |
+| Deterministic scheduling            | Complete and hardened                                 |
+| Semantic-time scheduling            | Implemented and hardened                              |
+| Find Time backend                   | Implemented and hardened                              |
+| Find Time web UX                    | Complete; propose + confirm                           |
+| Find Time mobile UX                 | In progress; awaiting pushed checkpoint               |
+| Luna Low vs Medium evaluation       | Complete; Luna Low selected for intent/ranking        |
+| Hosted AI deployment/E2E            | Pending                                               |
+| RevenueCat webhook/mirror/Pro gate  | Implemented                                           |
+| Monthly + annual billing E2E        | Proven live                                           |
+| Billing automation                  | Phases 4–6 complete for sandbox                       |
+| RevenueCat convergence              | Merged into main; verified locally                    |
+| Convergence hosted rollout          | Pending                                               |
+| Seller/legal and production billing | Pending; billing intentionally disabled               |
+| Production release hardening        | Passes 1–2 fixed in code; hosted cron install pending |
 
 ---
 

@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history for the migration immutability check.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -26,6 +29,18 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Hosted projects have already applied merged migrations; an edit would
+      # silently diverge fresh and hosted databases.
+      - name: Migration rules
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "::notice::No comparable base revision; skipping migration rules."
+            exit 0
+          fi
+          node tools/release/check-migrations.mjs "$BASE"
 
       - name: Format
         run: pnpm format:check
@@ -39,8 +54,10 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      - name: Web build
-        run: pnpm --filter @cal/web build
+      # Every workspace build, the billing CLI compile, and the client-bundle
+      # secret scan, as in `pnpm verify`.
+      - name: Build
+        run: pnpm build
 
   backend-functions:
     name: Backend functions (Deno)
@@ -51,6 +68,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: 2.9.6
+
+      - name: Lint Edge Functions
+        working-directory: supabase/functions
+        run: deno lint
 
       - name: Typecheck Edge Functions
         working-directory: supabase/functions
@@ -103,3 +124,14 @@ jobs:
             diff /tmp/database.types.ts packages/types/src/database.types.ts || true
             exit 1
           fi
+
+      # plpgsql_check follows the scheduled-job installers' constant EXECUTE
+      # strings into the cron schema. Hosted projects enable pg_cron/pg_net
+      # before installing schedules, so lint against the same shape. Last step:
+      # it changes the throwaway CI database.
+      - name: Lint database functions
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 \
+            -c 'create extension if not exists pg_cron' \
+            -c 'create extension if not exists pg_net'
+          supabase db lint --level warning --fail-on warning

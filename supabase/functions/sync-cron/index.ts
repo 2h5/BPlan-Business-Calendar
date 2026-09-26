@@ -5,6 +5,7 @@ import { providerFor, providerKindsForWatchScope } from '../_shared/providers/re
 import { JOB_KINDS, enqueue } from '../_shared/sync/jobs.ts';
 import { drainQueue } from '../_shared/sync/worker.ts';
 import { watchRenewalThreshold } from '../_shared/providers/watch.ts';
+import { readAllPages, requireCronSecret } from '../_shared/sync/cron.ts';
 
 /**
  * The scheduled half of the sync engine.
@@ -23,7 +24,7 @@ type Task = 'renew-watches' | 'retry-failed' | 'reconcile' | 'prune';
 const handler = withErrorHandling(async (request) => {
   if (request.method !== 'POST') throw new EdgeError('METHOD_NOT_ALLOWED', 'Use POST.', 405);
 
-  requireCronSecret(request);
+  requireCronSecret(request, Deno.env.get('SYNC_CRON_SECRET'));
 
   const task = (new URL(request.url).searchParams.get('task') ?? 'retry-failed') as Task;
   const admin = adminClient();
@@ -59,15 +60,18 @@ async function renewWatches(admin: ReturnType<typeof adminClient>) {
   const { data: states, error } =
     calendarProviderKinds.length === 0
       ? { data: [], error: null }
-      : await admin
-          .from('calendar_sync_states')
-          .select(
-            'calendar_id, provider_account_id, provider_accounts!inner(user_id, status, provider)',
-          )
-          .in('provider_accounts.provider', calendarProviderKinds)
-          .or(`webhook_expires_at.is.null,webhook_expires_at.lt.${threshold}`)
-          .not('calendar_id', 'is', null)
-          .limit(100);
+      : await readAllPages((from, to) =>
+          admin
+            .from('calendar_sync_states')
+            .select(
+              'calendar_id, provider_account_id, provider_accounts!inner(user_id, status, provider)',
+            )
+            .in('provider_accounts.provider', calendarProviderKinds)
+            .or(`webhook_expires_at.is.null,webhook_expires_at.lt.${threshold}`)
+            .not('calendar_id', 'is', null)
+            .order('calendar_id')
+            .range(from, to),
+        );
 
   if (error) throw new EdgeError('UNKNOWN', 'Could not list expiring channels.', 500);
 
@@ -103,13 +107,16 @@ async function renewWatches(admin: ReturnType<typeof adminClient>) {
   const { data: accounts, error: accountError } =
     accountProviderKinds.length === 0
       ? { data: [], error: null }
-      : await admin
-          .from('provider_accounts')
-          .select('id, user_id, provider, webhook_expires_at')
-          .in('provider', accountProviderKinds)
-          .eq('status', 'active')
-          .or(`webhook_expires_at.is.null,webhook_expires_at.lt.${threshold}`)
-          .limit(100);
+      : await readAllPages((from, to) =>
+          admin
+            .from('provider_accounts')
+            .select('id, user_id, provider, webhook_expires_at')
+            .in('provider', accountProviderKinds)
+            .eq('status', 'active')
+            .or(`webhook_expires_at.is.null,webhook_expires_at.lt.${threshold}`)
+            .order('id')
+            .range(from, to),
+        );
 
   if (accountError) throw new EdgeError('UNKNOWN', 'Could not list expiring account watches.', 500);
 
@@ -138,11 +145,16 @@ async function renewWatches(admin: ReturnType<typeof adminClient>) {
 
 /** A full pass per connection, in case a notification was never delivered. */
 async function reconcile(admin: ReturnType<typeof adminClient>) {
-  const { data: accounts, error } = await admin
-    .from('provider_accounts')
-    .select('id, user_id')
-    .eq('status', 'active')
-    .limit(500);
+  // Every active connection, not a capped first page: a capped read reconciles
+  // the same accounts every day and never reaches the rest.
+  const { data: accounts, error } = await readAllPages((from, to) =>
+    admin
+      .from('provider_accounts')
+      .select('id, user_id')
+      .eq('status', 'active')
+      .order('id')
+      .range(from, to),
+  );
 
   if (error) throw new EdgeError('UNKNOWN', 'Could not list connections.', 500);
 
@@ -167,18 +179,6 @@ async function prune(admin: ReturnType<typeof adminClient>) {
   const { data, error } = await admin.rpc('prune_sync_history');
   if (error) throw new EdgeError('UNKNOWN', 'Could not prune sync history.', 500);
   return { task: 'prune', deleted: data ?? 0 };
-}
-
-function requireCronSecret(request: Request): void {
-  const expected = Deno.env.get('SYNC_CRON_SECRET');
-  if (!expected) {
-    console.error(JSON.stringify({ code: 'CRON_SECRET_MISSING' }));
-    throw new EdgeError('NOT_AUTHORIZED', 'Scheduled sync is not configured.', 503);
-  }
-
-  if (request.headers.get('X-Sync-Cron-Secret') !== expected) {
-    throw new EdgeError('NOT_AUTHORIZED', 'Not allowed.', 403);
-  }
 }
 
 Deno.serve(handler);

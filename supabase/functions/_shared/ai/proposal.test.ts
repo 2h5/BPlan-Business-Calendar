@@ -504,7 +504,7 @@ Deno.test(
             return Promise.resolve(REQUEST_ID);
           },
           updateRequest: (userId, requestId, patch) => {
-            updates.push({ userId, requestId, patch: patch as any });
+            updates.push({ userId, requestId, patch });
             return Promise.resolve();
           },
         }),

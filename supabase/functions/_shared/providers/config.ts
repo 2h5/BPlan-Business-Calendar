@@ -13,11 +13,7 @@ export interface OAuthReturnUrlConfig {
 }
 
 /** Read a required server-side provider setting without exposing its value. */
-export const requireEnv = (name: string): string => {
-  const value = Deno.env.get(name);
-  if (!value) throw new EdgeError('UNKNOWN', `Missing ${name}`, 500);
-  return value;
-};
+export { requireEnv } from '../env.ts';
 
 /** Parse the small allowlist accepted by both OAuth start functions. */
 export function parseOAuthReturnTarget(value: unknown): OAuthReturnTarget {

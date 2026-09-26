@@ -1,4 +1,7 @@
 import { jsonResponse } from '../http/cors.ts';
+import { describeError } from './safe-error.ts';
+
+export { describeError, redactSensitiveText, type SafeErrorDescription } from './safe-error.ts';
 
 /**
  * Mirrors ERROR_CODES in packages/types so a code seen in the app matches a
@@ -57,7 +60,7 @@ export function withErrorHandling(
         return jsonResponse({ error: { code: error.code, message: error.message } }, error.status);
       }
 
-      console.error(JSON.stringify({ code: 'UNKNOWN', detail: String(error) }));
+      console.error(JSON.stringify({ code: 'UNKNOWN', error: describeError(error) }));
       return jsonResponse({ error: { code: 'UNKNOWN', message: 'Something went wrong.' } }, 500);
     }
   };

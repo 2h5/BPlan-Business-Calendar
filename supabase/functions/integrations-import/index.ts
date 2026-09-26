@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { adminClient, requireUser } from '../_shared/auth/index.ts';
-import { EdgeError, withErrorHandling } from '../_shared/errors/index.ts';
+import { EdgeError, describeError, withErrorHandling } from '../_shared/errors/index.ts';
 import { jsonResponse, preflight } from '../_shared/http/cors.ts';
 import {
   loadAccount,
@@ -171,7 +171,9 @@ async function dropCalendar(
         // An expired account cannot stop its provider watch; it lapses according
         // to provider limits (which may be only a few days), and every delivery
         // until then is dropped as unknown.
-        console.error(JSON.stringify({ code: 'UNWATCH_ON_DROP_FAILED', detail: String(cause) }));
+        console.error(
+          JSON.stringify({ code: 'UNWATCH_ON_DROP_FAILED', error: describeError(cause) }),
+        );
       }
     }
   }

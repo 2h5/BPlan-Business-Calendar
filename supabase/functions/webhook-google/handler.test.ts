@@ -1,3 +1,4 @@
+// deno-lint-ignore-file require-await -- async stubs implement Promise-returning dependency interfaces.
 import { assertEquals } from 'jsr:@std/assert@^1.0.0';
 
 import {
@@ -68,6 +69,11 @@ Deno.test('forged or incomplete Google proofs acknowledge without enqueueing', a
     {
       'X-Goog-Channel-ID': state.id,
       'X-Goog-Channel-Token': 'wrong',
+      'X-Goog-Resource-ID': 'resource-1',
+    },
+    {
+      'X-Goog-Channel-ID': state.id,
+      'X-Goog-Channel-Token': 'channel-toke',
       'X-Goog-Resource-ID': 'resource-1',
     },
     {

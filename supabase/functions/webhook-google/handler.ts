@@ -1,4 +1,6 @@
 import { adminClient } from '../_shared/auth/index.ts';
+import { constantTimeEqual } from '../_shared/billing/constant-time.ts';
+import { describeError } from '../_shared/errors/safe-error.ts';
 import { runAfterResponse } from '../_shared/http/background.ts';
 import { JOB_KINDS, calendarSyncKey, enqueue } from '../_shared/sync/jobs.ts';
 import { drainQueue } from '../_shared/sync/worker.ts';
@@ -75,7 +77,8 @@ export async function handleGoogleWebhook(
       !state.provider_account_id ||
       !token ||
       !resourceId ||
-      token !== state.webhook_token ||
+      !state.webhook_token ||
+      !constantTimeEqual(token, state.webhook_token) ||
       resourceId !== state.webhook_resource_id
     ) {
       console.warn(JSON.stringify({ code: 'WEBHOOK_TOKEN_OR_RESOURCE_MISMATCH' }));
@@ -93,12 +96,12 @@ export async function handleGoogleWebhook(
       idempotencyKey: calendarSyncKey(state.calendar_id, now()),
     });
 
-    await afterResponse(async () => undefined);
+    await afterResponse(() => Promise.resolve());
     return acceptedResponse();
   } catch (error) {
     // Deliberately still a 2xx. Losing one notification costs us until daily
     // reconciliation; teaching Google to stop delivering costs the channel.
-    console.error(JSON.stringify({ code: 'WEBHOOK_FAILED', detail: String(error) }));
+    console.error(JSON.stringify({ code: 'WEBHOOK_FAILED', error: describeError(error) }));
     return acceptedResponse();
   }
 }

@@ -1,3 +1,4 @@
+// deno-lint-ignore-file require-await -- async stubs implement Promise-returning dependency interfaces.
 import { assertEquals, assertRejects } from 'jsr:@std/assert@^1.0.0';
 
 import { EdgeError } from '../../errors/index.ts';

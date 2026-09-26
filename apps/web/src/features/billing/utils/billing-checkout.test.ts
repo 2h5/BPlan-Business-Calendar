@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  billingEnvIssues,
   checkoutAvailability,
   revenueCatCheckoutUrl,
   type BillingConfig,
+  type BillingEnvConfig,
 } from './billing-checkout';
 
 const baseConfig: BillingConfig = {
@@ -69,5 +71,33 @@ describe('billing checkout guard', () => {
         purchaseUrl: undefined,
       }),
     ).toBe('unconfigured');
+  });
+});
+
+describe('billing deployment guard', () => {
+  const sandbox: BillingEnvConfig = { ...baseConfig, mode: 'sandbox' };
+
+  it('refuses sandbox checkout in a production build', () => {
+    expect(billingEnvIssues(sandbox, 'production').map((issue) => issue.path)).toEqual(['mode']);
+    expect(billingEnvIssues(sandbox, 'preview')).toEqual([]);
+    expect(billingEnvIssues(sandbox, 'development')).toEqual([]);
+    expect(billingEnvIssues(baseConfig, 'production')).toEqual([]);
+  });
+
+  it('requires https billing links outside development', () => {
+    const insecure: BillingEnvConfig = {
+      ...baseConfig,
+      purchaseUrl: 'http://pay.rev.cat/example',
+      managementUrl: 'http://billing.example/manage',
+      termsUrl: 'http://bplan.example/terms.html',
+    };
+
+    expect(billingEnvIssues(insecure, 'production').map((issue) => issue.path)).toEqual([
+      'purchaseUrl',
+      'managementUrl',
+      'termsUrl',
+    ]);
+    expect(billingEnvIssues(insecure, 'preview')).toHaveLength(3);
+    expect(billingEnvIssues(insecure, 'development')).toEqual([]);
   });
 });

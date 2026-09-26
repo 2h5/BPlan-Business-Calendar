@@ -55,7 +55,9 @@ The installer is idempotent and returns `INSTALLED`, or what is missing:
 `EXTENSIONS_UNAVAILABLE` (enable `pg_cron` and `pg_net`),
 `VAULT_UNAVAILABLE`, `MISSING_VAULT_SECRETS`, or `INVALID_RECONCILE_URL`. The
 migration runs it once and reports the result as a NOTICE; rerun it after
-provisioning. To rotate the cron secret, update the Vault secret and the Edge
+provisioning. (Before migration `20260925000001`, a guard bug made it report
+`EXTENSIONS_UNAVAILABLE` even with pg_cron enabled; see
+`docs/release-hardening.md`.) To rotate the cron secret, update the Vault secret and the Edge
 secret together; the job needs no reinstall.
 
 ### Health and alerting
