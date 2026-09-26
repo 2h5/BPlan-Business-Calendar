@@ -94,7 +94,7 @@ All paths are under `apps/web/src/features/calendar/`.
 | `components/TimelineAllDayRow.tsx`    | All-day label + grid, click-to-create all-day slot, compact `EventButton`s, draft chip (resp. 8).                                                                                                                                               | 3 ✅  |
 | `hooks/useTimelineSlotSelection.ts`   | `dragSelection` state, press/hold timer, column pointer handlers, anchor rect (resp. 11). Pure snapping maths goes to `utils/slot-selection.ts` so `slot-selection.test.ts` can test the production code.                                       | 4 ✅  |
 | `hooks/useTimelineInitialScroll.ts`   | Scroll-key memo + `initialScrollHour` effect (resp. 6). Only if still worth a file after phase 4; otherwise stays inline.                                                                                                                       | 4 ✅  |
-| `hooks/useTimelineGestureFeedback.ts` | Magnetic snap, conflict flag, snap direction, settle timer, exiting-ghost timer, click-suppression ref + release, their unmount cleanup (resp. 14). Shared by move and resize.                                                                  | 5     |
+| `hooks/useTimelineGestureFeedback.ts` | Magnetic snap, conflict flag, snap direction, settle timer, exiting-ghost timer, click-suppression ref + release, their unmount cleanup (resp. 14). Shared by move and resize.                                                                  | 5 ✅  |
 | `hooks/useTimelineAutoScroll.ts`      | rAF loop, `lastPointerRef`, `stop` / `check` / `step` (resp. 15). Gesture-agnostic: takes the scroll container, an "is a gesture active" probe and an "apply at pointer/scrollTop" callback.                                                    | 6     |
 | `hooks/useTimelineResize.ts`          | Resize ref/preview, handle pointer handlers, `applyResizePosition`, `finishResize`, Escape/window-fallback entry points (resp. 12).                                                                                                             | 7     |
 | `hooks/useTimelineMove.ts`            | Move ref/preview, pending→dragging, `findTargetDateKey`, `applyMovePosition`, `finishMove`, Escape/window-fallback entry points (resp. 13).                                                                                                     | 8     |
@@ -167,7 +167,7 @@ everything.
 | 2   | Pure per-day layout (`timeline-day-layout.ts`) + unit tests      | complete |
 | 3   | Draft event + all-day row components                             | complete |
 | 4   | Slot selection hook (+ pure `slot-selection.ts`), initial scroll | complete |
-| 5   | Shared gesture feedback hook                                     | pending  |
+| 5   | Shared gesture feedback hook                                     | complete |
 | 6   | Shared auto-scroll hook                                          | pending  |
 | 7   | Resize hook                                                      | pending  |
 | 8   | Move hook                                                        | pending  |
@@ -510,7 +510,180 @@ Verification:
 Discoveries: item 5 resolved as planned (test target only; no production
 change). New item 9 below.
 
-### Phase 5 — Shared gesture feedback · next
+**Phase 4 follow-up — encoding correction:** commit `803ab73`
+(`fix(web): restore en dash in TimelineView drag-selection label`). The phase 4
+commit had saved the drag-selection indicator's range separator as the
+mojibake `â€“` (UTF-8 en dash decoded as Windows-1252 and re-encoded) instead
+of `–`. Restored from the phase 3 parent (`99c219c`); `TimelineView.tsx`'s set
+of non-ASCII characters now matches that parent exactly. All other phase 4
+files were scanned for double-encoded sequences and BOMs: none.
+
+### Phase 5 — Shared gesture feedback · complete
+
+Commit: `refactor(web): extract TimelineView gesture feedback (phase 5)` on
+`refactor/timeline-view` (the commit that adds this section).
+
+Moved resp. 14 (gesture feedback state) out of `TimelineView` into
+`hooks/useTimelineGestureFeedback.ts`. No change to slot selection, layout,
+drafts, all-day, auto-scroll, the window pointer fallback, or the move/resize
+pointer logic; only the feedback statements inside it were redirected to the
+hook's actions, in the same positions.
+
+API:
+
+```ts
+useTimelineGestureFeedback()
+  → { magneticSnap, hasConflict, snapDirection, settledOccurrenceKey, exitingGhost,
+      setMagneticSnap, setHasConflict, setSnapDirection,
+      triggerSettle, clearSettle, clearExitingGhost, showExitingGhost,
+      suppressClick, releaseSuppressedClickSoon, shouldSuppressSelect }
+```
+
+Owned by the hook, moved verbatim:
+
+- `magneticSnap`, `hasConflict`, `snapDirection`, `settledOccurrenceKey`,
+  `exitingGhost` state (types exported as `TimelineMagneticSnap`,
+  `TimelineSnapDirection`, `TimelineExitingGhost`; same shapes).
+- `settleTimerRef`, `SETTLE_ANIMATION_MS = 180`, `triggerSettle(key)` (still
+  the functional `current === key ? null : current` update), `clearSettle()`.
+- `ghostExitTimerRef`, `GHOST_EXIT_ANIMATION_MS = 140`, `clearExitingGhost()`.
+- `showExitingGhost(ghost)` — the sequence formerly written out in
+  `finishMove` and the Escape listener: `setExitingGhost(ghost)`, clear the
+  running timer (without nulling the ref, as before), arm a new 140 ms timer
+  that nulls the ref then clears the ghost.
+- `suppressedClickKeyRef` (private). `suppressClick(key)` replaces the four
+  direct writes (resize pointer-down, move promotion, `finishMove`, Escape
+  move branch) and the Escape resize branch's write.
+  `releaseSuppressedClickSoon(key)` replaces the four
+  `globalThis.setTimeout(…, 0)` releases (`finishResize`, `finishMove`, both
+  Escape branches) — clears only if the ref still equals `key` when the timer
+  fires. `shouldSuppressSelect(key)` is the consume-once check;
+  `EventButton` still receives an inline `() => shouldSuppressSelect(sourceOccurrence.key)`.
+- The settle and ghost timer unmount cleanups, split out of `TimelineView`'s
+  shared unmount effect, which now only calls `stopAutoScroll` (phase 6).
+- `setMagneticSnap`, `setHasConflict`, `setSnapDirection` are the raw state
+  setters, exposed individually; there is no combined reset because the
+  callers issue these in different orders and subsets.
+
+Compatibility decisions:
+
+- Actions are plain functions recreated each render (no `useCallback`), and
+  each touches only refs and state setters. The Escape listener keeps its
+  `[]` deps and first-render closure, so it calls the first render's actions;
+  those behave identically to later ones. `react-hooks/exhaustive-deps` cannot
+  see that for values returned by a custom hook and now warns on that effect,
+  so it carries an `eslint-disable-next-line` with that justification (the
+  deps array itself is unchanged).
+- `clearExitingGhost()` stays before `setHasConflict(false)` in both
+  pointer-downs; `setMagneticSnap/HasConflict/SnapDirection` calls keep their
+  order everywhere; `showExitingGhost` sits exactly where the inline sequence
+  was (before `preventDefault` in `finishMove`; after `setSnapDirection(null)`
+  in Escape). `const suppressedKey` locals are kept so each call site reads as
+  before.
+- Render gates unchanged: `isSettled` matches occurrence key or event id
+  (discovery 6); `hasConflict` still gated on `movePreview?.dateKey`
+  (discovery 1, not fixed); magnetic guide and `snapDirection` conditions
+  unchanged.
+- Hook call order in `TimelineView` changed (the feedback hook sits where
+  `snapDirection` state was declared; `suppressedClickKeyRef` and
+  `settleTimerRef` used to be declared after the move/resize refs). Stable
+  between renders, so irrelevant. Unmount cleanups now run as separate
+  effects; each only clears its own timer or rAF.
+- `moveHandlersRef` still holds `finishMove`/`finishResize` (and the rest);
+  the window listeners are untouched.
+
+Files changed:
+
+- added `apps/web/src/features/calendar/hooks/useTimelineGestureFeedback.ts`
+- added `apps/web/src/features/calendar/hooks/useTimelineGestureFeedback.test.tsx`
+  (12 tests: initial display state and no timers; suppress → consumed once,
+  other keys not suppressed; release on the next tick; suppression still
+  active before the tick; no release when the key changed; release compares
+  the key at fire time; settle timer 180 ms and restart on a new settle;
+  `clearSettle` with and without a running timer; ghost timer 140 ms; ghost
+  timer restarted by a second `showExitingGhost`; `clearExitingGhost`; settle
+  and ghost timers independent). Same static-render harness as phase 4:
+  state values after an action and the unmount cleanup are not observable
+  without a DOM, so the cleanup is covered by review only.
+- changed `apps/web/src/features/calendar/components/TimelineView.tsx`
+  (1,270 → 1,204 lines): calls the hook; drops the five `useState`s,
+  `ghostExitTimerRef`, `suppressedClickKeyRef`, `settleTimerRef`, both
+  animation constants, `triggerSettle`, `clearSettle`, `clearExitingGhost`,
+  the two inline ghost-timer sequences, the four inline suppression releases,
+  the inline consume-once check and the two timer cleanups.
+- changed this tracker.
+
+Verification:
+
+- `vitest run useTimelineGestureFeedback.test.tsx`: 12/12.
+- `vitest run src/features/calendar/components/TimelineView` (base, ghost,
+  cross-day): 3 files / 61 tests pass unchanged.
+- `vitest run src/features/calendar`: 31 files / 276 tests pass (264 + 12).
+- web `tsc --noEmit`: clean. `eslint src/features/calendar --max-warnings 0`:
+  clean (with the Escape-effect disable above). `prettier --check`: clean.
+- `pnpm verify`: pass — apps/web 61 files / 455 tests, domain 22 / 348,
+  mobile 2 / 11, billing 10 / 201, release 2 / 8; web build succeeds (existing chunk-size
+  warning only).
+- Browser: not run (calendar route requires sign-in; see phase 1). jsdom-level
+  gesture coverage is still absent: no test drives a real move/resize through
+  pointer events and timers together.
+
+Discoveries: new item 11 below. None fixed.
+
+### Phase 6 — Shared auto-scroll · next
+
+Scope: resp. 15 only. No change to feedback, slot selection, layout, drafts,
+all-day, the window pointer fallback, Escape, or the move/resize pointer logic
+beyond redirecting auto-scroll calls.
+
+1. **`hooks/useTimelineAutoScroll.ts`** owns, moved verbatim:
+   - `autoScrollRafRef`, `lastPointerRef`;
+   - `stopAutoScroll()`, `stepAutoScroll()`, `checkAndTriggerAutoScroll()` with
+     their bodies, early exits and statement order unchanged. The duplicated
+     probe (discovery 3) stays duplicated: no shared helper in this phase;
+   - the rAF unmount cleanup (`TimelineView`'s last shared unmount effect,
+     which is then deleted).
+2. **API shape** —
+   `useTimelineAutoScroll(scrollRef, { isMoveDragging, isResizeActive, applyResizeAt, applyMoveAt })`
+   returning `{ stopAutoScroll, checkAndTriggerAutoScroll, trackPointer, clearPointer }`.
+   - `isMoveDragging()` = `moveRef.current?.status === 'dragging'`,
+     `isResizeActive()` = `Boolean(resizeRef.current)`; both are read at the
+     same points the refs are read today (the post-scroll
+     `isResizeActive && resizeRef.current` re-check keeps its re-read).
+   - `applyResizeAt(clientY, scrollTop)` / `applyMoveAt(clientX, clientY, scrollTop)`
+     are `applyResizePosition` / `applyMovePosition` passed from the current
+     render. `stepAutoScroll` must stay a plain per-render function that
+     reschedules **itself**, so a running loop keeps calling the
+     `applyMovePosition` of the render that started it (discovery 2) — no
+     latest-callback ref.
+   - `trackPointer(clientX, clientY)` replaces every
+     `lastPointerRef.current = { clientX, clientY }` write (resize/move
+     pointer-down and pointer-move, both window-move branches) and
+     `clearPointer()` every `lastPointerRef.current = null` (`finishResize`,
+     `finishMove`, Escape), each at the same position. `lastPointerRef` becomes
+     private.
+3. **Must stay identical:** `moveHandlersRef` keeps holding
+   `checkAndTriggerAutoScroll` (now the hook's, from the latest render) next to
+   the other handlers; the window-listener effect keeps `[]` deps and its
+   first-render closure, calling `trackPointer` from that render (refs only),
+   so it gets the same `eslint-disable-next-line` justification as Escape;
+   Escape keeps `stopAutoScroll(); clearPointer();` first; `finishResize` /
+   `finishMove` keep `stopAutoScroll()` as their first statement; auto-scroll
+   runs only for a dragging move or an active resize, resize takes priority.
+4. **Tests** — hook tests in the static-render harness with
+   `requestAnimationFrame`/`cancelAnimationFrame` stubbed (`vi.stubGlobal`) and
+   a stub scroll container: no loop without a pointer / active gesture / edge
+   velocity / room to scroll (each stops a running loop); a loop starts once
+   (no second rAF while one is pending); each step scrolls by the clamped
+   velocity and re-applies resize before move; the loop stops when the
+   gesture ends or the scroll top stops changing; `stopAutoScroll` cancels the
+   pending frame; `trackPointer`/`clearPointer` drive the probe. Existing
+   `TimelineView`/ghost/cross-day tests unchanged; all calendar tests, web
+   `tsc`/eslint/prettier, `pnpm verify`. Browser check of edge auto-scroll
+   during move and resize if a signed-in session is available; otherwise
+   record that it was not run.
+
+### Phases 7–9 — Gesture machinery · pending
 
 Scope: resp. 14 only. No change to slot selection, layout, drafts, all-day,
 auto-scroll (phase 6), or the move/resize pointer logic itself (phases 7–8).
@@ -622,34 +795,44 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
     `setDragSelection`, `!isClick && dragSelection` is false and the default
     duration from the press minute is selected. Part of discovery 2's closure
     semantics; preserved by the phase 4 hook. Not changed.
+11. **A pending suppression release compares keys at fire time, not
+    ownership.** Each `setTimeout(0)` release clears the suppression if the
+    ref equals its key when it fires. If the same occurrence is suppressed
+    again (e.g. a new resize on it) before an earlier gesture's release tick
+    runs, that stale release clears the new suppression. Only reachable within
+    one macrotask of a gesture ending; preserved by
+    `releaseSuppressedClickSoon` (pinned by a hook test). Not changed.
 
 ## Verification log
 
-| Phase | Checks                                                                                                                                          | Result                        |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| base  | `vitest run src/features/calendar`                                                                                                              | 25 files / 228 tests pass     |
-| 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline | all pass (232 calendar tests) |
-| 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                   | all pass (243 calendar tests) |
-| 3     | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                            | all pass (252 calendar tests) |
-| 4     | slot-selection + hook tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                        | all pass (264 calendar tests) |
+| Phase | Checks                                                                                                                                               | Result                        |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| base  | `vitest run src/features/calendar`                                                                                                                   | 25 files / 228 tests pass     |
+| 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline      | all pass (232 calendar tests) |
+| 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                        | all pass (243 calendar tests) |
+| 3     | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                 | all pass (252 calendar tests) |
+| 4     | slot-selection + hook tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                             | all pass (264 calendar tests) |
+| 5     | feedback hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` | all pass (276 calendar tests) |
 
 ## Current checkpoint
 
-Phase 4 complete on `refactor/timeline-view` (branched from merged `main`;
-phases 1–2 were replayed there). The old `web-refactor/timeline-view` branch
-was deleted locally and on `origin` after phase 4: its calendar changes were
-identical to the replayed commits (`git diff a102904 81708a9` touches only
-`main`'s own non-calendar changes). `TimelineView.tsx` is 1,270 lines (1,916
-at baseline) and still owns responsibilities 1, 5, 7, 12–16, the render-side
-half of 10, the draft visibility condition of 9, and the drag-selection
-indicator JSX.
+Phase 5 complete on `refactor/timeline-view` (branched from merged `main`;
+phases 1–2 were replayed there), after the phase 4 encoding correction
+`803ab73`. The old `web-refactor/timeline-view` branch was deleted locally and
+on `origin` after phase 4: its calendar changes were identical to the replayed
+commits (`git diff a102904 81708a9` touches only `main`'s own non-calendar
+changes). `TimelineView.tsx` is 1,204 lines (1,916 at baseline) and still owns
+responsibilities 1, 5, 7, 12, 13, 15, 16, the render-side half of 10, the
+draft visibility condition of 9, the drag-selection indicator JSX, and the
+render-side use of the feedback values.
 
 ## Next step
 
-Start **Phase 5** exactly as planned under
-[Phase 5 — Shared gesture feedback](#phase-5--shared-gesture-feedback--next):
-`hooks/useTimelineGestureFeedback.ts` owning magnetic snap, conflict flag,
-snap direction, settle and exiting-ghost timers, and click suppression.
+Start **Phase 6** exactly as planned under
+[Phase 6 — Shared auto-scroll](#phase-6--shared-auto-scroll--next):
+`hooks/useTimelineAutoScroll.ts` owning the rAF loop, `lastPointerRef`,
+`stopAutoScroll` / `stepAutoScroll` / `checkAndTriggerAutoScroll` and the rAF
+unmount cleanup.
 
 ---
 

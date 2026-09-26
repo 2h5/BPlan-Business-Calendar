@@ -9,6 +9,7 @@ import type { AnchorRect } from './QuickCreatePopover';
 import { TimelineAllDayRow } from './TimelineAllDayRow';
 import { TimelineDraftEvent } from './TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import { useTimelineGestureFeedback } from '../hooks/useTimelineGestureFeedback';
 import { useTimelineInitialScroll } from '../hooks/useTimelineInitialScroll';
 import { useTimelineSlotSelection } from '../hooks/useTimelineSlotSelection';
 import { dateKeyToInstant } from '../utils/calendar-window';
@@ -38,8 +39,6 @@ import { formatHour, formatMinute } from '../utils/timeline-format';
 import { offHoursBands } from '../utils/working-hours-bands';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-const SETTLE_ANIMATION_MS = 180;
-const GHOST_EXIT_ANIMATION_MS = 140;
 
 export interface SlotSelection {
   dateKey: string;
@@ -132,33 +131,23 @@ export function TimelineView({
     dateKey: string;
     interval: MinuteInterval;
   } | null>(null);
-  const [snapDirection, setSnapDirection] = useState<{
-    key: string;
-    direction: 'left' | 'right';
-    id: number;
-  } | null>(null);
-  const [magneticSnap, setMagneticSnap] = useState<{
-    dateKey: string;
-    minute: number;
-    edge: 'start' | 'end';
-  } | null>(null);
-  const [hasConflict, setHasConflict] = useState(false);
-  const [settledOccurrenceKey, setSettledOccurrenceKey] = useState<string | null>(null);
-  const [exitingGhost, setExitingGhost] = useState<{
-    occurrence: EventOccurrence;
-    dateKey: string;
-    originalMinutes: MinuteInterval;
-    originalLayout: { left: number; width: number };
-  } | null>(null);
-  const ghostExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearExitingGhost = () => {
-    if (ghostExitTimerRef.current) {
-      clearTimeout(ghostExitTimerRef.current);
-      ghostExitTimerRef.current = null;
-    }
-    setExitingGhost(null);
-  };
+  const {
+    magneticSnap,
+    hasConflict,
+    snapDirection,
+    settledOccurrenceKey,
+    exitingGhost,
+    setMagneticSnap,
+    setHasConflict,
+    setSnapDirection,
+    triggerSettle,
+    clearSettle,
+    clearExitingGhost,
+    showExitingGhost,
+    suppressClick,
+    releaseSuppressedClickSoon,
+    shouldSuppressSelect,
+  } = useTimelineGestureFeedback();
 
   const resizeRef = useRef<{
     occurrence: EventOccurrence;
@@ -193,8 +182,6 @@ export function TimelineView({
     targets: MagneticTarget[];
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
-  const suppressedClickKeyRef = useRef<string | null>(null);
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoScrollRafRef = useRef<number | null>(null);
   const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
 
@@ -205,35 +192,9 @@ export function TimelineView({
     }
   };
 
-  const triggerSettle = (occurrenceKey: string) => {
-    if (settleTimerRef.current) {
-      clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = null;
-    }
-    setSettledOccurrenceKey(occurrenceKey);
-    settleTimerRef.current = setTimeout(() => {
-      settleTimerRef.current = null;
-      setSettledOccurrenceKey((current) => (current === occurrenceKey ? null : current));
-    }, SETTLE_ANIMATION_MS);
-  };
-
-  const clearSettle = () => {
-    if (settleTimerRef.current) {
-      clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = null;
-    }
-    setSettledOccurrenceKey(null);
-  };
-
   useEffect(() => {
     return () => {
       stopAutoScroll();
-      if (settleTimerRef.current) {
-        clearTimeout(settleTimerRef.current);
-      }
-      if (ghostExitTimerRef.current) {
-        clearTimeout(ghostExitTimerRef.current);
-      }
     };
   }, []);
 
@@ -388,7 +349,7 @@ export function TimelineView({
     if (active.status === 'pending') {
       active.status = 'dragging';
       clearSettle();
-      suppressedClickKeyRef.current = active.occurrence.key;
+      suppressClick(active.occurrence.key);
       try {
         active.button.setPointerCapture(active.pointerId);
       } catch {
@@ -559,7 +520,7 @@ export function TimelineView({
     lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
     clearSettle();
     clearExitingGhost();
-    suppressedClickKeyRef.current = occurrence.key;
+    suppressClick(occurrence.key);
     setResizePreview({ occurrenceKey: occurrence.key, interval });
     setMagneticSnap(null);
     setHasConflict(false);
@@ -605,9 +566,7 @@ export function TimelineView({
     setMagneticSnap(null);
     setHasConflict(false);
     const suppressedKey = active.occurrence.key;
-    globalThis.setTimeout(() => {
-      if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
-    }, 0);
+    releaseSuppressedClickSoon(suppressedKey);
     if (cancelled) return;
 
     const nextStart = dateMinuteToInstant(
@@ -709,19 +668,12 @@ export function TimelineView({
       return;
     }
 
-    setExitingGhost({
+    showExitingGhost({
       occurrence: active.occurrence,
       dateKey: active.originalDateKey,
       originalMinutes: active.originalMinutes,
       originalLayout: active.originalLayout,
     });
-    if (ghostExitTimerRef.current) {
-      clearTimeout(ghostExitTimerRef.current);
-    }
-    ghostExitTimerRef.current = setTimeout(() => {
-      ghostExitTimerRef.current = null;
-      setExitingGhost(null);
-    }, GHOST_EXIT_ANIMATION_MS);
 
     if ('preventDefault' in e) {
       e.preventDefault();
@@ -729,10 +681,8 @@ export function TimelineView({
     }
 
     const suppressedKey = occurrenceKey;
-    suppressedClickKeyRef.current = suppressedKey;
-    globalThis.setTimeout(() => {
-      if (suppressedClickKeyRef.current === suppressedKey) suppressedClickKeyRef.current = null;
-    }, 0);
+    suppressClick(suppressedKey);
+    releaseSuppressedClickSoon(suppressedKey);
 
     if (cancelled) return;
 
@@ -870,26 +820,15 @@ export function TimelineView({
           setMagneticSnap(null);
           setHasConflict(false);
           setSnapDirection(null);
-          setExitingGhost({
+          showExitingGhost({
             occurrence: active.occurrence,
             dateKey: active.originalDateKey,
             originalMinutes: active.originalMinutes,
             originalLayout: active.originalLayout,
           });
-          if (ghostExitTimerRef.current) {
-            clearTimeout(ghostExitTimerRef.current);
-          }
-          ghostExitTimerRef.current = setTimeout(() => {
-            ghostExitTimerRef.current = null;
-            setExitingGhost(null);
-          }, GHOST_EXIT_ANIMATION_MS);
           const suppressedKey = active.occurrence.key;
-          suppressedClickKeyRef.current = suppressedKey;
-          globalThis.setTimeout(() => {
-            if (suppressedClickKeyRef.current === suppressedKey) {
-              suppressedClickKeyRef.current = null;
-            }
-          }, 0);
+          suppressClick(suppressedKey);
+          releaseSuppressedClickSoon(suppressedKey);
         } else if (resizeRef.current) {
           const active = resizeRef.current;
           try {
@@ -902,17 +841,16 @@ export function TimelineView({
           setMagneticSnap(null);
           setHasConflict(false);
           const suppressedKey = active.occurrence.key;
-          suppressedClickKeyRef.current = suppressedKey;
-          globalThis.setTimeout(() => {
-            if (suppressedClickKeyRef.current === suppressedKey) {
-              suppressedClickKeyRef.current = null;
-            }
-          }, 0);
+          suppressClick(suppressedKey);
+          releaseSuppressedClickSoon(suppressedKey);
         }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // Registered once. The gesture-feedback actions it calls only touch refs and state
+    // setters, so the first render's copies behave the same as later ones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useTimelineInitialScroll(scrollRef, {
@@ -1213,11 +1151,7 @@ export function TimelineView({
                       onMovePointerMove={canMove ? handleMovePointerMove : undefined}
                       onMovePointerUp={canMove ? handleMovePointerUp : undefined}
                       onMovePointerCancel={canMove ? handleMovePointerCancel : undefined}
-                      shouldSuppressSelect={() => {
-                        if (suppressedClickKeyRef.current !== sourceOccurrence.key) return false;
-                        suppressedClickKeyRef.current = null;
-                        return true;
-                      }}
+                      shouldSuppressSelect={() => shouldSuppressSelect(sourceOccurrence.key)}
                       resizePreview={activeResizeInterval}
                       movePreview={activeMoveInterval}
                       isMovable={canMove}
