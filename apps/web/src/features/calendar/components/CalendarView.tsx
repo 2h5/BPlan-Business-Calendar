@@ -23,6 +23,7 @@ import {
 } from '../hooks/useCalendarMutations';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
+import { animateScrollTop } from '../utils/animate-scroll';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,
@@ -37,6 +38,7 @@ import {
   type EventFormValues,
 } from '../utils/event-form';
 import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
+import { scrollTopToRevealSlot } from '../utils/timeline-slot-reveal';
 import {
   getTransitionOrigin,
   getViewTransitionDirection,
@@ -60,7 +62,7 @@ function getNewEventAnchorRect(
 ): AnchorRect | null {
   const dayElement = document.querySelector<HTMLElement>(`[data-date-key="${dateKey}"]`);
   if (!dayElement) return null;
-  const rect = dayElement.getBoundingClientRect();
+  let rect = dayElement.getBoundingClientRect();
   if (mode === 'month') {
     return {
       top: rect.top,
@@ -73,8 +75,35 @@ function getNewEventAnchorRect(
   }
 
   const hourHeight = mode === 'week' ? 54 : 64;
-  const top = rect.top + (startMinute / 60) * hourHeight;
   const height = Math.max(22, ((endMinute - startMinute) / 60) * hourHeight - 2);
+
+  // Bring the slot on screen first (e.g. "New Event" at 9 PM while scrolled to
+  // the morning), then measure, so the draft and its popover are both visible.
+  const viewport = dayElement.closest<HTMLElement>('[data-timeline-viewport]');
+  if (viewport) {
+    const viewportRect = viewport.getBoundingClientRect();
+    const slotTop = (startMinute / 60) * hourHeight;
+    const nextScrollTop = scrollTopToRevealSlot({
+      scrollTop: viewport.scrollTop,
+      viewportHeight: viewport.clientHeight,
+      maxScrollTop: viewport.scrollHeight - viewport.clientHeight,
+      headerHeight: rect.top - viewportRect.top + viewport.scrollTop,
+      slotTop,
+      slotBottom: slotTop + height,
+    });
+    if (nextScrollTop !== null) {
+      // Anchor at where the slot lands; the popover then rides the scroll with the draft.
+      rect = new DOMRect(
+        rect.left,
+        rect.top - (nextScrollTop - viewport.scrollTop),
+        rect.width,
+        rect.height,
+      );
+      animateScrollTop(viewport, nextScrollTop);
+    }
+  }
+
+  const top = rect.top + (startMinute / 60) * hourHeight;
   return {
     top,
     bottom: top + height,
@@ -192,7 +221,7 @@ export function CalendarView() {
   const createTaskMutation = useCreateTask();
 
   const result = useCalendarWindow(mode, selectedDateKey);
-  const { showEventDetails } = useAppPreferences().preferences;
+  const { showEventDetails, showWorkingHours } = useAppPreferences().preferences;
   const toggleVisibility = useToggleCalendarVisibility();
   const createCalendar = useCreateCalendar();
   const updateCalendar = useUpdateCalendar();
@@ -819,6 +848,7 @@ export function CalendarView() {
                   workingHours={result.workingHours}
                   revealEventId={requestedEventId}
                   showEventDetails={showEventDetails}
+                  showWorkingHours={showWorkingHours}
                 />
               )}
             </div>

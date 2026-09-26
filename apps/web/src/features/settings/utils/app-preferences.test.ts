@@ -1,4 +1,4 @@
-import { DEFAULT_APP_PREFERENCES, parseAppPreferences } from '@cal/schemas';
+﻿import { DEFAULT_APP_PREFERENCES, parseAppPreferences } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { hotkeyOwner, toHotkey } from './app-preferences';
@@ -11,8 +11,10 @@ describe('parseAppPreferences', () => {
     expect(DEFAULT_APP_PREFERENCES).toEqual({
       accountMenuTrigger: 'click',
       showPlanInSidebar: true,
+      sidebarOnLaunch: 'remember',
       calendarHotkeys: { enabled: true, day: 'd', week: 'w', month: 'm' },
       showEventDetails: false,
+      showWorkingHours: true,
     });
   });
 
@@ -35,8 +37,10 @@ describe('parseAppPreferences', () => {
     ).toEqual({
       accountMenuTrigger: 'hover',
       showPlanInSidebar: true,
+      sidebarOnLaunch: 'remember',
       calendarHotkeys: { enabled: true, day: 'x', week: 'w', month: 'm' },
       showEventDetails: false,
+      showWorkingHours: true,
     });
     expect(parseAppPreferences({ accountMenuTrigger: 'long-press' }).accountMenuTrigger).toBe(
       'click',

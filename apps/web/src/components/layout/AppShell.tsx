@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './AppShell.module.css';
 import { PageTransition } from './PageTransition';
+import { initialSidebarCollapsed, writeSidebarCollapsed } from './sidebar-collapse';
 import { signOut, useAuth } from '../../features/auth';
 import { ProfileAvatar } from '../../features/settings/components/ProfileAvatar';
 import { useAppPreferences } from '../../features/settings/hooks/useAppPreferences';
@@ -10,6 +11,9 @@ import { useProfile } from '../../features/settings/hooks/useSettings';
 
 /** Grace period so the pointer can cross the gap between the account button and its menu. */
 const HOVER_CLOSE_DELAY_MS = 180;
+
+/** Matches the sidebar width transition in AppShell.module.css, plus a frame of slack. */
+const SIDEBAR_ANIMATION_MS = 340;
 
 interface NavItemConfig {
   to: string;
@@ -133,6 +137,25 @@ function SubscriptionIcon() {
   );
 }
 
+function SidebarToggleIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <line x1="9.5" y1="4" x2="9.5" y2="20" />
+    </svg>
+  );
+}
+
 function SignOutIcon() {
   return (
     <svg
@@ -169,7 +192,8 @@ function isWorkspacePath(pathname: string): boolean {
 export function AppShell() {
   const { email } = useAuth();
   const { data: profile } = useProfile();
-  const { accountMenuTrigger, showPlanInSidebar } = useAppPreferences().preferences;
+  const { accountMenuTrigger, showPlanInSidebar, sidebarOnLaunch } =
+    useAppPreferences().preferences;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -181,6 +205,13 @@ export function AppShell() {
   const [metrics, setMetrics] = useState<{ top: number; height: number } | null>(null);
   const [mode, setMode] = useState<'sliding' | 'entering' | 'exiting' | 'hidden'>('hidden');
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() =>
+    initialSidebarCollapsed(sidebarOnLaunch),
+  );
+  // Clips the sidebar only while its width animates, so labels are revealed
+  // cleanly but rail tooltips and the account menu can overflow at rest.
+  const [isSidebarAnimating, setIsSidebarAnimating] = useState(false);
+  const sidebarAnimationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const opensOnHover = accountMenuTrigger === 'hover';
 
@@ -274,6 +305,7 @@ export function AppShell() {
   useEffect(() => {
     return () => {
       if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+      if (sidebarAnimationTimerRef.current) clearTimeout(sidebarAnimationTimerRef.current);
     };
   }, []);
 
@@ -299,6 +331,20 @@ export function AppShell() {
     }, HOVER_CLOSE_DELAY_MS);
   }
 
+  function toggleSidebar() {
+    setIsAccountMenuOpen(false);
+    const next = !isSidebarCollapsed;
+    setIsSidebarCollapsed(next);
+    writeSidebarCollapsed(next);
+
+    setIsSidebarAnimating(true);
+    if (sidebarAnimationTimerRef.current) clearTimeout(sidebarAnimationTimerRef.current);
+    sidebarAnimationTimerRef.current = setTimeout(() => {
+      sidebarAnimationTimerRef.current = null;
+      setIsSidebarAnimating(false);
+    }, SIDEBAR_ANIMATION_MS);
+  }
+
   async function handleSignOut() {
     setIsAccountMenuOpen(false);
     try {
@@ -313,8 +359,25 @@ export function AppShell() {
   return (
     <div className={styles.layout}>
       {/* Sidebar Navigation */}
-      <aside className={styles.sidebar} aria-label="Sidebar Navigation">
+      <aside
+        id="app-sidebar"
+        className={`${styles.sidebar} ${isSidebarCollapsed ? styles.sidebarCollapsed : ''} ${
+          isSidebarAnimating ? styles.sidebarAnimating : ''
+        }`}
+        aria-label="Sidebar Navigation"
+      >
         <div className={styles.brand}>
+          <button
+            type="button"
+            className={styles.sidebarToggle}
+            onClick={toggleSidebar}
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!isSidebarCollapsed}
+            aria-controls="app-sidebar"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <SidebarToggleIcon />
+          </button>
           <div className={styles.brandLogo} aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none">
               <rect x="3" y="5" width="26" height="24" rx="6" fill="currentColor" />

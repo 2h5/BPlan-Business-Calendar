@@ -246,6 +246,51 @@ describe('TimelineView grid layout and all-day handling', () => {
     expect(html).toContain('draftTimelineEventBubbleEnter');
     expect(html).not.toContain('draftTimelineEventBubbleExit');
   });
+
+  it.each([
+    ['starts during', 630],
+    ['starts before', 570],
+  ])('moves an overlapped event left when the draft %s it', (_label, draftStart) => {
+    // 10:00–11:00 in New York.
+    const event = makeEvent({
+      allDay: false,
+      title: 'Plan tomorrow',
+      startAt: '2026-09-15T14:00:00.000Z',
+      endAt: '2026-09-15T15:00:00.000Z',
+    });
+    const occurrence: EventOccurrence = {
+      key: 'occ-overlap',
+      occurrenceIndex: 0,
+      start: new Date(event.startAt).getTime(),
+      end: new Date(event.endAt).getTime(),
+      event,
+      calendar,
+    };
+
+    const html = renderToStaticMarkup(
+      <TimelineView
+        dateKeys={['2026-09-15']}
+        byDateKey={new Map([['2026-09-15', [occurrence]]])}
+        selectedDateKey="2026-09-15"
+        timeZone={timeZone}
+        hourCycle="h12"
+        now={mockNow}
+        onSelectDate={vi.fn()}
+        onSelectEvent={vi.fn()}
+        draftEvent={{
+          dateKey: '2026-09-15',
+          startMinute: draftStart,
+          endMinute: draftStart + 60,
+          allDay: false,
+        }}
+      />,
+    );
+
+    const draftStartIndex = html.indexOf('data-quick-create-draft');
+    const draftTag = html.slice(draftStartIndex, html.indexOf('>', draftStartIndex));
+    expect(draftTag).toMatch(/left:calc\(50% \+ 2px\);width:calc\(50% - 4px\)/);
+    expect(html).toMatch(/left:calc\(0% \+ 2px\);width:calc\(50% - 4px\)/);
+  });
 });
 
 describe('TimelineView resize affordances', () => {

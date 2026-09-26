@@ -1,4 +1,8 @@
-import { type AccountMenuTrigger, type CalendarHotkeyView } from '@cal/schemas';
+import {
+  type AccountMenuTrigger,
+  type CalendarHotkeyView,
+  type SidebarOnLaunch,
+} from '@cal/schemas';
 import { Link } from 'react-router-dom';
 
 import styles from './CustomizeView.module.css';
@@ -17,9 +21,22 @@ const ACCOUNT_MENU_OPTIONS: { value: AccountMenuTrigger; label: string }[] = [
   { value: 'hover', label: 'Hover' },
 ];
 
+const SIDEBAR_ON_LAUNCH_OPTIONS: { value: SidebarOnLaunch; label: string }[] = [
+  { value: 'remember', label: 'Last used' },
+  { value: 'open', label: 'Open' },
+  { value: 'collapsed', label: 'Collapsed' },
+];
+
 export function CustomizeView() {
   const { preferences, setPreference, resetPreferences } = useAppPreferences();
-  const { accountMenuTrigger, showPlanInSidebar, calendarHotkeys, showEventDetails } = preferences;
+  const {
+    accountMenuTrigger,
+    showPlanInSidebar,
+    sidebarOnLaunch,
+    calendarHotkeys,
+    showEventDetails,
+    showWorkingHours,
+  } = preferences;
 
   // Taking a key another view already uses swaps the two, so a binding is never lost.
   const rebind = (view: CalendarHotkeyView, key: string): string | null => {
@@ -71,6 +88,30 @@ export function CustomizeView() {
           </div>
           <div className={styles.row}>
             <div className={styles.rowText}>
+              <strong>When the app opens</strong>
+              <span>Start with the sidebar as you last left it, or always open or collapsed.</span>
+            </div>
+            <div
+              className={styles.segmented}
+              role="radiogroup"
+              aria-label="Sidebar when the app opens"
+            >
+              {SIDEBAR_ON_LAUNCH_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={sidebarOnLaunch === option.value}
+                  className={sidebarOnLaunch === option.value ? styles.segmentActive : ''}
+                  onClick={() => setPreference('sidebarOnLaunch', option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.row}>
+            <div className={styles.rowText}>
               <strong id="show-plan-label">Show Plan &amp; Pro</strong>
               <span>Your plan stays available under Plan &amp; billing in Settings.</span>
             </div>
@@ -106,6 +147,28 @@ export function CustomizeView() {
               aria-labelledby="event-details-label"
               className={styles.switch}
               onClick={() => setPreference('showEventDetails', !showEventDetails)}
+            >
+              <span className={styles.switchThumb} />
+            </button>
+          </div>
+          <div className={styles.row}>
+            <div className={styles.rowText}>
+              <strong id="working-hours-label">Shade time outside working hours</strong>
+              <span>
+                In day and week view, hours outside your{' '}
+                <Link to="/settings" className={styles.inlineLink}>
+                  working hours
+                </Link>{' '}
+                get a subtle hatch.
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showWorkingHours}
+              aria-labelledby="working-hours-label"
+              className={styles.switch}
+              onClick={() => setPreference('showWorkingHours', !showWorkingHours)}
             >
               <span className={styles.switchThumb} />
             </button>

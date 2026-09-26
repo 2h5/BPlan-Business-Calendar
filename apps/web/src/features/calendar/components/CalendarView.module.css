@@ -779,6 +779,19 @@
   background: color-mix(in srgb, var(--color-accent) 2.5%, transparent);
 }
 
+/* Time outside the user's working hours: a faint hatch, under grid lines and events. */
+.offHoursBand {
+  position: absolute;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-border-subtle) 55%, transparent) 0 1px,
+    transparent 1px 7px
+  );
+}
+
 .hourLine {
   position: absolute;
   right: 0;

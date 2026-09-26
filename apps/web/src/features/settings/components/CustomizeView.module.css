@@ -75,6 +75,18 @@
   line-height: 1.5;
 }
 
+.inlineLink {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  text-underline-offset: 2px;
+  transition: text-decoration-color var(--transition-fast);
+}
+
+.inlineLink:hover {
+  text-decoration-color: currentColor;
+}
+
 /* Segmented control, matching the Calendar's Day / Week / Month switcher */
 .segmented {
   flex-shrink: 0;

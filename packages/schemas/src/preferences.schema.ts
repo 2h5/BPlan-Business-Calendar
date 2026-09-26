@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 /**
  * Per-user app behavior preferences, stored in `profiles.preferences`.
@@ -8,8 +8,10 @@ import { z } from 'zod';
  * discarding the whole object. Unknown keys are dropped on parse, which makes
  * retiring a preference safe. Add new preferences here, never ad hoc in an app.
  *
- * Web-only today: `accountMenuTrigger` and `showPlanInSidebar` (sidebar),
- * `calendarHotkeys` (keyboard), and `showEventDetails` (calendar).
+ * Web-only today: `accountMenuTrigger`, `showPlanInSidebar`, and
+ * `sidebarOnLaunch` (sidebar),
+ * `calendarHotkeys` (keyboard), and `showEventDetails` and `showWorkingHours`
+ * (calendar).
  */
 
 export type CalendarHotkeyView = 'day' | 'week' | 'month';
@@ -35,13 +37,18 @@ export const appPreferencesSchema = z.object({
   accountMenuTrigger: z.enum(['click', 'hover']).catch('click'),
   // Hiding the sidebar link keeps the plan reachable from Settings > Plan & billing.
   showPlanInSidebar: z.boolean().catch(true),
+  // How the sidebar starts when the app loads: as it was last left, or always open or collapsed.
+  sidebarOnLaunch: z.enum(['remember', 'open', 'collapsed']).catch('remember'),
   calendarHotkeys: calendarHotkeysSchema,
   // Day and week views: time range and duration inside events of 45+ minutes.
   showEventDetails: z.boolean().catch(false),
+  // Day and week views: shade the time outside the user's working hours.
+  showWorkingHours: z.boolean().catch(true),
 });
 
 export type AppPreferences = z.infer<typeof appPreferencesSchema>;
 export type AccountMenuTrigger = AppPreferences['accountMenuTrigger'];
+export type SidebarOnLaunch = AppPreferences['sidebarOnLaunch'];
 export type CalendarHotkeys = AppPreferences['calendarHotkeys'];
 
 export const DEFAULT_APP_PREFERENCES: AppPreferences = appPreferencesSchema.parse({});
