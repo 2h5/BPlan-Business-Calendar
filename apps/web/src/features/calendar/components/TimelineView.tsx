@@ -9,11 +9,11 @@ import type { AnchorRect } from './QuickCreatePopover';
 import { TimelineAllDayRow } from './TimelineAllDayRow';
 import { TimelineDraftEvent } from './TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import { useTimelineAutoScroll } from '../hooks/useTimelineAutoScroll';
 import { useTimelineGestureFeedback } from '../hooks/useTimelineGestureFeedback';
 import { useTimelineInitialScroll } from '../hooks/useTimelineInitialScroll';
 import { useTimelineSlotSelection } from '../hooks/useTimelineSlotSelection';
 import { dateKeyToInstant } from '../utils/calendar-window';
-import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
 import {
   collectConflictCandidates,
   hasConflict as checkHasConflict,
@@ -182,22 +182,6 @@ export function TimelineView({
     targets: MagneticTarget[];
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
-  const autoScrollRafRef = useRef<number | null>(null);
-  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
-
-  const stopAutoScroll = () => {
-    if (autoScrollRafRef.current !== null) {
-      cancelAnimationFrame(autoScrollRafRef.current);
-      autoScrollRafRef.current = null;
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      stopAutoScroll();
-    };
-  }, []);
-
   const applyResizePosition = (clientY: number, scrollTop: number) => {
     const active = resizeRef.current;
     if (!active) return;
@@ -397,83 +381,13 @@ export function TimelineView({
     });
   };
 
-  const stepAutoScroll = () => {
-    const scrollContainer = scrollRef.current;
-    const lastPointer = lastPointerRef.current;
-    const isMoveActive = moveRef.current?.status === 'dragging';
-    const isResizeActive = Boolean(resizeRef.current);
-
-    if (!scrollContainer || !lastPointer || (!isMoveActive && !isResizeActive)) {
-      stopAutoScroll();
-      return;
-    }
-
-    const viewportRect = scrollContainer.getBoundingClientRect();
-    const velocity = calculateAutoScrollVelocity(lastPointer.clientY, viewportRect);
-
-    if (velocity === 0) {
-      stopAutoScroll();
-      return;
-    }
-
-    const currentScrollTop = scrollContainer.scrollTop;
-    const newScrollTop = clampScrollTop(
-      currentScrollTop + velocity,
-      scrollContainer.scrollHeight,
-      scrollContainer.clientHeight,
-    );
-
-    if (newScrollTop === currentScrollTop) {
-      stopAutoScroll();
-      return;
-    }
-
-    scrollContainer.scrollTop = newScrollTop;
-
-    if (isResizeActive && resizeRef.current) {
-      applyResizePosition(lastPointer.clientY, newScrollTop);
-    } else if (isMoveActive && moveRef.current) {
-      applyMovePosition(lastPointer.clientX, lastPointer.clientY, newScrollTop);
-    }
-
-    autoScrollRafRef.current = requestAnimationFrame(stepAutoScroll);
-  };
-
-  const checkAndTriggerAutoScroll = () => {
-    const scrollContainer = scrollRef.current;
-    const lastPointer = lastPointerRef.current;
-    const isMoveActive = moveRef.current?.status === 'dragging';
-    const isResizeActive = Boolean(resizeRef.current);
-
-    if (!scrollContainer || !lastPointer || (!isMoveActive && !isResizeActive)) {
-      stopAutoScroll();
-      return;
-    }
-
-    const viewportRect = scrollContainer.getBoundingClientRect();
-    const velocity = calculateAutoScrollVelocity(lastPointer.clientY, viewportRect);
-
-    if (velocity === 0) {
-      stopAutoScroll();
-      return;
-    }
-
-    const currentScrollTop = scrollContainer.scrollTop;
-    const newScrollTop = clampScrollTop(
-      currentScrollTop + velocity,
-      scrollContainer.scrollHeight,
-      scrollContainer.clientHeight,
-    );
-
-    if (newScrollTop === currentScrollTop) {
-      stopAutoScroll();
-      return;
-    }
-
-    if (autoScrollRafRef.current === null) {
-      autoScrollRafRef.current = requestAnimationFrame(stepAutoScroll);
-    }
-  };
+  const { stopAutoScroll, checkAndTriggerAutoScroll, trackPointer, clearPointer } =
+    useTimelineAutoScroll(scrollRef, {
+      isMoveDragging: () => moveRef.current?.status === 'dragging',
+      isResizeActive: () => Boolean(resizeRef.current),
+      applyResizeAt: applyResizePosition,
+      applyMoveAt: applyMovePosition,
+    });
 
   const handleResizePointerDown = (
     e: React.PointerEvent<HTMLSpanElement>,
@@ -517,7 +431,7 @@ export function TimelineView({
       targets,
       conflictCandidates,
     };
-    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    trackPointer(e.clientX, e.clientY);
     clearSettle();
     clearExitingGhost();
     suppressClick(occurrence.key);
@@ -538,7 +452,7 @@ export function TimelineView({
     e.preventDefault();
     e.stopPropagation();
 
-    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    trackPointer(e.clientX, e.clientY);
     const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
     applyResizePosition(e.clientY, currentScrollTop);
     checkAndTriggerAutoScroll();
@@ -561,7 +475,7 @@ export function TimelineView({
     }
 
     resizeRef.current = null;
-    lastPointerRef.current = null;
+    clearPointer();
     setResizePreview(null);
     setMagneticSnap(null);
     setHasConflict(false);
@@ -618,7 +532,7 @@ export function TimelineView({
       targets,
       conflictCandidates,
     };
-    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    trackPointer(e.clientX, e.clientY);
     clearExitingGhost();
     setHasConflict(false);
   };
@@ -627,7 +541,7 @@ export function TimelineView({
     const active = moveRef.current;
     if (!active || active.pointerId !== e.pointerId) return;
 
-    lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    trackPointer(e.clientX, e.clientY);
     const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
     applyMovePosition(e.clientX, e.clientY, currentScrollTop);
     if (active.status === 'dragging') {
@@ -658,7 +572,7 @@ export function TimelineView({
     const occurrence = active.occurrence;
 
     moveRef.current = null;
-    lastPointerRef.current = null;
+    clearPointer();
     setMovePreview(null);
     setMagneticSnap(null);
     setHasConflict(false);
@@ -753,7 +667,7 @@ export function TimelineView({
           moveHandlersRef.current.finishResize(e, false);
           return;
         }
-        lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+        trackPointer(e.clientX, e.clientY);
         const scrollTop = scrollRef.current?.scrollTop ?? resize.initialScrollTop;
         moveHandlersRef.current.applyResizePosition(e.clientY, scrollTop);
         moveHandlersRef.current.checkAndTriggerAutoScroll();
@@ -766,7 +680,7 @@ export function TimelineView({
         moveHandlersRef.current.finishMove(e, false);
         return;
       }
-      lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+      trackPointer(e.clientX, e.clientY);
       const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
       moveHandlersRef.current.applyMovePosition(e.clientX, e.clientY, currentScrollTop);
       moveHandlersRef.current.checkAndTriggerAutoScroll();
@@ -801,13 +715,16 @@ export function TimelineView({
       window.removeEventListener('pointerup', onWindowPointerUp);
       window.removeEventListener('pointercancel', onWindowPointerCancel);
     };
+    // Registered once; handlers are read from `moveHandlersRef`. `trackPointer` only
+    // writes a ref, so the first render's copy behaves the same as later ones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         stopAutoScroll();
-        lastPointerRef.current = null;
+        clearPointer();
         if (moveRef.current?.status === 'dragging') {
           const active = moveRef.current;
           try {
@@ -848,8 +765,8 @@ export function TimelineView({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // Registered once. The gesture-feedback actions it calls only touch refs and state
-    // setters, so the first render's copies behave the same as later ones.
+    // Registered once. The gesture-feedback and auto-scroll actions it calls only touch
+    // refs and state setters, so the first render's copies behave the same as later ones.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
