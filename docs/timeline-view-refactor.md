@@ -1378,12 +1378,22 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 | 7     | resize hook tests; resize/snap/conflict utility tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                    | all pass (311 calendar tests); browser not run |
 | 8     | move hook tests; move/resize/snap/conflict + `timeline-day-layout` tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` | all pass (343 calendar tests); browser not run |
 | 9     | recovery factory tests; move/resize hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                           | all pass (366 calendar tests); browser not run |
+| merge | final audit of `main...refactor/timeline-view`; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` on `c108826` and again on merged `main` (`9b1edc4`)           | all pass (366 calendar tests); browser not run |
 
 ## Current checkpoint
 
-Phase 9 is complete on `refactor/timeline-view`, which branched from merged
-`main` (phases 1–2 were replayed there). Phase 10 was inspected and is not
-recommended, so the TimelineView refactor is complete.
+**Status: complete and merged.** Phases 1–9 are complete. Phase 10 (CSS
+split) was inspected and intentionally skipped as not recommended.
+
+- `refactor/timeline-view` (head `c108826`) was merged into `main` with a
+  non-fast-forward merge commit, `9b1edc4`, which keeps every phase commit in
+  history. The merged tree is identical to `c108826`.
+- Final verification passed on `c108826` and again on merged `main`:
+  366 calendar tests, web `tsc --noEmit`, `eslint --max-warnings 0`,
+  `prettier --check`, and `pnpm verify` (web 65 files / 545 tests, domain
+  22 / 348, mobile 2 / 11, billing 10 / 201, release 2 / 8; build and
+  client-bundle check clean). Browser checks were not run.
+- `refactor/timeline-view` is kept for now as a recovery reference.
 
 - The phase 4 encoding correction is commit `803ab73`.
 - The old `web-refactor/timeline-view` branch was deleted locally and on
@@ -1402,9 +1412,10 @@ recommended, so the TimelineView refactor is complete.
 
 ## Next step
 
-No further TimelineView phase. Next is review and merge of
-`refactor/timeline-view`. The discoveries above are candidates for separate
-fix PRs.
+No further TimelineView phase. Discoveries 1–14 are untouched and are
+candidates for separate fix PRs; discovery 14 (a pending move surviving an
+off-event release) is the first correctness task. Delete
+`refactor/timeline-view` once the merged `main` has been used successfully.
 
 ---
 
