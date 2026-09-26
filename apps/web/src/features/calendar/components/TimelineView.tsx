@@ -12,6 +12,7 @@ import type { EventOccurrence } from '../hooks/useCalendarWindow';
 import { useTimelineAutoScroll } from '../hooks/useTimelineAutoScroll';
 import { useTimelineGestureFeedback } from '../hooks/useTimelineGestureFeedback';
 import { useTimelineInitialScroll } from '../hooks/useTimelineInitialScroll';
+import { useTimelineResize } from '../hooks/useTimelineResize';
 import { useTimelineSlotSelection } from '../hooks/useTimelineSlotSelection';
 import { dateKeyToInstant } from '../utils/calendar-window';
 import {
@@ -22,7 +23,6 @@ import {
 import {
   collectMagneticTargets,
   snapMoveInterval,
-  snapResizeInterval,
   type MagneticTarget,
 } from '../utils/event-magnetic-snap';
 import {
@@ -32,7 +32,6 @@ import {
   isEventResizable,
   resolveMoveGesture,
   type MinuteInterval,
-  type ResizeEdge,
 } from '../utils/event-resize';
 import { layoutTimelineDay } from '../utils/timeline-day-layout';
 import { formatHour, formatMinute } from '../utils/timeline-format';
@@ -122,10 +121,6 @@ export function TimelineView({
     handleColumnPointerUp,
     handleColumnPointerCancel,
   } = useTimelineSlotSelection({ hourHeight, defaultDurationMinutes, onSelectSlot });
-  const [resizePreview, setResizePreview] = useState<{
-    occurrenceKey: string;
-    interval: MinuteInterval;
-  } | null>(null);
   const [movePreview, setMovePreview] = useState<{
     occurrenceKey: string;
     dateKey: string;
@@ -149,21 +144,6 @@ export function TimelineView({
     shouldSuppressSelect,
   } = useTimelineGestureFeedback();
 
-  const resizeRef = useRef<{
-    occurrence: EventOccurrence;
-    dateKey: string;
-    edge: ResizeEdge;
-    originalMinutes: MinuteInterval;
-    currentMinutes: MinuteInterval;
-    originalTiming: EventTiming;
-    pointerId: number;
-    handle: HTMLSpanElement;
-    columnTop: number;
-    initialScrollTop: number;
-    targets: MagneticTarget[];
-    conflictCandidates: ConflictCandidate[];
-  } | null>(null);
-
   const moveRef = useRef<{
     status: 'pending' | 'dragging';
     occurrence: EventOccurrence;
@@ -182,48 +162,6 @@ export function TimelineView({
     targets: MagneticTarget[];
     conflictCandidates: ConflictCandidate[];
   } | null>(null);
-  const applyResizePosition = (clientY: number, scrollTop: number) => {
-    const active = resizeRef.current;
-    if (!active) return;
-
-    const scrollDelta = scrollTop - active.initialScrollTop;
-    const rawMinute = ((clientY - active.columnTop + scrollDelta) / hourHeight) * 60;
-    const snapResult = snapResizeInterval({
-      originalMinutes: active.originalMinutes,
-      edge: active.edge,
-      rawPointerMinute: rawMinute,
-      targets: active.targets,
-    });
-    const next = snapResult.interval;
-
-    if (snapResult.snap) {
-      setMagneticSnap({
-        dateKey: active.dateKey,
-        minute: snapResult.snap.snappedMinute,
-        edge: snapResult.snap.edge,
-      });
-    } else {
-      setMagneticSnap(null);
-    }
-
-    const conflicting = checkHasConflict(next, active.conflictCandidates);
-    setHasConflict(conflicting);
-
-    if (
-      next.startMinute === active.currentMinutes.startMinute &&
-      next.endMinute === active.currentMinutes.endMinute
-    ) {
-      return;
-    }
-
-    const nextStart = dateMinuteToInstant(active.dateKey, next.startMinute, timeZone);
-    const nextEnd = dateMinuteToInstant(active.dateKey, next.endMinute, timeZone);
-    if (!nextStart || !nextEnd || nextStart.getTime() >= nextEnd.getTime()) return;
-
-    active.currentMinutes = next;
-    setResizePreview({ occurrenceKey: active.occurrence.key, interval: next });
-  };
-
   const getMagneticTargetsForDate = (dateKey: string, activeKey: string) => {
     return collectMagneticTargets({
       occurrences: byDateKey.get(dateKey) ?? [],
@@ -381,121 +319,44 @@ export function TimelineView({
     });
   };
 
+  // The resize hook below needs these auto-scroll actions, and auto-scroll needs the resize
+  // side back. The resize arrows forward to values declared below; they only run after
+  // render, so each render's arrow reaches that render's `resizeRef` / `applyResizePosition`.
   const { stopAutoScroll, checkAndTriggerAutoScroll, trackPointer, clearPointer } =
     useTimelineAutoScroll(scrollRef, {
       isMoveDragging: () => moveRef.current?.status === 'dragging',
       isResizeActive: () => Boolean(resizeRef.current),
-      applyResizeAt: applyResizePosition,
+      applyResizeAt: (clientY, scrollTop) => applyResizePosition(clientY, scrollTop),
       applyMoveAt: applyMovePosition,
     });
 
-  const handleResizePointerDown = (
-    e: React.PointerEvent<HTMLSpanElement>,
-    occurrence: EventOccurrence,
-    dateKey: string,
-    edge: ResizeEdge,
-    interval: MinuteInterval,
-  ) => {
-    if (e.button !== 0 || !onResizeEvent) return;
-    const column = e.currentTarget.closest<HTMLElement>('[data-date-key]');
-    if (!column) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    const override = timingOverrides?.get(occurrence.event.id);
-    const originalTiming = override ?? { start: occurrence.start, end: occurrence.end };
-    const targets = collectMagneticTargets({
-      occurrences: byDateKey.get(dateKey) ?? [],
-      activeOccurrenceKey: occurrence.key,
-      dateKey,
-      timeZone,
-      workingHours,
-    });
-    const conflictCandidates = collectConflictCandidates({
-      occurrences: byDateKey.get(dateKey) ?? [],
-      activeOccurrenceKey: occurrence.key,
-      dateKey,
-      timeZone,
-    });
-    resizeRef.current = {
-      occurrence,
-      dateKey,
-      edge,
-      originalMinutes: interval,
-      currentMinutes: interval,
-      originalTiming,
-      pointerId: e.pointerId,
-      handle: e.currentTarget,
-      columnTop: column.getBoundingClientRect().top,
-      initialScrollTop: scrollRef.current?.scrollTop ?? 0,
-      targets,
-      conflictCandidates,
-    };
-    trackPointer(e.clientX, e.clientY);
-    clearSettle();
-    clearExitingGhost();
-    suppressClick(occurrence.key);
-    setResizePreview({ occurrenceKey: occurrence.key, interval });
-    setMagneticSnap(null);
-    setHasConflict(false);
-
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // Pointer capture is best-effort in synthetic/test environments.
-    }
-  };
-
-  const handleResizePointerMove = (e: React.PointerEvent<HTMLSpanElement>) => {
-    const active = resizeRef.current;
-    if (!active || active.pointerId !== e.pointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    trackPointer(e.clientX, e.clientY);
-    const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
-    applyResizePosition(e.clientY, currentScrollTop);
-    checkAndTriggerAutoScroll();
-  };
-
-  const finishResize = (
-    e: React.PointerEvent<HTMLSpanElement> | PointerEvent,
-    cancelled: boolean,
-  ) => {
-    stopAutoScroll();
-    const active = resizeRef.current;
-    if (!active || active.pointerId !== e.pointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    try {
-      active.handle.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-
-    resizeRef.current = null;
-    clearPointer();
-    setResizePreview(null);
-    setMagneticSnap(null);
-    setHasConflict(false);
-    const suppressedKey = active.occurrence.key;
-    releaseSuppressedClickSoon(suppressedKey);
-    if (cancelled) return;
-
-    const nextStart = dateMinuteToInstant(
-      active.dateKey,
-      active.currentMinutes.startMinute,
-      timeZone,
-    );
-    const nextEnd = dateMinuteToInstant(active.dateKey, active.currentMinutes.endMinute, timeZone);
-    if (!nextStart || !nextEnd) return;
-
-    const nextTiming = { start: nextStart.getTime(), end: nextEnd.getTime() };
-    if (!hasTimingChanged(active.originalTiming, nextTiming)) return;
-    triggerSettle(active.occurrence.key);
-    onResizeEvent?.(active.occurrence, nextTiming);
-  };
+  const {
+    resizeRef,
+    resizePreview,
+    setResizePreview,
+    applyResizePosition,
+    handleResizePointerDown,
+    handleResizePointerMove,
+    finishResize,
+  } = useTimelineResize(scrollRef, {
+    hourHeight,
+    timeZone,
+    byDateKey,
+    workingHours,
+    timingOverrides,
+    onResizeEvent,
+    setMagneticSnap,
+    setHasConflict,
+    clearSettle,
+    clearExitingGhost,
+    suppressClick,
+    releaseSuppressedClickSoon,
+    triggerSettle,
+    stopAutoScroll,
+    checkAndTriggerAutoScroll,
+    trackPointer,
+    clearPointer,
+  });
 
   const handleMovePointerDown = (
     e: React.PointerEvent<HTMLButtonElement>,
