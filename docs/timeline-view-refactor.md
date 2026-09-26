@@ -1361,24 +1361,48 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
       `buttons === 0` and finishes the move with `cancelled = false`, which
       commits it if the timing changed.
 
-    Preserved by `useTimelineMove` and `useTimelineGestureRecovery`
-    (pinned by the pending-move fallback tests). Not changed.
+    **Resolved on `fix/timeline-pending-move-release`** (after the merge to
+    `main`). Only `createWindowPointerFallback` changed. For a move on the
+    matching pointer id (a matching resize still wins first):
+    - window `pointermove` with `buttons === 0` now calls
+      `finishMove(event, false)` for a pending move as well as a dragging
+      one;
+    - window `pointermove` with a button held still ignores a pending move,
+      so window movement never promotes it;
+    - window `pointerup` and `pointercancel` now finish a pending move as
+      well as a dragging one, with `finishMove(event, false)` and
+      `finishMove(event, true)`.
+
+    The existing `finishMove` pending path does the cleanup: it clears the
+    ref, tracked pointer, preview and feedback, and returns before the ghost,
+    click suppression, settle and commit. The 6 px threshold, pointer
+    capture, dragging-move and resize behaviour and Escape (which still
+    ignores a pending move) are unchanged.
+
+    Tests: `useTimelineGestureRecovery.test.ts` (23 → 28) pins a pending
+    move being finished by `buttons === 0`, pointer-up and pointer-cancel,
+    ignored while the button is held or on another pointer, and losing to a
+    matching resize. `useTimelineMove.test.tsx` (32 → 34) adds finishing a
+    pending move from a window `PointerEvent` (cancelled and not) with no
+    ghost, suppression or commit. The three new finish tests fail without
+    the fix.
 
 ## Verification log
 
-| Phase | Checks                                                                                                                                                                                                    | Result                                         |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| base  | `vitest run src/features/calendar`                                                                                                                                                                        | 25 files / 228 tests pass                      |
-| 1     | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline                                                           | all pass (232 calendar tests)                  |
-| 2     | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                             | all pass (243 calendar tests)                  |
-| 3     | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                      | all pass (252 calendar tests)                  |
-| 4     | slot-selection + hook tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                  | all pass (264 calendar tests)                  |
-| 5     | feedback hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                      | all pass (276 calendar tests)                  |
-| 6     | auto-scroll hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                   | all pass (293 calendar tests); browser not run |
-| 7     | resize hook tests; resize/snap/conflict utility tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                    | all pass (311 calendar tests); browser not run |
-| 8     | move hook tests; move/resize/snap/conflict + `timeline-day-layout` tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` | all pass (343 calendar tests); browser not run |
-| 9     | recovery factory tests; move/resize hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                           | all pass (366 calendar tests); browser not run |
-| merge | final audit of `main...refactor/timeline-view`; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` on `c108826` and again on merged `main` (`9b1edc4`)           | all pass (366 calendar tests); browser not run |
+| Phase  | Checks                                                                                                                                                                                                    | Result                                         |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| base   | `vitest run src/features/calendar`                                                                                                                                                                        | 25 files / 228 tests pass                      |
+| 1      | `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint` (calendar feature); `prettier --check`; `pnpm verify`; body `diff` vs baseline                                                           | all pass (232 calendar tests)                  |
+| 2      | new layout tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                             | all pass (243 calendar tests)                  |
+| 3      | new draft/all-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                      | all pass (252 calendar tests)                  |
+| 4      | slot-selection + hook tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                                                  | all pass (264 calendar tests)                  |
+| 5      | feedback hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                      | all pass (276 calendar tests)                  |
+| 6      | auto-scroll hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                                                   | all pass (293 calendar tests); browser not run |
+| 7      | resize hook tests; resize/snap/conflict utility tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                    | all pass (311 calendar tests); browser not run |
+| 8      | move hook tests; move/resize/snap/conflict + `timeline-day-layout` tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` | all pass (343 calendar tests); browser not run |
+| 9      | recovery factory tests; move/resize hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify`                           | all pass (366 calendar tests); browser not run |
+| merge  | final audit of `main...refactor/timeline-view`; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint`; `prettier`; `pnpm verify` on `c108826` and again on merged `main` (`9b1edc4`)           | all pass (366 calendar tests); browser not run |
+| fix 14 | recovery + move hook tests; TimelineView/ghost/cross-day tests; `vitest run src/features/calendar`; web `tsc --noEmit`; `eslint --max-warnings 0`; `prettier`; `pnpm verify`                              | all pass (373 calendar tests); browser not run |
 
 ## Current checkpoint
 
@@ -1412,9 +1436,9 @@ split) was inspected and intentionally skipped as not recommended.
 
 ## Next step
 
-No further TimelineView phase. Discoveries 1–14 are untouched and are
-candidates for separate fix PRs; discovery 14 (a pending move surviving an
-off-event release) is the first correctness task. Delete
+No further TimelineView phase. Discovery 14 is resolved on
+`fix/timeline-pending-move-release`; discoveries 1–13 are untouched and
+remain candidates for separate fix PRs. Delete
 `refactor/timeline-view` once the merged `main` has been used successfully.
 
 ---

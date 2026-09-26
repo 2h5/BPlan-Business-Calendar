@@ -189,19 +189,45 @@ describe('createWindowPointerFallback', () => {
       expect(moveHandlersRef.current.finishMove).toHaveBeenCalledWith(event, false);
     });
 
-    it('ignores a pending move', () => {
+    it('ignores a pending move while the button is held', () => {
       moveRef.current = activeMove({ status: 'pending' });
 
       createFallback().onWindowPointerMove(pointer());
-      createFallback().onWindowPointerMove(pointer({ buttons: 0 }));
 
       expect(log).toEqual([]);
     });
 
-    it('ignores a move on another pointer', () => {
-      moveRef.current = activeMove({ pointerId: 2 });
+    it('finishes a pending move, not cancelled, when no button is held', () => {
+      resizeRef.current = activeResize({ pointerId: 2 });
+      moveRef.current = activeMove({ status: 'pending' });
+      const event = pointer({ buttons: 0 });
 
-      createFallback().onWindowPointerMove(pointer());
+      createFallback().onWindowPointerMove(event);
+
+      expect(log).toEqual(['finishMove']);
+      expect(moveHandlersRef.current.finishMove).toHaveBeenCalledWith(event, false);
+    });
+
+    it('finishes a resize before a pending move when no button is held', () => {
+      resizeRef.current = activeResize();
+      moveRef.current = activeMove({ status: 'pending' });
+      const event = pointer({ buttons: 0 });
+
+      createFallback().onWindowPointerMove(event);
+
+      expect(log).toEqual(['finishResize']);
+      expect(moveHandlersRef.current.finishResize).toHaveBeenCalledWith(event, false);
+    });
+
+    it('ignores a move on another pointer', () => {
+      const fallback = createFallback();
+      moveRef.current = activeMove({ pointerId: 2 });
+      fallback.onWindowPointerMove(pointer());
+      fallback.onWindowPointerMove(pointer({ buttons: 0 }));
+
+      moveRef.current = activeMove({ status: 'pending', pointerId: 2 });
+      fallback.onWindowPointerMove(pointer());
+      fallback.onWindowPointerMove(pointer({ buttons: 0 }));
 
       expect(log).toEqual([]);
     });
@@ -257,9 +283,44 @@ describe('createWindowPointerFallback', () => {
       expect(moveHandlersRef.current.finishMove).toHaveBeenCalledWith(event, true);
     });
 
-    it('ignores a pending move or another pointer', () => {
+    it('finishes a pending move on pointer-up', () => {
+      moveRef.current = activeMove({ status: 'pending' });
+      const event = pointer({ buttons: 0 });
+
+      createFallback().onWindowPointerUp(event);
+
+      expect(log).toEqual(['finishMove']);
+      expect(moveHandlersRef.current.finishMove).toHaveBeenCalledWith(event, false);
+    });
+
+    it('cancels a pending move on pointer-cancel', () => {
+      moveRef.current = activeMove({ status: 'pending' });
+      const event = pointer({ buttons: 0 });
+
+      createFallback().onWindowPointerCancel(event);
+
+      expect(log).toEqual(['finishMove']);
+      expect(moveHandlersRef.current.finishMove).toHaveBeenCalledWith(event, true);
+    });
+
+    it('finishes or cancels a resize before a pending move', () => {
       const fallback = createFallback();
       moveRef.current = activeMove({ status: 'pending' });
+      resizeRef.current = activeResize();
+      const up = pointer({ buttons: 0 });
+      const cancel = pointer({ buttons: 0 });
+
+      fallback.onWindowPointerUp(up);
+      fallback.onWindowPointerCancel(cancel);
+
+      expect(log).toEqual(['finishResize', 'finishResize']);
+      expect(moveHandlersRef.current.finishResize).toHaveBeenNthCalledWith(1, up, false);
+      expect(moveHandlersRef.current.finishResize).toHaveBeenNthCalledWith(2, cancel, true);
+    });
+
+    it('ignores a pending or dragging move on another pointer', () => {
+      const fallback = createFallback();
+      moveRef.current = activeMove({ status: 'pending', pointerId: 2 });
       fallback.onWindowPointerUp(pointer());
       fallback.onWindowPointerCancel(pointer());
 

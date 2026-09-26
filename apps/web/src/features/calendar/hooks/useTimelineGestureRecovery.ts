@@ -86,11 +86,15 @@ export function createWindowPointerFallback({
     }
 
     const active = moveRef.current;
-    if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+    if (!active || active.pointerId !== e.pointerId) return;
     if (e.buttons === 0) {
+      // Also finishes a pending move: it holds no pointer capture, so its
+      // release may have happened off the event button.
       moveHandlersRef.current.finishMove(e, false);
       return;
     }
+    // A pending move is only promoted by the event button's own handler.
+    if (active.status !== 'dragging') return;
     trackPointer(e.clientX, e.clientY);
     const currentScrollTop = scrollRef.current?.scrollTop ?? active.initialScrollTop;
     moveHandlersRef.current.applyMovePosition(e.clientX, e.clientY, currentScrollTop);
@@ -103,7 +107,9 @@ export function createWindowPointerFallback({
       return;
     }
     const active = moveRef.current;
-    if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+    // Pending or dragging: a pending move holds no pointer capture, so this
+    // may be the only release it sees.
+    if (!active || active.pointerId !== e.pointerId) return;
     moveHandlersRef.current.finishMove(e, false);
   };
 
@@ -113,7 +119,9 @@ export function createWindowPointerFallback({
       return;
     }
     const active = moveRef.current;
-    if (!active || active.status !== 'dragging' || active.pointerId !== e.pointerId) return;
+    // Pending or dragging: a pending move holds no pointer capture, so this
+    // may be the only release it sees.
+    if (!active || active.pointerId !== e.pointerId) return;
     moveHandlersRef.current.finishMove(e, true);
   };
 

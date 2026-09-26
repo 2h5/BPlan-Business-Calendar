@@ -535,6 +535,30 @@ describe('useTimelineMove', () => {
       expect(event.preventDefault).not.toHaveBeenCalled();
     });
 
+    it.each([false, true])(
+      'clears a pending move from a window pointer event (cancelled: %s) with no ghost, suppression or commit',
+      (cancelled) => {
+        const move = renderHook();
+        pressMove(move);
+        const event = { pointerId: 1, buttons: 0, clientX: 400, clientY: 900 } as PointerEvent;
+
+        move.finishMove(event, cancelled);
+
+        expect(move.moveRef.current).toBeNull();
+        expect(log).toEqual([
+          'stopAutoScroll',
+          'releasePointerCapture',
+          'clearPointer',
+          'setMagneticSnap',
+          'setHasConflict',
+          'setSnapDirection',
+        ]);
+        expect(options.showExitingGhost).not.toHaveBeenCalled();
+        expect(options.suppressClick).not.toHaveBeenCalled();
+        expect(options.onMoveEvent).not.toHaveBeenCalled();
+      },
+    );
+
     it('clears the move ref before clearing the tracked pointer', () => {
       const move = renderHook();
       const button = startDrag(move);
