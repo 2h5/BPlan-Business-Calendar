@@ -23,9 +23,12 @@ re-implements them.
 
 ## Baseline
 
-- Branch: `web-refactor/timeline-view` (from `web`)
-- Starting commit: `c58d2238b3f048f0de14e5ea99a02001fe8b3f78`
+- Active branch: `refactor/timeline-view` (from merged `main`)
+- Baseline commit: `d8fd4e7ff4e5098fe0e1a75ab7a2bf47671aaac7`
+  (`Merge branch 'web'`)
+- Original baseline: `c58d2238b3f048f0de14e5ea99a02001fe8b3f78`
   (`feat(web): Search page redesign, workspace ordering, and login motion`)
+  on `web`, before `web` was merged into `main`.
 - `TimelineView.tsx` at baseline: 1,916 lines, exporting `TimelineView`,
   `EventButton`, `OriginGhost`, `EVENT_DETAILS_MIN_MINUTES` and the types
   `SlotSelection`, `DraftEventState`, `EventTiming`, `TimelineViewProps`,
@@ -172,7 +175,8 @@ everything.
 
 ### Phase 1 — Presentational extraction · complete
 
-Commit: `b1858dea0304011e30719643d7f95e25dd7ac38c`.
+Commit: `b5ac0bdc5f92a1b50d180cac72c9471980a70671` (replayed from
+`b1858dea0304011e30719643d7f95e25dd7ac38c`).
 
 Moved verbatim (byte-identical bodies, verified with `diff` against the
 baseline):
@@ -223,6 +227,9 @@ Decisions:
 - Styles stay in `CalendarView.module.css` for now (see phase 10).
 
 ### Phase 2 — Pure per-day layout · complete
+
+Commit: `81708a9b99629f81142a832e3bf9ea7289477f7f` (replayed from
+`a102904421cec42fb739dfe79bc07ffb2d5caf94`).
 
 Moved the per-column timed-layout computation out of the `dateKeys.map` render
 body into `layoutTimelineDay(input): TimelineDayLayout` in
@@ -362,9 +369,9 @@ Recorded, **not** changed — each is a candidate for a separate fix PR.
 
 ## Current checkpoint
 
-Phase 2 complete and committed on `web-refactor/timeline-view`
-(`refactor(web): extract TimelineView per-day layout (phase 2)`), pushed to
-`origin`. `TimelineView.tsx` is 1,498 lines and still owns responsibilities
+Phase 2 complete on `refactor/timeline-view`, replayed after the completed
+`web` work was merged into `main`. The old `web-refactor/timeline-view` branch
+remains a recovery reference. `TimelineView.tsx` is 1,498 lines and still owns responsibilities
 1, 5–9, 11–16 plus the render-side half of 10.
 
 ## Next step
