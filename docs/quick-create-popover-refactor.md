@@ -26,8 +26,9 @@
 ## Incremental phases
 
 1. **Complete:** Extract the event and task field JSX into presentational `QuickCreateEventFields.tsx` and `QuickCreateTaskFields.tsx`, with explicit values and callbacks. Add focused static-render tests. Keep all state and behavior in the parent.
-2. **Recommended next:** Extract the contiguous anchor lookup, position calculation, viewport listeners, and `useFollowAnchorMotion` integration into a `useQuickCreatePosition` hook. Pass `isOpen`, `anchorRect`, `editingOccurrence`, popover ref, and layout invalidators (`mode`, `errorMessage`) explicitly; return `coords`. Keep close animation, keyboard/focus handling, field state, submission, and CSS in the parent. Add focused hook/position integration checks for event versus draft anchor and layout updates. This targets the roughly 115-line position/anchor block now left in the parent.
-3. After Phase 2 verification, review the remaining form state/reset and submit/delete blocks as separate seams. Scope each subsequent phase from fresh code and test evidence.
+2. **Complete:** Extract anchor lookup, position calculation, viewport listeners, and `useFollowAnchorMotion` integration into `useQuickCreatePosition`. The parent passes `isOpen`, `anchorRect`, `editingOccurrence`, its popover ref, `mode`, and `errorMessage`; it renders from the returned `coords`.
+3. **Recommended next:** Extract the pure date/time display helpers and derived time-option creation into a focused calendar utility (or a small derivation hook if memoization is retained). Preserve the current 15-minute options, insertion and sorting of custom start/end times, duration details and filtering, and displayed date/time labels. Keep start/end time state, `handleStartTimeChange`, open/reset synchronization, submission, and picker JSX in their current owners. Add focused tests for non-quarter-hour times, duration details, and date/time labels before changing the parent wiring.
+4. Review form initialization/reset and submit/delete as separate later seams after Phase 3 verification.
 
 ## Phase 1 result and discoveries
 
@@ -55,3 +56,25 @@ Visual QA is left to the user under the repository's proportional verification r
 ESLint initially found only import-order errors in the three changed components. Its targeted autofix resolved them; the repository-wide zero-warning run passed afterward.
 
 `pnpm verify` completed with a Node engine advisory (local Node 20.19.6 versus the repository's `>=22` declaration) and Vite's existing large-chunk advisory; neither failed the gate. Workspace test totals included 348 domain, 11 mobile, 556 web, 201 billing, and 8 release tests.
+
+## Phase 2 result and discoveries
+
+- `QuickCreatePopover.tsx`: **887 → 775 lines**. Added `hooks/useQuickCreatePosition.ts` and `hooks/useQuickCreatePosition.test.ts`. The hook owns the initial centered `coords`, edited-occurrence and new-draft anchor lookup, their distinct geometry rules, `calculatePopoverPosition` invocation and result mapping, layout-triggered repositioning, resize and capture-phase scroll listeners with cleanup, and `useFollowAnchorMotion` wiring. The parent still renders with the returned `coords` and owns the popover ref, close/focus behavior, form state, and mutations.
+- Edited events still search every `[data-occurrence-key]` element and match `editingOccurrence.key` against `dataset.occurrenceKey`. New drafts still use `[data-quick-create-draft="true"]`, with `offsetWidth`/`offsetHeight` preferred over the entrance transform's collapsed rect and the rect as a fallback. Missing DOM anchors still use the supplied `anchorRect`.
+- The 440×440 measurement fallbacks, 8px gap, `bottom` empty-style mapping, and `mode`/`errorMessage` layout invalidators were carried over. The popover ref was added to the position callback dependencies; it is stable because the parent creates it with `useRef`. The anchor lookup and position callbacks remain memoized, so `useFollowAnchorMotion` does not restart on mode/error-only changes.
+- Web Vitest runs without a DOM environment. Focused hook tests use a small React-hook/effect harness with stubbed browser geometry and listeners; they exercise the real `useFollowAnchorMotion` integration without repeating the position algorithm's unit tests.
+- The remaining parent has a cohesive date/time derivation seam near its top: `pad`, `addMinutesToTime`, `formatDateDisplay`, `formatTimeDisplay`, the 15-minute option list, custom time insertion, and end-time duration filtering. This is the basis for the Phase 3 recommendation above.
+
+## Phase 2 verification log
+
+| Check                                                                             | Result                                                                         |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| New hook tests                                                                    | PASS: 7 tests                                                                  |
+| Focused hook, popover, Phase 1 fields, pickers, position, and anchor-motion tests | PASS: 7 files, 43 tests                                                        |
+| All calendar tests                                                                | PASS: 38 files, 384 tests                                                      |
+| Web typecheck                                                                     | PASS                                                                           |
+| ESLint, zero warnings                                                             | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                                                                          | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                                                                     | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 563 web, 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
