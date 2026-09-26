@@ -10,29 +10,10 @@ import {
 import { createPortal } from 'react-dom';
 
 import styles from './QuickCreatePickers.module.css';
+import type { TimePickerOption } from '../utils/quick-create-time';
 
-export interface TimePickerOption {
-  value: string;
-  label: string;
-  detail?: string;
-}
-
-export function formatDurationBetweenTimes(startTime: string, endTime: string): string | undefined {
-  const [startHour, startMinute] = startTime.split(':').map(Number);
-  const [endHour, endMinute] = endTime.split(':').map(Number);
-  const duration =
-    (endHour ?? 0) * 60 + (endMinute ?? 0) - ((startHour ?? 0) * 60 + (startMinute ?? 0));
-  if (duration <= 0) return undefined;
-  if (duration < 60) return `${duration} min${duration === 1 ? '' : 's'}`;
-  if (duration % 60 === 0) {
-    const hours = duration / 60;
-    return `${hours} hr${hours === 1 ? '' : 's'}`;
-  }
-  if (duration % 30 === 0) return `${duration / 60} hrs`;
-  const hours = Math.floor(duration / 60);
-  const minutes = duration % 60;
-  return `${hours} hr ${minutes} mins`;
-}
+export { formatDurationBetweenTimes } from '../utils/quick-create-time';
+export type { TimePickerOption } from '../utils/quick-create-time';
 
 interface AnchoredPosition {
   top: number;

@@ -27,8 +27,9 @@
 
 1. **Complete:** Extract the event and task field JSX into presentational `QuickCreateEventFields.tsx` and `QuickCreateTaskFields.tsx`, with explicit values and callbacks. Add focused static-render tests. Keep all state and behavior in the parent.
 2. **Complete:** Extract anchor lookup, position calculation, viewport listeners, and `useFollowAnchorMotion` integration into `useQuickCreatePosition`. The parent passes `isOpen`, `anchorRect`, `editingOccurrence`, its popover ref, `mode`, and `errorMessage`; it renders from the returned `coords`.
-3. **Recommended next:** Extract the pure date/time display helpers and derived time-option creation into a focused calendar utility (or a small derivation hook if memoization is retained). Preserve the current 15-minute options, insertion and sorting of custom start/end times, duration details and filtering, and displayed date/time labels. Keep start/end time state, `handleStartTimeChange`, open/reset synchronization, submission, and picker JSX in their current owners. Add focused tests for non-quarter-hour times, duration details, and date/time labels before changing the parent wiring.
-4. Review form initialization/reset and submit/delete as separate later seams after Phase 3 verification.
+3. **Complete:** Extract pure date/time display helpers, 15-minute time-option creation, custom time insertion, end-time duration filtering, and the duration formatter into `utils/quick-create-time.ts`. Keep memoization and form behavior in the parent, and preserve picker exports.
+4. **Recommended next:** Extract form state initialization and the open/edit/reset synchronization effect into a `useQuickCreateDraft` hook. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners. Preserve edit-mode event reset, new-create reset asymmetry (including only updating times when `initialStartTime` exists), calendar fallback, first task-list selection, and existing mode behavior. Test reopen/new-slot/edit transitions and late calendar/task-list data before changing the parent wiring.
+5. Review submit/delete as a separate later seam after Phase 4 verification.
 
 ## Phase 1 result and discoveries
 
@@ -78,3 +79,25 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                                                                     | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 563 web, 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Phase 3 result and discoveries
+
+- `QuickCreatePopover.tsx`: **775 → 721 lines**. Added `utils/quick-create-time.ts` and `utils/quick-create-time.test.ts`; changed `QuickCreatePickers.tsx` only to import and re-export the moved type/function. The utility exports `TimePickerOption`, `pad`, `addMinutesToTime`, `formatDateDisplay`, `formatTimeDisplay`, `createTimeOptions`, `withCustomTimeOption`, `formatDurationBetweenTimes`, and `createEndTimePickerOptions`. The picker continues exporting `TimePickerOption` and `formatDurationBetweenTimes` for existing callers.
+- The parent retains `useMemo` around the base grid, the two selected-time lists, and the filtered end-time list. It retains initial start/end state calculations and `handleStartTimeChange`, including its positive-duration/default-duration fallback. No picker UI or field markup changed.
+- `formatDurationBetweenTimes` was implemented in `QuickCreatePickers.tsx`, so moving its implementation required a compatibility re-export there. The option type moved with it to keep the pure utility independent of the picker component.
+- The base grid is 96 entries from `00:00` through `23:45`. A custom selected time is inserted only when absent; the on-grid path returns the original grid array. Non-future end times remain filtered except the selected end time, which can have `detail: undefined`. The duration formatter remains same-day only; no overnight or malformed-input interpretation was added.
+- The remaining parent has a large form-state initialization block and an open/edit/reset effect. Fresh create intentionally leaves some prior values alone (for example, start/end times when no `initialStartTime` is supplied, and mode unless editing forces event). Phase 4 must preserve these asymmetries.
+
+## Phase 3 verification log
+
+| Check                                                  | Result                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| New pure utility tests                                 | PASS: 10 tests                                                                 |
+| Utility, picker, field, popover, and positioning tests | PASS: 8 files, 53 tests                                                        |
+| All calendar tests                                     | PASS: 39 files, 394 tests                                                      |
+| Web typecheck                                          | PASS                                                                           |
+| ESLint, zero warnings                                  | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                                               | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                                          | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 573 web, 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.

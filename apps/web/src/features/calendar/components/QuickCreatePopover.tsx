@@ -12,7 +12,6 @@ import {
 import { createPortal } from 'react-dom';
 
 import { QuickCreateEventFields } from './QuickCreateEventFields';
-import { formatDurationBetweenTimes, type TimePickerOption } from './QuickCreatePickers';
 import styles from './QuickCreatePopover.module.css';
 import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
@@ -20,6 +19,14 @@ import { useQuickCreatePosition } from '../hooks/useQuickCreatePosition';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
 import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
 import type { AnchorRect } from '../utils/popover-position';
+import {
+  addMinutesToTime,
+  createEndTimePickerOptions,
+  createTimeOptions,
+  formatDateDisplay,
+  pad,
+  withCustomTimeOption,
+} from '../utils/quick-create-time';
 
 export type { AnchorRect };
 
@@ -46,43 +53,6 @@ export interface QuickCreatePopoverProps {
   onCreateTask: (input: CreateTaskInput) => Promise<void>;
   onMoreOptions: (draftValues: Partial<EventFormValues>) => void;
   onDraftChange?: (draft: { title: string; calendarColor: string }) => void;
-}
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function addMinutesToTime(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = (h ?? 9) * 60 + (m ?? 0) + minutes;
-  const newHour = Math.floor(total / 60) % 24;
-  const newMin = total % 60;
-  return `${pad(newHour)}:${pad(newMin)}`;
-}
-
-function formatDateDisplay(dateStr: string): string {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  const year = Number(parts[0]);
-  const month = Number(parts[1]);
-  const day = Number(parts[2]);
-  if (!year || !month || !day) return dateStr;
-  const date = new Date(year, month - 1, day, 12, 0, 0);
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
-function formatTimeDisplay(timeStr: string): string {
-  if (!timeStr) return '';
-  const [hStr, mStr] = timeStr.split(':');
-  const h = Number(hStr);
-  const m = Number(mStr);
-  if (isNaN(h) || isNaN(m)) return timeStr;
-  const period = h >= 12 ? 'pm' : 'am';
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${String(m).padStart(2, '0')}${period}`;
 }
 
 export function QuickCreatePopover({
@@ -181,44 +151,20 @@ export function QuickCreatePopover({
     setEndTime(addMinutesToTime(newStartTime, duration));
   };
 
-  const timeOptions = useMemo(() => {
-    const options: Array<{ value: string; label: string }> = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 15) {
-        const val = `${pad(h)}:${pad(m)}`;
-        options.push({
-          value: val,
-          label: formatTimeDisplay(val),
-        });
-      }
-    }
-    return options;
-  }, []);
+  const timeOptions = useMemo(createTimeOptions, []);
 
-  const startTimeOptions = useMemo(() => {
-    if (startTime && !timeOptions.some((o) => o.value === startTime)) {
-      const custom = { value: startTime, label: formatTimeDisplay(startTime) };
-      return [...timeOptions, custom].sort((a, b) => a.value.localeCompare(b.value));
-    }
-    return timeOptions;
-  }, [startTime, timeOptions]);
+  const startTimeOptions = useMemo(
+    () => withCustomTimeOption(timeOptions, startTime),
+    [startTime, timeOptions],
+  );
 
-  const endTimeOptions = useMemo(() => {
-    if (endTime && !timeOptions.some((o) => o.value === endTime)) {
-      const custom = { value: endTime, label: formatTimeDisplay(endTime) };
-      return [...timeOptions, custom].sort((a, b) => a.value.localeCompare(b.value));
-    }
-    return timeOptions;
-  }, [endTime, timeOptions]);
+  const endTimeOptions = useMemo(
+    () => withCustomTimeOption(timeOptions, endTime),
+    [endTime, timeOptions],
+  );
 
-  const endTimePickerOptions = useMemo<TimePickerOption[]>(
-    () =>
-      endTimeOptions
-        .map((option) => ({
-          ...option,
-          detail: formatDurationBetweenTimes(startTime, option.value),
-        }))
-        .filter((option) => option.detail || option.value === endTime),
+  const endTimePickerOptions = useMemo(
+    () => createEndTimePickerOptions(startTime, endTime, endTimeOptions),
     [endTime, endTimeOptions, startTime],
   );
 
