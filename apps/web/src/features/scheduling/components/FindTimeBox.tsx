@@ -2,19 +2,10 @@ import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
-import {
-  ArrowRightIcon,
-  CalendarIcon,
-  CheckCircleIcon,
-  CheckIcon,
-  HelpCircleIcon,
-  LockIcon,
-  PlusIcon,
-  SparkleIcon,
-  StarIcon,
-} from './FindTimeIcons';
+import { ArrowRightIcon, HelpCircleIcon, LockIcon, SparkleIcon, StarIcon } from './FindTimeIcons';
 import { FindTimeProposalResults } from './FindTimeProposalResults';
 import { FindTimeRotatingPrompt } from './FindTimeRotatingPrompt';
+import { ScheduledBanner, ScheduledConfirmationCard } from './FindTimeScheduledNotice';
 import { useSubscription } from '../../billing/hooks/useBilling';
 import { getSubscriptionStatusInfo } from '../../billing/utils/subscription-display';
 import {
@@ -29,7 +20,6 @@ import {
   saveStoredFindTimeDraft,
   useFindTime,
 } from '../hooks/useFindTime';
-import { formatSlot, getEventDateKey } from '../utils/find-time-format';
 import { FIND_TIME_PLACEHOLDER_EXAMPLE } from '../utils/find-time-prompts';
 import {
   BANNER_TOTAL_DURATION_MS,
@@ -345,10 +335,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   const activeConfirmation =
     noticePhase === 'banner' ? null : (recentScheduled ?? confirmSlot.confirmation);
 
-  const calendarLink = activeConfirmation?.event?.id
-    ? `/calendar?date=${getEventDateKey(activeConfirmation.event.startAt)}&event=${activeConfirmation.event.id}`
-    : '/calendar';
-
   return (
     <section className={styles.container} aria-label="Find a time">
       {!isPro ? (
@@ -546,97 +532,23 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
 
       {/* Beautiful Scheduled Confirmation (preserved in both Pro and Free) */}
       {activeConfirmation?.event && !isSchedulingAnother && (
-        <div className={styles.confirmationCard} role="status">
-          <div className={styles.confirmationHeader}>
-            <div className={styles.checkIconWrap}>
-              <CheckCircleIcon />
-            </div>
-            <div className={styles.confirmationMain}>
-              <div className={styles.confirmationBadgeRow}>
-                <span className={styles.confirmationBadge}>Successfully Scheduled</span>
-                <span className={styles.confirmationLiveIndicator}>✦ Synced</span>
-              </div>
-              <h3 className={styles.confirmationTitle}>{activeConfirmation.event.title}</h3>
-              <div className={styles.confirmationTimeRow}>
-                <CalendarIcon />
-                <span>
-                  {formatSlot(
-                    activeConfirmation.event.startAt,
-                    activeConfirmation.event.endAt,
-                    timeZone,
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.confirmationActions}>
-            <button
-              type="button"
-              className={styles.actionResetButton}
-              onClick={handleScheduleAnother}
-            >
-              <PlusIcon />
-              <span>Schedule another</span>
-            </button>
-            <Link to={calendarLink} className={styles.actionCalendarButton}>
-              <span>View in Calendar</span>
-              <ArrowRightIcon />
-            </Link>
-          </div>
-        </div>
+        <ScheduledConfirmationCard
+          event={activeConfirmation.event}
+          timeZone={timeZone}
+          onScheduleAnother={handleScheduleAnother}
+        />
       )}
 
       {/* Docked Recent Scheduled Notification */}
       {isSchedulingAnother && recentScheduled?.event && (
-        <div
-          className={`${styles.recentBanner} ${isBannerExiting ? styles.recentBannerExiting : ''}`}
-          role="status"
-        >
-          <div className={styles.recentBannerMain}>
-            <div className={styles.recentCheckIcon}>
-              <CheckIcon />
-            </div>
-            <div className={styles.recentText}>
-              <span className={styles.recentTag}>Scheduled</span>
-              <span className={styles.recentTitle}>{recentScheduled.event.title}</span>
-              <span className={styles.recentSeparator}>·</span>
-              <span className={styles.recentTime}>
-                {formatSlot(recentScheduled.event.startAt, recentScheduled.event.endAt, timeZone)}
-              </span>
-            </div>
-          </div>
-          <div className={styles.recentActions}>
-            <Link
-              to={
-                recentScheduled.event.id
-                  ? `/calendar?date=${getEventDateKey(recentScheduled.event.startAt)}&event=${recentScheduled.event.id}`
-                  : '/calendar'
-              }
-              className={styles.recentCalendarLink}
-            >
-              <span>View in Calendar</span>
-              <ArrowRightIcon />
-            </Link>
-            <button
-              type="button"
-              className={styles.recentDismissButton}
-              onClick={triggerBannerDismiss}
-              aria-label="Dismiss scheduled notice"
-            >
-              ✕
-            </button>
-          </div>
-          <div
-            className={styles.bannerTimerBar}
-            style={
-              {
-                '--start-width': `${Math.max(0, Math.min(100, (bannerRemainingMs / bannerTotalDurationMs) * 100))}%`,
-                '--deplete-duration': `${bannerRemainingMs}ms`,
-              } as React.CSSProperties
-            }
-          />
-        </div>
+        <ScheduledBanner
+          event={recentScheduled.event}
+          timeZone={timeZone}
+          isExiting={isBannerExiting}
+          remainingMs={bannerRemainingMs}
+          totalDurationMs={bannerTotalDurationMs}
+          onDismiss={triggerBannerDismiss}
+        />
       )}
 
       {(findTime.errorMessage ?? confirmSlot.errorMessage) && (
