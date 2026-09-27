@@ -36,6 +36,7 @@
 | 1     | Implemented and verified | Added `CalendarFeedback.tsx` with `CalendarState` and `CalendarToastPresentation`. `CalendarView.tsx` is 963 physical lines after Phase 1, down 56 from 1,019. Added eight focused presentation tests. All toast lifecycle and event orchestration remain in the parent. |
 | 2     | Implemented and verified | Added `useCalendarToast.ts` for toast state, refs, timer scheduling, hold/release, success helper, and unmount cleanup. `CalendarView.tsx` is 877 physical lines after Phase 2, down 86 from 963.                                                                        |
 | 3     | Implemented and verified | Moved `getNewEventAnchorRect` into `utils/new-event-anchor.ts`, preserving its geometry and scroll sequence. `CalendarView.tsx` is 816 physical lines after Phase 3, down 61 from 877. Added five focused utility tests.                                                 |
+| 4     | Implemented and verified | Added `useCalendarViewTransition.ts` for visual transition state, origin/direction calculation, reduced-motion handling, timer replacement, and cleanup. `CalendarView.tsx` is 781 physical lines after Phase 4, down 35 from 816.                                       |
 
 Phase 1 checks: focused tests (8), all calendar tests (452), web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify` passed. The full gate included 656 web, 348 domain, 11 mobile, 201 billing, and 8 release tests plus the web production build and bundle scan.
 
@@ -63,3 +64,12 @@ Phase boundaries are reassessed after each push.
 - Five focused tests use the existing Vitest global-stubbing pattern for the missing day, month passthrough, visible week slot, late week slot with scrolling, and minimum day draft height. No DOM library or new infrastructure was added. These stubs verify returned geometry and the scroll call, but do not exercise real browser layout or animation frames.
 - Phase 3 checks passed: five focused tests, 464 calendar tests, web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify`.
 - A provisional Phase 4 candidate is the view-transition state/timer around `changeMode`. Its interaction with mode and URL coordination needs inspection before setting that scope; no Phase 4 work has started.
+
+## Phase 4 boundary and coverage
+
+- `useCalendarViewTransition()` returns `transitionState` and a stable `startTransition({ fromMode, toMode, selectedDateKey, targetDateKey?, timeZone, weekStartsOn, dateKeys })` callback. The hook owns only the visual transition state, direction/origin calculation, reduced-motion branch, 240 ms timer and its replacement/cleanup. Each call receives current context, including `targetDateKey ?? selectedDateKey` for the origin.
+- `CalendarView` still rejects same-mode changes, persists the selected mode, calls `startTransition` before `setMode`, then closes dependent UI state in the original order. Mode initialization, URL coordination, hotkeys, and render classes/transform-origin style remain in the parent.
+- `CalendarView.transition.test.tsx` now invokes the real hook for timer duration, rapid replacement, fresh origin inputs, reduced motion, and no-direction clearing. It retains the existing direction/origin utility assertions and CSS hardening/reduced-motion assertions. The file has eight tests, up from six; the two handwritten lifecycle simulations were replaced by four hook tests.
+- React server rendering exposes the hook callback and timer behavior but does not run effects or make state updates observable. Rendered transition-state changes and unmount cleanup therefore remain interaction-test gaps until a DOM-capable test layer exists. The cleanup effect was moved without changing its timer-clear logic.
+- Phase 4 checks passed: eight focused transition tests, 466 calendar tests, web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify`.
+- A provisional Phase 5 candidate is the optimistic timing-override map and its reconciliation with authoritative occurrences. Its type dependencies and coupling to move/resize persistence need inspection before setting scope; no Phase 5 work has started.

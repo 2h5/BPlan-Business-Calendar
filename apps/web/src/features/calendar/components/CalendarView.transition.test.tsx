@@ -1,19 +1,45 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  getTransitionOrigin,
-  getViewTransitionDirection,
-  type ViewTransitionState,
-} from '../utils/view-transition';
+import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
+import * as viewTransition from '../utils/view-transition';
+
+const { getTransitionOrigin, getViewTransitionDirection } = viewTransition;
+
+type TransitionInput = Parameters<
+  ReturnType<typeof useCalendarViewTransition>['startTransition']
+>[0];
+
+function renderTransitionHook(): ReturnType<typeof useCalendarViewTransition> {
+  let result: ReturnType<typeof useCalendarViewTransition> | undefined;
+  function Harness() {
+    result = useCalendarViewTransition();
+    return null;
+  }
+  renderToStaticMarkup(<Harness />);
+  return result!;
+}
+
+const transitionInput: TransitionInput = {
+  fromMode: 'month',
+  toMode: 'week',
+  selectedDateKey: '2026-09-15',
+  timeZone: 'UTC',
+  weekStartsOn: 0,
+  dateKeys: ['2026-09-15'],
+};
 
 describe('CalendarView Spatial Transitions Lifecycle & Hardening', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.stubGlobal('window', { matchMedia: vi.fn(() => ({ matches: false })) });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -76,82 +102,87 @@ describe('CalendarView Spatial Transitions Lifecycle & Hardening', () => {
     expect(origin).toEqual({ x: 35.71, y: 50 });
   });
 
-  it('manages transition timer and settles cleanly to null (terminal transform: none)', () => {
-    let transitionState: ViewTransitionState | null = null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+  it('uses the current origin context and clears its timer after 240 ms', () => {
+    const origin = vi.spyOn(viewTransition, 'getTransitionOrigin');
+    const transition = renderTransitionHook();
 
-    const startTransition = (from: 'month' | 'week' | 'day', to: 'month' | 'week' | 'day') => {
-      const direction = getViewTransitionDirection(from, to);
-      if (direction) {
-        const origin = getTransitionOrigin({
-          fromMode: from,
-          toMode: to,
-          selectedDateKey: '2026-09-15',
-          timeZone: 'UTC',
-        });
-        transitionState = { direction, origin };
+    transition.startTransition({ ...transitionInput, targetDateKey: '2026-09-17' });
 
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          transitionState = null;
-          timer = null;
-        }, 240);
-      }
-      return transitionState;
-    };
-
-    // Trigger transition Month -> Week
-    const active = startTransition('month', 'week');
-    expect(active).not.toBeNull();
-    expect(active?.direction).toBe('in');
-
-    // Advance 100ms: transition still running
-    vi.advanceTimersByTime(100);
-    expect(transitionState as ViewTransitionState | null).not.toBeNull();
-
-    // Advance past 240ms: transition cleared to null
-    vi.advanceTimersByTime(140);
-    expect(transitionState as ViewTransitionState | null).toBeNull();
+    expect(window.matchMedia).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)');
+    expect(origin).toHaveBeenCalledWith({
+      fromMode: 'month',
+      toMode: 'week',
+      selectedDateKey: '2026-09-17',
+      timeZone: 'UTC',
+      weekStartsOn: 0,
+      dateKeys: transitionInput.dateKeys,
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(239);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('handles rapid sequential view switches without stuck intermediate states', () => {
-    let transitionState: ViewTransitionState | null = null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+  it('replaces pending timers across rapid view switches', () => {
+    const direction = vi.spyOn(viewTransition, 'getViewTransitionDirection');
+    const origin = vi.spyOn(viewTransition, 'getTransitionOrigin');
+    const transition = renderTransitionHook();
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
 
-    const startTransition = (from: 'month' | 'week' | 'day', to: 'month' | 'week' | 'day') => {
-      const direction = getViewTransitionDirection(from, to);
-      if (direction) {
-        const origin = getTransitionOrigin({
-          fromMode: from,
-          toMode: to,
-          selectedDateKey: '2026-09-15',
-          timeZone: 'UTC',
-        });
-        transitionState = { direction, origin };
-
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          transitionState = null;
-          timer = null;
-        }, 240);
-      }
-      return transitionState;
-    };
-
-    // Switch 1: Month -> Week
-    expect(startTransition('month', 'week')?.direction).toBe('in');
-
-    // 50ms later, rapid switch: Week -> Day
+    transition.startTransition(transitionInput);
     vi.advanceTimersByTime(50);
-    expect(startTransition('week', 'day')?.direction).toBe('in');
-
-    // 50ms later, rapid switch: Day -> Month
+    transition.startTransition({
+      ...transitionInput,
+      fromMode: 'week',
+      toMode: 'day',
+      selectedDateKey: '2026-09-18',
+      timeZone: 'America/New_York',
+      weekStartsOn: 1,
+      dateKeys: ['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18'],
+    });
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(direction).toHaveBeenNthCalledWith(2, 'week', 'day');
+    expect(origin).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        selectedDateKey: '2026-09-18',
+        timeZone: 'America/New_York',
+        weekStartsOn: 1,
+      }),
+    );
+    expect(vi.getTimerCount()).toBe(1);
     vi.advanceTimersByTime(50);
-    expect(startTransition('day', 'month')?.direction).toBe('out');
+    transition.startTransition({ ...transitionInput, fromMode: 'day', toMode: 'month' });
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(239);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 
-    // Advance 240ms after last switch: settles cleanly to null
-    vi.advanceTimersByTime(240);
-    expect(transitionState as ViewTransitionState | null).toBeNull();
+  it('clears a pending timer immediately when reduced motion is preferred', () => {
+    const origin = vi.spyOn(viewTransition, 'getTransitionOrigin');
+    const transition = renderTransitionHook();
+    transition.startTransition(transitionInput);
+    expect(vi.getTimerCount()).toBe(1);
+
+    vi.stubGlobal('window', { matchMedia: vi.fn(() => ({ matches: true })) });
+    transition.startTransition({ ...transitionInput, fromMode: 'week', toMode: 'day' });
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(origin).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a pending timer when direction is absent', () => {
+    const transition = renderTransitionHook();
+    transition.startTransition(transitionInput);
+    expect(vi.getTimerCount()).toBe(1);
+
+    transition.startTransition({ ...transitionInput, toMode: 'month' });
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('verifies CSS rules in CalendarView.module.css satisfy Chromium hardening and reduced-motion', () => {

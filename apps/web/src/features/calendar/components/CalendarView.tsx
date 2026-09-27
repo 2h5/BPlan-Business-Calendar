@@ -24,6 +24,7 @@ import {
 } from '../hooks/useCalendarMutations';
 import { useCalendarToast } from '../hooks/useCalendarToast';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
+import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import {
   getActiveCalendarView,
@@ -40,11 +41,6 @@ import {
 } from '../utils/event-form';
 import { getNewEventAnchorRect } from '../utils/new-event-anchor';
 import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
-import {
-  getTransitionOrigin,
-  getViewTransitionDirection,
-  type ViewTransitionState,
-} from '../utils/view-transition';
 
 export function CalendarView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,8 +54,7 @@ export function CalendarView() {
     const activeView = getActiveCalendarView();
     return searchParams.has('event') ? viewForLinkedEvent(activeView) : activeView;
   });
-  const [transitionState, setTransitionState] = useState<ViewTransitionState | null>(null);
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { transitionState, startTransition } = useCalendarViewTransition();
   const [selectedDateKey, setSelectedDateKey] = useState(
     () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
   );
@@ -300,37 +295,15 @@ export function CalendarView() {
     (nextMode: CalendarViewMode, targetDateKey?: string) => {
       if (nextMode === mode) return;
       setLastCalendarView(nextMode);
-
-      const prefersReducedMotion =
-        typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-      const direction = getViewTransitionDirection(mode, nextMode);
-      if (direction && !prefersReducedMotion) {
-        const origin = getTransitionOrigin({
-          fromMode: mode,
-          toMode: nextMode,
-          selectedDateKey: targetDateKey ?? selectedDateKey,
-          timeZone,
-          weekStartsOn,
-          dateKeys: calendarWindow.dateKeys,
-        });
-        setTransitionState({ direction, origin });
-
-        if (transitionTimerRef.current) {
-          clearTimeout(transitionTimerRef.current);
-        }
-        transitionTimerRef.current = setTimeout(() => {
-          setTransitionState(null);
-          transitionTimerRef.current = null;
-        }, 240);
-      } else {
-        if (transitionTimerRef.current) {
-          clearTimeout(transitionTimerRef.current);
-          transitionTimerRef.current = null;
-        }
-        setTransitionState(null);
-      }
+      startTransition({
+        fromMode: mode,
+        toMode: nextMode,
+        selectedDateKey,
+        targetDateKey,
+        timeZone,
+        weekStartsOn,
+        dateKeys: calendarWindow.dateKeys,
+      });
 
       setMode(nextMode);
       setSelectedOccurrence(null);
@@ -339,7 +312,7 @@ export function CalendarView() {
       setIsEventEditorClosing(false);
       setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
-    [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys],
+    [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys, startTransition],
   );
 
   useCalendarViewHotkeys(
@@ -353,14 +326,6 @@ export function CalendarView() {
       changeMode(viewParam);
     }
   }, [viewParam, mode, changeMode]);
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-      }
-    };
-  }, []);
 
   const selectMonthDate = useCallback(
     (dateKey: string) => {
