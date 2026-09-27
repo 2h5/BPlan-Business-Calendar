@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import { QuickCreateEventFields } from './QuickCreateEventFields';
+import { QuickCreateHeader } from './QuickCreateHeader';
 import styles from './QuickCreatePopover.module.css';
 import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
@@ -297,122 +298,25 @@ export function QuickCreatePopover({
           />
         )}
 
-        <header className={styles.header}>
-          {editingOccurrence ? (
-            <span className={styles.editingLabel}>Edit event</span>
-          ) : (
-            <div className={styles.typeTabs} role="tablist" aria-label="Creation type">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'event'}
-                className={`${styles.tabButton} ${mode === 'event' ? styles.tabButtonActive : ''}`}
-                onClick={() => {
-                  setMode('event');
-                  setErrorMessage(null);
-                }}
-              >
-                Event
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'task'}
-                className={`${styles.tabButton} ${mode === 'task' ? styles.tabButtonActive : ''}`}
-                onClick={() => {
-                  setMode('task');
-                  setErrorMessage(null);
-                }}
-              >
-                Task
-              </button>
-            </div>
-          )}
-
-          <div className={styles.headerRight}>
-            {editingOccurrence && onDeleteEvent && !isReadOnly && (
-              <div className={styles.deleteControl}>
-                <button
-                  type="button"
-                  className={styles.deleteButton}
-                  onClick={() => setIsDeleteConfirmOpen((current) => !current)}
-                  aria-label="Delete event"
-                  aria-expanded={isDeleteConfirmOpen}
-                  aria-controls="quick-create-delete-confirm"
-                  title="Delete event"
-                  disabled={isSaving}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                  </svg>
-                </button>
-
-                {isDeleteConfirmOpen ? (
-                  <div
-                    id="quick-create-delete-confirm"
-                    className={styles.deleteConfirm}
-                    role="alertdialog"
-                    aria-label="Confirm event deletion"
-                  >
-                    <span>Delete this event?</span>
-                    <div className={styles.deleteConfirmActions}>
-                      <button
-                        type="button"
-                        className={styles.deleteCancelButton}
-                        onClick={() => setIsDeleteConfirmOpen(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.deleteConfirmButton}
-                        onClick={() => void handleDelete()}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-
-            <button
-              type="button"
-              className={styles.closeButton}
-              onClick={handleRequestClose}
-              aria-label="Close"
-              disabled={isSaving}
-            >
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        </header>
+        <QuickCreateHeader
+          isEditing={!!editingOccurrence}
+          mode={mode}
+          isSaving={isSaving}
+          showDelete={!!editingOccurrence && !!onDeleteEvent && !isReadOnly}
+          isDeleteConfirmOpen={isDeleteConfirmOpen}
+          onSelectEvent={() => {
+            setMode('event');
+            setErrorMessage(null);
+          }}
+          onSelectTask={() => {
+            setMode('task');
+            setErrorMessage(null);
+          }}
+          onToggleDeleteConfirm={() => setIsDeleteConfirmOpen((current) => !current)}
+          onCancelDelete={() => setIsDeleteConfirmOpen(false)}
+          onConfirmDelete={() => void handleDelete()}
+          onRequestClose={handleRequestClose}
+        />
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.titleRow}>

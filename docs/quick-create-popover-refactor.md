@@ -31,7 +31,7 @@
 4. **Complete:** Extract form state initialization and the open/edit/reset synchronization effect into `useQuickCreateDraft`. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners.
 5. **Complete:** Extract submit/create/update and delete action handling into `useQuickCreateActions`, with explicit draft values, callbacks, timezone, and saving state. Preserve title/calendar validation, error text and focus behavior, event form conversion, task due-time conversion, edit/update routing, and close timing. Leave More options, `handleStartTimeChange`, time-option memoization, positioning, focus trapping, close animation, field components, and CSS in the parent.
 6. **Complete:** Extract the popover dismissal and keyboard/focus lifecycle into `useQuickCreateLifecycle`. The parent retains both refs and passes them in. More options, start-time handling, draft preview notification, time-option memoization, action hook, position hook, rendering, and CSS remain in their existing owners.
-7. **Recommended next:** Extract the header presentation into `QuickCreateHeader.tsx`, passing mode/edit status, delete availability and confirmation state, saving state, and explicit tab/delete/close callbacks. Keep every state value and handler in the parent or its existing hooks; preserve the header's DOM, SVGs, classes, ARIA, delete-confirm controls, and animated Close path. Add focused static-render and callback tests. Leave title/error/form/footer markup and the other behavior seams in the parent.
+7. **Complete:** Extract the header presentation into `QuickCreateHeader.tsx`, passing mode/edit status, delete availability and confirmation state, saving state, and explicit tab/delete/close callbacks. Keep every state value and handler in the parent or its existing hooks; preserve the header's DOM, SVGs, classes, ARIA, delete-confirm controls, and animated Close path. Add focused static-render and callback tests. Leave title/error/form/footer markup and the other behavior seams in the parent.
 
 ## Phase 1 result and discoveries
 
@@ -169,3 +169,25 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                                                     | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 617 web (including 438 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Phase 7 result and discoveries
+
+- `QuickCreatePopover.tsx`: **543 → 447 lines**. Added `components/QuickCreateHeader.tsx` and `components/QuickCreateHeader.test.tsx`. The component contains only the existing header markup: edit label, Event/Task tabs, delete button and confirmation, Close button, SVGs, classes, and ARIA. It receives explicit presentation state and callbacks; it has no Quick Create state, effect, occurrence, or mutation callback.
+- The parent still decides delete availability from `!!editingOccurrence && !!onDeleteEvent && !isReadOnly`. It owns mode selection and error clearing, confirmation toggling/cancellation, the returned `handleDelete`, and animated `handleRequestClose`. The header keeps the same DOM order, button types, selected-tab ARIA, delete-confirm ID and alertdialog, and saving-disabled delete/Close controls. Cancel only closes confirmation, and the Close button still takes the lifecycle hook's animated path.
+- Focused static-render tests cover both creation modes, edit mode, delete availability and confirmation, ARIA state, button order, saving-disabled controls, and Close in both modes. A small React-element inspection exercises the six supplied callbacks directly without a new click-testing framework. Existing popover tests remained unchanged.
+- After extraction, the parent still fetches and derives calendar/task-list data, wires the draft/action/lifecycle/position hooks, preserves the duration-aware start-time callback and memoized time options, notifies the calendar draft preview, handles More options and title Enter, and composes the backdrop, arrows, dialog shell, title/error/form, field components, footer, and portal. These responsibilities legitimately connect the extracted pieces. Further extraction now would be diminishing-return micro-fragmentation; no Phase 8 is recommended.
+- **Implementation decomposition is complete.** The branch still requires an independent full-branch review and any resulting fixes before merge. Phase 7 does not merge the branch.
+
+## Phase 7 verification log
+
+| Check                                                           | Result                                                    |
+| --------------------------------------------------------------- | --------------------------------------------------------- |
+| New header tests                                                | PASS: 6 tests                                             |
+| Focused Quick Create, picker, position, and anchor-motion tests | PASS: 12 files, 103 tests                                 |
+| All calendar tests                                              | PASS: 43 files, 444 tests                                 |
+| Web typecheck                                                   | PASS                                                      |
+| ESLint, zero warnings                                           | PASS: `pnpm exec eslint . --max-warnings 0`               |
+| Prettier                                                        | PASS: `pnpm verify` format check                          |
+| `pnpm verify`                                                   | PASS: format, lint, typechecks, tests, build, bundle scan |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 623 web (including 444 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
