@@ -1,5 +1,5 @@
 import type { Calendar, CalendarEvent, CreateTaskInput } from '@cal/schemas';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 import { QuickCreateEventFields } from './QuickCreateEventFields';
@@ -8,6 +8,7 @@ import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
 import { useQuickCreateActions } from '../hooks/useQuickCreateActions';
 import { useQuickCreateDraft } from '../hooks/useQuickCreateDraft';
+import { useQuickCreateLifecycle } from '../hooks/useQuickCreateLifecycle';
 import { useQuickCreatePosition } from '../hooks/useQuickCreatePosition';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
 import type { eventInputFromForm, EventFormValues } from '../utils/event-form';
@@ -190,15 +191,16 @@ export function QuickCreatePopover({
     onCreateTask,
   });
 
-  // Autofocus title input when popover opens
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        titleInputRef.current?.focus({ preventScroll: true });
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
+  const { isClosing, handleRequestClose, handleAnimationEnd } = useQuickCreateLifecycle({
+    isOpen,
+    isSaving,
+    isDeleteConfirmOpen,
+    setIsDeleteConfirmOpen,
+    popoverRef,
+    titleInputRef,
+    onClosing,
+    onClose,
+  });
 
   // Notify parent of draft updates for calendar preview
   useEffect(() => {
@@ -218,57 +220,6 @@ export function QuickCreatePopover({
     mode,
     errorMessage,
   });
-
-  const [isClosing, setIsClosing] = useState(false);
-
-  const handleRequestClose = useCallback(() => {
-    if (isSaving || isClosing) return;
-    setIsClosing(true);
-    onClosing?.();
-  }, [isSaving, isClosing, onClosing]);
-
-  const handleAnimationEnd = (e: React.AnimationEvent) => {
-    if (isClosing && e.target === popoverRef.current) {
-      setIsClosing(false);
-      onClose();
-    }
-  };
-
-  // Keyboard navigation & Escape key & focus trapping
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSaving) {
-        e.stopPropagation();
-        if (isDeleteConfirmOpen) {
-          e.preventDefault();
-          setIsDeleteConfirmOpen(false);
-          return;
-        }
-        handleRequestClose();
-      }
-
-      if (e.key === 'Tab' && popoverRef.current) {
-        const focusable = popoverRef.current.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)',
-        );
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isDeleteConfirmOpen, isOpen, isSaving, handleRequestClose, setIsDeleteConfirmOpen]);
 
   if (!isOpen) return null;
 

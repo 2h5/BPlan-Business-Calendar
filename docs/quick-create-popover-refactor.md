@@ -30,7 +30,8 @@
 3. **Complete:** Extract pure date/time display helpers, 15-minute time-option creation, custom time insertion, end-time duration filtering, and the duration formatter into `utils/quick-create-time.ts`. Keep memoization and form behavior in the parent, and preserve picker exports.
 4. **Complete:** Extract form state initialization and the open/edit/reset synchronization effect into `useQuickCreateDraft`. Keep `handleStartTimeChange`, submission, deletion, More options, positioning, focus, close behavior, field components, and CSS in their current owners.
 5. **Complete:** Extract submit/create/update and delete action handling into `useQuickCreateActions`, with explicit draft values, callbacks, timezone, and saving state. Preserve title/calendar validation, error text and focus behavior, event form conversion, task due-time conversion, edit/update routing, and close timing. Leave More options, `handleStartTimeChange`, time-option memoization, positioning, focus trapping, close animation, field components, and CSS in the parent.
-6. **Recommended next:** Extract the popover dismissal and keyboard/focus lifecycle into a focused hook. Move the title autofocus timer, `isClosing`/request-close/animation-end flow, and capture-phase Escape/Tab listener together; keep the popover and title refs in the parent and pass them explicitly. Add interaction tests for delete-confirm Escape, saving/closing guards, focus wrap, animation target, and cleanup. Leave More options, start-time handling, draft preview notification, time-option memoization, action hook, position hook, rendering, and CSS in their existing owners.
+6. **Complete:** Extract the popover dismissal and keyboard/focus lifecycle into `useQuickCreateLifecycle`. The parent retains both refs and passes them in. More options, start-time handling, draft preview notification, time-option memoization, action hook, position hook, rendering, and CSS remain in their existing owners.
+7. **Recommended next:** Extract the header presentation into `QuickCreateHeader.tsx`, passing mode/edit status, delete availability and confirmation state, saving state, and explicit tab/delete/close callbacks. Keep every state value and handler in the parent or its existing hooks; preserve the header's DOM, SVGs, classes, ARIA, delete-confirm controls, and animated Close path. Add focused static-render and callback tests. Leave title/error/form/footer markup and the other behavior seams in the parent.
 
 ## Phase 1 result and discoveries
 
@@ -146,3 +147,25 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                      | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 601 web (including 422 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Phase 6 result and discoveries
+
+- `QuickCreatePopover.tsx`: **592 → 543 lines**. Added `hooks/useQuickCreateLifecycle.ts` and `hooks/useQuickCreateLifecycle.test.ts`. The hook owns the 50ms title autofocus effect and cleanup, `isClosing` state, guarded `handleRequestClose`, target-checked `handleAnimationEnd`, and the capture-phase window Escape/Tab effect and cleanup. It returns `isClosing`, `handleRequestClose`, and `handleAnimationEnd`; the parent still owns `popoverRef` and `titleInputRef`.
+- Animated dismissal remains limited to backdrop click, header Close, and ordinary Escape. Task Cancel still calls `onClose` directly; More options still calls `onClose` after `onMoreOptions`; successful create/update/task/delete still close through the existing action callbacks. The JSX routing and DOM were not changed.
+- Escape while saving still does nothing. Accepted Escape stops propagation; with delete confirmation open it prevents default and only dismisses confirmation, while ordinary Escape requests close without explicitly preventing default. Tab trapping remains active while saving, uses the exact existing selector, wraps only at the first/last element, and does not capture focus from outside the popover. The listener is added and removed with capture `true` only while open.
+- Request-close still guards saving and already-closing state, sets closing before calling `onClosing`, and waits for the popover's own animation target before resetting state and calling `onClose`. Closing state is not reset merely because `isOpen` changes. The new hook lists the passed refs in effect dependencies for lint; the parent creates both refs with `useRef`, so their identities remain stable.
+- The next substantial presentational seam is the header: mode tabs, delete control and confirmation, and animated Close button occupy a contiguous block. Extracting that block next can reduce the parent without moving title/form/footer behavior or altering the existing lifecycle hook.
+
+## Phase 6 verification log
+
+| Check                                                             | Result                                                                         |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| New lifecycle-hook tests                                          | PASS: 16 tests                                                                 |
+| Lifecycle, action, draft, position, time, picker, fields, popover | PASS: 11 files, 97 tests                                                       |
+| All calendar tests                                                | PASS: 42 files, 438 tests                                                      |
+| Web typecheck                                                     | PASS                                                                           |
+| ESLint, zero warnings                                             | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                                                          | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                                                     | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+`pnpm verify` test totals were 348 domain, 11 mobile, 617 web (including 438 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
