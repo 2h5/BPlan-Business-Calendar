@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CalendarEditor } from './CalendarEditor';
+import { CalendarState, CalendarToastPresentation } from './CalendarFeedback';
 import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
@@ -112,48 +113,6 @@ function getNewEventAnchorRect(
     width: rect.width,
     height,
   };
-}
-
-function CalendarState({
-  kind,
-  onRetry,
-}: {
-  kind: 'loading' | 'empty' | 'error';
-  onRetry?: () => void;
-}) {
-  const copy = {
-    loading: ['Loading your calendar', 'Bringing your calendars and events into view.'],
-    empty: [
-      'Nothing scheduled here',
-      'This range is clear. Events from visible calendars will appear here.',
-    ],
-    error: ['We could not load your calendar', 'Check the local connection and try again.'],
-  }[kind];
-
-  return (
-    <div className={styles.statePanel} role={kind === 'error' ? 'alert' : 'status'}>
-      <svg
-        viewBox="0 0 24 24"
-        width="36"
-        height="36"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden="true"
-      >
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M16 3v4M8 3v4M3 10h18" />
-        {kind === 'error' ? <path d="M12 14v3M12 19h.01" /> : null}
-      </svg>
-      <strong>{copy[0]}</strong>
-      <span>{copy[1]}</span>
-      {kind === 'error' && onRetry ? (
-        <button type="button" onClick={onRetry}>
-          Try again
-        </button>
-      ) : null}
-    </div>
-  );
 }
 
 export function CalendarView() {
@@ -990,29 +949,14 @@ export function CalendarView() {
       ) : null}
 
       {toast ? (
-        <div
-          className={`${styles.toast} ${isToastExiting ? styles.toastExiting : ''}`}
-          role="status"
-          aria-live="polite"
-          onPointerEnter={holdToast}
-          onPointerLeave={releaseToast}
-          onFocus={holdToast}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) releaseToast();
-          }}
-        >
-          <span className={styles.toastMessage} key={toast.message}>
-            {toast.message === 'Restoring event…' ? (
-              <span className={styles.toastSpinner} aria-hidden="true" />
-            ) : null}
-            <span>{toast.message}</span>
-          </span>
-          {toast.actionLabel && toast.onAction && !isToastExiting ? (
-            <button type="button" onClick={toast.onAction}>
-              {toast.actionLabel}
-            </button>
-          ) : null}
-        </div>
+        <CalendarToastPresentation
+          message={toast.message}
+          actionLabel={toast.actionLabel}
+          onAction={toast.onAction}
+          isExiting={isToastExiting}
+          onHold={holdToast}
+          onRelease={releaseToast}
+        />
       ) : null}
     </div>
   );
