@@ -4,10 +4,10 @@ import path from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { OriginGhost } from './OriginGhost';
+import { OriginGhost } from './components/OriginGhost';
 import { TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
-import { resolveMoveGesture } from '../utils/event-resize';
+import { resolveMoveGesture } from './utils/event-resize';
 
 const mockNow = new Date('2026-09-15T10:00:00.000Z');
 const timeZone = 'America/New_York';
@@ -253,7 +253,7 @@ describe('Phase 3.2 � Origin Ghost Indicator', () => {
   });
 
   describe('Reduced Motion CSS Compliance', () => {
-    const cssPath = path.resolve(__dirname, 'CalendarView.module.css');
+    const cssPath = path.resolve(__dirname, '../components/CalendarView.module.css');
     const cssContent = fs.readFileSync(cssPath, 'utf8');
 
     it('includes .timelineEventMoving and .timelineEventResizing in prefers-reduced-motion reset', () => {

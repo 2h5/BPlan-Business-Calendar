@@ -8,7 +8,7 @@ import {
   snapResizeInterval,
   type MagneticTarget,
 } from './event-magnetic-snap';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 
 const mockCalendar: Calendar = {
   id: 'b0000000-0000-0000-0000-000000000001',

@@ -7,7 +7,7 @@ import {
   type TimelineSlotSelection,
   type UseTimelineSlotSelectionOptions,
 } from './useTimelineSlotSelection';
-import styles from '../components/CalendarView.module.css';
+import styles from '../../components/CalendarView.module.css';
 
 const hourHeight = 64;
 const colRect = { top: 100, bottom: 100 + 24 * hourHeight, left: 300, right: 450, width: 150 };

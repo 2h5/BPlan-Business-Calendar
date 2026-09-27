@@ -1,8 +1,8 @@
 import { addZonedDays, minuteOfDay } from '@cal/domain';
 
-import { dateKeyToInstant } from './calendar-window';
 import { MINUTES_PER_DAY, type MinuteInterval } from './event-resize';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
+import { dateKeyToInstant } from '../../utils/calendar-window';
 
 export interface ConflictCandidate {
   key: string;

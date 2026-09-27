@@ -7,9 +7,9 @@ import {
   toZonedDateKey,
 } from '@cal/domain';
 
-import type { EventOccurrence } from './calendar-occurrences';
-import { dateKeyToInstant } from './calendar-window';
 import { dateMinuteToInstant, type MinuteInterval } from './event-resize';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
+import { dateKeyToInstant } from '../../utils/calendar-window';
 
 const DRAFT_LAYOUT_KEY = '__quick-create-draft__';
 

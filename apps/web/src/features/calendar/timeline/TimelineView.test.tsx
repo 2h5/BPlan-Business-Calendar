@@ -2,11 +2,11 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { EventButton } from './EventButton';
-import { OriginGhost } from './OriginGhost';
+import { EventButton } from './components/EventButton';
+import { OriginGhost } from './components/OriginGhost';
 import { TimelineView } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
-import { calculateAutoScrollVelocity, clampScrollTop } from '../utils/event-auto-scroll';
+import { calculateAutoScrollVelocity, clampScrollTop } from './utils/event-auto-scroll';
 
 const mockNow = new Date('2026-09-15T10:00:00.000Z');
 const timeZone = 'America/New_York';

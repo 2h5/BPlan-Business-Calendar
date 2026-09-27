@@ -105,31 +105,169 @@ where the new paths changed sort position.
 
 - Moved QuickCreate tests: 12 files, 116 tests (26 DOM) pass.
 - `features/calendar` + `features/settings`: 61 files, 592 tests pass.
-- `pnpm verify` on Node 24.11.1 passes (web: 99 files / 862 tests).
+- `pnpm verify` passes (web: 99 files / 862 tests). The top-level `pnpm` ran
+  on Node 24.11.1, but its nested `pnpm` calls went through the Node 20 shim
+  (see findings). Phase 2 re-ran everything on Node 24.
+
+## Phase 2: Timeline (done)
+
+### Starting layout
+
+```
+features/calendar/
+  components/  CalendarView, CalendarToolbar, MonthView, EventEditor, ...,
+               TimelineView (+ .test, .crossday.test, .ghost.test),
+               TimelineAllDayRow, TimelineDraftEvent, EventButton, OriginGhost
+  hooks/       useCalendar*, useTimeline{AutoScroll,GestureFeedback,GestureRecovery,
+               InitialScroll,Move,Resize,SlotSelection}
+  utils/       shared calendar utilities mixed with event-resize, event-conflict,
+               event-magnetic-snap, event-auto-scroll, timeline-format,
+               timeline-day-layout, timeline-initial-scroll, working-hours-bands,
+               slot-selection
+```
+
+### Resulting layout
+
+```
+features/calendar/
+  components/    CalendarView (+ .module.css), CalendarToolbar, CalendarEditor,
+                 CalendarFeedback, CalendarSidebar, EventEditor, MonthView
+  hooks/         useCalendar*, useCalendarWindow, useCalendars
+  utils/         calendar-occurrences, calendar-preferences, calendar-window,
+                 event-form, event-ownership, new-event-anchor, new-event-defaults,
+                 animate-scroll, popover-position, timeline-slot-reveal,
+                 view-transition
+  quick-create/  (Phase 1)
+  timeline/
+    TimelineView.tsx (+ .test, .crossday.test, .ghost.test)
+    components/  TimelineAllDayRow, TimelineDraftEvent, EventButton, OriginGhost (+ tests)
+    hooks/       useTimelineAutoScroll, useTimelineGestureFeedback,
+                 useTimelineGestureRecovery, useTimelineInitialScroll,
+                 useTimelineMove, useTimelineResize, useTimelineSlotSelection (+ tests)
+    utils/       event-auto-scroll, event-conflict, event-magnetic-snap,
+                 event-resize, slot-selection, timeline-day-layout,
+                 timeline-format, timeline-initial-scroll, working-hours-bands (+ tests)
+```
+
+No `timeline/index.ts`. Outside the subsystem, only `TimelineView.tsx` is
+imported: `CalendarView` renders it, and `CalendarView`, `MonthView` and two
+calendar hooks import its exported types. A barrel would not narrow that.
+
+### Files moved (41)
+
+- `components/` → `timeline/`: `TimelineView.tsx`, `TimelineView.test.tsx`,
+  `TimelineView.crossday.test.tsx`, `TimelineView.ghost.test.tsx`.
+- `components/` → `timeline/components/`: `TimelineAllDayRow(.test).tsx`,
+  `TimelineDraftEvent(.test).tsx`, `EventButton.tsx`, `OriginGhost.tsx`.
+- `hooks/` → `timeline/hooks/`: the seven `useTimeline*` hooks and their six
+  tests (`useTimelineInitialScroll` has none).
+- `utils/` → `timeline/utils/`: `event-auto-scroll`, `event-conflict`,
+  `event-magnetic-snap`, `event-resize`, `slot-selection`,
+  `timeline-day-layout`, `timeline-format`, `timeline-initial-scroll`,
+  `working-hours-bands`, each with its test.
+
+Importers updated outside the subsystem: `CalendarView`, `MonthView`,
+`useCalendarEventTimingChanges` and `useCalendarTimingOverrides` (all for
+`TimelineView` or its exported types). No file outside `features/calendar`
+imported a moved Timeline file. QuickCreate files did not change.
+
+### Ownership decisions
+
+Each moved file is used only by Timeline code (or by its own test).
+
+- **`EventButton`** has a generic name but only `TimelineView` and
+  `TimelineAllDayRow` render it. `MonthView` has its own markup.
+- **`event-resize`** (`MinuteInterval`, `ResizeEdge`, move/resize geometry,
+  `isEventMovable`) is used by `EventButton`, `OriginGhost`, `TimelineView`,
+  the gesture hooks and the Timeline layout utilities. Nothing at the calendar
+  level uses it. Its own dependency, `event-ownership`, is shared with
+  `useCalendarMutations` and stays in the root.
+- **`timeline-format`**: its consumers are all Timeline (`EventButton`,
+  `TimelineDraftEvent`, `TimelineView`).
+- **`event-conflict` / `event-magnetic-snap`**: only the move and resize hooks
+  use them.
+
+### Deliberately kept shared
+
+- **`components/CalendarView.module.css`**: shared by CalendarView, Toolbar,
+  Sidebar, Editor, Feedback, EventEditor, MonthView and Timeline. Splitting it
+  is CSS work, not a move. Timeline imports
+  `../../components/CalendarView.module.css`.
+- **`utils/timeline-slot-reveal.ts`**: its only consumer is `new-event-anchor`
+  (CalendarView reveals the new slot before QuickCreate opens). Moving it would
+  make a root utility import from `timeline/`.
+- **`utils/popover-position.ts`**: owns `AnchorRect`, which Timeline, Month,
+  CalendarView and QuickCreate all use.
+- **`hooks/useCalendarWindow.ts`, `utils/calendar-window.ts`,
+  `utils/calendar-occurrences.ts`**: the core calendar model, used by Month,
+  Today, QuickCreate and Timeline.
+- **`hooks/useCalendarEventTimingChanges.ts`,
+  `hooks/useCalendarTimingOverrides.ts`**: CalendarView orchestration. They
+  import the `EventTiming` type from `TimelineView` but are not Timeline
+  internals.
+- **`components/MonthView.tsx`**: a sibling view. It imports the
+  `DraftEventState` / `SlotSelection` types from `TimelineView`.
+
+### AnchorRect cleanup
+
+`EventButton`, `MonthView`, `TimelineAllDayRow`, `TimelineView` and
+`CalendarView` now import `AnchorRect` from `utils/popover-position` instead of
+through `QuickCreatePopover`'s re-export. In `CalendarView` this splits
+`import { QuickCreatePopover, type AnchorRect }` into a value import plus a
+type import. This change is type-only. `QuickCreatePopover` still has
+`export type { AnchorRect }` (QuickCreate was left untouched), but nothing
+imports it now.
+
+### Non-path changes
+
+- `TimelineView.ghost.test.tsx` reads the shared CSS from disk with
+  `path.resolve(__dirname, 'CalendarView.module.css')`. The string became
+  `'../components/CalendarView.module.css'`. The test logic is unchanged.
+- Prettier collapsed one multi-line `event-conflict` import in
+  `TimelineView.crossday.test.tsx` onto one line now that the path is shorter.
+- `eslint --fix` re-sorted imports where the new paths changed `import/order`.
+
+### Verification
+
+- Moved Timeline tests: 20 files, 282 tests pass.
+- `features/calendar` + `features/settings` + `features/today`: 69 files, 638
+  tests pass.
+- `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
+  warning (web: 99 files / 862 tests, the same count as before).
 
 ## Findings for later phases
 
-- **`AnchorRect` is imported through `QuickCreatePopover`.** `EventButton`,
-  `MonthView`, `TimelineAllDayRow` and `TimelineView` get the type from the
-  popover's re-export rather than from `utils/popover-position`, so Timeline
-  and Month depend on the QuickCreate subsystem for a shared type. Pointing them
-  at `utils/popover-position` is a one-line, type-only change per file and fits
-  the Timeline phase.
+- **Shared calendar types live in `TimelineView.tsx`.** `EventTiming`,
+  `SlotSelection` and `DraftEventState` are exported from the Timeline
+  component. `CalendarView`, `MonthView`, `useCalendarEventTimingChanges` and
+  `useCalendarTimingOverrides` import them from `timeline/TimelineView`.
+  Moving them to a calendar-level types module would be a code change, not a
+  move. It is worth its own small commit.
+- **`QuickCreatePopover`'s `export type { AnchorRect }` is now unused.** It
+  can be removed in a QuickCreate-scoped commit.
+- **String paths escape import rewriting.** Tests that read files through
+  `__dirname` (`TimelineView.ghost.test.tsx`,
+  `CalendarView.transition.test.tsx`) need a manual check whenever a file
+  moves.
 - **Settings deep-imports `QuickCreateTimePicker`.** If more features reuse the
-  pickers, promote them to a shared web component. Until then the deep import
-  documents the coupling.
+  pickers, promote them to a shared web component.
 - **`popover-position` mixes a shared type with QuickCreate-only logic.** A
-  future split (type stays, `calculatePopoverPosition` moves) would be a code
-  change, not a move, so it was left out of this phase.
-- **The local `pnpm` shim runs a bundled Node 20** (`Z:\Dev\Tools\Node`), so
-  `pnpm verify` warns about the `>=22` engine. Run it through Node 24's
-  `corepack/dist/pnpm.js`, or update the bundled Node.
+  future split would be a code change.
+- **The local `pnpm` shim runs a bundled Node 20** (`Z:\Dev\Tools\Node`), and
+  `pnpm verify` spawns nested `pnpm` calls that also go through it. Put a Node
+  22+ `pnpm` first on `PATH`, or update the bundled Node.
+- **Other features deep-import calendar internals.** Today (`useToday`,
+  `day-glance`, `TodayScheduleSection`, `TodaySearch`), Search (`SearchView`)
+  and Settings (`SettingsView`) import `calendar/hooks/useCalendarWindow`,
+  `useCalendars`, `calendar/utils/calendar-occurrences`,
+  `calendar-preferences` and `calendar-window` directly. None of these moved
+  in Phases 1–2. They are the calendar feature's real cross-feature surface and
+  should stay put, or get an explicit boundary, during the Today phase.
 
 ## Remaining phases
 
-1. ~~QuickCreate~~ (done, above).
-2. Timeline: `TimelineView`, `TimelineAllDayRow`, `TimelineDraftEvent`,
-   `useTimeline*` hooks and timeline/slot/resize/move utilities.
+1. ~~QuickCreate~~ (Phase 1).
+2. ~~Timeline~~ (Phase 2).
 3. Tasks.
 4. Today.
 5. Scheduling / Find Time.

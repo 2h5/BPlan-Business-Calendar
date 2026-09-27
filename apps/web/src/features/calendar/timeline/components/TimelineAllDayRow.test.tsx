@@ -3,9 +3,9 @@ import type { MouseEvent, ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import styles from './CalendarView.module.css';
 import { TimelineAllDayRow, type TimelineAllDayRowProps } from './TimelineAllDayRow';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import styles from '../../components/CalendarView.module.css';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 
 const timeZone = 'America/New_York';
 const dateKeys = ['2026-09-15', '2026-09-16'];

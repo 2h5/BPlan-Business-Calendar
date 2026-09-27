@@ -1,6 +1,6 @@
 import { minuteOfDay, toZonedDateKey } from '@cal/domain';
 
-import type { EventOccurrence } from './calendar-occurrences';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 
 /** Hours of context shown above a revealed event. */
 const REVEAL_LEAD_HOURS = 1;

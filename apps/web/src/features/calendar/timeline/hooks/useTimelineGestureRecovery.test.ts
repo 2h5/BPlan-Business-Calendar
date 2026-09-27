@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventOccurrence } from './useCalendarWindow';
 import {
   createEscapeKeyHandler,
   createWindowPointerFallback,
@@ -9,6 +8,7 @@ import {
 } from './useTimelineGestureRecovery';
 import type { TimelineActiveMove } from './useTimelineMove';
 import type { TimelineActiveResize } from './useTimelineResize';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 
 const occurrence = {
   key: 'evt-1::2026-09-15',

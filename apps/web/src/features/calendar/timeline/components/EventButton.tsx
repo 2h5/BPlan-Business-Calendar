@@ -1,9 +1,9 @@
 import { resolveEventColor } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
 
-import styles from './CalendarView.module.css';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
-import type { AnchorRect } from '../quick-create/QuickCreatePopover';
+import styles from '../../components/CalendarView.module.css';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
+import type { AnchorRect } from '../../utils/popover-position';
 import type { MinuteInterval, ResizeEdge } from '../utils/event-resize';
 import { formatDuration, formatEventTime, formatMinute } from '../utils/timeline-format';
 

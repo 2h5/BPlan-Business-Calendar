@@ -1,7 +1,6 @@
 import { addZonedDays, getZonedParts, minuteOfDay } from '@cal/domain';
 import type { WorkingHours } from '@cal/schemas';
 
-import { dateKeyToInstant } from './calendar-window';
 import {
   dateMinuteToInstant,
   MINUTES_PER_DAY,
@@ -11,7 +10,8 @@ import {
   type MinuteInterval,
   type ResizeEdge,
 } from './event-resize';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
+import { dateKeyToInstant } from '../../utils/calendar-window';
 
 export const DEFAULT_MAGNETIC_THRESHOLD_MINUTES = 7;
 

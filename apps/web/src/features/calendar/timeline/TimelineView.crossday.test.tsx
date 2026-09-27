@@ -2,12 +2,9 @@ import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
-import {
-  collectConflictCandidates,
-  hasConflict as checkHasConflict,
-} from '../utils/event-conflict';
-import { collectMagneticTargets, snapMoveInterval } from '../utils/event-magnetic-snap';
-import { dateMinuteToInstant, hasTimingChanged, isEventMovable } from '../utils/event-resize';
+import { collectConflictCandidates, hasConflict as checkHasConflict } from './utils/event-conflict';
+import { collectMagneticTargets, snapMoveInterval } from './utils/event-magnetic-snap';
+import { dateMinuteToInstant, hasTimingChanged, isEventMovable } from './utils/event-resize';
 
 const timeZone = 'America/New_York';
 

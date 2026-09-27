@@ -1,8 +1,8 @@
 import type { Calendar, CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
-import type { EventOccurrence } from './calendar-occurrences';
 import { layoutTimelineDay, type TimelineDayLayoutInput } from './timeline-day-layout';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 
 const timeZone = 'UTC';
 const day = '2026-09-15';

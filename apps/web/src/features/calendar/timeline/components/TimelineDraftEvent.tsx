@@ -1,6 +1,6 @@
 import type { HourCycle } from '@cal/schemas';
 
-import styles from './CalendarView.module.css';
+import styles from '../../components/CalendarView.module.css';
 import { formatMinute } from '../utils/timeline-format';
 
 interface DraftAppearance {

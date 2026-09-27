@@ -1,4 +1,4 @@
-import type { AnchorRect } from './popover-position';
+import type { AnchorRect } from '../../utils/popover-position';
 
 /** How long a press must be held before the 15-minute selection box shows. */
 export const SLOT_HOLD_DELAY_MS = 180;

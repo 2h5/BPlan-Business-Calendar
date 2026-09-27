@@ -2,13 +2,13 @@ import type React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventOccurrence } from './useCalendarWindow';
 import {
   useTimelineMove,
   type TimelineActiveMove,
   type UseTimelineMoveOptions,
 } from './useTimelineMove';
-import type { EventTiming } from '../components/TimelineView';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
+import type { EventTiming } from '../TimelineView';
 import type { MinuteInterval } from '../utils/event-resize';
 
 const DAY_1 = '2026-09-15';

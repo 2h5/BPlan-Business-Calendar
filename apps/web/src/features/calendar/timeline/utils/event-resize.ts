@@ -1,7 +1,7 @@
 import { getZonedParts, toZonedDateKey, zonedWallClockToUtc } from '@cal/domain';
 import type { Calendar, CalendarEvent } from '@cal/schemas';
 
-import { eventWriteRoute } from './event-ownership';
+import { eventWriteRoute } from '../../utils/event-ownership';
 
 export const RESIZE_SNAP_MINUTES = 15;
 export const MOVE_SNAP_MINUTES = 15;

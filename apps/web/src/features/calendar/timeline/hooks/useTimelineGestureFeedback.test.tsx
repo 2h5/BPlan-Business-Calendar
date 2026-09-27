@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EventOccurrence } from './useCalendarWindow';
 import {
   GHOST_EXIT_ANIMATION_MS,
   SETTLE_ANIMATION_MS,
@@ -9,6 +8,7 @@ import {
   type TimelineExitingGhost,
   type TimelineGestureFeedback,
 } from './useTimelineGestureFeedback';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 
 /**
  * Runs the hook once and hands back its values and actions. The web tests have

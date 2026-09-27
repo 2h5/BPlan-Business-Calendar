@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import type { useUpdateEvent } from './useCalendarMutations';
 import type { useCalendarToast } from './useCalendarToast';
 import type { EventOccurrence } from './useCalendarWindow';
-import type { EventTiming } from '../components/TimelineView';
+import type { EventTiming } from '../timeline/TimelineView';
 import { eventInputWithTiming } from '../utils/event-form';
 
 interface CalendarEventTimingChangeOptions {

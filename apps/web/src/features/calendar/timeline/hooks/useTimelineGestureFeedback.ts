@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { EventOccurrence } from './useCalendarWindow';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 import type { MinuteInterval } from '../utils/event-resize';
 
 export const SETTLE_ANIMATION_MS = 180;

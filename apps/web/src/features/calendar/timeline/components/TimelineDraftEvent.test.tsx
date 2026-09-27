@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import styles from './CalendarView.module.css';
 import { TimelineAllDayDraft, TimelineDraftEvent } from './TimelineDraftEvent';
+import styles from '../../components/CalendarView.module.css';
 
 describe('TimelineDraftEvent', () => {
   it('renders the timed draft at its minutes, in its layout column, with its title and colour', () => {

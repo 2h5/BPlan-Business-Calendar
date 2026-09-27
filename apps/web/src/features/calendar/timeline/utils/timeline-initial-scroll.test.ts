@@ -1,8 +1,8 @@
 import type { CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
-import type { EventOccurrence } from './calendar-occurrences';
 import { initialScrollHour, type InitialScrollInput } from './timeline-initial-scroll';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 
 const TIME_ZONE = 'UTC';
 const WEEK = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25'];

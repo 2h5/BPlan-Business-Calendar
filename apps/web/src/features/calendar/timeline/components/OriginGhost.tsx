@@ -1,7 +1,7 @@
 import { resolveEventColor } from '@cal/domain';
 
-import styles from './CalendarView.module.css';
-import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import styles from '../../components/CalendarView.module.css';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
 import type { MinuteInterval } from '../utils/event-resize';
 
 export interface OriginGhostProps {

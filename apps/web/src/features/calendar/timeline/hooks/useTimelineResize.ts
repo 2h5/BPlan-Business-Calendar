@@ -1,10 +1,10 @@
 import type { WorkingHours } from '@cal/schemas';
 import { useRef, useState, type RefObject } from 'react';
 
-import type { EventOccurrence } from './useCalendarWindow';
 import type { TimelineAutoScroll } from './useTimelineAutoScroll';
 import type { TimelineGestureFeedback } from './useTimelineGestureFeedback';
-import type { EventTiming } from '../components/TimelineView';
+import type { EventOccurrence } from '../../hooks/useCalendarWindow';
+import type { EventTiming } from '../TimelineView';
 import {
   collectConflictCandidates,
   hasConflict as checkHasConflict,
