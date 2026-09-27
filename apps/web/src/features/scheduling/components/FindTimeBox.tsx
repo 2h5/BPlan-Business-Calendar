@@ -18,98 +18,17 @@ import {
   saveStoredFindTimeDraft,
   useFindTime,
 } from '../hooks/useFindTime';
+import { formatSlot, getEventDateKey } from '../utils/find-time-format';
 import { FIND_TIME_PLACEHOLDER_EXAMPLE } from '../utils/find-time-prompts';
-
-const BANNER_STORAGE_KEY = 'bplan_recent_scheduled_banner';
-const CONFIRMATION_DISPLAY_DURATION_MS = 5000;
-const BANNER_TOTAL_DURATION_MS = 30000;
-
-type ScheduledNoticePhase = 'confirmation' | 'banner';
-
-interface StoredScheduledBanner {
-  confirmation: FindTimeConfirmation;
-  phase?: ScheduledNoticePhase;
-  /** Expiry for the currently stored phase. */
-  expiresAt: number;
-  /** Absolute expiry for the compact banner after the confirmation phase. */
-  bannerExpiresAt?: number;
-  totalDurationMs: number;
-}
-
-function getStoredBanner(): StoredScheduledBanner | null {
-  try {
-    if (typeof window === 'undefined' || !window.sessionStorage) return null;
-    const raw = window.sessionStorage.getItem(BANNER_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredScheduledBanner;
-    if (!parsed || !parsed.confirmation || typeof parsed.expiresAt !== 'number') {
-      window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
-      return null;
-    }
-
-    const now = Date.now();
-    const phase: ScheduledNoticePhase = parsed.phase === 'confirmation' ? 'confirmation' : 'banner';
-    const totalDurationMs =
-      Number.isFinite(parsed.totalDurationMs) && parsed.totalDurationMs > 0
-        ? parsed.totalDurationMs
-        : BANNER_TOTAL_DURATION_MS;
-
-    if (phase === 'confirmation') {
-      const bannerExpiresAt =
-        typeof parsed.bannerExpiresAt === 'number'
-          ? parsed.bannerExpiresAt
-          : parsed.expiresAt + totalDurationMs;
-
-      if (parsed.expiresAt > now) {
-        return { ...parsed, phase, bannerExpiresAt, totalDurationMs };
-      }
-
-      if (bannerExpiresAt > now) {
-        const migrated = {
-          ...parsed,
-          phase: 'banner' as const,
-          expiresAt: bannerExpiresAt,
-          bannerExpiresAt,
-          totalDurationMs,
-        };
-        saveBannerRecord(migrated);
-        return migrated;
-      }
-
-      window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
-      return null;
-    }
-
-    if (parsed.expiresAt > now) {
-      return { ...parsed, phase, totalDurationMs };
-    }
-
-    window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function saveBannerRecord(record: StoredScheduledBanner): void {
-  try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem(BANNER_STORAGE_KEY, JSON.stringify(record));
-    }
-  } catch {
-    // Ignore storage quota or security errors
-  }
-}
-
-function clearBannerRecord(): void {
-  try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.removeItem(BANNER_STORAGE_KEY);
-    }
-  } catch {
-    // Ignore
-  }
-}
+import {
+  BANNER_TOTAL_DURATION_MS,
+  clearBannerRecord,
+  CONFIRMATION_DISPLAY_DURATION_MS,
+  getStoredBanner,
+  saveBannerRecord,
+  type ScheduledNoticePhase,
+  type StoredScheduledBanner,
+} from '../utils/scheduled-notice-storage';
 
 export interface FindTimeBoxProps {
   timeZone: string;
@@ -828,51 +747,6 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
       )}
     </section>
   );
-}
-
-function getEventDateKey(startAt?: string): string {
-  try {
-    if (!startAt) return '';
-    const date = new Date(startAt);
-    if (isNaN(date.getTime())) return '';
-    return date.toISOString().slice(0, 10);
-  } catch {
-    return '';
-  }
-}
-
-/** e.g. "Thu, Sep 10 · 10:15 AM – 10:30 AM". */
-function formatSlot(startAt?: string, endAt?: string, timeZone?: string): string {
-  if (!startAt || !endAt) return '';
-  try {
-    const tz = timeZone || 'UTC';
-    const start = new Date(startAt);
-    const end = new Date(endAt);
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
-    const day = new Intl.DateTimeFormat('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      timeZone: tz,
-    }).format(start);
-
-    return `${day} · ${clockTime(start, tz)} – ${clockTime(end, tz)}`;
-  } catch {
-    return '';
-  }
-}
-
-function clockTime(value: Date, timeZone: string): string {
-  try {
-    if (isNaN(value.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      timeZone,
-    }).format(value);
-  } catch {
-    return '';
-  }
 }
 
 function StarIcon() {

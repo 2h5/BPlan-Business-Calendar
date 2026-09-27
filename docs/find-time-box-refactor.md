@@ -1,0 +1,29 @@
+# FindTimeBox refactor
+
+## Starting point
+
+- Branch: `refactor/find-time-box`, created from `main` at `b8648cb43f6cd6862e240c6d4869f9ef27ca1c85`.
+- Baseline: `apps/web/src/features/scheduling/components/FindTimeBox.tsx` is 1,098 physical lines, including blank lines.
+- Responsibilities observed: Pro subscription gate and teaser; prompt input and draft persistence; request loading, clarification and ranked proposals; slot confirmation; full confirmation and compact scheduled notice; timer and navigation restoration; calendar links; date/time presentation; local SVG icons.
+- The scheduling hooks own request/confirmation state and server calls. `FindTimeBox` owns local presentation state, handlers and notice lifecycle. The existing `FindTimeBox.test.tsx` covers gating, confirmation restoration, banner migration and proposal presentation.
+
+## Behavioral invariants
+
+- Keep the Pro gate, input, proposal, confirmation, banner and calendar-link markup/behavior unchanged.
+- The scheduled notice uses `bplan_recent_scheduled_banner` in `sessionStorage`, a five-second confirmation and a 30-second banner. Restoration uses absolute expiry times so navigation does not restart the countdown.
+- Storage access tolerates SSR and storage exceptions. Invalid records and expired phases are handled exactly as before, including confirmation-to-banner migration and older-record defaults.
+- Slot display uses `en-US` and the supplied timezone, defaulting to UTC; invalid inputs yield empty strings. Calendar date keys use the UTC ISO date of a valid start time.
+- Preserve Find Time draft/request state in `useFindTime`, confirmation handling in `useConfirmSlot`, and deterministic server-side availability boundaries.
+
+## Provisional decomposition
+
+1. **Phase 1:** Move scheduled-notice storage/expiry helpers and date/slot formatting into scheduling `utils/`. Keep the clock formatter private to its formatting module. Add focused tests. Keep state, effects, timers, handlers, hooks, JSX, icons, CSS and gating in `FindTimeBox`.
+2. **Later phases (not started):** Reassess whether the notice lifecycle deserves its own hook after inspecting its timer/ref dependencies and existing tests. Then consider smaller presentation boundaries only where props and state flow stay clear. Do not force a split merely to reduce line count.
+
+## Progress
+
+- Baseline inspected: component, component tests, scheduling hooks/API, adjacent utility/test conventions and the relevant architecture guidance. `main` and `origin/main` both resolve to the starting SHA after fetch.
+- Phase 1: complete. Scheduled-notice storage and expiry behavior moved to `scheduled-notice-storage.ts`; calendar date key and slot/clock formatting moved to `find-time-format.ts`. `FindTimeBox.tsx` is now 972 physical lines. React state, effects, refs, timers, handlers, JSX, icons, gating, hooks and CSS remain in place.
+- Phase 1 verification: 9 focused helper tests, 37 scheduling tests, web typecheck, zero-warning ESLint on changed TypeScript, Prettier checks and `pnpm verify` passed. Existing `FindTimeBox` tests were not changed. Full verification ran with Node 20.19.6 and emitted the repository's Node `>=22` engine warning.
+- Later-phase observation: notice restoration and transition are tied to `useConfirmSlot`, local state and several timer refs. Reassess that boundary before extracting a hook; no later-phase extraction was attempted here.
+- Phase 2: not started.
