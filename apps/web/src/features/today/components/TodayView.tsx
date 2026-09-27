@@ -6,11 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import { DayGlanceCard } from './DayGlanceCard';
 import { ProgressRing } from './ProgressRing';
 import { CalendarIcon, MoonIcon, PlusIcon, SunIcon } from './TodayIcons';
+import { TodayQuickAdd } from './TodayQuickAdd';
 import { TodayScheduleSection } from './TodayScheduleSection';
 import { TodaySearch } from './TodaySearch';
 import { TodayTaskGroups } from './TodayTaskGroups';
 import styles from './TodayView.module.css';
-import { Select } from '../../../components/forms/Select';
 import { FindTimeBox } from '../../scheduling';
 import type { TaskWithTags } from '../../tasks/api/tasks.api';
 import {
@@ -326,10 +326,22 @@ export function TodayView() {
           </div>
 
           {/* Inline Quick Add Task Accordion */}
-          <div
-            className={`${styles.quickAddAccordion} ${
-              isQuickAddOpen ? styles.quickAddAccordionOpen : ''
-            }`}
+          <TodayQuickAdd
+            isOpen={isQuickAddOpen}
+            isFullyOpen={isQuickAddFullyOpen}
+            title={quickTitle}
+            listId={quickListId}
+            priority={quickPriority}
+            isSubmitting={isSubmittingTask}
+            inputRef={quickInputRef}
+            hasLists={today.lists.length > 0}
+            listOptions={listOptions}
+            priorityOptions={priorityOptions}
+            onTitleChange={setQuickTitle}
+            onListChange={setQuickListId}
+            onPriorityChange={setQuickPriority}
+            onCancel={handleCancelQuickAdd}
+            onSubmit={handleSubmitQuickAdd}
             onTransitionEnd={(e) => {
               if (e.target === e.currentTarget && e.propertyName === 'grid-template-rows') {
                 if (isQuickAddOpen) {
@@ -337,70 +349,7 @@ export function TodayView() {
                 }
               }
             }}
-          >
-            <div
-              className={`${styles.quickAddAccordionInner} ${
-                isQuickAddFullyOpen ? styles.quickAddAccordionInnerOpen : ''
-              }`}
-            >
-              <form className={styles.quickAddBox} onSubmit={handleSubmitQuickAdd}>
-                <input
-                  ref={quickInputRef}
-                  type="text"
-                  className={styles.quickAddInput}
-                  placeholder="What needs doing today? (Press Enter to add)"
-                  value={quickTitle}
-                  onChange={(e) => setQuickTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') handleCancelQuickAdd();
-                  }}
-                  disabled={isSubmittingTask}
-                />
-                <div className={styles.quickAddOptionsRow}>
-                  <div className={styles.quickAddControlsGroup}>
-                    {today.lists.length > 0 && (
-                      <Select
-                        className={styles.quickSelect}
-                        size="sm"
-                        value={quickListId}
-                        options={listOptions}
-                        onChange={(val) => setQuickListId(val)}
-                        disabled={isSubmittingTask}
-                        ariaLabel="Task list"
-                      />
-                    )}
-                    <Select
-                      className={styles.quickSelect}
-                      size="sm"
-                      value={quickPriority}
-                      options={priorityOptions}
-                      onChange={(val) => setQuickPriority(val as TaskPriority)}
-                      disabled={isSubmittingTask}
-                      ariaLabel="Task priority"
-                    />
-                  </div>
-
-                  <div className={styles.quickAddActionButtons}>
-                    <button
-                      type="button"
-                      className={styles.cancelButton}
-                      onClick={handleCancelQuickAdd}
-                      disabled={isSubmittingTask}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className={styles.submitButton}
-                      disabled={!quickTitle.trim() || isSubmittingTask}
-                    >
-                      {isSubmittingTask ? 'Adding...' : 'Add Task'}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
+          />
           <TodayTaskGroups
             overdue={today.overdue}
             dueToday={today.dueToday}
