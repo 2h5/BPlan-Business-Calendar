@@ -191,3 +191,52 @@ ESLint initially found only import-order errors in the three changed components.
 | `pnpm verify`                                                   | PASS: format, lint, typechecks, tests, build, bundle scan |
 
 `pnpm verify` test totals were 348 domain, 11 mobile, 623 web (including 444 calendar tests), 201 billing, and 8 release tests. The local Node 20.19.6 engine advisory (repository requires `>=22`) and Vite large-chunk advisory did not fail the gate.
+
+## Independent review
+
+- **HEAD reviewed:** `447dd092cc917808dc7567feaadb48536e21f799` on `refactor/quick-create-popover`, merge base `ee27488d745d6f06978f127f42cde695134de2a5`.
+- **Scope:** the full cumulative `main...HEAD` diff (all seven phase commits, 19 files). The review compared `main`'s 1,162-line `QuickCreatePopover.tsx` against the parent, both field components, the header, all four hooks, `quick-create-time.ts`, the `QuickCreatePickers.tsx` re-exports, the CSS module, `useFollowAnchorMotion`, the callers, and every new or existing Quick Create test. The earlier phase notes above were used as context only.
+
+### Findings
+
+No correctness or behavior regression was found. The review compared each area below with `main` directly:
+
+- **Draft/open/edit:** the state initializers and the open-sync effect body and dependency list are unchanged, including fresh-reopen asymmetries (mode, times without `initialStartTime`, priority, Set time, and selected list/calendar all survive), edit forcing event mode, and the error/delete-confirm reset.
+- **Date/time:** the helpers are character-for-character moves. `handleStartTimeChange` and the four time-option memos stay in the parent with the same dependencies.
+- **Actions:** submit and delete handlers are verbatim moves. They are recreated on every render as before, so they never close over stale draft values.
+- **Positioning:** the anchor lookup, geometry, listeners, and anchor-motion wiring are unchanged. Adding the stable `popoverRef` to the dependencies does not change callback identity.
+- **Lifecycle:** autofocus, `isClosing`, animation-target filtering, capture-phase Escape/Tab, and the animated vs direct close paths are unchanged. The added `setIsDeleteConfirmOpen`/ref dependencies are stable.
+- **Effect order:** the relative order of passive effects changed: the keydown listener now registers before the resize/scroll/anchor-motion listeners. They are independent listeners, so there is no observable effect. There is still one layout effect, and draft sync still runs before the draft-preview notification.
+- **Markup:** a throwaway parity test (not committed) rendered `main`'s original component and the branch component with `renderToStaticMarkup` for fresh create without a time, a custom non-grid start with an earlier end, all day, saving at 23:30, edit, read-only edit, and closed. All seven cases produced byte-identical markup.
+
+**Low: mode switching now remounts the field subtree (accepted, not fixed).** On `main`, the event and task fields were two unkeyed fragments in the same ternary, so React matched their children by position when the mode changed. It reused the first row's `QuickCreateDatePicker`, the second row's `Select` (calendar ↔ task list), the `dateTimeRow`'s second `div`, and the description `textarea` in place. Now `QuickCreateEventFields` and `QuickCreateTaskFields` are different component types, so switching modes unmounts one tree and mounts the other. The observable differences are small:
+
+- Switching task → event with Set time and All day both checked no longer plays the 120ms `.timeRange` opacity/transform transition that `main` triggered by reusing the `timeBoxWrapper` `div` as `timeRange timeRangeHidden`. The hidden range now just appears hidden, which matches opening the popover directly in all-day mode.
+- Picker, `Select`, and textarea internal state (open menu, typed time text, the textarea's user-resized height) no longer carries over between modes. Pickers close on outside `pointerdown`, and the date picker re-syncs its visible month whenever it opens, so this is only reachable through unusual keyboard paths.
+
+Neither difference affects data, submission, or accessibility semantics. Restoring `main`'s reconciliation would mean undoing the Phase 1 component split, so this is recorded as accepted drift rather than fixed.
+
+**Informational:** the Phase 1 invariant above ("same DOM order … picker props") holds for static markup but did not mention this remount semantics.
+
+### Fixes made
+
+None. No code or test changes were needed. This section is the only change.
+
+### Residual risks and test limitations
+
+- Web Vitest has no DOM environment. The draft, lifecycle, and position hook tests run against a hand-written `vi.mock('react')` hook/effect harness, not the React reconciler. They pin the hook contracts (dependency-driven re-sync, listener registration, timer cleanup) but cannot catch real-React issues such as effect ordering across hooks, Strict Mode double invocation, batching, or reconciliation, including the finding above. The action-hook tests call the hook as a plain function, which is valid because it uses no React primitives.
+- Parent-level interactions have no automated coverage: mode switching, `handleStartTimeChange` duration preservation, event start-date → end-date advancement, More options payload and close, task Cancel's direct close, title Enter submit, reopen through `CalendarView`, and the `onDraftChange` preview. `QuickCreatePopover.test.tsx` is static-render only and was not changed on this branch, so it serves as an unchanged regression baseline for the event-mode markup. Task-mode markup is covered only by the new `QuickCreateTaskFields` tests.
+- No browser or visual QA was performed in this review.
+
+### Final verification
+
+| Check                                                     | Result                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| All calendar tests (includes every Quick Create test)     | PASS: 43 files, 444 tests                                                      |
+| Throwaway `main`-vs-branch static-markup parity (7 cases) | PASS, byte-identical; not committed                                            |
+| Web typecheck                                             | PASS                                                                           |
+| ESLint, zero warnings                                     | PASS: `pnpm exec eslint . --max-warnings 0`                                    |
+| Prettier                                                  | PASS: `pnpm exec prettier --check .`                                           |
+| `pnpm verify`                                             | PASS: format, lint, workspace typechecks/tests, build, and client bundle check |
+
+**Another fix pass required:** no. The branch is ready for final merge review. The reviewer should explicitly accept the Low mode-switch remount drift, or request a browser check of task → event switching.
