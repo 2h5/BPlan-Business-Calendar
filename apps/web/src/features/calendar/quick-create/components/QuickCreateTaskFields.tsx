@@ -5,8 +5,8 @@ import {
   QuickCreateTimePicker,
   type TimePickerOption,
 } from './QuickCreatePickers';
-import styles from './QuickCreatePopover.module.css';
-import { Select } from '../../../components/forms/Select';
+import { Select } from '../../../../components/forms/Select';
+import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateTaskFieldsProps {
   startDate: string;

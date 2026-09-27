@@ -9,7 +9,7 @@ import styles from './SettingsView.module.css';
 import { Select } from '../../../components/forms/Select';
 import { useAuth } from '../../auth';
 import { BillingSection } from '../../billing/components/BillingSection';
-import { QuickCreateTimePicker } from '../../calendar/components/QuickCreatePickers';
+import { QuickCreateTimePicker } from '../../calendar/quick-create/components/QuickCreatePickers';
 import { useCalendarViewPreference } from '../../calendar/utils/calendar-preferences';
 import type { CalendarViewMode } from '../../calendar/utils/calendar-window';
 import { useProfile, useUpdateProfile } from '../hooks/useSettings';

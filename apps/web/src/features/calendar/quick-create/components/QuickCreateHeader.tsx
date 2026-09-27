@@ -1,4 +1,4 @@
-import styles from './QuickCreatePopover.module.css';
+import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateHeaderProps {
   isEditing: boolean;

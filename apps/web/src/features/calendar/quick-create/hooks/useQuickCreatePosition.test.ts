@@ -2,8 +2,8 @@ import type * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useQuickCreatePosition } from './useQuickCreatePosition';
-import type { EventOccurrence } from '../utils/calendar-occurrences';
-import type { AnchorRect, PopoverPositionResult } from '../utils/popover-position';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
+import type { AnchorRect, PopoverPositionResult } from '../../utils/popover-position';
 
 const { hooks, calculatePosition } = vi.hoisted(() => {
   type Effect = () => void | (() => void);
@@ -68,7 +68,7 @@ vi.mock('react', async (importOriginal) => {
   };
 });
 
-vi.mock('../utils/popover-position', () => ({ calculatePopoverPosition: calculatePosition }));
+vi.mock('../../utils/popover-position', () => ({ calculatePopoverPosition: calculatePosition }));
 
 const fallbackRect: AnchorRect = {
   top: 100,

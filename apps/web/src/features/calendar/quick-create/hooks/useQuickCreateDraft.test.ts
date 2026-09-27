@@ -3,7 +3,7 @@ import type * as React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useQuickCreateDraft } from './useQuickCreateDraft';
-import type { EventOccurrence } from '../utils/calendar-occurrences';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 
 const { hooks } = vi.hoisted(() => {
   type Slot = { value?: unknown; deps?: readonly unknown[]; cleanup?: () => void };
@@ -93,7 +93,7 @@ const editingOccurrence = {
   event: { title: 'Edited event', calendarId: 'cal-edit' },
 } as EventOccurrence;
 
-vi.mock('../utils/event-form', () => ({ eventToFormValues: () => editValues }));
+vi.mock('../../utils/event-form', () => ({ eventToFormValues: () => editValues }));
 
 type Inputs = Parameters<typeof useQuickCreateDraft>[0];
 const defaults: Inputs = {

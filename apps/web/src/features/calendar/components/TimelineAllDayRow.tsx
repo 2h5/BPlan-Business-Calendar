@@ -2,10 +2,10 @@ import type { HourCycle } from '@cal/schemas';
 
 import styles from './CalendarView.module.css';
 import { EventButton } from './EventButton';
-import type { AnchorRect } from './QuickCreatePopover';
 import { TimelineAllDayDraft } from './TimelineDraftEvent';
 import type { DraftEventState, SlotSelection } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { AnchorRect } from '../quick-create/QuickCreatePopover';
 
 export interface TimelineAllDayRowProps {
   dateKeys: readonly string[];

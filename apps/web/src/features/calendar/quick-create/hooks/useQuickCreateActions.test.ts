@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useQuickCreateActions } from './useQuickCreateActions';
-import type { EventOccurrence } from '../utils/calendar-occurrences';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 
 type Options = Parameters<typeof useQuickCreateActions>[0];
 

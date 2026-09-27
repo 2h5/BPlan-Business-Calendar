@@ -2,8 +2,8 @@ import { zonedWallClockToUtc } from '@cal/domain';
 import type { Calendar, CalendarEvent, CreateTaskInput, TaskPriority } from '@cal/schemas';
 import type { FormEvent, RefObject } from 'react';
 
-import type { EventOccurrence } from '../utils/calendar-occurrences';
-import { eventInputFromForm, type EventFormValues } from '../utils/event-form';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
+import { eventInputFromForm, type EventFormValues } from '../../utils/event-form';
 
 interface UseQuickCreateActionsOptions {
   mode: 'event' | 'task';

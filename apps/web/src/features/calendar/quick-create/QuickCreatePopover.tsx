@@ -2,15 +2,15 @@ import type { Calendar, CalendarEvent, CreateTaskInput } from '@cal/schemas';
 import { useEffect, useMemo, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 
-import { QuickCreateEventFields } from './QuickCreateEventFields';
-import { QuickCreateHeader } from './QuickCreateHeader';
+import { QuickCreateEventFields } from './components/QuickCreateEventFields';
+import { QuickCreateHeader } from './components/QuickCreateHeader';
+import { QuickCreateTaskFields } from './components/QuickCreateTaskFields';
+import { useQuickCreateActions } from './hooks/useQuickCreateActions';
+import { useQuickCreateDraft } from './hooks/useQuickCreateDraft';
+import { useQuickCreateLifecycle } from './hooks/useQuickCreateLifecycle';
+import { useQuickCreatePosition } from './hooks/useQuickCreatePosition';
 import styles from './QuickCreatePopover.module.css';
-import { QuickCreateTaskFields } from './QuickCreateTaskFields';
 import { useTaskLists } from '../../tasks/hooks/useTasks';
-import { useQuickCreateActions } from '../hooks/useQuickCreateActions';
-import { useQuickCreateDraft } from '../hooks/useQuickCreateDraft';
-import { useQuickCreateLifecycle } from '../hooks/useQuickCreateLifecycle';
-import { useQuickCreatePosition } from '../hooks/useQuickCreatePosition';
 import type { EventOccurrence } from '../utils/calendar-occurrences';
 import type { eventInputFromForm, EventFormValues } from '../utils/event-form';
 import type { AnchorRect } from '../utils/popover-position';
@@ -20,7 +20,7 @@ import {
   createTimeOptions,
   formatDateDisplay,
   withCustomTimeOption,
-} from '../utils/quick-create-time';
+} from './utils/quick-create-time';
 
 export type { AnchorRect };
 

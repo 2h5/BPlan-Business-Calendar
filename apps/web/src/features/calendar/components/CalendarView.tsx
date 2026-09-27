@@ -9,7 +9,6 @@ import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
-import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
 import { TimelineView, type SlotSelection } from './TimelineView';
 import { useAppPreferences } from '../../settings/hooks/useAppPreferences';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
@@ -28,6 +27,7 @@ import { useCalendarToast } from '../hooks/useCalendarToast';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
+import { QuickCreatePopover, type AnchorRect } from '../quick-create/QuickCreatePopover';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,

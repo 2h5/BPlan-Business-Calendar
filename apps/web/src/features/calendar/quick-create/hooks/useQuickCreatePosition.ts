@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
 import { useFollowAnchorMotion } from './useFollowAnchorMotion';
-import type { EventOccurrence } from '../utils/calendar-occurrences';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
 import {
   calculatePopoverPosition,
   type AnchorRect,
   type PopoverPlacement,
-} from '../utils/popover-position';
+} from '../../utils/popover-position';
 
 interface QuickCreatePositionOptions {
   isOpen: boolean;

@@ -2,8 +2,8 @@ import { getZonedParts } from '@cal/domain';
 import type { Calendar, TaskList, TaskPriority } from '@cal/schemas';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { EventOccurrence } from '../utils/calendar-occurrences';
-import { eventToFormValues } from '../utils/event-form';
+import type { EventOccurrence } from '../../utils/calendar-occurrences';
+import { eventToFormValues } from '../../utils/event-form';
 import { addMinutesToTime, pad } from '../utils/quick-create-time';
 
 interface UseQuickCreateDraftOptions {
