@@ -35,6 +35,7 @@
 | ----- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1     | Implemented and verified | Added `CalendarFeedback.tsx` with `CalendarState` and `CalendarToastPresentation`. `CalendarView.tsx` is 963 physical lines after Phase 1, down 56 from 1,019. Added eight focused presentation tests. All toast lifecycle and event orchestration remain in the parent. |
 | 2     | Implemented and verified | Added `useCalendarToast.ts` for toast state, refs, timer scheduling, hold/release, success helper, and unmount cleanup. `CalendarView.tsx` is 877 physical lines after Phase 2, down 86 from 963.                                                                        |
+| 3     | Implemented and verified | Moved `getNewEventAnchorRect` into `utils/new-event-anchor.ts`, preserving its geometry and scroll sequence. `CalendarView.tsx` is 816 physical lines after Phase 3, down 61 from 877. Added five focused utility tests.                                                 |
 
 Phase 1 checks: focused tests (8), all calendar tests (452), web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify` passed. The full gate included 656 web, 348 domain, 11 mobile, 201 billing, and 8 release tests plus the web production build and bundle scan.
 
@@ -54,3 +55,11 @@ Phase boundaries are reassessed after each push.
 - Focused hook tests use the repository's React server rendering pattern with fake timers to observe scheduling, replacement, holding, remaining time, grace, and exit timing. This pattern does not run React effects or expose state updates, so rendered exit-state transitions and unmount cleanup remain interaction-test gaps until a DOM-capable layer is added separately.
 - Phase 2 checks passed: seven focused hook tests, 459 calendar tests, web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify` (663 web, 348 domain, 11 mobile, 201 billing, and 8 release tests plus the web build and bundle scan). The extracted lifecycle callback/effect block matches the Phase 1 source text exactly.
 - A provisional Phase 3 candidate is the standalone `getNewEventAnchorRect` DOM measurement/scroll helper. It has narrow inputs and is already separate from React state. Reassess that seam and the broader orchestration after Phase 2 is pushed.
+
+## Phase 3 boundary and coverage
+
+- `utils/new-event-anchor.ts` exports `getNewEventAnchorRect(dateKey, startMinute, endMinute, mode): AnchorRect | null`. It imports `CalendarViewMode` and `AnchorRect` from calendar utility modules, with no dependency on a UI component. The helper owns the existing day lookup, month/timeline geometry, slot reveal calculation, anchor adjustment, and scroll call. Its function body matches the Phase 2 source text exactly.
+- Both route-driven creation and toolbar New Event still call the helper at their original points. `CalendarView` retains opening decisions, Quick Create state, default-slot and writable-calendar checks, URL logic, and the toolbar button-rect fallback.
+- Five focused tests use the existing Vitest global-stubbing pattern for the missing day, month passthrough, visible week slot, late week slot with scrolling, and minimum day draft height. No DOM library or new infrastructure was added. These stubs verify returned geometry and the scroll call, but do not exercise real browser layout or animation frames.
+- Phase 3 checks passed: five focused tests, 464 calendar tests, web typecheck, ESLint with zero warnings, Prettier, and `pnpm verify`.
+- A provisional Phase 4 candidate is the view-transition state/timer around `changeMode`. Its interaction with mode and URL coordination needs inspection before setting that scope; no Phase 4 work has started.
