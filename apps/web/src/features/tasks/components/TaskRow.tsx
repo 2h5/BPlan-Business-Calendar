@@ -36,6 +36,7 @@ export const TaskRow = memo(function TaskRow({
   >(null);
   const [isActionsOpen, setIsActionsOpen] = useState(false);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitFiredRef = useRef(false);
   const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,6 +44,15 @@ export const TaskRow = memo(function TaskRow({
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     };
   }, []);
+
+  // Usually the action moves or removes the task and this row unmounts. When
+  // the updated task stays in place (for example a snooze that leaves it
+  // overdue), leave the finished exit state so the row is visible again.
+  useEffect(() => {
+    if (!exitFiredRef.current) return;
+    exitFiredRef.current = false;
+    setIsExiting(null);
+  }, [task]);
 
   useEffect(() => {
     if (!isActionsOpen) return;
@@ -75,11 +85,13 @@ export const TaskRow = memo(function TaskRow({
     if (!isCompleted) {
       setIsExiting('completing');
       exitTimerRef.current = setTimeout(() => {
+        exitFiredRef.current = true;
         onToggleComplete(task, true);
       }, 260);
     } else {
       setIsExiting('uncompleting');
       exitTimerRef.current = setTimeout(() => {
+        exitFiredRef.current = true;
         onToggleComplete(task, false);
       }, 260);
     }
@@ -92,6 +104,7 @@ export const TaskRow = memo(function TaskRow({
     setIsActionsOpen(false);
     setIsExiting('snoozing');
     exitTimerRef.current = setTimeout(() => {
+      exitFiredRef.current = true;
       onSnooze(task);
     }, 260);
   };
@@ -103,6 +116,7 @@ export const TaskRow = memo(function TaskRow({
     setIsActionsOpen(false);
     setIsExiting('deleting');
     exitTimerRef.current = setTimeout(() => {
+      exitFiredRef.current = true;
       onDelete(task);
     }, 260);
   };
