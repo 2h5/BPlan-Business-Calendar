@@ -2,7 +2,7 @@ import type { CalendarEvent } from '@cal/schemas';
 import { describe, expect, it } from 'vitest';
 
 import { describeDayGlance, type DayGlanceInput } from './day-glance';
-import type { EventOccurrence } from '../../calendar/hooks/useCalendarWindow';
+import type { EventOccurrence } from '../../../calendar/hooks/useCalendarWindow';
 
 const TZ = 'America/New_York';
 // 2026-09-23 in New York is UTC-4.

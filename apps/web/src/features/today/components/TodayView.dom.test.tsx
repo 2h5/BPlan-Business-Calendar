@@ -28,8 +28,8 @@ vi.mock('../../tasks/hooks/useTasks', () => ({
 }));
 // Panels with their own data and tests; the task column is the subject here.
 vi.mock('../../scheduling', () => ({ FindTimeBox: () => null }));
-vi.mock('./TodaySearch', () => ({ TodaySearch: () => null }));
-vi.mock('./DayGlanceCard', () => ({ DayGlanceCard: () => null }));
+vi.mock('../search/TodaySearch', () => ({ TodaySearch: () => null }));
+vi.mock('../glance/DayGlanceCard', () => ({ DayGlanceCard: () => null }));
 vi.mock('./TodayScheduleSection', () => ({ TodayScheduleSection: () => null }));
 
 type Today = ReturnType<typeof useToday>;

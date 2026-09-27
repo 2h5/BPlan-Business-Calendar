@@ -4,8 +4,8 @@ import { useMemo } from 'react';
 import { DayBar } from './DayBar';
 import styles from './DayGlanceCard.module.css';
 import type { useToday } from '../hooks/useToday';
-import { buildDayBar, type DayBarSegment } from '../utils/day-bar';
-import { describeDayGlance } from '../utils/day-glance';
+import { buildDayBar, type DayBarSegment } from './utils/day-bar';
+import { describeDayGlance } from './utils/day-glance';
 
 const ACCENT = 'var(--color-accent)';
 

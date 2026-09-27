@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 import styles from './DayBar.module.css';
-import { formatHourMark, type DayBarModel, type DayBarSegment } from '../utils/day-bar';
+import { formatHourMark, type DayBarModel, type DayBarSegment } from './utils/day-bar';
 
 export interface DayBarProps {
   model: DayBarModel;

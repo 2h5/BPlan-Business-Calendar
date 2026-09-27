@@ -356,6 +356,110 @@ TasksView logic changed.
   `TodayTaskGroups` sit beside the Tasks list's `TaskRow` and share only the
   `TaskWithTags` type. Any convergence is product/UI work.
 
+## Phase 4: Today (done)
+
+### Starting layout
+
+```
+features/today/
+  components/  TodayView (+ .module.css, .dom.test), TodayIcons, ProgressRing (+ .module.css),
+               TodayQuickAdd (+ test), TodayScheduleSection (+ test),
+               TodayTaskGroups (+ test), TodayTaskRow (+ test),
+               DayGlanceCard (+ .module.css), DayBar (+ .module.css),
+               TodaySearch (+ .module.css), TodaySearchResults
+  hooks/       useToday
+  utils/       day-bar, day-glance, today-clock (+ tests)
+```
+
+### Resulting layout
+
+```
+features/today/
+  components/  TodayView (+ .module.css, .dom.test), TodayIcons, ProgressRing (+ .module.css),
+               TodayQuickAdd (+ test), TodayScheduleSection (+ test),
+               TodayTaskGroups (+ test), TodayTaskRow (+ test)
+  glance/      DayGlanceCard (+ .module.css), DayBar (+ .module.css)
+    utils/     day-bar, day-glance (+ tests)
+  search/      TodaySearch, TodaySearchResults, TodaySearch.module.css
+  hooks/       useToday
+  utils/       today-clock (+ test)
+```
+
+Today has no `index.ts`. `pages/TodayPage` imports
+`features/today/components/TodayView` directly, and that path did not change.
+
+### Files moved (11)
+
+- `components/` → `glance/`: `DayGlanceCard.tsx`, `DayGlanceCard.module.css`,
+  `DayBar.tsx`, `DayBar.module.css`.
+- `utils/` → `glance/utils/`: `day-bar.ts`, `day-bar.test.ts`,
+  `day-glance.ts`, `day-glance.test.ts`.
+- `components/` → `search/`: `TodaySearch.tsx`, `TodaySearchResults.tsx`,
+  `TodaySearch.module.css`.
+
+### Ownership decisions
+
+The deciding factor was the stylesheet. `TodayView.module.css` and
+`TodayIcons` are shared by `TodayView`, `TodayQuickAdd`,
+`TodayScheduleSection`, `TodayTaskGroups` and `TodayTaskRow`. Those five are
+sections of one page styled by one module. Moving any of them would only add
+`../components/TodayView.module.css` and `../components/TodayIcons`
+back-references. Only self-contained areas moved:
+
+- **`glance/`**: `DayGlanceCard` renders `DayBar`, and together they are the
+  only users of `day-bar` and `day-glance`. Each has its own CSS module. Only
+  `TodayView` imports the subsystem (`DayGlanceCard`).
+- **`search/`**: `TodaySearch` renders `TodaySearchResults`, and both use
+  only `TodaySearch.module.css`. Only `TodayView` imports it. It is
+  Today's embedded search. The standalone Search feature remains
+  `features/search`, which it reuses (`useSearch`, `useMeasuredHeight`,
+  `search-results`, `SearchIllustration`).
+
+### Kept at feature level
+
+- **`components/TodayView`**: page orchestration. It composes every section,
+  runs the task mutations and owns quick-add, completion and snooze wiring.
+- **`TodayQuickAdd`, `TodayScheduleSection`, `TodayTaskGroups`,
+  `TodayTaskRow`, `TodayIcons`** (+ tests): styled by `TodayView.module.css`,
+  as described above. A `quick-add/` or `schedule/` folder would each hold a
+  single component. A `tasks/` folder would hold two components whose styles
+  and icons live in `components/`, so it would not create a real boundary.
+- **`ProgressRing`**: rendered only by `TodayView`'s header, not by the
+  glance card.
+- **`hooks/useToday`**: page-wide coordination of Calendar, Tasks and Settings
+  data. `TodayView` and (as a type) `DayGlanceCard` use it.
+- **`utils/today-clock`**: the page clock, used by `useToday`.
+
+### Cross-feature paths changed
+
+Only `glance/utils/day-glance.ts` and its test changed depth. Their
+`EventOccurrence` type import is now
+`../../../calendar/hooks/useCalendarWindow`. The `search/` files are at the
+same depth as `components/`, so their Calendar, Search, Settings and Tasks
+imports did not change. `TodayView.dom.test.tsx` kept its
+`../../../test/dom` import and the `../../tasks/hooks/useTasks` and
+`../../scheduling` mocks. Only its `./TodaySearch` and `./DayGlanceCard` mocks
+became `../search/TodaySearch` and `../glance/DayGlanceCard`. No Calendar or
+Tasks file changed.
+
+### Non-path changes
+
+None. No Today test reads files through `__dirname` or `readFileSync`. The
+staged diff is 11 renames plus import/mock path edits in `TodayView.tsx`,
+`TodayView.dom.test.tsx`, `DayBar.tsx`, `DayGlanceCard.tsx` and
+`day-glance(.test).ts`.
+
+### Verification
+
+- `TodayView.dom.test`: 11 tests pass. These include the mocked
+  `TodaySearch` / `DayGlanceCard`, which would render for real, and fail
+  without providers, if the new mock paths missed.
+- All of `features/today`: 8 files, 46 tests pass.
+- Consumers and neighbours (`tasks`, `calendar`, `search`, `scheduling`): 72
+  files, 685 tests pass.
+- `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
+  warning (web: 99 files / 862 tests, unchanged).
+
 ## Findings for later phases
 
 - **Shared calendar types live in `TimelineView.tsx`.** `EventTiming`,
@@ -389,12 +493,24 @@ TasksView logic changed.
   in `TodayView.dom.test`). If Today components move to a different depth,
   those relative mock paths must move with them. Tasks' `api/` and `hooks/`
   are stable targets now, so nothing on the Tasks side needs to change for the
-  Today phase.
+  Today phase. (Phase 4 kept those files at their depth.)
+- **Scheduling's only consumer is Today.** `TodayView` imports `FindTimeBox`
+  from the `features/scheduling` barrel, and `TodayView.dom.test` mocks
+  `'../../scheduling'`. Scheduling's `index.ts` exports `FindTimeBox`,
+  `useConfirmSlot`, `useFindTime` and the `FindTime*` API types. As long as
+  the barrel's exports stay, Scheduling can reorganize internally without
+  touching Today.
+- **Scheduling's own relative paths to watch.** `FindTimeBox(.dom).test` mock
+  `../../../lib/supabase/client` and `../../billing/hooks/useBilling`, and the
+  DOM test imports `../../../test/dom`. `find-time.api.test` mocks
+  `../../../lib/supabase/client`. `FindTimeBox` imports
+  `billing/hooks/useBilling` and `billing/utils/subscription-display`. No
+  Scheduling test reads files through `__dirname`.
 
 ## Remaining phases
 
 1. ~~QuickCreate~~ (Phase 1).
 2. ~~Timeline~~ (Phase 2).
 3. ~~Tasks~~ (Phase 3).
-4. Today.
+4. ~~Today~~ (Phase 4).
 5. Scheduling / Find Time.

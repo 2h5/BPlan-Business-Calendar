@@ -1,6 +1,6 @@
 import { formatDuration, formatTimeOfDay, type FreeTimeSummary } from '@cal/domain';
 
-import type { EventOccurrence } from '../../calendar/hooks/useCalendarWindow';
+import type { EventOccurrence } from '../../../calendar/hooks/useCalendarWindow';
 
 export interface DayGlanceInput {
   now: Date;

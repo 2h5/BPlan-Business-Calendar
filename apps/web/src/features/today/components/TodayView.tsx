@@ -3,12 +3,10 @@ import type { TaskPriority } from '@cal/schemas';
 import React, { useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { DayGlanceCard } from './DayGlanceCard';
 import { ProgressRing } from './ProgressRing';
 import { CalendarIcon, MoonIcon, PlusIcon, SunIcon } from './TodayIcons';
 import { TodayQuickAdd } from './TodayQuickAdd';
 import { TodayScheduleSection } from './TodayScheduleSection';
-import { TodaySearch } from './TodaySearch';
 import { TodayTaskGroups } from './TodayTaskGroups';
 import styles from './TodayView.module.css';
 import { FindTimeBox } from '../../scheduling';
@@ -19,7 +17,9 @@ import {
   useSnoozeTask,
   useToggleTaskComplete,
 } from '../../tasks/hooks/useTasks';
+import { DayGlanceCard } from '../glance/DayGlanceCard';
 import { useToday } from '../hooks/useToday';
+import { TodaySearch } from '../search/TodaySearch';
 
 export function TodayView() {
   const today = useToday();
