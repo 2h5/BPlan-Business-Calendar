@@ -1,8 +1,8 @@
 import { addZonedDays, startOfZonedDay, type SchedulingIntent } from '@cal/domain';
 import { z } from 'zod';
 
-import { toAppError } from '../../../lib/errors/app-error';
-import { supabase } from '../../../lib/supabase/client';
+import { toAppError } from '../../../../lib/errors/app-error';
+import { supabase } from '../../../../lib/supabase/client';
 
 /** Applied when the user named no duration, e.g. "coffee with Priya". */
 export const DEFAULT_MEETING_MINUTES = 30;

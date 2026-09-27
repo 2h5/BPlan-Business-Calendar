@@ -5,15 +5,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { FindTimeBox } from './FindTimeBox';
-import { useSubscription } from '../../billing/hooks/useBilling';
+import { useSubscription } from '../../../billing/hooks/useBilling';
 import { useConfirmSlot, type ConfirmSlotState } from '../hooks/useConfirmSlot';
 import { useFindTime, type FindTimeState } from '../hooks/useFindTime';
 
-vi.mock('../../../lib/supabase/client', () => ({
+vi.mock('../../../../lib/supabase/client', () => ({
   supabase: {},
 }));
 
-vi.mock('../../billing/hooks/useBilling', () => ({
+vi.mock('../../../billing/hooks/useBilling', () => ({
   useSubscription: vi.fn(),
 }));
 

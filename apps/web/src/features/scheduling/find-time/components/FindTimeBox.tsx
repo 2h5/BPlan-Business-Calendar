@@ -4,8 +4,8 @@ import styles from './FindTimeBox.module.css';
 import { FindTimeActivePrompt, FindTimeLockedTeaser } from './FindTimePromptPresentation';
 import { FindTimeProposalResults } from './FindTimeProposalResults';
 import { ScheduledBanner, ScheduledConfirmationCard } from './FindTimeScheduledNotice';
-import { useSubscription } from '../../billing/hooks/useBilling';
-import { getSubscriptionStatusInfo } from '../../billing/utils/subscription-display';
+import { useSubscription } from '../../../billing/hooks/useBilling';
+import { getSubscriptionStatusInfo } from '../../../billing/utils/subscription-display';
 import {
   type FindTimeConfirmation,
   type FindTimeProposal,

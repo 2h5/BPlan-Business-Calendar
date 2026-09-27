@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { queryKeys } from '../../../lib/query/query-client';
+import { queryKeys } from '../../../../lib/query/query-client';
 import { confirmFindTimeSuggestion, type FindTimeConfirmation } from '../api/find-time.api';
 
 export interface ConfirmSlotState {

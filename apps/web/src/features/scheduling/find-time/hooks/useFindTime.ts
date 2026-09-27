@@ -1,7 +1,7 @@
 import type { SchedulingIntent } from '@cal/schemas/scheduling';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
-import { queryClient, queryKeys } from '../../../lib/query/query-client';
+import { queryClient, queryKeys } from '../../../../lib/query/query-client';
 import {
   findTimeForText,
   type FindTimeClarification,

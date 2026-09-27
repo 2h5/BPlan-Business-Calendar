@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 // Pure schema contract tests. Isolate supabase client to prevent env validation error in CI.
-vi.mock('../../../lib/supabase/client', () => ({ supabase: {} }));
+vi.mock('../../../../lib/supabase/client', () => ({ supabase: {} }));
 
 import { clarificationSchema, readbackSchema } from './find-time.api';
 

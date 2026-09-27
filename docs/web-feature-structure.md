@@ -460,6 +460,115 @@ staged diff is 11 renames plus import/mock path edits in `TodayView.tsx`,
 - `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
   warning (web: 99 files / 862 tests, unchanged).
 
+## Phase 5: Scheduling / Find Time (done)
+
+### Starting layout
+
+```
+features/scheduling/
+  index.ts
+  api/         find-time.api (+ test)
+  components/  FindTimeBox (+ .module.css, .test, .dom.test), FindTimeIcons,
+               FindTimePromptPresentation (+ test), FindTimeProposalResults (+ test),
+               FindTimeRotatingPrompt (+ .module.css, test), FindTimeScheduledNotice (+ test)
+  hooks/       useConfirmSlot, useFindTime (+ test)
+  utils/       find-time-format, find-time-prompts, scheduled-notice-storage (+ tests)
+```
+
+### Resulting layout
+
+```
+features/scheduling/
+  index.ts
+  find-time/
+    api/         find-time.api (+ test)
+    components/  FindTimeBox (+ .module.css, .test, .dom.test), FindTimeIcons,
+                 FindTimePromptPresentation (+ test), FindTimeProposalResults (+ test),
+                 FindTimeRotatingPrompt (+ .module.css, test), FindTimeScheduledNotice (+ test)
+    hooks/       useConfirmSlot, useFindTime (+ test)
+    utils/       find-time-format, find-time-prompts, scheduled-notice-storage (+ tests)
+```
+
+Every Scheduling file belongs to Find Time. The dependency graph is a single
+tree rooted at `FindTimeBox`: the API module, both hooks and all three
+utilities are used only by Find Time components and hooks. So the whole
+implementation moved as a unit, keeping its internal `api/`, `components/`,
+`hooks/` and `utils/` split. Internal relative imports between those folders
+did not change. There is no `find-time/index.ts`, because the feature-level
+`index.ts` is already the public entry point.
+
+### Files moved (25)
+
+- `api/` → `find-time/api/`: `find-time.api.ts`, `find-time.api.test.ts`.
+- `components/` → `find-time/components/`: `FindTimeBox.tsx`,
+  `FindTimeBox.module.css`, `FindTimeBox.test.tsx`,
+  `FindTimeBox.dom.test.tsx`, `FindTimeIcons.tsx`,
+  `FindTimePromptPresentation.tsx` (+ test),
+  `FindTimeProposalResults.tsx` (+ test), `FindTimeRotatingPrompt.tsx`,
+  `FindTimeRotatingPrompt.module.css`, `FindTimeRotatingPrompt.test.tsx`,
+  `FindTimeScheduledNotice.tsx` (+ test).
+- `hooks/` → `find-time/hooks/`: `useConfirmSlot.ts`, `useFindTime.ts`,
+  `useFindTime.test.ts`.
+- `utils/` → `find-time/utils/`: `find-time-format.ts`,
+  `find-time-prompts.ts`, `scheduled-notice-storage.ts` (+ tests).
+
+### Retained at `scheduling/` root
+
+- **`index.ts`**: the only root file. Its exports are unchanged —
+  `FindTimeBox`, `useConfirmSlot`, `useFindTime` and the types
+  `FindTimeConfirmation`, `FindTimeProposal`, `FindTimeSuggestion`. Only the
+  four `from` paths gained `./find-time/`.
+
+Today still imports `FindTimeBox` from `../../scheduling`, and
+`TodayView.dom.test` still mocks `'../../scheduling'`. No Today file changed.
+
+### External relative paths updated
+
+Every path out of the feature gained one `../`:
+
+- `lib/supabase/client`: import in `find-time.api.ts`; `vi.mock` in
+  `find-time.api.test.ts`, `FindTimeBox.test.tsx` and
+  `FindTimeBox.dom.test.tsx`.
+- `lib/errors/app-error`: import in `find-time.api.ts`.
+- `lib/query/query-client`: imports in `useConfirmSlot.ts` and
+  `useFindTime.ts`.
+- `billing/hooks/useBilling`: import in `FindTimeBox.tsx` and
+  `FindTimeBox.test.tsx`; `vi.mock` in `FindTimeBox.test.tsx` and
+  `FindTimeBox.dom.test.tsx`.
+- `billing/utils/subscription-display`: import in `FindTimeBox.tsx`.
+- `test/dom`: side-effect import in `FindTimeBox.dom.test.tsx`.
+
+Internal `../api`, `../hooks` and `../utils` imports and mocks, and all
+`./*.module.css` imports, stayed the same.
+
+### Non-path changes
+
+None. No Scheduling file reads the filesystem (`__dirname`, `readFileSync`,
+`path.resolve`, `import.meta.url`), and the CSS modules have no `composes`,
+`url()` or `@import`. The staged diff is 25 renames plus 17 changed import,
+export and `vi.mock` lines, in 8 files. Import order and Prettier needed no
+changes.
+
+### Verification
+
+- `FindTimeBox.dom.test`: 9 tests pass. These include the mocked
+  `useFindTime`, `useConfirmSlot`, `useBilling` and Supabase client, which
+  would fail without the corrected paths.
+- All of `features/scheduling`: 11 files, 62 tests pass.
+- `features/today` (the barrel's consumer): 8 files, 46 tests pass.
+- `features/billing` (imported and mocked by `FindTimeBox`): 3 files, 25
+  tests pass.
+- `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
+  warning (web: 99 files / 862 tests, unchanged; domain 348, mobile 11,
+  tooling 201 and 8).
+
+## Structural phase status
+
+All five planned moves (QuickCreate, Timeline, Tasks, Today, Scheduling / Find
+Time) are implemented on `refactor/feature-structure`, one commit per
+subsystem. The branch is awaiting an independent cumulative review before
+merge. The findings below are deliberately out of scope for these commits.
+
 ## Findings for later phases
 
 - **Shared calendar types live in `TimelineView.tsx`.** `EventTiming`,
@@ -505,7 +614,21 @@ staged diff is 11 renames plus import/mock path edits in `TodayView.tsx`,
   DOM test imports `../../../test/dom`. `find-time.api.test` mocks
   `../../../lib/supabase/client`. `FindTimeBox` imports
   `billing/hooks/useBilling` and `billing/utils/subscription-display`. No
-  Scheduling test reads files through `__dirname`.
+  Scheduling test reads files through `__dirname`. (Phase 5 updated all of
+  these; they now start one `../` deeper from `find-time/`.)
+- **The QuickCreate `AnchorRect` re-export is now unused.** After Phase 2,
+  nothing imports `AnchorRect` from `QuickCreatePopover`, but its
+  `export type { AnchorRect }` remains. Removing it is a public-surface
+  decision for its own commit.
+- **Prose docs still cite pre-move paths.** `docs/dom-component-testing.md`
+  (e.g. `tasks/components/TaskInspector.dom.test.tsx`,
+  `calendar/components/QuickCreatePopover.dom.test.tsx`,
+  `scheduling/components/FindTimeBox.dom.test.tsx`),
+  and `docs/find-time-box-refactor.md` name old file locations
+  (`docs/ai-scheduling.md` and `docs/sprint-6-active.md` cite only the
+  still-valid `features/scheduling/` folder). `find-time-box-refactor.md` is a
+  historical record. `dom-component-testing.md` is a living guide and could be
+  refreshed in a docs-only commit.
 
 ## Remaining phases
 
@@ -513,4 +636,4 @@ staged diff is 11 renames plus import/mock path edits in `TodayView.tsx`,
 2. ~~Timeline~~ (Phase 2).
 3. ~~Tasks~~ (Phase 3).
 4. ~~Today~~ (Phase 4).
-5. Scheduling / Find Time.
+5. ~~Scheduling / Find Time~~ (Phase 5).

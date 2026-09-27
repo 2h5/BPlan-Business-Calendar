@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import '../../../test/dom';
+import '../../../../test/dom';
 
 import type { Subscription } from '@cal/schemas/subscription';
 import type { UseQueryResult } from '@tanstack/react-query';
@@ -24,9 +24,9 @@ import {
   getStoredBanner,
 } from '../utils/scheduled-notice-storage';
 
-vi.mock('../../../lib/supabase/client', () => ({ supabase: {} }));
+vi.mock('../../../../lib/supabase/client', () => ({ supabase: {} }));
 
-vi.mock('../../billing/hooks/useBilling', () => ({
+vi.mock('../../../billing/hooks/useBilling', () => ({
   useSubscription: () =>
     ({
       data: { status: 'active', entitlement: 'pro', expiresAt: '2026-12-31T00:00:00Z' },
