@@ -1,9 +1,10 @@
 import type { TaskList } from '@cal/schemas';
 import React, { useState } from 'react';
 
+import { TaskListHeaderControls } from './TaskListHeaderControls';
 import styles from './TaskListPane.module.css';
-import { TaskRow } from './TaskRow';
-import { Select } from '../../../components/forms/Select';
+import { TaskListSection } from './TaskListSection';
+import { TaskQuickAdd } from './TaskQuickAdd';
 import type { TaskWithTags } from '../api/tasks.api';
 import type { TaskFilter, WebTaskBuckets } from '../hooks/useTaskBuckets';
 
@@ -57,6 +58,7 @@ export function TaskListPane({
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   const completedCount = buckets.allCompleted.length;
   const openCount = Math.max(0, allTasks.length - completedCount);
+  const totalTaskCount = allTasks.length;
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,68 +78,15 @@ export function TaskListPane({
     }
   };
 
-  const renderSection = (title: string, tasks: TaskWithTags[], isOverdue = false) => {
-    if (tasks.length === 0) return null;
-
-    const sectionTone = isOverdue
-      ? styles.sectionOverdue
-      : title === 'Due Today'
-        ? styles.sectionToday
-        : title === 'No Due Date'
-          ? styles.sectionSomeday
-          : title.startsWith('Completed')
-            ? styles.sectionCompleted
-            : styles.sectionUpcoming;
-
-    const sectionIcon = isOverdue ? (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </svg>
-    ) : title === 'Due Today' ? (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M16 3v4M8 3v4M3 10h18" />
-      </svg>
-    ) : title.startsWith('Completed') ? (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="m8 12 2.5 2.5L16 9" />
-      </svg>
-    ) : (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6 3h9l4 4v14H6z" />
-        <path d="M14 3v5h5" />
-      </svg>
-    );
-
-    return (
-      <section className={`${styles.section} ${sectionTone}`} key={title}>
-        <div className={styles.sectionHeader}>
-          <span className={styles.sectionTitle}>
-            <span className={styles.sectionIcon}>{sectionIcon}</span>
-            <span>{title}</span>
-          </span>
-          <span className={styles.sectionCount}>{tasks.length}</span>
-        </div>
-        <div className={styles.sectionItems}>
-          {tasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              isSelected={task.id === selectedTaskId}
-              lists={lists}
-              now={now}
-              timeZone={timeZone}
-              onSelect={onSelectTask}
-              onToggleComplete={onToggleComplete}
-              onSnooze={onSnooze}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      </section>
-    );
+  const sectionContext = {
+    selectedTaskId,
+    lists,
+    now,
+    timeZone,
+    onSelectTask,
+    onToggleComplete,
+    onSnooze,
+    onDelete,
   };
 
   const renderContent = () => {
@@ -175,7 +124,7 @@ export function TaskListPane({
         );
       }
 
-      return renderSection('Completed', buckets.allCompleted);
+      return <TaskListSection title="Completed" tasks={buckets.allCompleted} {...sectionContext} />;
     }
 
     if (activeTab === 'all') {
@@ -201,11 +150,11 @@ export function TaskListPane({
 
       return (
         <>
-          {renderSection('Overdue', buckets.overdue, true)}
-          {renderSection('Due Today', buckets.dueToday)}
-          {renderSection('Upcoming', buckets.upcoming)}
-          {renderSection('No Due Date', buckets.someday)}
-          {renderSection('Completed', buckets.allCompleted)}
+          <TaskListSection title="Overdue" tasks={buckets.overdue} isOverdue {...sectionContext} />
+          <TaskListSection title="Due Today" tasks={buckets.dueToday} {...sectionContext} />
+          <TaskListSection title="Upcoming" tasks={buckets.upcoming} {...sectionContext} />
+          <TaskListSection title="No Due Date" tasks={buckets.someday} {...sectionContext} />
+          <TaskListSection title="Completed" tasks={buckets.allCompleted} {...sectionContext} />
         </>
       );
     }
@@ -240,11 +189,15 @@ export function TaskListPane({
 
     return (
       <>
-        {renderSection('Overdue', buckets.overdue, true)}
-        {renderSection('Due Today', buckets.dueToday)}
-        {renderSection('Upcoming', buckets.upcoming)}
-        {renderSection('No Due Date', buckets.someday)}
-        {renderSection('Completed Today', buckets.completedToday)}
+        <TaskListSection title="Overdue" tasks={buckets.overdue} isOverdue {...sectionContext} />
+        <TaskListSection title="Due Today" tasks={buckets.dueToday} {...sectionContext} />
+        <TaskListSection title="Upcoming" tasks={buckets.upcoming} {...sectionContext} />
+        <TaskListSection title="No Due Date" tasks={buckets.someday} {...sectionContext} />
+        <TaskListSection
+          title="Completed Today"
+          tasks={buckets.completedToday}
+          {...sectionContext}
+        />
       </>
     );
   };
@@ -271,117 +224,25 @@ export function TaskListPane({
       }}
     >
       <div className={styles.header}>
-        <div className={styles.titleRow}>
-          <div>
-            <h1 className={styles.pageTitle}>Tasks</h1>
-            <p className={styles.pageSubtitle}>Stay organized and get more done.</p>
-          </div>
+        <TaskListHeaderControls
+          lists={lists}
+          selectedListId={selectedListId}
+          activeTab={activeTab}
+          openCount={openCount}
+          totalTaskCount={totalTaskCount}
+          completedCount={completedCount}
+          onListChange={onListChange}
+          onTabChange={onTabChange}
+          onNewTaskClick={onNewTaskClick}
+        />
 
-          <div className={styles.headerActions}>
-            <Select
-              className={styles.listSelect}
-              size="sm"
-              value={selectedListId ?? ''}
-              options={[
-                { value: '', label: 'All Lists' },
-                ...lists.map((list) => ({ value: list.id, label: list.name })),
-              ]}
-              onChange={(value) => onListChange(value || null)}
-              ariaLabel="Filter by list"
-            />
-
-            <button
-              type="button"
-              className={styles.newTaskBtn}
-              onClick={onNewTaskClick}
-              title="Create task (Inspector)"
-              aria-label="Create a new task"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span>New task</span>
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.toolbar}>
-          <div className={styles.filterTabs}>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'inbox' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('inbox')}
-              aria-pressed={activeTab === 'inbox'}
-            >
-              <span>Inbox</span>
-              <span className={styles.tabCount}>{openCount}</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'all' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('all')}
-              aria-pressed={activeTab === 'all'}
-            >
-              <span>All</span>
-              <span className={styles.tabCount}>{allTasks.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`${styles.tabBtn} ${activeTab === 'completed' ? styles.tabBtnActive : ''}`}
-              onClick={() => onTabChange('completed')}
-              aria-pressed={activeTab === 'completed'}
-            >
-              <span>Done</span>
-              <span className={styles.tabCount}>{completedCount}</span>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleQuickSubmit} className={styles.quickAddForm}>
-          <span className={styles.quickAddIcon}>
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            className={styles.quickAddInput}
-            placeholder="Add task to inbox... Press Enter"
-            value={quickTitle}
-            disabled={isQuickAdding}
-            aria-describedby={quickAddError ? 'quick-add-error' : undefined}
-            aria-invalid={!!quickAddError}
-            onChange={(e) => setQuickTitle(e.target.value)}
-          />
-          <button
-            type="submit"
-            className={styles.quickAddSubmit}
-            disabled={isQuickAdding || !quickTitle.trim()}
-          >
-            {isQuickAdding ? 'Adding…' : 'Add'}
-          </button>
-        </form>
-        {quickAddError && (
-          <p id="quick-add-error" className={styles.inlineError} role="alert">
-            {quickAddError}
-          </p>
-        )}
+        <TaskQuickAdd
+          quickTitle={quickTitle}
+          quickAddError={quickAddError}
+          isQuickAdding={isQuickAdding}
+          onTitleChange={(e) => setQuickTitle(e.target.value)}
+          onSubmit={handleQuickSubmit}
+        />
       </div>
 
       <div className={styles.listScroll}>
