@@ -347,11 +347,11 @@ TasksView logic changed.
 
 ### Deferred structural debt
 
-- **The barrel is bypassed.** Every cross-feature consumer deep-imports
-  `tasks/api/tasks.api` or `tasks/hooks/*` instead of `features/tasks`, and
-  nothing outside Tasks uses the barrel's `TaskListPane`, `TaskRow` or
-  `TaskInspector` re-exports. Routing consumers through the barrel, or
-  narrowing it, is an API decision, not a move.
+- **Resolved: the root barrel was too broad.** `tasks/index.ts` now exports
+  only `TasksView`, its sole external root consumer (`TasksPage`). Calendar,
+  Search and Today retain direct imports of the specific Tasks API types and
+  hooks they use. Those paths are stable, explicit dependencies; routing them
+  through the root would obscure ownership and complicate existing test mocks.
 - **Today has its own task presentation.** `TodayTaskRow` and
   `TodayTaskGroups` sit beside the Tasks list's `TaskRow` and share only the
   `TaskWithTags` type. Any convergence is product/UI work.
@@ -569,34 +569,36 @@ Time) are implemented on `refactor/feature-structure`, one commit per
 subsystem. The independent cumulative review (below) found no blocking issue.
 The findings below are deliberately out of scope for these commits.
 
-## Findings for later phases
+## Deferred findings: current disposition
 
-- **Shared calendar types live in `TimelineView.tsx`.** `EventTiming`,
-  `SlotSelection` and `DraftEventState` are exported from the Timeline
-  component. `CalendarView`, `MonthView`, `useCalendarEventTimingChanges` and
-  `useCalendarTimingOverrides` import them from `timeline/TimelineView`.
-  Moving them to a calendar-level types module would be a code change, not a
-  move. It is worth its own small commit.
-- **`QuickCreatePopover`'s `export type { AnchorRect }` is now unused.** It
-  can be removed in a QuickCreate-scoped commit.
+- **Resolved: shared Calendar types.** `EventTiming`, `SlotSelection` and
+  `DraftEventState` live in `calendar/types.ts`; Timeline, CalendarView,
+  MonthView and the Calendar hooks import them there. No shared Calendar code
+  imports a presentation component solely for these types.
+- **Resolved: stale QuickCreate type export.** Nothing imported `AnchorRect`
+  through `QuickCreatePopover`, so its re-export was removed. Consumers keep
+  their direct type imports from `calendar/utils/popover-position`.
 - **String paths escape import rewriting.** Tests that read files through
   `__dirname` (`TimelineView.ghost.test.tsx`,
   `CalendarView.transition.test.tsx`) need a manual check whenever a file
   moves.
 - **Settings deep-imports `QuickCreateTimePicker`.** If more features reuse the
   pickers, promote them to a shared web component.
-- **`popover-position` mixes a shared type with QuickCreate-only logic.** A
-  future split would be a code change.
-- **The local `pnpm` shim runs a bundled Node 20** (`Z:\Dev\Tools\Node`), and
-  `pnpm verify` spawns nested `pnpm` calls that also go through it. Put a Node
-  22+ `pnpm` first on `PATH`, or update the bundled Node.
-- **Other features deep-import calendar internals.** Today (`useToday`,
+- **Retained: `popover-position` holds `AnchorRect` and QuickCreate positioning.**
+  The type describes the positioning function's input and is also used by
+  Calendar slot and event anchors. Splitting it would move a small type and
+  touch many type-only imports without improving runtime dependency direction.
+- **Resolved: the Windows pnpm/Corepack setup.** A normal fresh-shell
+  `pnpm verify` now uses Node 24.11.1 for top-level and nested pnpm calls.
+- **Retained: other features import specific Calendar surfaces.** Today (`useToday`,
   `day-glance`, `TodayScheduleSection`, `TodaySearch`), Search (`SearchView`)
   and Settings (`SettingsView`) import `calendar/hooks/useCalendarWindow`,
   `useCalendars`, `calendar/utils/calendar-occurrences`,
   `calendar-preferences` and `calendar-window` directly. None of these moved
-  in Phases 1–2. They are the calendar feature's real cross-feature surface and
-  should stay put, or get an explicit boundary, during the Today phase.
+  in Phases 1–2. The hook and utility paths identify the exact contract each
+  consumer needs. A root barrel would collect unrelated hooks, preferences,
+  occurrence types and API details into one broad entry point without making
+  these dependencies clearer. The existing direct imports remain appropriate.
 - **Today depends on Tasks through deep imports as well** (`useTaskBuckets`,
   `useTaskLists`, `TaskWithTags`, and a `vi.mock('../../tasks/hooks/useTasks')`
   in `TodayView.dom.test`). If Today components move to a different depth,
@@ -616,10 +618,8 @@ The findings below are deliberately out of scope for these commits.
   `billing/hooks/useBilling` and `billing/utils/subscription-display`. No
   Scheduling test reads files through `__dirname`. (Phase 5 updated all of
   these; they now start one `../` deeper from `find-time/`.)
-- **The QuickCreate `AnchorRect` re-export is now unused.** After Phase 2,
-  nothing imports `AnchorRect` from `QuickCreatePopover`, but its
-  `export type { AnchorRect }` remains. Removing it is a public-surface
-  decision for its own commit.
+- **Resolved after Phase 2: QuickCreate's unused `AnchorRect` re-export.**
+  It was removed during the deferred structural cleanup.
 - **Historical docs still cite pre-move paths.** `docs/find-time-box-refactor.md`,
   `docs/quick-create-popover-refactor.md`, `docs/task-inspector-refactor.md`,
   `docs/timeline-view-refactor.md` and `docs/web-active.md` are dated records
