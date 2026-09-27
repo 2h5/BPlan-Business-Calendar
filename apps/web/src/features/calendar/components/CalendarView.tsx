@@ -10,9 +10,10 @@ import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
+import { TimelineView, type SlotSelection } from './TimelineView';
 import { useAppPreferences } from '../../settings/hooks/useAppPreferences';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
+import { useCalendarEventTimingChanges } from '../hooks/useCalendarEventTimingChanges';
 import {
   useCreateCalendar,
   useCreateEvent,
@@ -34,12 +35,7 @@ import {
   viewForLinkedEvent,
 } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
-import {
-  eventInputFromForm,
-  eventInputWithTiming,
-  eventToFormValues,
-  type EventFormValues,
-} from '../utils/event-form';
+import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
 import { getNewEventAnchorRect } from '../utils/new-event-anchor';
 import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
 
@@ -368,112 +364,14 @@ export function CalendarView() {
   }, []);
 
   const { timingOverrides, setTimingOverride } = useCalendarTimingOverrides(result.occurrences);
-
-  const handleResizeEvent = useCallback(
-    (occurrence: EventOccurrence, timing: EventTiming) => {
-      const { event } = occurrence;
-      const previous = timingOverrides.get(event.id) ?? {
-        start: occurrence.start,
-        end: occurrence.end,
-      };
-      if (previous.start === timing.start && previous.end === timing.end) return;
-
-      setTimingOverride(event.id, timing);
-      const persist = async () => {
-        try {
-          await updateEvent.mutateAsync({
-            event,
-            input: eventInputWithTiming(
-              event,
-              new Date(timing.start).toISOString(),
-              new Date(timing.end).toISOString(),
-            ),
-          });
-          showToast({
-            message: 'Event resized',
-            actionLabel: 'Undo',
-            onAction: () => {
-              setTimingOverride(event.id, previous);
-              showToast({ message: 'Restoring event…' });
-              void updateEvent
-                .mutateAsync({
-                  event,
-                  input: eventInputWithTiming(
-                    event,
-                    new Date(previous.start).toISOString(),
-                    new Date(previous.end).toISOString(),
-                  ),
-                })
-                .then(() => showSuccess('Resize undone.'))
-                .catch(() => {
-                  setTimingOverride(event.id, null);
-                  result.refetch();
-                  showToast({ message: 'The resize could not be undone.' });
-                });
-            },
-          });
-        } catch {
-          setTimingOverride(event.id, null);
-          showToast({ message: 'The event resize could not be saved.' });
-        }
-      };
-      void persist();
-    },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
-  );
-
-  const handleMoveEvent = useCallback(
-    (occurrence: EventOccurrence, timing: EventTiming) => {
-      const { event } = occurrence;
-      const previous = timingOverrides.get(event.id) ?? {
-        start: occurrence.start,
-        end: occurrence.end,
-      };
-      if (previous.start === timing.start && previous.end === timing.end) return;
-
-      setTimingOverride(event.id, timing);
-      const persist = async () => {
-        try {
-          await updateEvent.mutateAsync({
-            event,
-            input: eventInputWithTiming(
-              event,
-              new Date(timing.start).toISOString(),
-              new Date(timing.end).toISOString(),
-            ),
-          });
-          showToast({
-            message: 'Event moved',
-            actionLabel: 'Undo',
-            onAction: () => {
-              setTimingOverride(event.id, previous);
-              showToast({ message: 'Restoring event…' });
-              void updateEvent
-                .mutateAsync({
-                  event,
-                  input: eventInputWithTiming(
-                    event,
-                    new Date(previous.start).toISOString(),
-                    new Date(previous.end).toISOString(),
-                  ),
-                })
-                .then(() => showSuccess('Move undone.'))
-                .catch(() => {
-                  setTimingOverride(event.id, null);
-                  result.refetch();
-                  showToast({ message: 'The move could not be undone.' });
-                });
-            },
-          });
-        } catch {
-          setTimingOverride(event.id, null);
-          showToast({ message: 'The event move could not be saved.' });
-        }
-      };
-      void persist();
-    },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
-  );
+  const { handleMoveEvent, handleResizeEvent } = useCalendarEventTimingChanges({
+    timingOverrides,
+    setTimingOverride,
+    updateEvent,
+    showToast,
+    showSuccess,
+    refetch: result.refetch,
+  });
 
   return (
     <div className={styles.workspace}>
