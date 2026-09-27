@@ -391,3 +391,88 @@ Yes. The foundation is in place: per-file jsdom opt-in, one shared helper, a doc
 - keep each `*.dom.test.tsx` next to its component;
 - update the relative `vi.mock` paths;
 - keep each file's `src/test/dom` import (or move the helper and update the imports together).
+
+## Final independent review (pre-merge)
+
+A final review of the whole branch before merge. It covered base `54ae7c4` → `78692dc`: 3 commits ahead of base, 0 behind `main`. It looked at the combined diff, the code around each production change, all eight DOM test files, the harness and the tracker. **Production code was not changed during the review.**
+
+### How the review was done
+
+- **The four production fixes.** Each was read against its callers and effect dependencies, and checked for cleanup, repeated updates and failure paths. Each fix was reverted on its own and its suites re-run. Every revert fails tests:
+
+  | Fix reverted                 | Failing tests |
+  | ---------------------------- | ------------- |
+  | `TaskRow.tsx`                | 1 of 27       |
+  | `useQuickCreateLifecycle.ts` | 3 of 26       |
+  | `useQuickCreateDraft.ts`     | 4 of 37       |
+  | `FindTimeBox.tsx`            | 2 of 9        |
+
+- **Isolation.** The DOM suite was run in random order with five seeds (1, 7, 42, 1234 and 99991). All 120 tests passed every time. No `act()` warnings, React warnings or stderr output appeared.
+- **Escape propagation.** Every `keydown` listener in `apps/web/src` was listed to see what now receives the Escape that the QuickCreate fix lets through to nested controls.
+
+### Assessment of the production fixes
+
+- **TaskRow: the row stays hidden after a snooze.**
+  - **Verdict: correct and narrow.** The reset is armed only after the exit timer fires, and runs only when the `task` prop changes.
+  - A task update during the 260 ms exit does not cancel it, and there is a test for that.
+  - The reset relies on the task object keeping its identity until its data changes. That holds today:
+    - TanStack Query's structural sharing keeps unchanged objects;
+    - the task buckets only filter and sort, so they pass the cached objects through;
+    - completing, reopening or deleting moves the task to another keyed section, so the row remounts.
+  - An optimistic toggle that fails now rolls back into a visible row. Before the fix, that row stayed hidden.
+  - **Keep in mind during the reorganization:** a future caller that maps tasks to new objects on every render would clear the exit state early.
+- **QuickCreate: Escape on a nested control (`useQuickCreateLifecycle`).**
+  - **Verdict: correct.** The Escape is let through only when:
+    - focus is on an expanded trigger (Select, the date trigger or the time combobox), or
+    - focus is in a portaled `dialog` or `listbox` outside the popover.
+  - While the delete confirmation is open, the check is skipped. The Delete button carries `aria-expanded`, so without that exception the confirmation's own Escape would be let through.
+  - The date and time menus stop propagation themselves. Select does not, so its Escape now reaches the window's bubble-phase listeners. All of those are harmless while QuickCreate is open:
+    - the timeline's Escape handler only clears idle gesture refs;
+    - calendar hotkeys ignore dialog targets, and Escape cannot be bound as a hotkey;
+    - the toolbar, account menu and EventEditor listeners are not active, because opening QuickCreate closes or clears them.
+  - **Theoretical edge case, not a regression:** a keyboard shortcut opens QuickCreate while focus is inside another `role="dialog"`. For up to 50 ms, until the autofocus runs, Escape would not close QuickCreate.
+- **QuickCreate: the draft reset (`useQuickCreateDraft`).**
+  - **Verdict: correct, and behavior-preserving apart from the bug.** The sync effect keeps its original triggers: open, a new occurrence, and the slot and duration inputs.
+  - The default-calendar and default-list conditions are unchanged, including skipping the calendar default while editing. They now run in their own effect.
+  - The draft is still kept between sessions while the popover stays mounted. It stays mounted in CalendarView, so this is unchanged behavior.
+  - Task lists that load late no longer reset a typed title.
+- **Find Time: results never dismissed (`FindTimeBox`).**
+  - **Verdict: correct.** The "show a new proposal" effect now runs only when the proposal changes, so starting the exit no longer cancels it.
+  - The proposal object keeps its identity between renders: `useFindTime` returns the cached module-store snapshot, and storage is parsed only once.
+  - Submit, retyping during the exit, selecting a slot, "Schedule another" and a remount all behave as before. Clearing the text or pressing Escape now completes the 280 ms exit.
+
+### Assessment of the testing architecture
+
+- **Environment.** jsdom is opt-in per file, and there is no global setup file or Vitest config change. The other 91 web test files still run in Node, and the existing static-markup tests are untouched.
+- **Dependencies.** Testing Library (dom, react, user-event, jest-dom) and jsdom were added as web dev dependencies only.
+- **`src/test/dom.ts`.** It is small and does the right things: it registers the jest-dom matchers, calls `cleanup`, restores real timers and restores mocks.
+  - One note for a future Vitest 3 upgrade: `restoreAllMocks` will no longer reset `vi.fn()` implementations there. Suites that set implementations on hoisted mocks use `vi.clearAllMocks` or set a fresh implementation per test, and the shuffled runs pass. After that upgrade, re-run a shuffled pass.
+- **Timers.** user-event with real timers is used for untimed interactions. `fireEvent` with fake timers is used where a delay is the contract, and those tests check both sides of the boundary (for example 149/150 ms and 349/350 ms). The reason user-event is avoided under fake timers is documented.
+- **Test quality.** Queries use roles, accessible names and visible text.
+  - A few animation states are read from CSS-module class names, because jsdom has no other observable signal. They are guarded with `?? '__missing__'`, so a renamed class fails loudly instead of passing vacuously.
+  - Server hooks are faked with stable identity, matching how TanStack Query behaves.
+- **Surviving file moves.** The assertions don't depend on file paths. Only the relative `vi.mock` specifiers and the `src/test/dom` import will need updating.
+
+### Findings
+
+- **Blocking:** none.
+- **Low, documentation only:**
+  1. Select's Escape now bubbles past QuickCreate to the window's bubble-phase listeners. It was checked and is harmless, as described above.
+  2. The Escape edge case in the 50 ms before autofocus, described above.
+  3. The Vitest 3 `restoreAllMocks` semantics change.
+  4. TaskRow relies on the task object keeping its identity.
+- **Unresolved observations:** the tracker above was reviewed.
+  - None is a regression introduced by this branch, and none blocks merging.
+  - The Select row is correctly marked resolved. The Escape that Select no longer has stopped by QuickCreate reaches only the harmless listeners listed above.
+
+### Verification
+
+Run on the review HEAD with Node v24.11.1:
+
+- DOM suites: 8 files, 120 tests, passing in five random orders.
+- Four fix-revert checks: all fail as expected.
+- `pnpm verify` exits 0: domain 348, mobile 11, web 99 files / 862 tests, billing 201, release 8; typecheck, zero-warning ESLint and Prettier clean; build succeeds with the existing chunk-size warning; client bundle scan clean.
+
+### Merge readiness
+
+The branch is ready to merge. The limits of jsdom and the targeted Playwright follow-up above still apply. The structural reorganization can start from this foundation.
