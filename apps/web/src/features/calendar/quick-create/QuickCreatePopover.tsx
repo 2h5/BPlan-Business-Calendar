@@ -22,8 +22,6 @@ import {
   withCustomTimeOption,
 } from './utils/quick-create-time';
 
-export type { AnchorRect };
-
 export interface QuickCreatePopoverProps {
   isOpen: boolean;
   anchorRect: AnchorRect | null;

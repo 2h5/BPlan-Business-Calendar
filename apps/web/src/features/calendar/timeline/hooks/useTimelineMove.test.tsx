@@ -8,7 +8,7 @@ import {
   type UseTimelineMoveOptions,
 } from './useTimelineMove';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import type { EventTiming } from '../TimelineView';
+import type { EventTiming } from '../../types';
 import type { MinuteInterval } from '../utils/event-resize';
 
 const DAY_1 = '2026-09-15';

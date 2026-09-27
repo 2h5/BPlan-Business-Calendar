@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import styles from '../../components/CalendarView.module.css';
-import type { SlotSelection } from '../TimelineView';
+import type { SlotSelection } from '../../types';
 import {
   clickSlotRange,
   dragSlotRange,

@@ -8,6 +8,7 @@ import { OriginGhost } from './components/OriginGhost';
 import { TimelineAllDayRow } from './components/TimelineAllDayRow';
 import { TimelineDraftEvent } from './components/TimelineDraftEvent';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { DraftEventState, EventTiming, SlotSelection } from '../types';
 import { useTimelineAutoScroll } from './hooks/useTimelineAutoScroll';
 import { useTimelineGestureFeedback } from './hooks/useTimelineGestureFeedback';
 import { useTimelineGestureRecovery } from './hooks/useTimelineGestureRecovery';
@@ -23,29 +24,6 @@ import { formatHour, formatMinute } from './utils/timeline-format';
 import { offHoursBands } from './utils/working-hours-bands';
 
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-
-export interface SlotSelection {
-  dateKey: string;
-  startMinute?: number;
-  endMinute?: number;
-  allDay?: boolean;
-  anchorRect: AnchorRect;
-}
-
-export interface DraftEventState {
-  dateKey: string;
-  startMinute?: number;
-  endMinute?: number;
-  allDay?: boolean;
-  title?: string;
-  calendarColor?: string;
-  isClosing?: boolean;
-}
-
-export interface EventTiming {
-  start: number;
-  end: number;
-}
 
 export interface TimelineViewProps {
   dateKeys: readonly string[];

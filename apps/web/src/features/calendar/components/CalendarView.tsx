@@ -27,7 +27,8 @@ import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
 import { QuickCreatePopover } from '../quick-create/QuickCreatePopover';
-import { TimelineView, type SlotSelection } from '../timeline/TimelineView';
+import { TimelineView } from '../timeline/TimelineView';
+import type { SlotSelection } from '../types';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,
