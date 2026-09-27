@@ -4,8 +4,8 @@ import { EventButton } from './EventButton';
 import { TimelineAllDayDraft } from './TimelineDraftEvent';
 import styles from '../../components/CalendarView.module.css';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import type { AnchorRect } from '../../utils/popover-position';
 import type { DraftEventState, SlotSelection } from '../../types';
+import type { AnchorRect } from '../../utils/popover-position';
 
 export interface TimelineAllDayRowProps {
   dateKeys: readonly string[];
