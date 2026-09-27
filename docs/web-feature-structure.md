@@ -723,8 +723,13 @@ No blocking or medium findings.
 
 ### Verification
 
-- `pnpm verify` on Node 24.11.1 passes: format, lint, typecheck, tests, build
-  and the client-bundle check.
+- `pnpm verify` passes: format, lint, typecheck, tests, build and the
+  client-bundle check. Correction: the review's own `pnpm verify` runs, and the
+  first run on the merged tree, had the top-level process on Node 24.11.1, but
+  their nested `pnpm` calls went through the `Z:\Dev\Tools\Node` shim on Node
+  20.19.6 and emitted "Unsupported engine" warnings. The final pre-push run on
+  the merged tree was repeated with every nested `pnpm` on Node 24.11.1, and it
+  passed with no engine warnings.
 - Test counts: web 99 files / 862 tests, the same as `main` (run on a base
   worktree). Domain 348, mobile 11, tooling 201 and 8. There are 175 test files
   at both revisions.
