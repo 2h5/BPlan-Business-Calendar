@@ -43,7 +43,7 @@
 
 ## DOM tests added
 
-`apps/web/src/features/tasks/components/TaskInspector.dom.test.tsx`, 19 tests:
+`apps/web/src/features/tasks/inspector/TaskInspector.dom.test.tsx`, 19 tests:
 
 - **Draft title focus (5).** Focus does not happen at 229 ms and does at 230 ms, on the title input, with `{ preventScroll: true }` observed through a spy on `HTMLElement.prototype.focus`. A draft re-render does not restart the delay. Replacing the draft with a selected task before 230 ms cancels the stale focus. Unmount clears the timer (`vi.getTimerCount()`). A selected existing task never schedules focus.
 - **Delete confirmation (9).** Delete Task opens the dialog and sets `aria-expanded`, and Cancel closes it without deleting. Pointer presses inside the dialog keep it open, and a press outside (on the title input) closes it. Pressing Delete Task again toggles it closed. Escape closes it. Escape stops in the document capture phase: a window capture listener still sees it, but listeners on the focused target and document bubble listeners do not, and `defaultPrevented` stays `false`. After closing, the listener is removed and Escape propagates normally. Other keys keep the dialog open and propagate. Changing the selected task closes it, while a same-id refetch leaves it open. Delete calls `onDelete` once with the currently selected task and closes the dialog.
@@ -93,7 +93,7 @@ The TaskInspector items in the baseline list above are now proven against real R
   - An unknown value is shown as-is and highlights the first enabled option.
   - The highlight follows a value change made while open, and an options replacement moves it to the first enabled option.
 
-**`apps/web/src/features/tasks/components/TaskRow.dom.test.tsx` (13 tests).**
+**`apps/web/src/features/tasks/list/TaskRow.dom.test.tsx` (13 tests).**
 
 - Clicking the content selects the row without starting an action.
 - Complete and reopen show immediately, but the callback fires exactly at 260 ms (not at 259).
@@ -103,7 +103,7 @@ The TaskInspector items in the baseline list above are now proven against real R
 - **Actions menu:** the button toggles it without selecting the row. Presses inside the menu keep it open, and outside presses (including on the row content) close it. Escape closes it, and opening another row's menu closes the first.
 - A regression test for the bug below, plus a guard test: a task update _before_ the delay ends does not cancel or re-enable the exit.
 
-**`apps/web/src/features/tasks/components/TaskListPane.dom.test.tsx` (14 tests).**
+**`apps/web/src/features/tasks/list/TaskListPane.dom.test.tsx` (14 tests).**
 
 - **Quick Add:** state lives in the pane, and `TaskQuickAdd` is exercised through it.
   - Enter submits the trimmed title.
@@ -181,7 +181,7 @@ Testing Library's async wrapper waits on a real 0 ms `setTimeout` and only auto-
 
 ### DOM tests added
 
-**`apps/web/src/features/calendar/components/QuickCreatePopover.dom.test.tsx` (26 tests).** Task lists come from a stable mocked `useTaskLists`, as TanStack Query would provide. Untimed tests first wait for the real 50 ms autofocus so it cannot steal focus from a control opened afterwards.
+**`apps/web/src/features/calendar/quick-create/QuickCreatePopover.dom.test.tsx` (26 tests).** Task lists come from a stable mocked `useTaskLists`, as TanStack Query would provide. Untimed tests first wait for the real 50 ms autofocus so it cannot steal focus from a control opened afterwards.
 
 - **Autofocus:** the title is focused at 50 ms (not 49) with `{ preventScroll: true }`. Closing or unmounting first clears the timer, and reopening schedules a new one.
 - **Closing:**
@@ -213,7 +213,7 @@ Testing Library's async wrapper waits on a real 0 ms `setTimeout` and only auto-
   - Choosing another calendar or task list keeps the draft and saves to the new choice.
   - When editing an event, a new calendar and the edits both stick.
 
-**`apps/web/src/features/scheduling/components/FindTimeBox.dom.test.tsx` (9 tests).** `useFindTime` and `useConfirmSlot` are replaced by small stateful fakes with the same shape. A test settles a request the way the query would. The real `sessionStorage` notice storage is used.
+**`apps/web/src/features/scheduling/find-time/components/FindTimeBox.dom.test.tsx` (9 tests).** `useFindTime` and `useConfirmSlot` are replaced by small stateful fakes with the same shape. A test settles a request the way the query would. The real `sessionStorage` notice storage is used.
 
 - The request submits as typed. A blank request cannot submit, and the pending state disables the button. A search error clears as soon as the request is edited.
 - Escape clears the request. The results then play their 280 ms exit (not reset at 279 ms, reset at 280 ms). Clearing the field starts the same exit, and typing again cancels it.

@@ -566,8 +566,8 @@ changes.
 
 All five planned moves (QuickCreate, Timeline, Tasks, Today, Scheduling / Find
 Time) are implemented on `refactor/feature-structure`, one commit per
-subsystem. The branch is awaiting an independent cumulative review before
-merge. The findings below are deliberately out of scope for these commits.
+subsystem. The independent cumulative review (below) found no blocking issue.
+The findings below are deliberately out of scope for these commits.
 
 ## Findings for later phases
 
@@ -620,15 +620,11 @@ merge. The findings below are deliberately out of scope for these commits.
   nothing imports `AnchorRect` from `QuickCreatePopover`, but its
   `export type { AnchorRect }` remains. Removing it is a public-surface
   decision for its own commit.
-- **Prose docs still cite pre-move paths.** `docs/dom-component-testing.md`
-  (e.g. `tasks/components/TaskInspector.dom.test.tsx`,
-  `calendar/components/QuickCreatePopover.dom.test.tsx`,
-  `scheduling/components/FindTimeBox.dom.test.tsx`),
-  and `docs/find-time-box-refactor.md` name old file locations
-  (`docs/ai-scheduling.md` and `docs/sprint-6-active.md` cite only the
-  still-valid `features/scheduling/` folder). `find-time-box-refactor.md` is a
-  historical record. `dom-component-testing.md` is a living guide and could be
-  refreshed in a docs-only commit.
+- **Historical docs still cite pre-move paths.** `docs/find-time-box-refactor.md`,
+  `docs/quick-create-popover-refactor.md`, `docs/task-inspector-refactor.md`,
+  `docs/timeline-view-refactor.md` and `docs/web-active.md` are dated records
+  and keep their original paths. (`docs/dom-component-testing.md`, the living
+  guide, was refreshed during the final review.)
 
 ## Remaining phases
 
@@ -637,3 +633,107 @@ merge. The findings below are deliberately out of scope for these commits.
 3. ~~Tasks~~ (Phase 3).
 4. ~~Today~~ (Phase 4).
 5. ~~Scheduling / Find Time~~ (Phase 5).
+
+## Final independent review
+
+Reviewed `c64b503..ff445ff` (5 commits ahead of `main`, 0 behind) as one
+cumulative diff: 133 paths, 122 renames (67 byte-identical), 10 modified, 1
+added (this document). No production code was changed by the review.
+
+### Method
+
+- **Normalised source diff.** Every renamed or modified `.ts`/`.tsx`/`.css`
+  file was compared with its base version after removing `import`/`export …
+from` statements and replacing `vi.mock` / `import()` path literals. The only
+  remaining difference in the whole branch is the expected
+  `TimelineView.ghost.test.tsx` string
+  (`'CalendarView.module.css'` → `'../components/CalendarView.module.css'`).
+- **Resolved import graph.** Every import, side-effect import, `export … from`
+  and `vi.mock` specifier was resolved to a file at base and at HEAD. Base
+  targets were mapped through the rename table and compared, with bindings, per
+  file. All match except the documented type-only `AnchorRect` source change
+  (Phase 2) in 5 files. No specifier is unresolved, so no `vi.mock` targets a
+  missing module and no test falls through to a real implementation it used to
+  mock. The only filesystem-relative strings in `apps/web/src` are the two
+  `__dirname` reads, and both resolve.
+- **Built-bundle comparison.** `vite build` of base and HEAD, minified and
+  unminified. Unminified JS is line-for-line identical once Rollup's `$N`
+  deconfliction suffixes are normalised. The CSS bundle is byte-for-byte the
+  same size with the same rules and the same CSS Module hashes. The only
+  difference is stylesheet order (below).
+- **Module side effects.** None of the moved non-test modules has top-level
+  statements other than declarations, so the changed evaluation order has no
+  runtime effect.
+
+### Findings
+
+No blocking or medium findings.
+
+- **Low: CSS Module emission order changed in two places.** The import
+  re-sorts in `TasksView.tsx` and `TodayView.tsx` change where their CSS
+  Modules land in the bundle. `TasksView.module.css` now comes before the
+  TaskInspector, TaskListPane and TaskRow modules instead of after. `DayBar`,
+  `DayGlanceCard` and `TodaySearch` modules now come after `ProgressRing`,
+  `TodayView`, `FindTimeBox` and `FindTimeRotatingPrompt` instead of before.
+  The Phase 3 and 4 notes ("no CSS changed") miss this. It has no computed-style
+  effect. CSS Module class names are unique per module, and no moved component
+  takes a `className` from another module. The only selectors in the affected
+  modules that reach another module's elements are:
+  - `.glanceCell > *` (TodayView). It hits `DayGlanceCard`'s root and sets only
+    `flex: 1`. `.card`/`.free`/`.busy` set no `flex*` property.
+  - `.listSelect :global([class*='trigger'])` (TaskListPane). Its order
+    relative to `Select.module.css` did not change.
+
+  The residual hazard: `.glanceCell > *` now precedes `.card` at equal
+  specificity. If `.card` ever sets `flex`, the card rule would win. Not worth
+  un-sorting imports to restore the old order.
+
+- **Info: empty leftover directory.** After Phase 3 a local checkout could keep
+  an empty `features/tasks/utils/` directory. Git does not track it and it has
+  no effect.
+
+### Per-move assessment
+
+- **QuickCreate → `calendar/quick-create/`.** Path-only. QuickCreate depends
+  on `calendar/utils` (`calendar-occurrences`, `event-form`,
+  `popover-position`), `tasks/hooks/useTasks` and the shared `Select`. Nothing
+  depends on Timeline. Consumers are `CalendarView` and Settings
+  (`QuickCreatePickers`, a known deep import).
+- **Timeline → `calendar/timeline/`.** Path-only, plus the documented `__dirname`
+  string and the type-only `AnchorRect` source. Timeline depends only on
+  `calendar/hooks/useCalendarWindow` and `calendar/utils`. It never imports
+  QuickCreate or `calendar/components`. `calendar/components` and
+  `calendar/hooks` depend on it only for `TimelineView` and its exported
+  shared types (deferred).
+- **Tasks → `tasks/inspector/` + `tasks/list/`.** Path-only. The inspector and
+  list never import each other. Both depend only on `tasks/api`, `tasks/hooks`
+  and `Select`. `tasks/index.ts` exports the same modules, so its public
+  symbols are unchanged.
+- **Today → `today/glance/` + `today/search/`.** Path-only. Glance and search
+  never import each other. `TodayView` and the other page-level pieces
+  (`ProgressRing`, `TodayIcons`, `TodayQuickAdd`, `TodayScheduleSection`,
+  `TodayTaskGroups`) stay in `today/components`. `TodayView.dom.test` mocks
+  the moved `../glance/DayGlanceCard` and `../search/TodaySearch`, which
+  resolve to the modules `TodayView` imports.
+- **Scheduling → `scheduling/find-time/`.** Path-only. `scheduling/index.ts`
+  exports the same three values and three types from the same modules.
+  Nothing outside Scheduling imports `find-time/` directly: Today uses the
+  barrel. The Supabase client, `query-client`, `app-error` and billing
+  imports and mocks resolve to the same files as at base.
+
+### Verification
+
+- `pnpm verify` on Node 24.11.1 passes: format, lint, typecheck, tests, build
+  and the client-bundle check.
+- Test counts: web 99 files / 862 tests, the same as `main` (run on a base
+  worktree). Domain 348, mobile 11, tooling 201 and 8. There are 175 test files
+  at both revisions.
+- Refreshed the five stale test paths in `docs/dom-component-testing.md`
+  (docs only). Every `apps/web/src/...` path in that guide now exists.
+
+### Verdict
+
+Ready to merge. The branch is behaviour-preserving and every public entry
+point still resolves. The dependencies run from page, to subsystem, to
+feature-level `api`/`hooks`/`utils`. The debt under "Findings for later
+phases" remains deferred.
