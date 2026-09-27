@@ -8,7 +8,7 @@ import {
   type UseTimelineResizeOptions,
 } from './useTimelineResize';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import type { EventTiming } from '../TimelineView';
+import type { EventTiming } from '../../types';
 import { dateMinuteToInstant, type MinuteInterval } from '../utils/event-resize';
 
 const DATE_KEY = '2026-09-15';

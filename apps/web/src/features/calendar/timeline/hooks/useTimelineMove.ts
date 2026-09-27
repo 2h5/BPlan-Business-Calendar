@@ -4,7 +4,7 @@ import { useRef, useState, type RefObject } from 'react';
 import type { TimelineAutoScroll } from './useTimelineAutoScroll';
 import type { TimelineGestureFeedback } from './useTimelineGestureFeedback';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import type { EventTiming } from '../TimelineView';
+import type { EventTiming } from '../../types';
 import {
   collectConflictCandidates,
   hasConflict as checkHasConflict,

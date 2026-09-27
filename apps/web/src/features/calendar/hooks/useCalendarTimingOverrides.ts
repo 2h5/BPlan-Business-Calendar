@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { EventOccurrence } from './useCalendarWindow';
-import type { EventTiming } from '../timeline/TimelineView';
+import type { EventTiming } from '../types';
 
 type AuthoritativeTimingOccurrence = Pick<EventOccurrence, 'start' | 'end'> & {
   event: Pick<EventOccurrence['event'], 'id'>;
