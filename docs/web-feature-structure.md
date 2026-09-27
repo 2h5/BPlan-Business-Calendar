@@ -235,6 +235,127 @@ imports it now.
 - `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
   warning (web: 99 files / 862 tests, the same count as before).
 
+## Phase 3: Tasks (done)
+
+### Starting layout
+
+```
+features/tasks/
+  api/         tasks.api (+ test)
+  hooks/       useTasks, useTaskBuckets (+ test)
+  utils/       taskInspectorForm (+ test)
+  components/  TasksView (+ .module.css),
+               TaskInspector (+ .module.css, .dom.test), TaskInspectorFields (+ test),
+               TaskListPane (+ .module.css, .dom.test), TaskListHeaderControls (+ test),
+               TaskListSection (+ test), TaskQuickAdd (+ test),
+               TaskRow (+ .module.css, .dom.test)
+  index.ts
+```
+
+### Resulting layout
+
+```
+features/tasks/
+  api/         tasks.api (+ test)
+  hooks/       useTasks, useTaskBuckets (+ test)
+  components/  TasksView (+ .module.css)
+  inspector/
+    TaskInspector.tsx / .module.css / .dom.test.tsx
+    TaskInspectorFields.tsx / .test.tsx
+    utils/     taskInspectorForm (+ test)
+  list/
+    TaskListPane.tsx / .module.css / .dom.test.tsx
+    TaskListHeaderControls.tsx / .test.tsx
+    TaskListSection.tsx / .test.tsx
+    TaskQuickAdd.tsx / .test.tsx
+    TaskRow.tsx / .module.css / .dom.test.tsx
+  index.ts
+```
+
+`tasks/utils/` is gone. Its only file was Inspector-specific.
+
+### Files moved (19)
+
+- `components/` → `inspector/`: `TaskInspector.tsx`,
+  `TaskInspector.module.css`, `TaskInspector.dom.test.tsx`,
+  `TaskInspectorFields.tsx`, `TaskInspectorFields.test.tsx`.
+- `utils/` → `inspector/utils/`: `taskInspectorForm.ts`,
+  `taskInspectorForm.test.ts`.
+- `components/` → `list/`: `TaskListPane` (`.tsx`, `.module.css`,
+  `.dom.test.tsx`), `TaskListHeaderControls` (+ test), `TaskListSection`
+  (+ test), `TaskQuickAdd` (+ test), `TaskRow` (`.tsx`, `.module.css`,
+  `.dom.test.tsx`).
+
+`list/` and `inspector/` sit at the same depth as `components/`, so the
+`../../../test/dom` imports, the `../api` and `../hooks` imports and the shared
+`components/forms/Select` imports in those files did not change. Only the
+`taskInspectorForm` references (now `./utils/…`) and that file's own `../api`
+import (now `../../api/…`) changed.
+
+### Stayed at feature level
+
+- **`components/TasksView`** composes the list and inspector and owns their
+  shared selection and filter state. It is the feature's page-level
+  orchestration and is what `pages/TasksPage` renders.
+- **`api/tasks.api`**: used by the list, inspector, `useTasks`,
+  `useTaskBuckets`, and by Search and Today.
+- **`hooks/useTasks`**: used by `TasksView`, `useTaskBuckets`, Calendar
+  (`CalendarView`, `QuickCreatePopover`), Search and Today.
+- **`hooks/useTaskBuckets`**: used by `TasksView`, the list (the `TaskFilter` /
+  `WebTaskBuckets` types) and Today (`useToday`).
+- **`index.ts`**: same exports, updated paths. It still re-exports
+  `TaskListPane`, `TaskRow` and `TaskInspector`, which were already part of it.
+  It was not narrowed or broadened.
+
+### External imports
+
+No file outside `features/tasks` imported a moved file, so no external import
+changed. The existing cross-feature imports all target the feature-level
+`api/` and `hooks/`:
+
+| Consumer                                                                                                              | Imports                                     |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `pages/TasksPage`                                                                                                     | `TasksView` via the `features/tasks` barrel |
+| `calendar/components/CalendarView`                                                                                    | `useCreateTask` (`hooks/useTasks`)          |
+| `calendar/quick-create/QuickCreatePopover` (+ its two tests mock it)                                                  | `useTaskLists` (`hooks/useTasks`)           |
+| `search/api/search.api`, `search/utils/search-results.test`                                                           | `api/tasks.api`                             |
+| `search/components/SearchView`                                                                                        | `useTaskLists`                              |
+| `today/hooks/useToday`                                                                                                | `useTaskBuckets`, `useTaskLists`            |
+| `today/components/TodayView` (+ `.dom.test` mocks `hooks/useTasks`), `TodaySearch`, `TodayTaskGroups`, `TodayTaskRow` | `TaskWithTags`, task hooks                  |
+
+Tasks itself imports one other feature: `TasksView` uses `useProfile` from
+`settings/hooks/useSettings`.
+
+### Non-path changes
+
+None. The staged diff is 19 renames plus path edits in `TasksView.tsx`,
+`index.ts`, `TaskInspector.tsx`, `TaskInspectorFields(.test).tsx` and
+`taskInspectorForm(.test).ts`. `eslint --fix` re-sorted one import in
+`TaskInspectorFields.test.tsx`. No CSS, TaskRow exit, Inspector lifecycle or
+TasksView logic changed.
+
+### Verification
+
+- Inspector: 3 files, 37 tests pass (including `TaskInspector.dom.test`).
+- List: 5 files, 49 tests pass (including the `TaskListPane` and `TaskRow` DOM
+  tests).
+- All of `features/tasks`: 10 files, 95 tests pass.
+- Consumers of task imports (`features/calendar`, `search`, `today`): 59
+  files, 574 tests pass.
+- `pnpm verify` passes with every nested `pnpm` on Node 24.11.1 and no engine
+  warning (web: 99 files / 862 tests, unchanged).
+
+### Deferred structural debt
+
+- **The barrel is bypassed.** Every cross-feature consumer deep-imports
+  `tasks/api/tasks.api` or `tasks/hooks/*` instead of `features/tasks`, and
+  nothing outside Tasks uses the barrel's `TaskListPane`, `TaskRow` or
+  `TaskInspector` re-exports. Routing consumers through the barrel, or
+  narrowing it, is an API decision, not a move.
+- **Today has its own task presentation.** `TodayTaskRow` and
+  `TodayTaskGroups` sit beside the Tasks list's `TaskRow` and share only the
+  `TaskWithTags` type. Any convergence is product/UI work.
+
 ## Findings for later phases
 
 - **Shared calendar types live in `TimelineView.tsx`.** `EventTiming`,
@@ -263,11 +384,17 @@ imports it now.
   `calendar-preferences` and `calendar-window` directly. None of these moved
   in Phases 1–2. They are the calendar feature's real cross-feature surface and
   should stay put, or get an explicit boundary, during the Today phase.
+- **Today depends on Tasks through deep imports as well** (`useTaskBuckets`,
+  `useTaskLists`, `TaskWithTags`, and a `vi.mock('../../tasks/hooks/useTasks')`
+  in `TodayView.dom.test`). If Today components move to a different depth,
+  those relative mock paths must move with them. Tasks' `api/` and `hooks/`
+  are stable targets now, so nothing on the Tasks side needs to change for the
+  Today phase.
 
 ## Remaining phases
 
 1. ~~QuickCreate~~ (Phase 1).
 2. ~~Timeline~~ (Phase 2).
-3. Tasks.
+3. ~~Tasks~~ (Phase 3).
 4. Today.
 5. Scheduling / Find Time.

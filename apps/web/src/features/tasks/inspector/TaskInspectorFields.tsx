@@ -3,8 +3,8 @@ import type { Tag, TaskList, TaskPriority } from '@cal/schemas';
 import type { Ref } from 'react';
 
 import styles from './TaskInspector.module.css';
+import type { TaskInspectorForm } from './utils/taskInspectorForm';
 import { Select } from '../../../components/forms/Select';
-import type { TaskInspectorForm } from '../utils/taskInspectorForm';
 
 export interface TaskInspectorFieldsProps {
   values: TaskInspectorForm;

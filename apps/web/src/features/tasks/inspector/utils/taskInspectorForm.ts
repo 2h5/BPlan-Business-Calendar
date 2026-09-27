@@ -1,7 +1,7 @@
 import { getZonedParts, zonedWallClockToUtc } from '@cal/domain';
 import type { CreateTaskInput, TaskPriority, UpdateTaskInput } from '@cal/schemas';
 
-import type { TaskWithTags } from '../api/tasks.api';
+import type { TaskWithTags } from '../../api/tasks.api';
 
 export interface TaskInspectorForm {
   title: string;

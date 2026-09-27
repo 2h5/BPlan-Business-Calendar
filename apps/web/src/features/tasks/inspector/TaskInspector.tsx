@@ -8,7 +8,7 @@ import {
   emptyTaskInspectorForm,
   inspectorFormToTaskInput,
   taskToInspectorForm,
-} from '../utils/taskInspectorForm';
+} from './utils/taskInspectorForm';
 
 interface TaskInspectorProps {
   task: TaskWithTags | null;

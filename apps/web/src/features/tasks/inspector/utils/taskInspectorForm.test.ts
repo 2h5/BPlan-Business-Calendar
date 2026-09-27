@@ -6,7 +6,7 @@ import {
   inspectorFormToTaskInput,
   taskToInspectorForm,
 } from './taskInspectorForm';
-import type { TaskWithTags } from '../api/tasks.api';
+import type { TaskWithTags } from '../../api/tasks.api';
 
 const task: Task = {
   id: '00000000-0000-0000-0000-000000000001',

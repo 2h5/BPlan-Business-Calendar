@@ -12,8 +12,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import styles from './TaskInspector.module.css';
 import { TaskInspectorFields, type TaskInspectorFieldsProps } from './TaskInspectorFields';
+import { emptyTaskInspectorForm } from './utils/taskInspectorForm';
 import { Select } from '../../../components/forms/Select';
-import { emptyTaskInspectorForm } from '../utils/taskInspectorForm';
 
 const lists: TaskList[] = [
   {
