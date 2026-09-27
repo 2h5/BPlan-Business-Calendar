@@ -22,6 +22,7 @@ import {
   useUpdateCalendar,
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
+import { useCalendarTimingOverrides } from '../hooks/useCalendarTimingOverrides';
 import { useCalendarToast } from '../hooks/useCalendarToast';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
@@ -69,9 +70,6 @@ export function CalendarView() {
   const { toast, setToast, isToastExiting, showToast, showSuccess, holdToast, releaseToast } =
     useCalendarToast();
 
-  const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
-    () => new Map(),
-  );
   const openingControlRef = useRef<HTMLElement | null>(null);
 
   const [quickCreateState, setQuickCreateState] = useState<{
@@ -369,32 +367,7 @@ export function CalendarView() {
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
-  useEffect(() => {
-    const reflectedEventIds = [...timingOverrides]
-      .filter(([eventId, timing]) => {
-        const authoritative = result.occurrences.find(
-          (occurrence) => occurrence.event.id === eventId,
-        );
-        return authoritative?.start === timing.start && authoritative.end === timing.end;
-      })
-      .map(([eventId]) => eventId);
-    if (reflectedEventIds.length === 0) return;
-
-    setTimingOverrides((current) => {
-      const next = new Map(current);
-      reflectedEventIds.forEach((eventId) => next.delete(eventId));
-      return next;
-    });
-  }, [result.occurrences, timingOverrides]);
-
-  const setTimingOverride = useCallback((eventId: string, timing: EventTiming | null) => {
-    setTimingOverrides((current) => {
-      const next = new Map(current);
-      if (timing) next.set(eventId, timing);
-      else next.delete(eventId);
-      return next;
-    });
-  }, []);
+  const { timingOverrides, setTimingOverride } = useCalendarTimingOverrides(result.occurrences);
 
   const handleResizeEvent = useCallback(
     (occurrence: EventOccurrence, timing: EventTiming) => {
