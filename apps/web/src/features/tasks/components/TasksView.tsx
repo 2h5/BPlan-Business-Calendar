@@ -3,8 +3,6 @@ import type { CreateTaskInput, UpdateTaskInput } from '@cal/schemas';
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { TaskInspector } from './TaskInspector';
-import { TaskListPane } from './TaskListPane';
 import styles from './TasksView.module.css';
 import { useProfile } from '../../settings/hooks/useSettings';
 import type { TaskWithTags } from '../api/tasks.api';
@@ -18,6 +16,8 @@ import {
   useToggleTaskComplete,
   useUpdateTask,
 } from '../hooks/useTasks';
+import { TaskInspector } from '../inspector/TaskInspector';
+import { TaskListPane } from '../list/TaskListPane';
 
 export function TasksView() {
   const [searchParams, setSearchParams] = useSearchParams();

@@ -9,8 +9,6 @@ import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
-import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type SlotSelection } from './TimelineView';
 import { useAppPreferences } from '../../settings/hooks/useAppPreferences';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
 import { useCalendarEventTimingChanges } from '../hooks/useCalendarEventTimingChanges';
@@ -28,6 +26,8 @@ import { useCalendarToast } from '../hooks/useCalendarToast';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
 import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
+import { QuickCreatePopover } from '../quick-create/QuickCreatePopover';
+import { TimelineView, type SlotSelection } from '../timeline/TimelineView';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,
@@ -38,6 +38,7 @@ import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../util
 import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
 import { getNewEventAnchorRect } from '../utils/new-event-anchor';
 import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
+import type { AnchorRect } from '../utils/popover-position';
 
 export function CalendarView() {
   const [searchParams, setSearchParams] = useSearchParams();

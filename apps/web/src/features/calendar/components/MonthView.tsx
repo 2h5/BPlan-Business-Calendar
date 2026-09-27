@@ -1,10 +1,10 @@
 import { resolveEventColor, toZonedDateKey } from '@cal/domain';
 
 import styles from './CalendarView.module.css';
-import type { AnchorRect } from './QuickCreatePopover';
-import type { DraftEventState, SlotSelection } from './TimelineView';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
+import type { DraftEventState, SlotSelection } from '../timeline/TimelineView';
 import { dateKeyToInstant } from '../utils/calendar-window';
+import type { AnchorRect } from '../utils/popover-position';
 
 interface MonthViewProps {
   dateKeys: readonly string[];
