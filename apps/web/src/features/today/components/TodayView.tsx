@@ -5,19 +5,10 @@ import { useNavigate } from 'react-router-dom';
 
 import { DayGlanceCard } from './DayGlanceCard';
 import { ProgressRing } from './ProgressRing';
-import {
-  AlertTriangleIcon,
-  CalendarIcon,
-  CheckIcon,
-  ChevronDownIcon,
-  MoonIcon,
-  PlusIcon,
-  SunIcon,
-  TasksEmptyIcon,
-} from './TodayIcons';
+import { CalendarIcon, MoonIcon, PlusIcon, SunIcon } from './TodayIcons';
 import { TodayScheduleSection } from './TodayScheduleSection';
 import { TodaySearch } from './TodaySearch';
-import { TodayTaskRow } from './TodayTaskRow';
+import { TodayTaskGroups } from './TodayTaskGroups';
 import styles from './TodayView.module.css';
 import { Select } from '../../../components/forms/Select';
 import { FindTimeBox } from '../../scheduling';
@@ -410,144 +401,24 @@ export function TodayView() {
               </form>
             </div>
           </div>
-
-          {/* Task Groups */}
-          {relevantCount === 0 ? (
-            <div className={styles.emptyTasks}>
-              <TasksEmptyIcon />
-              <h3>No tasks for today</h3>
-              <p>You have no overdue items or tasks due today.</p>
-              <button
-                type="button"
-                className={styles.secondaryActionButton}
-                onClick={handleOpenQuickAdd}
-              >
-                + Add a Task
-              </button>
-            </div>
-          ) : (
-            <div className={styles.taskGroupsList}>
-              {/* Overdue Section */}
-              {today.overdue.length > 0 && (
-                <div className={styles.taskSection}>
-                  <div className={styles.taskSectionHeaderOverdue}>
-                    <AlertTriangleIcon />
-                    <span>Overdue</span>
-                    <span className={styles.taskSectionBadgeOverdue}>{today.overdue.length}</span>
-                  </div>
-                  {today.overdue.map((task) => (
-                    <TodayTaskRow
-                      key={task.id}
-                      task={task}
-                      lists={today.lists}
-                      now={today.now}
-                      timeZone={today.timeZone}
-                      hourCycle={today.hourCycle}
-                      onOpen={(id) => navigate(`/tasks?task=${id}`)}
-                      onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
-                      onSnooze={handleSnooze}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Due Today Section */}
-              {today.dueToday.length > 0 && (
-                <div className={styles.taskSection}>
-                  <div className={styles.taskSectionHeader}>
-                    <span>Due Today</span>
-                    <span className={styles.taskSectionBadge}>{today.dueToday.length}</span>
-                  </div>
-                  {today.dueToday.map((task) => (
-                    <TodayTaskRow
-                      key={task.id}
-                      task={task}
-                      lists={today.lists}
-                      now={today.now}
-                      timeZone={today.timeZone}
-                      hourCycle={today.hourCycle}
-                      onOpen={(id) => navigate(`/tasks?task=${id}`)}
-                      onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
-                      onSnooze={handleSnooze}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Unscheduled / Flexible Section */}
-              {today.unscheduled.length > 0 && (
-                <div className={styles.taskSection}>
-                  <div className={styles.taskSectionHeader}>
-                    <span>Flexible Focus</span>
-                    <span className={styles.taskSectionBadge}>{today.unscheduled.length}</span>
-                  </div>
-                  {today.unscheduled.map((task) => (
-                    <TodayTaskRow
-                      key={task.id}
-                      task={task}
-                      lists={today.lists}
-                      now={today.now}
-                      timeZone={today.timeZone}
-                      hourCycle={today.hourCycle}
-                      onOpen={(id) => navigate(`/tasks?task=${id}`)}
-                      onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
-                      onSnooze={handleSnooze}
-                      onDelete={handleDelete}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Completed Today Collapsible Section */}
-          {today.completedToday.length > 0 && (
-            <div className={styles.completedCollapsible}>
-              <button
-                type="button"
-                className={styles.completedSummary}
-                onClick={() => setIsCompletedOpen((prev) => !prev)}
-                aria-expanded={isCompletedOpen}
-                aria-controls="completed-today-list"
-              >
-                <span className={styles.completedSummaryLeft}>
-                  <CheckIcon className={styles.checkIconGreen} />
-                  <span>Completed today</span>
-                  <span className={styles.completedCountBadge}>{today.completedToday.length}</span>
-                </span>
-                <ChevronDownIcon
-                  className={`${styles.chevronIcon} ${isCompletedOpen ? styles.chevronIconOpen : ''}`}
-                />
-              </button>
-              <div
-                id="completed-today-list"
-                className={`${styles.completedAccordion} ${
-                  isCompletedOpen ? styles.completedAccordionOpen : ''
-                }`}
-              >
-                <div className={styles.completedAccordionInner}>
-                  <div className={styles.completedList}>
-                    {today.completedToday.map((task) => (
-                      <TodayTaskRow
-                        key={task.id}
-                        task={task}
-                        lists={today.lists}
-                        now={today.now}
-                        timeZone={today.timeZone}
-                        hourCycle={today.hourCycle}
-                        onOpen={(id) => navigate(`/tasks?task=${id}`)}
-                        onToggle={(t, c) => toggle.mutate({ id: t.id, completed: c })}
-                        onSnooze={handleSnooze}
-                        onDelete={handleDelete}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <TodayTaskGroups
+            overdue={today.overdue}
+            dueToday={today.dueToday}
+            unscheduled={today.unscheduled}
+            completedToday={today.completedToday}
+            lists={today.lists}
+            now={today.now}
+            timeZone={today.timeZone}
+            hourCycle={today.hourCycle}
+            relevantCount={relevantCount}
+            isCompletedOpen={isCompletedOpen}
+            onToggleCompleted={() => setIsCompletedOpen((prev) => !prev)}
+            onAddTask={handleOpenQuickAdd}
+            onOpenTask={(id) => navigate(`/tasks?task=${id}`)}
+            onToggleTask={(task, completed) => toggle.mutate({ id: task.id, completed })}
+            onSnoozeTask={handleSnooze}
+            onDeleteTask={handleDelete}
+          />
         </section>
       </div>
     </div>
