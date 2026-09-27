@@ -1,11 +1,4 @@
-import {
-  addZonedDays,
-  formatDuration,
-  formatTimeOfDay,
-  getZonedParts,
-  resolveEventColor,
-  zonedWallClockToUtc,
-} from '@cal/domain';
+import { addZonedDays, getZonedParts, zonedWallClockToUtc } from '@cal/domain';
 import type { TaskPriority } from '@cal/schemas';
 import React, { useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +7,6 @@ import { DayGlanceCard } from './DayGlanceCard';
 import { ProgressRing } from './ProgressRing';
 import {
   AlertTriangleIcon,
-  CalendarEmptyIcon,
   CalendarIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -23,6 +15,7 @@ import {
   SunIcon,
   TasksEmptyIcon,
 } from './TodayIcons';
+import { TodayScheduleSection } from './TodayScheduleSection';
 import { TodaySearch } from './TodaySearch';
 import { TodayTaskRow } from './TodayTaskRow';
 import styles from './TodayView.module.css';
@@ -311,154 +304,17 @@ export function TodayView() {
       {/* Main Split Content: Schedule vs Tasks */}
       <div className={styles.columns}>
         {/* Left Column: Schedule & Timeline */}
-        <section className={styles.section} aria-labelledby={scheduleHeadingId}>
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionTitleRow}>
-              <h2 id={scheduleHeadingId} className={styles.sectionHeading}>
-                Schedule
-              </h2>
-              <span className={styles.countBadge}>{today.allDay.length + today.timed.length}</span>
-            </div>
-            <button
-              type="button"
-              className={styles.textNavButton}
-              onClick={() => navigate(`/calendar?date=${today.todayKey}`)}
-            >
-              Full calendar →
-            </button>
-          </div>
-
-          {/* All-Day Events */}
-          {today.allDay.length > 0 && (
-            <div className={styles.allDayBlock}>
-              <span className={styles.allDayLabel}>All-Day</span>
-              <div className={styles.allDayList}>
-                {today.allDay.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    className={styles.allDayPill}
-                    onClick={() =>
-                      navigate(`/calendar?date=${today.todayKey}&event=${item.event.id}`)
-                    }
-                  >
-                    <span
-                      className={styles.allDayDot}
-                      style={{
-                        backgroundColor: resolveEventColor(
-                          item.event.color,
-                          item.calendar?.color,
-                          'var(--color-accent)',
-                        ),
-                      }}
-                    />
-                    <span className={styles.allDayTitle}>{item.event.title}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Interactive Timeline */}
-          {today.timed.length === 0 ? (
-            <div className={styles.emptySchedule}>
-              <CalendarEmptyIcon />
-              <h3>Your schedule is clear</h3>
-              <p>No timed commitments today. Enjoy uninterrupted focus time.</p>
-              <button
-                type="button"
-                className={styles.secondaryActionButton}
-                onClick={() => navigate(`/calendar?date=${today.todayKey}&newEvent=true`)}
-              >
-                + Schedule Event
-              </button>
-            </div>
-          ) : (
-            <div className={styles.timeline}>
-              {today.timed.map((item) => {
-                const nowMs = today.now.getTime();
-                const isCurrent = nowMs >= item.start && nowMs < item.end;
-                const isPast = nowMs >= item.end;
-                const durationMins = Math.round((item.end - item.start) / 60000);
-                const color = resolveEventColor(
-                  item.event.color,
-                  item.calendar?.color,
-                  'var(--color-accent)',
-                );
-                const startTimeStr = formatTimeOfDay(
-                  new Date(item.start),
-                  today.timeZone,
-                  today.hourCycle,
-                );
-                const endTimeStr = formatTimeOfDay(
-                  new Date(item.end),
-                  today.timeZone,
-                  today.hourCycle,
-                );
-
-                return (
-                  <div
-                    key={item.key}
-                    className={`${styles.timelineEntry} ${isCurrent ? styles.timelineCurrent : ''} ${
-                      isPast ? styles.timelinePast : ''
-                    }`}
-                  >
-                    <div className={styles.timelineTimeCol}>
-                      <time className={styles.timelineTime}>
-                        {isCurrent ? 'Now' : startTimeStr}
-                      </time>
-                      <span className={styles.timelineDuration}>
-                        {formatDuration(durationMins)}
-                      </span>
-                    </div>
-
-                    <div className={styles.timelineSpine}>
-                      <div
-                        className={styles.timelineNode}
-                        style={{
-                          borderColor: color,
-                          backgroundColor: isCurrent ? color : undefined,
-                        }}
-                      />
-                      <div className={styles.timelineLine} />
-                    </div>
-
-                    <button
-                      type="button"
-                      className={styles.eventCard}
-                      onClick={() =>
-                        navigate(`/calendar?date=${today.todayKey}&event=${item.event.id}`)
-                      }
-                    >
-                      <div
-                        className={styles.eventCardColorBar}
-                        style={{ backgroundColor: color }}
-                      />
-                      <div className={styles.eventCardContent}>
-                        <div className={styles.eventCardTop}>
-                          <strong className={styles.eventCardTitle}>{item.event.title}</strong>
-                        </div>
-                        <div className={styles.eventCardMeta}>
-                          <span className={styles.eventCardRange}>
-                            {startTimeStr} – {endTimeStr}
-                          </span>
-                          <span className={styles.eventCalendarTag}>
-                            {item.calendar?.name ?? 'Calendar'}
-                          </span>
-                          {item.event.location && (
-                            <span className={styles.eventLocationTag}>
-                              📍 {item.event.location}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        <TodayScheduleSection
+          headingId={scheduleHeadingId}
+          allDay={today.allDay}
+          timed={today.timed}
+          now={today.now}
+          timeZone={today.timeZone}
+          hourCycle={today.hourCycle}
+          onOpenCalendar={() => navigate(`/calendar?date=${today.todayKey}`)}
+          onCreateEvent={() => navigate(`/calendar?date=${today.todayKey}&newEvent=true`)}
+          onOpenEvent={(eventId) => navigate(`/calendar?date=${today.todayKey}&event=${eventId}`)}
+        />
 
         {/* Right Column: Tasks Focus */}
         <section className={styles.section} aria-labelledby={tasksHeadingId}>
