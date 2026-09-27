@@ -99,15 +99,9 @@ export function useQuickCreateDraft({
           setStartTime(initialStartTime);
           setEndTime(initialEndTime ?? addMinutesToTime(initialStartTime, defaultDurationMinutes));
         }
-        if (defaultCalendar && !calendarId) {
-          setCalendarId(defaultCalendar.id);
-        }
       }
       setErrorMessage(null);
       setIsDeleteConfirmOpen(false);
-      if (taskLists && taskLists.length > 0 && !selectedListId && taskLists[0]) {
-        setSelectedListId(taskLists[0].id);
-      }
     }
   }, [
     isOpen,
@@ -117,11 +111,19 @@ export function useQuickCreateDraft({
     initialEndTime,
     initialAllDay,
     defaultDurationMinutes,
-    defaultCalendar,
-    calendarId,
-    taskLists,
-    selectedListId,
   ]);
+
+  // Fill an empty calendar or list selection. Kept separate from the sync
+  // above so choosing a calendar or list does not reset the rest of the draft.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!editingOccurrence && defaultCalendar && !calendarId) {
+      setCalendarId(defaultCalendar.id);
+    }
+    if (taskLists && taskLists.length > 0 && !selectedListId && taskLists[0]) {
+      setSelectedListId(taskLists[0].id);
+    }
+  }, [isOpen, editingOccurrence, defaultCalendar, calendarId, taskLists, selectedListId]);
 
   return {
     mode,
