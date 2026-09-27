@@ -165,9 +165,229 @@ The TaskInspector items in the baseline list above are now proven against real R
 
 Testing Library's async wrapper waits on a real 0 ms `setTimeout` and only auto-advances Jest's fake timers. With Vitest fake timers, every `user-event` call therefore hangs. Timed tests use fake timers with synchronous `fireEvent`, and untimed interaction tests use `user-event` with real timers. The shared helper already restores real timers after each test.
 
-## Remaining DOM-test targets (Phase 3)
+## Phase 3: QuickCreate, Find Time, Today and the calendar toolbar
 
-- `QuickCreatePopover` and `FindTimeBox`: focus entry and return, outside dismissal, Escape layering with a nested Select, and picker interaction.
-- `TodayView` quick add and task rows (a separate `TodayTaskRow` implementation).
-- `CalendarView` interactions that jsdom can model (toolbar, view switching, and event selection). Gesture, layout and animation behavior (timeline drag and resize, scroll) needs a real browser.
-- Real-browser (Playwright) candidates: Quick Add focus after submit, CSS exit animations and row collapse, TaskInspector close timing and descendant `animationend`, and `preventScroll`.
+- Base: `test/dom-component-infrastructure` at `b2fb40f21957aebae60fe6d392f23cbf6d79ed9f`. No new dependencies or config. Each new file uses the per-file jsdom docblock and `src/test/dom`.
+
+### Where DOM coverage was added, and where it was not
+
+| Area                                | Before                                                                                                                         | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QuickCreatePopover`                | Static markup, plus a fake-hook runtime for `useQuickCreateLifecycle` and `useQuickCreateDraft`.                               | **Covered (26 tests).** This is the highest-risk surface: a window capture listener, a focus trap, a delete confirmation layered on Escape, nested Selects and portaled pickers, and the draft-sync effect. Two bugs were found.                                                                                                                                                                                                                   |
+| `FindTimeBox`                       | Static markup of each restored phase only.                                                                                     | **Covered (9 tests).** Every phase change is timer-driven (280 ms proposal exit, 5 s confirmation, 30 s banner, 350 ms banner exit, 50 ms refocus) and persisted to `sessionStorage`. One bug was found.                                                                                                                                                                                                                                           |
+| `TodayView` quick add and task rows | `TodayQuickAdd`, `TodayTaskRow` and `TodayTaskGroups` were tested as static markup and element props. `TodayView` had no test. | **Covered through `TodayView` (11 tests).** The quick-add state machine (rAF focus, `transitionend` filtering, submit, cancel) lives in `TodayView`. `TodayTaskRow` is stateless and acts immediately, so it gets wiring tests through the view instead of its own DOM file.                                                                                                                                                                       |
+| `CalendarToolbar`                   | No test.                                                                                                                       | **Covered (9 tests).** It has its own dropdown lifecycle: a 150 ms close fallback, `animationend`, outside press and Escape.                                                                                                                                                                                                                                                                                                                       |
+| `CalendarView` itself               | Hook- and utility-level tests for move, resize, slot selection, gesture recovery, transitions and hotkeys (48 calendar files). | **Not given a DOM test.** It is a 650-line orchestrator over about ten data hooks. A full jsdom render would mostly test the mocks. Its risky interactions are pointer gestures, geometry and scrolling, which jsdom cannot model, and its keyboard and transition logic already has deterministic tests. The toolbar was the part jsdom could exercise reliably. Wiring from an event click to QuickCreate is left for a real-browser smoke test. |
+
+### DOM tests added
+
+**`apps/web/src/features/calendar/components/QuickCreatePopover.dom.test.tsx` (26 tests).** Task lists come from a stable mocked `useTaskLists`, as TanStack Query would provide. Untimed tests first wait for the real 50 ms autofocus so it cannot steal focus from a control opened afterwards.
+
+- **Autofocus:** the title is focused at 50 ms (not 49) with `{ preventScroll: true }`. Closing or unmounting first clears the timer, and reopening schedules a new one.
+- **Closing:**
+  - Close and the backdrop start the animated close: the closing class is set and `onClosing` is called, but `onClose` is not called until the dialog's own `animationend`.
+  - A descendant `animationend` that bubbles up is ignored. Unlike TaskInspector, QuickCreate checks the event target.
+  - A second close request while closing is ignored.
+  - Escape starts the same close, and its capture-phase `stopPropagation` keeps it from other window listeners.
+  - While saving, the backdrop, Close and Escape all do nothing, and the controls are disabled.
+  - Cancel (task mode) and More options close **immediately**, without the exit animation or `onClosing`. More options passes the draft.
+- **Focus trap and modes:**
+  - Tab from Save wraps to the Event tab, and Shift+Tab wraps back.
+  - The disabled time controls of an all-day event are skipped.
+  - Switching Event → Task keeps focus on the tab, keeps the typed title (the same input node), changes the placeholder and clears the error.
+- **Submission:**
+  - An empty title shows the alert and refocuses the title.
+  - Enter creates the event (trimmed title, default calendar, zoned times) and then closes.
+  - A failure keeps the draft open with the error.
+  - Task mode creates the task in the first list with the due time.
+- **Delete confirmation:**
+  - The delete button toggles the confirmation and `aria-expanded`, and Cancel closes it.
+  - The first Escape closes only the confirmation; the second closes the popover.
+  - Confirm deletes, then closes.
+  - A failed delete shows the error and stays open.
+  - Opening a different event closes the confirmation and loads the new event.
+  - A read-only calendar offers no delete.
+- **Nested controls (regression tests for the fixes below):**
+  - Escape with the calendar Select open closes only the Select, and focus stays on its trigger.
+  - Escape inside the portaled date picker or time menu closes only that picker and returns focus to its trigger.
+  - Choosing another calendar or task list keeps the draft and saves to the new choice.
+  - When editing an event, a new calendar and the edits both stick.
+
+**`apps/web/src/features/scheduling/components/FindTimeBox.dom.test.tsx` (9 tests).** `useFindTime` and `useConfirmSlot` are replaced by small stateful fakes with the same shape. A test settles a request the way the query would. The real `sessionStorage` notice storage is used.
+
+- The request submits as typed. A blank request cannot submit, and the pending state disables the button. A search error clears as soon as the request is edited.
+- Escape clears the request. The results then play their 280 ms exit (not reset at 279 ms, reset at 280 ms). Clearing the field starts the same exit, and typing again cancels it.
+- Booking a slot calls `confirm` and `onScheduled`, and clears the request and draft.
+- **Notice lifecycle:**
+  - The confirmation card shows for exactly 5 s.
+  - It then becomes the compact banner (stored as `banner`) for exactly 30 s.
+  - The banner then exits over exactly 350 ms, and storage is cleared.
+- "Schedule another" docks the banner at once and focuses the request at 50 ms.
+- Dismiss and a new search both clear the stored notice and remove the banner after 350 ms.
+- Unmounting clears every timer. A remount (route navigation) resumes the confirmation phase for its remaining time.
+
+**`apps/web/src/features/today/components/TodayView.dom.test.tsx` (11 tests).** The data hooks and router are mocked. Unrelated panels (Find Time, search, day glance, schedule) are stubbed out.
+
+- **Quick add:**
+  - It opens from the header or the empty state, and focuses on the next animation frame with `preventScroll`.
+  - It becomes fully open only when the accordion's own `grid-template-rows` transition ends while open. A child's transition, another property, or a transition after cancelling does not count. jsdom has no `TransitionEvent`, so the test builds the event with `propertyName` itself.
+  - Escape in the title, and Cancel, both close it and clear the title.
+  - Escape with the priority Select open closes only the Select.
+  - Submit sends the trimmed title, list, priority and an 18:00-today due time. While pending, the input and buttons are disabled.
+  - On success it closes and resets title, list and priority.
+  - A failure keeps it open with the title and shows no error.
+  - A blank title does not submit.
+- **Task rows (`TodayTaskRow` through the view):**
+  - Complete, open, snooze and delete act immediately, through the task hooks and navigation.
+  - An all-day task snoozes to noon on the day after its old due date, which is still overdue. A timed task keeps its time.
+  - The completed-today accordion toggles, and a completed task can be reopened.
+
+**`apps/web/src/features/calendar/components/CalendarToolbar.dom.test.tsx` (9 tests).**
+
+- **Calendars menu:**
+  - The badge shows the visible count, and the rows expose their visibility through `aria-pressed`, with default and read-only notes and the time zone.
+  - The menu closes over exactly 150 ms, or sooner on its own `animationend`; a descendant `animationend` is ignored.
+  - Presses inside keep it open. A press outside or Escape closes it.
+  - The trigger is ignored while the menu is already closing.
+  - Toggling visibility keeps the menu open. Create and Edit close it.
+  - With no calendars, an empty state is shown.
+- **Navigation and views:** Previous and Next are named for the current view. Today and New event report their clicks. The view buttons mark the current view with `aria-pressed` and report changes. The fetch indicator is shown while fetching.
+
+The existing `useQuickCreateDraft.test.ts` also gained one unit test: the open draft survives a calendar or list change, for both new and edited events.
+
+### Mutation check
+
+- 27 mutations were each applied on their own against the new DOM test file for their surface, then restored from a copy. The uncommitted fixes were never touched by `git checkout`.
+- 26 were caught. The first run missed two because the tests were too loose: a 300 ms banner exit and "clear storage on dismiss". Those assertions were tightened (349/350 ms, and checking storage after a manual dismiss), and both mutations are now caught. A snooze-time mutation was hidden by a noon fixture, so the fixture moved to 18:00, which is what Today's quick add creates.
+- **Caught:**
+  - **QuickCreate (10):** a 40 ms autofocus; no autofocus cleanup; `animationend` from any target; no `stopPropagation`; no Tab wrap; no nested-Escape guard; no delete-confirmation Escape layer; the draft always adopting the default calendar; Enter in the title ignored; no close after delete.
+  - **FindTimeBox (5):** a 300 ms results exit; Escape keeping the text; a 300 ms banner exit; a 10 ms refocus; dismiss keeping storage.
+  - **TodayView (6):** a transition from any target; priority not reset; due at 17:00; no Escape cancel; focus without `preventScroll`; snooze always keeping the stored hour.
+  - **CalendarToolbar (5):** a 200 ms close; `animationend` from any target; inside presses closing; visibility toggles closing; Escape ignored.
+- **Survived (1, equivalent):** skipping "show new proposal" while the old results are exiting. A new proposal can only come from a submit, and `handleSubmit` already clears the exiting state first.
+
+### Production fixes
+
+**1. Escape on an open Select or picker closed the whole QuickCreate popover.** (`useQuickCreateLifecycle.ts`)
+
+- **Symptom:** with the calendar or task-list Select, the date picker, or a time menu open, one Escape started closing the popover. The nested menu stayed visibly open during the exit animation.
+- **Cause:** the popover's Escape listener is on `window` in the **capture** phase and calls `stopPropagation`. It therefore runs before, and blocks, every nested handler. The pickers' own Escape code (close, then `stopPropagation`, then refocus the trigger) and Select's Escape handling never ran.
+- **Intended semantics:** Escape is already layered: the delete confirmation closes first, then the popover. The pickers were clearly written to consume their own Escape. The capture listener defeated that design; the design itself is unchanged.
+- **Fix:** the capture listener lets Escape through, without closing or stopping it, when the target is an expanded trigger (`aria-expanded="true"`, which is where a Select keeps focus). It does the same when the target is inside a dialog or listbox outside the popover (the portaled picker menus). The delete-confirmation layer still takes priority.
+  - Every other Escape behaves as before, including the capture-phase `stopPropagation`.
+  - Select still does not stop propagation. With this fix, its Escape can reach window bubble listeners, but none of them act while the popover is open. The timeline gesture listener only cancels an active drag, and view hotkeys ignore Escape and modal targets.
+- **Regression tests:** the three nested Escape tests. All three failed without the fix, and the delete-confirmation Escape test still passes.
+
+**2. Choosing a calendar or task list wiped the QuickCreate draft.** (`useQuickCreateDraft.ts`)
+
+- **Symptom:**
+  - In a new event, choosing another calendar cleared the typed title, location and description.
+  - In task mode, choosing another list cleared the title.
+  - When editing an event, choosing another calendar snapped back to the event's own calendar and discarded the edits, so an event could not be moved to another calendar from QuickCreate.
+- **Cause:** the open-sync effect, which resets the draft for a new slot or event, also depended on `calendarId`, `selectedListId`, `defaultCalendar` and `taskLists`. It needed them only to fill an empty selection. Any selection change therefore re-ran the full reset. This predates the draft extraction refactor (`05247c9`). The existing fake-runtime tests only checked across close and reopen, never a change while open.
+- **Fix:** split the effect.
+  - The sync keeps its open, slot and event dependencies.
+  - A second effect only fills an empty calendar (for new events) or list selection.
+  - Open, slot and event resets, and filling defaults, behave as before.
+  - Changing a selection no longer clears the error banner or delete confirmation as a side effect. Both still reset on open.
+- **Regression tests:** the three QuickCreate draft tests, plus the new hook unit test. All failed without the fix.
+
+**3. Clearing or escaping Find Time never dismissed the results.** (`FindTimeBox.tsx`)
+
+- **Symptom:** after Escape, or after clearing the request, the input was empty but the old slot results stayed on screen indefinitely, and `findTime.reset()` never ran. The 280 ms exit was cancelled as soon as it started.
+- **Cause:** commit `35a49a8` added `isProposalExiting` to the dependencies of the effect that shows a newly arrived proposal. Starting the exit re-ran that effect, which saw the proposal still present, set `isProposalExiting` back to false and cleared the exit timer.
+- **Fix:** split the effect.
+  - Showing a new proposal, and cancelling any exit for it, depends only on `findTime.proposal`.
+  - A second effect keeps the existing "drop the displayed proposal after a reset" branch with its original dependencies.
+  - The real hook reads the proposal through `useSyncExternalStore`, so its identity is stable between renders.
+- **Regression tests:** the two exit tests. Both failed without the fix.
+
+All three fixes are small (effect splits and one guard), contain no refactoring, and leave the surrounding tests unchanged and passing. None was checked in a real browser: that needs a signed-in local session, which was not set up here.
+
+### Notable behaviors recorded (not changed)
+
+- **QuickCreate has two close paths.** Close, the backdrop and Escape animate and call `onClosing` (CalendarView uses it to fade the draft block). Save, Delete, Cancel and More options call `onClose` directly, with no exit animation and no `onClosing`. This looks deliberate for completed actions, but Cancel in task mode is a dismissal that skips the animation.
+- **QuickCreate autofocus can steal focus.** The 50 ms title autofocus would take focus from a picker opened within 50 ms of the popover opening. This is only reachable with scripted input.
+- **Today quick add failure is silent.** On a failed create the accordion stays open with the title, but nothing tells the user it failed. The comment says the mutation handles the error, but `TodayView` renders no mutation error.
+- **Today rows act immediately.** Complete, snooze and delete call the mutations at once, with no exit delay or undo, unlike the Tasks page `TaskRow`. Snooze uses the same one-day-after-old-due-date rule, so an overdue task can stay overdue.
+- **Toolbar menu:**
+  - The trigger is ignored during the 150 ms close; a quick second click does not reopen the menu.
+  - Escape closes the menu without returning focus to the trigger. Focus inside the menu falls back to `<body>` when it unmounts.
+- **Find Time refocus timer.** The 50 ms refocus timer after "Schedule another" is not cleared on unmount. It is harmless because the ref is null-safe.
+
+### Harness notes
+
+- jsdom has no `TransitionEvent`. `fireEvent.transitionEnd(el, { propertyName })` produces an event without `propertyName`, so `TodayView.dom.test.tsx` builds the event itself.
+- Portaled picker menus focus their selected option on the next animation frame. Tests wait for focus to arrive (`waitFor`) instead of assuming it.
+
+## Closing out the DOM-testing phases
+
+### What Phases 1–3 cover
+
+- **8 DOM test files, 120 DOM tests,** all opted in per file and alongside the existing Node and static tests:
+  - **Phase 1 (19):** TaskInspector.
+  - **Phase 2 (46):** Select, TaskRow, and TaskListPane with TaskQuickAdd and TaskListSection.
+  - **Phase 3 (55):** QuickCreatePopover, FindTimeBox, TodayView with TodayTaskRow and TodayQuickAdd, and CalendarToolbar.
+- **Proven against real React commits and jsdom events:**
+  - delayed focus and its cleanup;
+  - capture and bubble Escape layering and `stopPropagation`;
+  - outside-press dismissal against real `contains`;
+  - focus traps and focus return;
+  - `animationend` and `transitionend` target filtering;
+  - timer-driven exits and phase changes at exact boundaries;
+  - `sessionStorage` phase restore across remounts;
+  - keyed remount identity;
+  - memoized-row state across data updates;
+  - nested Select and picker composition inside popovers.
+- **Mutation checks:** 22 in Phase 2 and 27 in Phase 3, plus 12 in Phase 1. Every one was caught except a single equivalent mutation.
+
+### Production bugs found and fixed
+
+1. **Phase 2:** TaskRow stayed invisible and inert after a snooze that left the task in place.
+2. **Phase 3:** Escape on a nested Select or picker closed the whole QuickCreate popover.
+3. **Phase 3:** choosing a calendar or list wiped the QuickCreate draft, and editing could not change an event's calendar.
+4. **Phase 3:** clearing or escaping Find Time never dismissed its results.
+
+### Known unresolved behaviors (tracker)
+
+| Behavior                                                                                                  | Found   | Status                                                                                        |
+| --------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------- |
+| TaskInspector: a descendant `animationend` bubbles and can end the close early                            | Phase 1 | Open; needs a real browser to confirm the timing                                              |
+| TaskInspector: a refetch returning changed data resets unsaved form edits                                 | Phase 1 | Open; input for the planned form-state extraction                                             |
+| TaskRow: a failed snooze (no task update follows) leaves the row in its exit state                        | Phase 2 | Open; needs snooze-failure UI, a product decision                                             |
+| Snooze moves one day from the old due date, so an overdue task can stay overdue (Tasks and Today)         | Phase 2 | Open; product decision                                                                        |
+| TaskRow: completing, then switching to Done within 260 ms, drops the action                               | Phase 2 | Open; pinned as current behavior                                                              |
+| TaskRow actions menu: no arrow keys, and Escape does not restore focus                                    | Phase 2 | Open; accessibility follow-up                                                                 |
+| Quick Add inputs (Tasks, Today, QuickCreate title) are disabled while saving, so real browsers drop focus | Phase 2 | Open; needs a real browser                                                                    |
+| Select calls `preventDefault` but not `stopPropagation` on Escape                                         | Phase 2 | **Resolved as a QuickCreate bug** (fix 1). Select itself unchanged; no other surface affected |
+| QuickCreate: Cancel and More options skip the exit animation and `onClosing`                              | Phase 3 | Open; confirm intent                                                                          |
+| Today quick add: a failed create shows no error                                                           | Phase 3 | Open; UX follow-up                                                                            |
+| Calendar toolbar: the trigger is ignored during the 150 ms close, and Escape does not return focus        | Phase 3 | Open; minor                                                                                   |
+
+### What jsdom still cannot prove
+
+- Layout, geometry and positioning: popover placement and arrows, picker anchoring, and the timeline grid.
+- CSS animation and transition timing: whether `animationend` and `transitionend` actually fire, and when. Tests dispatch these events themselves.
+- Real scrolling and `preventScroll`: the tests check the argument passed, not the scroll position.
+- The browser's focus fix-up when a focused element becomes disabled or is removed.
+- Pointer gestures with capture: timeline drag, resize and slot selection.
+- `inert`, and the view-transition and reduced-motion rendering paths.
+
+### Is real-browser (Playwright) work warranted now?
+
+It can wait until after the reorganization, with a small, targeted scope. The jsdom suite now covers the event, focus-order and timer logic that a move of files could break. The remaining gaps are visual and timing checks that do not depend on folder layout.
+
+When it is added, a first Playwright pass should cover:
+
+- Quick Add focus after submit (Tasks and Today);
+- TaskInspector close timing with descendant animations;
+- one QuickCreate open → pick → save → close smoke test, including the event-click wiring from CalendarView;
+- one timeline drag.
+
+### Ready for the structural reorganization?
+
+Yes. The foundation is in place: per-file jsdom opt-in, one shared helper, a documented fake-timer strategy, and stable-identity fakes for server hooks. Each high-risk interactive surface has behavior-level tests that assert on roles, labels and user-visible state rather than file paths or internals. Those tests will catch a reorganization that changes lifecycle, focus or event behavior. When files move:
+
+- keep each `*.dom.test.tsx` next to its component;
+- update the relative `vi.mock` paths;
+- keep each file's `src/test/dom` import (or move the helper and update the imports together).

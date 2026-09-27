@@ -262,6 +262,29 @@ describe('useQuickCreateDraft', () => {
     });
   });
 
+  it('keeps the open draft when the calendar or task list changes', () => {
+    const fresh = render({ ...defaults, isOpen: true });
+    fresh.setTitle('Lunch');
+    fresh.setLocation('Cafe');
+    fresh.setCalendarId('cal-other');
+    fresh.setSelectedListId('list-other');
+    expect(render({ ...defaults, isOpen: true })).toMatchObject({
+      title: 'Lunch',
+      location: 'Cafe',
+      calendarId: 'cal-other',
+      selectedListId: 'list-other',
+    });
+
+    hooks.reset();
+    const editing = render({ ...defaults, isOpen: true, editingOccurrence });
+    editing.setTitle('Renamed');
+    editing.setCalendarId('cal-other');
+    expect(render({ ...defaults, isOpen: true, editingOccurrence })).toMatchObject({
+      title: 'Renamed',
+      calendarId: 'cal-other',
+    });
+  });
+
   it('clears error and delete confirmation each time open synchronization runs', () => {
     const initial = render({ ...defaults, isOpen: true });
     initial.setErrorMessage('Failed');

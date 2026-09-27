@@ -198,16 +198,21 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     }
   }, [storedRecord, transitionToBanner, triggerBannerDismiss]);
 
-  // Sync displayed proposal when a new one arrives from findTime or when reset
+  // Show a new proposal when one arrives from findTime. This runs only when the
+  // proposal changes, so starting the exit below does not cancel it again.
   useEffect(() => {
-    if (findTime.proposal) {
-      setDisplayedProposal(findTime.proposal);
-      setIsProposalExiting(false);
-      if (proposalExitTimerRef.current) {
-        clearTimeout(proposalExitTimerRef.current);
-        proposalExitTimerRef.current = null;
-      }
-    } else if (!findTime.isPending && !isProposalExiting) {
+    if (!findTime.proposal) return;
+    setDisplayedProposal(findTime.proposal);
+    setIsProposalExiting(false);
+    if (proposalExitTimerRef.current) {
+      clearTimeout(proposalExitTimerRef.current);
+      proposalExitTimerRef.current = null;
+    }
+  }, [findTime.proposal]);
+
+  // Drop the displayed proposal once findTime has been reset
+  useEffect(() => {
+    if (!findTime.proposal && !findTime.isPending && !isProposalExiting) {
       setDisplayedProposal(null);
     }
   }, [findTime.proposal, findTime.isPending, isProposalExiting]);

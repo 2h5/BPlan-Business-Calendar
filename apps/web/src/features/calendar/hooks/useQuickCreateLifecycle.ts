@@ -11,6 +11,18 @@ interface UseQuickCreateLifecycleOptions {
   onClose: () => void;
 }
 
+/**
+ * True when Escape is aimed at an open Select or picker inside the popover:
+ * focus is on its expanded trigger, or in its menu (pickers portal their menu
+ * outside the popover). That control closes itself on Escape, so this capture
+ * listener must let the key through instead of closing the whole popover.
+ */
+function isNestedPopupTarget(target: EventTarget | null, popover: HTMLElement | null): boolean {
+  if (!target || !(target instanceof Element)) return false;
+  if (target.getAttribute('aria-expanded') === 'true') return true;
+  return !popover?.contains(target) && target.closest('[role="dialog"], [role="listbox"]') !== null;
+}
+
 export function useQuickCreateLifecycle({
   isOpen,
   isSaving,
@@ -52,6 +64,7 @@ export function useQuickCreateLifecycle({
 
     const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape' && !isSaving) {
+        if (!isDeleteConfirmOpen && isNestedPopupTarget(e.target, popoverRef.current)) return;
         e.stopPropagation();
         if (isDeleteConfirmOpen) {
           e.preventDefault();
