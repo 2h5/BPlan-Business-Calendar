@@ -4,14 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { CalendarEditor } from './CalendarEditor';
+import { CalendarState, CalendarToastPresentation } from './CalendarFeedback';
 import { CalendarToolbar } from './CalendarToolbar';
 import styles from './CalendarView.module.css';
 import { EventEditor } from './EventEditor';
 import { MonthView } from './MonthView';
 import { QuickCreatePopover, type AnchorRect } from './QuickCreatePopover';
-import { TimelineView, type EventTiming, type SlotSelection } from './TimelineView';
+import { TimelineView, type SlotSelection } from './TimelineView';
 import { useAppPreferences } from '../../settings/hooks/useAppPreferences';
 import { useCreateTask } from '../../tasks/hooks/useTasks';
+import { useCalendarEventTimingChanges } from '../hooks/useCalendarEventTimingChanges';
 import {
   useCreateCalendar,
   useCreateEvent,
@@ -21,9 +23,11 @@ import {
   useUpdateCalendar,
   useUpdateEvent,
 } from '../hooks/useCalendarMutations';
+import { useCalendarTimingOverrides } from '../hooks/useCalendarTimingOverrides';
+import { useCalendarToast } from '../hooks/useCalendarToast';
 import { useCalendarViewHotkeys } from '../hooks/useCalendarViewHotkeys';
+import { useCalendarViewTransition } from '../hooks/useCalendarViewTransition';
 import { type EventOccurrence, useCalendarWindow } from '../hooks/useCalendarWindow';
-import { animateScrollTop } from '../utils/animate-scroll';
 import {
   getActiveCalendarView,
   isValidCalendarViewMode,
@@ -31,130 +35,9 @@ import {
   viewForLinkedEvent,
 } from '../utils/calendar-preferences';
 import { type CalendarViewMode, formatRangeHeading, shiftDateKey } from '../utils/calendar-window';
-import {
-  eventInputFromForm,
-  eventInputWithTiming,
-  eventToFormValues,
-  type EventFormValues,
-} from '../utils/event-form';
+import { eventInputFromForm, eventToFormValues, type EventFormValues } from '../utils/event-form';
+import { getNewEventAnchorRect } from '../utils/new-event-anchor';
 import { getNewEventSlotDefaults } from '../utils/new-event-defaults';
-import { scrollTopToRevealSlot } from '../utils/timeline-slot-reveal';
-import {
-  getTransitionOrigin,
-  getViewTransitionDirection,
-  type ViewTransitionState,
-} from '../utils/view-transition';
-
-interface CalendarToast {
-  message: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}
-
-/** Minimum time a held toast stays after the pointer or focus leaves it. */
-const TOAST_RESUME_GRACE_MS = 1500;
-
-function getNewEventAnchorRect(
-  dateKey: string,
-  startMinute: number,
-  endMinute: number,
-  mode: CalendarViewMode,
-): AnchorRect | null {
-  const dayElement = document.querySelector<HTMLElement>(`[data-date-key="${dateKey}"]`);
-  if (!dayElement) return null;
-  let rect = dayElement.getBoundingClientRect();
-  if (mode === 'month') {
-    return {
-      top: rect.top,
-      bottom: rect.bottom,
-      left: rect.left,
-      right: rect.right,
-      width: rect.width,
-      height: rect.height,
-    };
-  }
-
-  const hourHeight = mode === 'week' ? 54 : 64;
-  const height = Math.max(22, ((endMinute - startMinute) / 60) * hourHeight - 2);
-
-  // Bring the slot on screen first (e.g. "New Event" at 9 PM while scrolled to
-  // the morning), then measure, so the draft and its popover are both visible.
-  const viewport = dayElement.closest<HTMLElement>('[data-timeline-viewport]');
-  if (viewport) {
-    const viewportRect = viewport.getBoundingClientRect();
-    const slotTop = (startMinute / 60) * hourHeight;
-    const nextScrollTop = scrollTopToRevealSlot({
-      scrollTop: viewport.scrollTop,
-      viewportHeight: viewport.clientHeight,
-      maxScrollTop: viewport.scrollHeight - viewport.clientHeight,
-      headerHeight: rect.top - viewportRect.top + viewport.scrollTop,
-      slotTop,
-      slotBottom: slotTop + height,
-    });
-    if (nextScrollTop !== null) {
-      // Anchor at where the slot lands; the popover then rides the scroll with the draft.
-      rect = new DOMRect(
-        rect.left,
-        rect.top - (nextScrollTop - viewport.scrollTop),
-        rect.width,
-        rect.height,
-      );
-      animateScrollTop(viewport, nextScrollTop);
-    }
-  }
-
-  const top = rect.top + (startMinute / 60) * hourHeight;
-  return {
-    top,
-    bottom: top + height,
-    left: rect.left,
-    right: rect.right,
-    width: rect.width,
-    height,
-  };
-}
-
-function CalendarState({
-  kind,
-  onRetry,
-}: {
-  kind: 'loading' | 'empty' | 'error';
-  onRetry?: () => void;
-}) {
-  const copy = {
-    loading: ['Loading your calendar', 'Bringing your calendars and events into view.'],
-    empty: [
-      'Nothing scheduled here',
-      'This range is clear. Events from visible calendars will appear here.',
-    ],
-    error: ['We could not load your calendar', 'Check the local connection and try again.'],
-  }[kind];
-
-  return (
-    <div className={styles.statePanel} role={kind === 'error' ? 'alert' : 'status'}>
-      <svg
-        viewBox="0 0 24 24"
-        width="36"
-        height="36"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        aria-hidden="true"
-      >
-        <rect x="3" y="5" width="18" height="16" rx="2" />
-        <path d="M16 3v4M8 3v4M3 10h18" />
-        {kind === 'error' ? <path d="M12 14v3M12 19h.01" /> : null}
-      </svg>
-      <strong>{copy[0]}</strong>
-      <span>{copy[1]}</span>
-      {kind === 'error' && onRetry ? (
-        <button type="button" onClick={onRetry}>
-          Try again
-        </button>
-      ) : null}
-    </div>
-  );
-}
 
 export function CalendarView() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -168,8 +51,7 @@ export function CalendarView() {
     const activeView = getActiveCalendarView();
     return searchParams.has('event') ? viewForLinkedEvent(activeView) : activeView;
   });
-  const [transitionState, setTransitionState] = useState<ViewTransitionState | null>(null);
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { transitionState, startTransition } = useCalendarViewTransition();
   const [selectedDateKey, setSelectedDateKey] = useState(
     () => searchParams.get('date') ?? toZonedDateKey(new Date(), initialTimeZone),
   );
@@ -181,17 +63,9 @@ export function CalendarView() {
   const [isEventEditorClosing, setIsEventEditorClosing] = useState(false);
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false);
   const [editingCalendar, setEditingCalendar] = useState<Calendar | null>(null);
-  const [toast, setToast] = useState<CalendarToast | null>(null);
-  const [isToastExiting, setIsToastExiting] = useState(false);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toastExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toastDeadlineRef = useRef(0);
-  const toastRemainingRef = useRef<number | null>(null);
-  const isToastHeldRef = useRef(false);
+  const { toast, setToast, isToastExiting, showToast, showSuccess, holdToast, releaseToast } =
+    useCalendarToast();
 
-  const [timingOverrides, setTimingOverrides] = useState<ReadonlyMap<string, EventTiming>>(
-    () => new Map(),
-  );
   const openingControlRef = useRef<HTMLElement | null>(null);
 
   const [quickCreateState, setQuickCreateState] = useState<{
@@ -286,6 +160,7 @@ export function CalendarView() {
     result.isLoading,
     result.calendars,
     setSearchParams,
+    setToast,
     timeZone,
   ]);
 
@@ -378,7 +253,7 @@ export function CalendarView() {
         editingOccurrence: null,
       });
     },
-    [result.calendars, rememberOpeningControl],
+    [result.calendars, rememberOpeningControl, setToast],
   );
 
   const activeDraftEvent = useMemo(() => {
@@ -407,44 +282,22 @@ export function CalendarView() {
       );
       if (selectedOccurrence?.event.calendarId === calendar.id) setSelectedOccurrence(null);
     },
-    [selectedOccurrence, toggleVisibility],
+    [selectedOccurrence, setToast, toggleVisibility],
   );
 
   const changeMode = useCallback(
     (nextMode: CalendarViewMode, targetDateKey?: string) => {
       if (nextMode === mode) return;
       setLastCalendarView(nextMode);
-
-      const prefersReducedMotion =
-        typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-      const direction = getViewTransitionDirection(mode, nextMode);
-      if (direction && !prefersReducedMotion) {
-        const origin = getTransitionOrigin({
-          fromMode: mode,
-          toMode: nextMode,
-          selectedDateKey: targetDateKey ?? selectedDateKey,
-          timeZone,
-          weekStartsOn,
-          dateKeys: calendarWindow.dateKeys,
-        });
-        setTransitionState({ direction, origin });
-
-        if (transitionTimerRef.current) {
-          clearTimeout(transitionTimerRef.current);
-        }
-        transitionTimerRef.current = setTimeout(() => {
-          setTransitionState(null);
-          transitionTimerRef.current = null;
-        }, 240);
-      } else {
-        if (transitionTimerRef.current) {
-          clearTimeout(transitionTimerRef.current);
-          transitionTimerRef.current = null;
-        }
-        setTransitionState(null);
-      }
+      startTransition({
+        fromMode: mode,
+        toMode: nextMode,
+        selectedDateKey,
+        targetDateKey,
+        timeZone,
+        weekStartsOn,
+        dateKeys: calendarWindow.dateKeys,
+      });
 
       setMode(nextMode);
       setSelectedOccurrence(null);
@@ -453,7 +306,7 @@ export function CalendarView() {
       setIsEventEditorClosing(false);
       setQuickCreateState((prev) => ({ ...prev, isOpen: false }));
     },
-    [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys],
+    [mode, selectedDateKey, timeZone, weekStartsOn, calendarWindow.dateKeys, startTransition],
   );
 
   useCalendarViewHotkeys(
@@ -467,14 +320,6 @@ export function CalendarView() {
       changeMode(viewParam);
     }
   }, [viewParam, mode, changeMode]);
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-      }
-    };
-  }, []);
 
   const selectMonthDate = useCallback(
     (dateKey: string) => {
@@ -518,212 +363,15 @@ export function CalendarView() {
     globalThis.requestAnimationFrame(() => openingControlRef.current?.focus());
   }, []);
 
-  const dismissToast = useCallback(() => {
-    if (toastTimerRef.current) {
-      globalThis.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    if (toastExitTimerRef.current) {
-      globalThis.clearTimeout(toastExitTimerRef.current);
-      toastExitTimerRef.current = null;
-    }
-    toastRemainingRef.current = null;
-    setIsToastExiting(true);
-    toastExitTimerRef.current = globalThis.setTimeout(() => {
-      // Unmounting under the pointer never fires pointerleave; drop the hold here.
-      isToastHeldRef.current = false;
-      setToast(null);
-      setIsToastExiting(false);
-      toastExitTimerRef.current = null;
-    }, 180);
-  }, []);
-
-  const scheduleToastDismiss = useCallback(
-    (duration: number) => {
-      if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
-      toastRemainingRef.current = duration;
-      toastDeadlineRef.current = Date.now() + duration;
-      // While the pointer or focus is on the toast (for example, deciding on
-      // Undo) it stays put; the countdown resumes when they leave.
-      toastTimerRef.current = isToastHeldRef.current
-        ? null
-        : globalThis.setTimeout(dismissToast, duration);
-    },
-    [dismissToast],
-  );
-
-  const showToast = useCallback(
-    (nextToast: CalendarToast, duration = 6000) => {
-      if (toastExitTimerRef.current) {
-        globalThis.clearTimeout(toastExitTimerRef.current);
-        toastExitTimerRef.current = null;
-      }
-      setToast(nextToast);
-      setIsToastExiting(false);
-      scheduleToastDismiss(duration);
-    },
-    [scheduleToastDismiss],
-  );
-
-  const holdToast = useCallback(() => {
-    if (isToastHeldRef.current) return;
-    isToastHeldRef.current = true;
-    if (!toastTimerRef.current) return;
-    globalThis.clearTimeout(toastTimerRef.current);
-    toastTimerRef.current = null;
-    toastRemainingRef.current = Math.max(0, toastDeadlineRef.current - Date.now());
-  }, []);
-
-  const releaseToast = useCallback(() => {
-    if (!isToastHeldRef.current) return;
-    isToastHeldRef.current = false;
-    const remaining = toastRemainingRef.current;
-    // A short grace period so the toast never vanishes the instant they move away.
-    if (remaining !== null) scheduleToastDismiss(Math.max(remaining, TOAST_RESUME_GRACE_MS));
-  }, [scheduleToastDismiss]);
-
-  const showSuccess = useCallback((message: string) => showToast({ message }, 3000), [showToast]);
-
-  useEffect(
-    () => () => {
-      if (toastTimerRef.current) globalThis.clearTimeout(toastTimerRef.current);
-      if (toastExitTimerRef.current) globalThis.clearTimeout(toastExitTimerRef.current);
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const reflectedEventIds = [...timingOverrides]
-      .filter(([eventId, timing]) => {
-        const authoritative = result.occurrences.find(
-          (occurrence) => occurrence.event.id === eventId,
-        );
-        return authoritative?.start === timing.start && authoritative.end === timing.end;
-      })
-      .map(([eventId]) => eventId);
-    if (reflectedEventIds.length === 0) return;
-
-    setTimingOverrides((current) => {
-      const next = new Map(current);
-      reflectedEventIds.forEach((eventId) => next.delete(eventId));
-      return next;
-    });
-  }, [result.occurrences, timingOverrides]);
-
-  const setTimingOverride = useCallback((eventId: string, timing: EventTiming | null) => {
-    setTimingOverrides((current) => {
-      const next = new Map(current);
-      if (timing) next.set(eventId, timing);
-      else next.delete(eventId);
-      return next;
-    });
-  }, []);
-
-  const handleResizeEvent = useCallback(
-    (occurrence: EventOccurrence, timing: EventTiming) => {
-      const { event } = occurrence;
-      const previous = timingOverrides.get(event.id) ?? {
-        start: occurrence.start,
-        end: occurrence.end,
-      };
-      if (previous.start === timing.start && previous.end === timing.end) return;
-
-      setTimingOverride(event.id, timing);
-      const persist = async () => {
-        try {
-          await updateEvent.mutateAsync({
-            event,
-            input: eventInputWithTiming(
-              event,
-              new Date(timing.start).toISOString(),
-              new Date(timing.end).toISOString(),
-            ),
-          });
-          showToast({
-            message: 'Event resized',
-            actionLabel: 'Undo',
-            onAction: () => {
-              setTimingOverride(event.id, previous);
-              showToast({ message: 'Restoring event…' });
-              void updateEvent
-                .mutateAsync({
-                  event,
-                  input: eventInputWithTiming(
-                    event,
-                    new Date(previous.start).toISOString(),
-                    new Date(previous.end).toISOString(),
-                  ),
-                })
-                .then(() => showSuccess('Resize undone.'))
-                .catch(() => {
-                  setTimingOverride(event.id, null);
-                  result.refetch();
-                  showToast({ message: 'The resize could not be undone.' });
-                });
-            },
-          });
-        } catch {
-          setTimingOverride(event.id, null);
-          showToast({ message: 'The event resize could not be saved.' });
-        }
-      };
-      void persist();
-    },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
-  );
-
-  const handleMoveEvent = useCallback(
-    (occurrence: EventOccurrence, timing: EventTiming) => {
-      const { event } = occurrence;
-      const previous = timingOverrides.get(event.id) ?? {
-        start: occurrence.start,
-        end: occurrence.end,
-      };
-      if (previous.start === timing.start && previous.end === timing.end) return;
-
-      setTimingOverride(event.id, timing);
-      const persist = async () => {
-        try {
-          await updateEvent.mutateAsync({
-            event,
-            input: eventInputWithTiming(
-              event,
-              new Date(timing.start).toISOString(),
-              new Date(timing.end).toISOString(),
-            ),
-          });
-          showToast({
-            message: 'Event moved',
-            actionLabel: 'Undo',
-            onAction: () => {
-              setTimingOverride(event.id, previous);
-              showToast({ message: 'Restoring event…' });
-              void updateEvent
-                .mutateAsync({
-                  event,
-                  input: eventInputWithTiming(
-                    event,
-                    new Date(previous.start).toISOString(),
-                    new Date(previous.end).toISOString(),
-                  ),
-                })
-                .then(() => showSuccess('Move undone.'))
-                .catch(() => {
-                  setTimingOverride(event.id, null);
-                  result.refetch();
-                  showToast({ message: 'The move could not be undone.' });
-                });
-            },
-          });
-        } catch {
-          setTimingOverride(event.id, null);
-          showToast({ message: 'The event move could not be saved.' });
-        }
-      };
-      void persist();
-    },
-    [result, showSuccess, showToast, setTimingOverride, timingOverrides, updateEvent],
-  );
+  const { timingOverrides, setTimingOverride } = useCalendarTimingOverrides(result.occurrences);
+  const { handleMoveEvent, handleResizeEvent } = useCalendarEventTimingChanges({
+    timingOverrides,
+    setTimingOverride,
+    updateEvent,
+    showToast,
+    showSuccess,
+    refetch: result.refetch,
+  });
 
   return (
     <div className={styles.workspace}>
@@ -990,29 +638,14 @@ export function CalendarView() {
       ) : null}
 
       {toast ? (
-        <div
-          className={`${styles.toast} ${isToastExiting ? styles.toastExiting : ''}`}
-          role="status"
-          aria-live="polite"
-          onPointerEnter={holdToast}
-          onPointerLeave={releaseToast}
-          onFocus={holdToast}
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) releaseToast();
-          }}
-        >
-          <span className={styles.toastMessage} key={toast.message}>
-            {toast.message === 'Restoring event…' ? (
-              <span className={styles.toastSpinner} aria-hidden="true" />
-            ) : null}
-            <span>{toast.message}</span>
-          </span>
-          {toast.actionLabel && toast.onAction && !isToastExiting ? (
-            <button type="button" onClick={toast.onAction}>
-              {toast.actionLabel}
-            </button>
-          ) : null}
-        </div>
+        <CalendarToastPresentation
+          message={toast.message}
+          actionLabel={toast.actionLabel}
+          onAction={toast.onAction}
+          isExiting={isToastExiting}
+          onHold={holdToast}
+          onRelease={releaseToast}
+        />
       ) : null}
     </div>
   );
