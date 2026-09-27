@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 
 import styles from './FindTimeBox.module.css';
-import { ArrowRightIcon, HelpCircleIcon, LockIcon, SparkleIcon, StarIcon } from './FindTimeIcons';
+import { FindTimeActivePrompt, FindTimeLockedTeaser } from './FindTimePromptPresentation';
 import { FindTimeProposalResults } from './FindTimeProposalResults';
-import { FindTimeRotatingPrompt } from './FindTimeRotatingPrompt';
 import { ScheduledBanner, ScheduledConfirmationCard } from './FindTimeScheduledNotice';
 import { useSubscription } from '../../billing/hooks/useBilling';
 import { getSubscriptionStatusInfo } from '../../billing/utils/subscription-display';
@@ -20,7 +18,6 @@ import {
   saveStoredFindTimeDraft,
   useFindTime,
 } from '../hooks/useFindTime';
-import { FIND_TIME_PLACEHOLDER_EXAMPLE } from '../utils/find-time-prompts';
 import {
   BANNER_TOTAL_DURATION_MS,
   clearBannerRecord,
@@ -322,6 +319,43 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
     findTime.submit(text, timeZone);
   };
 
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = event.target.value;
+    setText(newText);
+    saveStoredFindTimeDraft(newText);
+    if (confirmSlot.errorMessage) confirmSlot.reset();
+    if (findTime.errorMessage) findTime.reset();
+
+    if (newText.trim().length === 0) {
+      clearStoredFindTimeDraft();
+      if (findTime.clarification) {
+        findTime.reset();
+      }
+      if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
+        triggerProposalExit();
+      }
+    } else if (isProposalExiting) {
+      if (proposalExitTimerRef.current) {
+        clearTimeout(proposalExitTimerRef.current);
+        proposalExitTimerRef.current = null;
+      }
+      setIsProposalExiting(false);
+    }
+  };
+
+  const handleInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setText('');
+      clearStoredFindTimeDraft();
+      if (findTime.clarification) {
+        findTime.reset();
+      }
+      if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
+        triggerProposalExit();
+      }
+    }
+  };
+
   const handleSelect = (suggestion: FindTimeSuggestion) => {
     setText('');
     clearStoredFindTimeDraft();
@@ -338,185 +372,25 @@ export function FindTimeBox({ timeZone, onScheduled }: FindTimeBoxProps) {
   return (
     <section className={styles.container} aria-label="Find a time">
       {!isPro ? (
-        <div className={styles.lockedTeaser}>
-          <div className={styles.lockedHeader}>
-            <div className={styles.lockedBadgeGroup}>
-              <span className={styles.proBadge}>
-                <SparkleIcon className={styles.proSparkleIcon} />
-                <span>PRO</span>
-              </span>
-              <span className={styles.lockedHeading}>Find Time with AI</span>
-            </div>
-            <span className={styles.lockedSubheading}>AI-assisted natural language scheduling</span>
-          </div>
-
-          <div className={styles.lockedInputBar}>
-            <div className={styles.lockedInputWrap}>
-              <span className={styles.lockIcon} aria-hidden="true">
-                <LockIcon />
-              </span>
-              <input
-                id={inputId}
-                className={`${styles.input} ${styles.inputLocked}`}
-                type="text"
-                disabled
-                readOnly
-                value=""
-                placeholder={`Try ${FIND_TIME_PLACEHOLDER_EXAMPLE}`}
-                aria-label="Find Time with AI is available on the Pro plan"
-              />
-            </div>
-            <Link to="/subscription" className={styles.upgradeButton}>
-              <span>Upgrade to Pro</span>
-              <ArrowRightIcon />
-            </Link>
-          </div>
-
-          <p className={styles.lockedDescription}>
-            BPlan interprets your natural-language requests and finds optimal, conflict-free
-            openings on your calendar. Upgrade to Pro to unlock AI scheduling.
-          </p>
-        </div>
+        <FindTimeLockedTeaser inputId={inputId} />
       ) : (
         <>
-          <form className={styles.form} onSubmit={handleSubmit}>
-            <div
-              className={`${styles.inputWrap} ${findTime.isPending ? styles.inputWrapScanning : ''}`}
-            >
-              <span
-                className={`${styles.inputIcon} ${findTime.isPending ? styles.inputIconScanning : ''}`}
-                aria-hidden="true"
-              >
-                <StarIcon />
-              </span>
-              <input
-                id={inputId}
-                ref={inputRef}
-                className={styles.input}
-                type="text"
-                value={text}
-                placeholder=""
-                aria-label="Describe what you want to schedule"
-                onChange={(event) => {
-                  const newText = event.target.value;
-                  setText(newText);
-                  saveStoredFindTimeDraft(newText);
-                  if (confirmSlot.errorMessage) confirmSlot.reset();
-                  if (findTime.errorMessage) findTime.reset();
-
-                  if (newText.trim().length === 0) {
-                    clearStoredFindTimeDraft();
-                    if (findTime.clarification) {
-                      findTime.reset();
-                    }
-                    if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
-                      triggerProposalExit();
-                    }
-                  } else if (isProposalExiting) {
-                    if (proposalExitTimerRef.current) {
-                      clearTimeout(proposalExitTimerRef.current);
-                      proposalExitTimerRef.current = null;
-                    }
-                    setIsProposalExiting(false);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    setText('');
-                    clearStoredFindTimeDraft();
-                    if (findTime.clarification) {
-                      findTime.reset();
-                    }
-                    if ((displayedProposal || findTime.proposal) && !isProposalExiting) {
-                      triggerProposalExit();
-                    }
-                  }
-                }}
-              />
-              {!text && !findTime.isPending && <FindTimeRotatingPrompt />}
-            </div>
-            <button
-              type="submit"
-              className={`${styles.submit} ${findTime.isPending ? styles.submitFinding : ''}`}
-              disabled={!canSubmit}
-            >
-              {findTime.isPending ? (
-                <>
-                  <SparkleIcon className={styles.spinningSparkle} />
-                  <span>Finding slots…</span>
-                </>
-              ) : (
-                <>
-                  <StarIcon />
-                  <span>Find time</span>
-                </>
-              )}
-            </button>
-          </form>
-
-          {!activeConfirmation && (
-            <p className={styles.hint}>
-              Describe a meeting and BPlan will suggest the three best open slots in your schedule.
-            </p>
-          )}
-
-          {/* Loading Radar / Shimmering Skeletons while finding */}
-          {findTime.isPending && (
-            <div className={styles.loadingArea} role="status" aria-live="polite">
-              <div className={styles.loadingHeader}>
-                <div className={styles.loadingBadge}>
-                  <SparkleIcon className={styles.spinningSparkle} />
-                  <span>AI Engine</span>
-                </div>
-                <span className={styles.loadingText}>
-                  Verifying deterministic calendar availability &amp; ranking optimal slots…
-                </span>
-              </div>
-              <div className={styles.skeletonContainer}>
-                <div className={styles.skeletonCard}>
-                  <div className={styles.skeletonRank} />
-                  <div className={styles.skeletonBody}>
-                    <div className={styles.skeletonTime} />
-                    <div className={styles.skeletonReason} />
-                  </div>
-                  <div className={styles.skeletonAction} />
-                </div>
-                <div className={`${styles.skeletonCard} ${styles.skeletonDelay1}`}>
-                  <div className={styles.skeletonRank} />
-                  <div className={styles.skeletonBody}>
-                    <div className={styles.skeletonTime} />
-                    <div className={styles.skeletonReason} />
-                  </div>
-                  <div className={styles.skeletonAction} />
-                </div>
-                <div className={`${styles.skeletonCard} ${styles.skeletonDelay2}`}>
-                  <div className={styles.skeletonRank} />
-                  <div className={styles.skeletonBody}>
-                    <div className={styles.skeletonTime} />
-                    <div className={styles.skeletonReason} />
-                  </div>
-                  <div className={styles.skeletonAction} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Clarification Notice */}
-          {findTime.clarification && !activeConfirmation && !findTime.isPending && (
-            <div className={styles.clarificationCard} role="status">
-              <div className={styles.clarificationHeader}>
-                <div className={styles.clarificationIconWrap}>
-                  <HelpCircleIcon />
-                </div>
-                <div className={styles.clarificationMain}>
-                  <div className={styles.clarificationTag}>BPlan needs more verification</div>
-                  <p className={styles.clarificationQuestion}>
-                    {findTime.clarification.clarificationQuestion}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          <FindTimeActivePrompt
+            inputId={inputId}
+            inputRef={inputRef}
+            text={text}
+            isPending={findTime.isPending}
+            canSubmit={canSubmit}
+            showHint={!activeConfirmation}
+            clarificationQuestion={
+              findTime.clarification && !activeConfirmation && !findTime.isPending
+                ? findTime.clarification.clarificationQuestion
+                : null
+            }
+            onSubmit={handleSubmit}
+            onInputChange={handleInputChange}
+            onInputKeyDown={handleInputKeyDown}
+          />
 
           {displayedProposal && !activeConfirmation && !findTime.isPending && (
             <FindTimeProposalResults
