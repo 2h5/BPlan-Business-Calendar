@@ -46,3 +46,34 @@
 
 - `TaskListPane` still owns Quick Add state and submission, loading/error/empty and active-tab content branching, section choice and order, count calculations, the caught-up footer, and empty-space click handling.
 - At 264 lines, the parent is a coherent pane coordinator. `renderContent` is the only substantial candidate seam, but it owns the pane's state branching and section selection; a further extraction is not justified solely by size. Revisit only if that behavior grows or needs independent reuse.
+
+## Independent review
+
+- Scope: adversarial review of the cumulative `main` (`2ec1eedb1c8eb0320d6a1d2ca39505dba88df1be`) → `refactor/task-list-pane` (`b7297f45b0a98e9b4f9d67bc825a7a60fba4f944`) diff, three commits ahead and zero behind. Phase 4 was not started; no production code was changed by the review.
+- Findings: no Critical, High, Medium, or Low regressions found.
+- Source review: `handleQuickSubmit`, the counts, all `renderContent` branches, the caught-up footer, and the empty-space predicate are text-identical to the base. The extracted section, Quick Add, and header JSX match the base blocks after indentation and prop-name normalization. Each branch still chooses the same section titles, arrays, order, and `isOverdue` flag.
+- Accepted differences:
+  - `useId`-generated Select ids differ (for example `select-«R65»` becomes `select-«Rcl»`) because the Select now sits under an extra component. They stay internally consistent, and nothing references them.
+  - `TaskListHeaderControls` and `TaskQuickAdd` return keyless fragments, and `TaskListSection` adds a composite layer. None of these adds a DOM node. Section and row identity is unchanged: the section keys (`key={title}`) are still honoured because they are now on the single element each `TaskListSection` returns. Switching between Inbox and All still remounts the last section (`Completed Today` ↔ `Completed`) and its rows, as before. Otherwise, fibers are remounted only once, when the new version first renders.
+- Maintenance note: the `key={title}` inside `TaskListSection` is required. It can look like a redundant key but keeps the base remount semantics. Static markup cannot see it; the temporary harness below caught its removal. Keep it, or cover it with a test when DOM tests arrive.
+
+### Parity work (temporary; deleted after review)
+
+- Copied the base `TaskListPane` next to the branch version and compared them in Vitest with `react-dom/server` and a partial `react` mock that controlled the parent's three `useState` values and recorded their setters.
+- Static markup (`useId` normalized): 2,304 combinations of tab × loading × error × all 64 non-empty/empty patterns of Overdue, Due Today, Upcoming, No Due Date, Completed Today, and Completed × consistent, empty, and inconsistent `allTasks` (including the `openCount` clamp). Also 480 combinations of selected task (every section, missing, null), list filter (null, '', known, unknown), and lists (undefined, [], one, reordered), plus 96 combinations of Quick Add title, error, pending, and tab. All were identical.
+- Element tree and callbacks: after expanding the extracted children and flattening keyless fragments, the host trees matched in type, key, non-function props, `TaskRow` and Select props, and callback identity. Every inline handler (pane click, Retry, tabs, New task, Select change, Quick Add change and submit) was called with 15 argument probes. That covered the empty-space predicate for no target, a non-interactive target, and each of the nine excluded selectors, a missing `onEmptySpaceClick`, and Select values `''`, known, and unknown. Base and branch call traces matched.
+- Quick Add transitions: blank, whitespace, and padded titles × a resolving, rejecting `Error`, rejecting a string, rejecting `undefined`, or synchronously throwing `onQuickAdd`. The traces matched before and after the gated promise settled: `preventDefault`, error cleared, pending set to true, the trimmed title passed, then either the title reset or the Error-vs-fallback message, and finally pending set to false.
+- Deliberate regressions planted one at a time and all caught: section tone, section order, Quick Add disabled rule, list `'' → null` conversion, title reset before `await`, removal of the `[role="option"]` exclusion, removal of the inner section key, All count, selected-row predicate, footer condition, and error-message selection.
+
+### Verification
+
+- Task feature tests: 49 passed across seven files. Web typecheck, zero-warning ESLint, and Prettier passed.
+- `pnpm verify`: passed. That covered format, lint, workspace and billing typechecks, and all tests: web 741, domain 348, mobile 11, and 201 + 8 in the other suites. It also ran the web and billing builds and the client bundle scan. The only warnings were the local Node 20 engine warning and the Vite chunk-size warning; neither failed verification.
+
+### Residual DOM/browser limitations
+
+- The review did not render in a DOM. Real click bubbling and `closest()` against real elements, form submission and Enter key handling, focus retention on the controlled input while it is disabled, Select keyboard and popup behavior, `role="alert"` announcements, `TaskRow` exit-animation timers across tab switches, and the Inbox ↔ All remount were checked only in source, statically, or by reasoning about React reconciliation. They need DOM/browser tests later.
+
+### Merge readiness
+
+- Ready to merge: behavior is preserved apart from the accepted differences above.
