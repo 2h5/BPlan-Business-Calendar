@@ -320,17 +320,6 @@ export function SettingsView() {
                 </span>
               </div>
               <div className={styles.formGrid}>
-                <Field label="Default task duration">
-                  <Select
-                    value={String(draft.defaultTaskMinutes)}
-                    options={[15, 30, 45, 60, 90, 120].map((minutes) => ({
-                      value: String(minutes),
-                      label: `${minutes} minutes`,
-                    }))}
-                    onChange={(value) => setDraft({ ...draft, defaultTaskMinutes: Number(value) })}
-                    ariaLabel="Default task duration"
-                  />
-                </Field>
                 <Field label="Default event duration">
                   <Select
                     value={String(draft.defaultEventMinutes)}
@@ -340,6 +329,17 @@ export function SettingsView() {
                     }))}
                     onChange={(value) => setDraft({ ...draft, defaultEventMinutes: Number(value) })}
                     ariaLabel="Default event duration"
+                  />
+                </Field>
+                <Field label="Default task duration">
+                  <Select
+                    value={String(draft.defaultTaskMinutes)}
+                    options={[15, 30, 45, 60, 90, 120].map((minutes) => ({
+                      value: String(minutes),
+                      label: `${minutes} minutes`,
+                    }))}
+                    onChange={(value) => setDraft({ ...draft, defaultTaskMinutes: Number(value) })}
+                    ariaLabel="Default task duration"
                   />
                 </Field>
               </div>
