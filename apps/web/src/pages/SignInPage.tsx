@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type MouseEvent, type ReactNode 
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import styles from './pages.module.css';
+import { GoogleGlyph, MicrosoftGlyph } from '../components/brand/BrandGlyphs';
 import { SignInForm, useAuth } from '../features/auth';
 import {
   LoginBackdrop,
@@ -131,10 +132,10 @@ export function SignInPage() {
 
           <div className={styles.providerStrip} aria-label="Supported calendar providers">
             <span>
-              <ProviderCalendarIcon /> Google Calendar
+              <GoogleGlyph /> Google Calendar
             </span>
             <span>
-              <MicrosoftIcon /> Outlook
+              <MicrosoftGlyph /> Outlook
             </span>
             <span>
               <AppleIcon /> Apple Calendar
@@ -364,33 +365,6 @@ function BenefitCheck() {
         />
       </svg>
     </span>
-  );
-}
-
-function ProviderCalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="17" rx="4" fill="#1f6ff2" />
-      <path d="M7 2.5v4M17 2.5v4M3 9h18" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
-      <path
-        d="m8 15 2.2 2.1L16 12"
-        stroke="white"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function MicrosoftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path fill="#f25022" d="M2 2h9v9H2z" />
-      <path fill="#7fba00" d="M13 2h9v9h-9z" />
-      <path fill="#00a4ef" d="M2 13h9v9H2z" />
-      <path fill="#ffb900" d="M13 13h9v9h-9z" />
-    </svg>
   );
 }
 

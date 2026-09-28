@@ -528,6 +528,7 @@ export function CalendarView() {
         editingOccurrence={quickCreateState.editingOccurrence}
         calendars={result.calendars}
         timeZone={timeZone}
+        weekStartsOn={weekStartsOn}
         defaultDurationMinutes={result.defaultEventMinutes}
         isSaving={
           createEvent.isPending ||

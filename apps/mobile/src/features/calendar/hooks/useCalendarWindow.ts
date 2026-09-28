@@ -54,7 +54,7 @@ export function useCalendarWindow(): CalendarWindowResult {
 
   const timeZone = useUserTimeZone();
   const { data: profile } = useProfile();
-  const weekStartsOn = profile?.weekStartsOn ?? 1;
+  const weekStartsOn = profile?.weekStartsOn ?? 0; // profiles.week_starts_on defaults to Sunday
 
   const window = useMemo(
     () => windowForView(mode, selectedDateKey, timeZone, weekStartsOn),

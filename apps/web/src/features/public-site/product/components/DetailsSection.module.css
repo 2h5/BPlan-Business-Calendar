@@ -1,0 +1,365 @@
+.details {
+  width: min(100% - 2.5rem, 1180px);
+  margin: 0 auto;
+  padding: clamp(5rem, 10vw, 8rem) 0 clamp(3rem, 6vw, 5rem);
+}
+
+.intro {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.eyebrow,
+.title,
+.items > li {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translate3d(0, 20px, 0);
+  transition:
+    opacity 900ms var(--ease-out),
+    filter 900ms var(--ease-out),
+    transform 1100ms var(--ease-out);
+}
+
+.title {
+  transition-delay: 90ms;
+}
+
+.items > li {
+  transition-delay: calc(260ms + var(--i) * 110ms);
+}
+
+.details[data-revealed='true'] .eyebrow,
+.details[data-revealed='true'] .title,
+.details[data-revealed='true'] .items > li {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.eyebrow {
+  margin-bottom: 1.1rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  color: var(--ink);
+  font-size: clamp(2rem, 3.6vw, 3.05rem);
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+
+.title em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.items {
+  margin-top: clamp(3rem, 6vw, 4.75rem);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(2rem, 4vw, 3.5rem);
+  list-style: none;
+}
+
+.items h3 {
+  margin-top: 1.5rem;
+  color: var(--ink);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.items p {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+/* Each illustration floats on the page: no card, no frame. */
+.art {
+  position: relative;
+  height: 128px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+/* Search */
+.search {
+  height: 38px;
+  padding: 0 0.8rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 500;
+}
+
+.search svg {
+  width: 15px;
+  height: 15px;
+  color: var(--faint);
+}
+
+.search i {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: var(--accent);
+  animation: blink 1s steps(1) infinite;
+}
+
+.results {
+  padding: 0 0.3rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.results mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.results small {
+  margin-left: 0.3rem;
+  color: var(--faint);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Accent swatches */
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.swatches button {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 4px 10px -4px var(--swatch);
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.swatches button:hover {
+  transform: scale(1.1);
+}
+
+.swatches button[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 0 4px var(--swatch);
+  transform: scale(1.05);
+}
+
+.swatches button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
+
+.tryIt {
+  color: var(--faint);
+  font-size: 0.76rem;
+}
+
+/* Sync */
+.sync {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+}
+
+.provider {
+  padding: 0.4rem 0.65rem;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #ffffff;
+  box-shadow: var(--shadow-float);
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  font-weight: 650;
+}
+
+.provider svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.hub {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  background: var(--accent);
+  box-shadow: 0 10px 22px -8px var(--accent);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.wire {
+  position: relative;
+  height: 2px;
+  flex: 1;
+  min-width: 18px;
+  background: repeating-linear-gradient(90deg, rgba(20, 42, 92, 0.14) 0 4px, transparent 4px 8px);
+}
+
+/* A packet travels one way, then the other: sync runs in both directions. */
+.wire i {
+  position: absolute;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: travel 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite alternate;
+}
+
+.wire[data-reverse='true'] i {
+  animation-direction: alternate-reverse;
+}
+
+/* Shortcuts */
+.keys {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+}
+
+.keys kbd {
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(20, 42, 92, 0.1);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #ffffff, #f3f6fb);
+  box-shadow:
+    0 3px 0 rgba(20, 42, 92, 0.1),
+    0 10px 20px -10px rgba(28, 58, 120, 0.35);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  animation: press 3.6s ease-in-out infinite;
+}
+
+.keys kbd:nth-child(2) {
+  animation-delay: 1.2s;
+}
+
+.keys kbd:nth-child(3) {
+  animation-delay: 2.4s;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes travel {
+  from {
+    left: 0;
+  }
+
+  to {
+    left: calc(100% - 6px);
+  }
+}
+
+@keyframes press {
+  0%,
+  12%,
+  100% {
+    color: var(--ink-2);
+    box-shadow:
+      0 3px 0 rgba(20, 42, 92, 0.1),
+      0 10px 20px -10px rgba(28, 58, 120, 0.35);
+    transform: none;
+  }
+
+  4% {
+    color: var(--accent);
+    box-shadow:
+      0 0 0 rgba(20, 42, 92, 0.1),
+      0 4px 10px -6px rgba(28, 58, 120, 0.35);
+    transform: translateY(3px);
+  }
+}
+
+@media (max-width: 1020px) {
+  .items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 3.5rem;
+  }
+}
+
+/* Stacked, each item reads top to bottom: name it, then show it. */
+@media (max-width: 560px) {
+  .items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .items > li {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .items h3 {
+    margin-top: 0;
+  }
+
+  .art {
+    order: 1;
+    margin-top: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eyebrow,
+  .title,
+  .items > li {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+
+  .search i,
+  .wire i,
+  .keys kbd {
+    animation: none;
+  }
+}

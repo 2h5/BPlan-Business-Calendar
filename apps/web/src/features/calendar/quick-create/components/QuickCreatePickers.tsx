@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import styles from './QuickCreatePickers.module.css';
+import { DEFAULT_WEEK_STARTS_ON } from '../../hooks/useCalendarProfile';
 import type { TimePickerOption } from '../utils/quick-create-time';
 
 export { formatDurationBetweenTimes } from '../utils/quick-create-time';
@@ -83,6 +84,8 @@ function dateFromKey(value: string): Date {
   return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1, 12);
 }
 
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
 function dateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -95,11 +98,13 @@ export function QuickCreateDatePicker({
   displayValue,
   onChange,
   ariaLabel,
+  weekStartsOn = DEFAULT_WEEK_STARTS_ON,
 }: {
   value: string;
   displayValue: string;
   onChange: (value: string) => void;
   ariaLabel: string;
+  weekStartsOn?: number;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
@@ -131,7 +136,7 @@ export function QuickCreateDatePicker({
     const firstGridDay = new Date(
       visibleMonth.getFullYear(),
       visibleMonth.getMonth(),
-      1 - visibleMonth.getDay(),
+      1 - ((visibleMonth.getDay() - weekStartsOn + 7) % 7),
       12,
     );
     return Array.from({ length: 42 }, (_, index) => {
@@ -139,7 +144,7 @@ export function QuickCreateDatePicker({
       day.setDate(firstGridDay.getDate() + index);
       return day;
     });
-  }, [visibleMonth]);
+  }, [visibleMonth, weekStartsOn]);
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {
@@ -207,9 +212,10 @@ export function QuickCreateDatePicker({
                 </div>
               </div>
               <div className={styles.weekdayRow} aria-hidden="true">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                  <span key={`${day}-${index}`}>{day}</span>
-                ))}
+                {WEEKDAY_INITIALS.map((_, index) => {
+                  const day = WEEKDAY_INITIALS[(weekStartsOn + index) % 7];
+                  return <span key={index}>{day}</span>;
+                })}
               </div>
               <div className={styles.dayGrid}>
                 {days.map((day) => {

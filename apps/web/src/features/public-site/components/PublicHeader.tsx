@@ -4,12 +4,11 @@ import { Link } from 'react-router-dom';
 import styles from './PublicHeader.module.css';
 
 interface PublicHeaderProps {
-  activePage?: 'pricing';
+  activePage?: 'product' | 'pricing';
   onAccountAction?: MouseEventHandler<HTMLAnchorElement>;
 }
 
 const PREVIEW_NAV_ITEMS = [
-  { label: 'Product', hasMenu: true },
   { label: 'Solutions', hasMenu: true },
   { label: 'Resources', hasMenu: true },
 ] as const;
@@ -23,17 +22,10 @@ export function PublicHeader({ activePage, onAccountAction }: PublicHeaderProps)
       </Link>
 
       <nav className={styles.nav} aria-label="Public navigation">
-        {PREVIEW_NAV_ITEMS.slice(0, 2).map((item) => (
-          <PreviewNavItem key={item.label} {...item} />
-        ))}
-        <Link
-          className={`${styles.navItem} ${activePage === 'pricing' ? styles.navItemActive : ''}`}
-          to="/pricing"
-          aria-current={activePage === 'pricing' ? 'page' : undefined}
-        >
-          Pricing
-        </Link>
-        <PreviewNavItem {...PREVIEW_NAV_ITEMS[2]} />
+        <NavLink to="/product" label="Product" active={activePage === 'product'} />
+        <PreviewNavItem {...PREVIEW_NAV_ITEMS[0]} />
+        <NavLink to="/pricing" label="Pricing" active={activePage === 'pricing'} />
+        <PreviewNavItem {...PREVIEW_NAV_ITEMS[1]} />
       </nav>
 
       <div className={styles.actions} aria-label="Account actions">
@@ -45,6 +37,18 @@ export function PublicHeader({ activePage, onAccountAction }: PublicHeaderProps)
         </Link>
       </div>
     </header>
+  );
+}
+
+function NavLink({ to, label, active }: { to: string; label: string; active: boolean }) {
+  return (
+    <Link
+      className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}
+      to={to}
+      aria-current={active ? 'page' : undefined}
+    >
+      {label}
+    </Link>
   );
 }
 

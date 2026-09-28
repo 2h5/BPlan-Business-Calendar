@@ -11,6 +11,7 @@ import { useSegmentIndicator } from '../../../../components/segmented/useSegment
 import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateTaskFieldsProps {
+  weekStartsOn?: number;
   startDate: string;
   startDateDisplay: string;
   onStartDateChange: (value: string) => void;
@@ -29,6 +30,7 @@ interface QuickCreateTaskFieldsProps {
 }
 
 export function QuickCreateTaskFields({
+  weekStartsOn,
   startDate,
   startDateDisplay,
   onStartDateChange,
@@ -71,6 +73,7 @@ export function QuickCreateTaskFields({
               displayValue={startDateDisplay}
               onChange={onStartDateChange}
               ariaLabel={`Due date: ${startDateDisplay}`}
+              weekStartsOn={weekStartsOn}
             />
 
             {taskHasTime ? (

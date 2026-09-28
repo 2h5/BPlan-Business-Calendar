@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent, type PointerEvent } from 'react';
 
 import styles from './SignInForm.module.css';
+import { GoogleGlyph, MicrosoftGlyph } from '../../../components/brand/BrandGlyphs';
 import { signInWithPassword } from '../api/auth.api';
 
 interface SignInFormProps {
@@ -180,20 +181,24 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
       </div>
 
       <div className={styles.socialButtons} aria-label="Alternative sign-in options coming soon">
-        <button type="button" className={styles.socialPlaceholder} disabled>
-          <span className={styles.googleGlyph} aria-hidden="true">
-            G
-          </span>
-          Continue with Google
+        {/* The divider already says "or continue with", so each button names only its provider. */}
+        <button
+          type="button"
+          className={styles.socialPlaceholder}
+          aria-label="Continue with Google"
+          disabled
+        >
+          <GoogleGlyph />
+          Google
         </button>
-        <button type="button" className={styles.socialPlaceholder} disabled>
-          <span className={styles.microsoftGlyph} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          Continue with Microsoft
+        <button
+          type="button"
+          className={styles.socialPlaceholder}
+          aria-label="Continue with Microsoft"
+          disabled
+        >
+          <MicrosoftGlyph />
+          Microsoft
         </button>
       </div>
 

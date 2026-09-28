@@ -298,7 +298,7 @@ export function TimelineView({
         </div>
 
         <div className={styles.dayColumns}>
-          {dateKeys.map((dateKey) => {
+          {dateKeys.map((dateKey, columnIndex) => {
             const activeResize = resizeRef.current;
             const activeMove = moveRef.current;
             const isDraggingMove =
@@ -347,10 +347,14 @@ export function TimelineView({
                       key={band.startMinute}
                       aria-hidden="true"
                       className={styles.offHoursBand}
-                      style={{
-                        top: (band.startMinute / 60) * hourHeight,
-                        height: ((band.endMinute - band.startMinute) / 60) * hourHeight,
-                      }}
+                      style={
+                        {
+                          top: (band.startMinute / 60) * hourHeight,
+                          height: ((band.endMinute - band.startMinute) / 60) * hourHeight,
+                          '--band-top': `${(band.startMinute / 60) * hourHeight}px`,
+                          '--column-index': columnIndex,
+                        } as React.CSSProperties
+                      }
                     />
                   ),
                 )}

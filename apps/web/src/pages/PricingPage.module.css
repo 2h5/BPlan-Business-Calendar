@@ -2,48 +2,11 @@
   position: relative;
   min-height: 100dvh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 31%, rgba(194, 220, 255, 0.34), transparent 30%),
-    radial-gradient(circle at 12% 64%, rgba(219, 235, 255, 0.5), transparent 28%),
-    radial-gradient(circle at 91% 22%, rgba(218, 235, 255, 0.52), transparent 30%),
-    linear-gradient(135deg, #fbfdff 0%, #f7faff 52%, #fcfeff 100%);
+  background: linear-gradient(180deg, #f8faff 0%, #fbfcfe 38%, #fdfdfe 100%);
   color: #0b1433;
   isolation: isolate;
 }
 
 .page > header {
   left: calc((100vw - 100%) / 2);
-}
-
-.page::before {
-  position: absolute;
-  z-index: 0;
-  width: 760px;
-  height: 760px;
-  top: 210px;
-  left: 50%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(177, 211, 255, 0.2), transparent 68%);
-  content: '';
-  transform: translateX(-50%);
-  pointer-events: none;
-  animation: pricing-glow-enter 700ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
-}
-
-@keyframes pricing-glow-enter {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.92);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .page::before {
-    animation: none;
-  }
 }

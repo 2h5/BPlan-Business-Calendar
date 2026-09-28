@@ -32,6 +32,7 @@ export interface QuickCreatePopoverProps {
   editingOccurrence?: EventOccurrence | null;
   calendars: readonly Calendar[];
   timeZone: string;
+  weekStartsOn?: number;
   defaultDurationMinutes: number;
   isSaving: boolean;
   onClose: () => void;
@@ -57,6 +58,7 @@ export function QuickCreatePopover({
   editingOccurrence,
   calendars,
   timeZone,
+  weekStartsOn,
   defaultDurationMinutes,
   isSaving,
   onClose,
@@ -356,6 +358,7 @@ export function QuickCreatePopover({
 
           {mode === 'event' ? (
             <QuickCreateEventFields
+              weekStartsOn={weekStartsOn}
               startDate={startDate}
               startDateDisplay={formatDateDisplay(startDate)}
               onStartDateChange={(value) => {
@@ -382,6 +385,7 @@ export function QuickCreatePopover({
             />
           ) : (
             <QuickCreateTaskFields
+              weekStartsOn={weekStartsOn}
               startDate={startDate}
               startDateDisplay={formatDateDisplay(startDate)}
               onStartDateChange={setStartDate}

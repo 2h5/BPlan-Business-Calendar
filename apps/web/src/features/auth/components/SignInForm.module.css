@@ -305,13 +305,13 @@
 .socialPlaceholder {
   min-width: 0;
   height: 46px;
-  padding: 0 0.75rem;
+  padding: 0 1rem;
   border: 1px solid #dbe3ef;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.55rem;
+  gap: 0.6rem;
   background: #ffffff;
   color: #1a2443;
   font-size: 0.82rem;
@@ -321,39 +321,10 @@
   cursor: default;
 }
 
-.googleGlyph {
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  color: #4285f4;
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.microsoftGlyph {
-  width: 18px;
-  height: 18px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 2px;
-}
-
-.microsoftGlyph i:nth-child(1) {
-  background: #f25022;
-}
-
-.microsoftGlyph i:nth-child(2) {
-  background: #7fba00;
-}
-
-.microsoftGlyph i:nth-child(3) {
-  background: #00a4ef;
-}
-
-.microsoftGlyph i:nth-child(4) {
-  background: #ffb900;
+.socialPlaceholder svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
 }
 
 .createAccount {

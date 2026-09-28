@@ -27,6 +27,8 @@ import {
 } from '../components/PlanningPreferencesSheet';
 import { useProfile } from '../hooks/useProfile';
 
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 /**
  * Identity, planning preferences, reminders, connections, and the destructive
  * actions. Anything still unbuilt is badged rather than hidden, so nobody has
@@ -98,7 +100,7 @@ export function SettingsScreen() {
         <Divider inset />
         <ListRow
           title="Week starts on"
-          meta={profile?.weekStartsOn === 1 ? 'Monday' : 'Sunday'}
+          meta={WEEKDAYS[profile?.weekStartsOn ?? 0]}
           showChevron
           onPress={() => setPreference('weekStartsOn')}
         />

@@ -203,6 +203,11 @@
   background: var(--color-bg-surface-raised);
 }
 
+/* Over the day and week grids, the toolbar and date strip form one header. */
+.calendarMain:has(.timelineViewport) .calendarToolbar {
+  border-bottom-color: transparent;
+}
+
 .rangeBlock {
   min-width: 190px;
   display: flex;
@@ -645,10 +650,10 @@
   z-index: 3;
   top: 0;
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-bg-surface-raised) 96%, transparent);
-  backdrop-filter: blur(12px);
+  background: var(--color-bg-surface-raised);
 }
 
+/* The corner is part of the date strip: one unbroken band under the toolbar. */
 .timelineHeaderSpacer {
   left: 0;
   z-index: 4;
@@ -662,8 +667,8 @@
 }
 
 .dayHeader {
+  position: relative;
   min-width: 0;
-  border-left: 1px solid var(--color-border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -672,6 +677,18 @@
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
+}
+
+/* Day edges rise out of the grid and fade before they reach the toolbar. */
+.dayHeader + .dayHeader::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, var(--color-border-subtle));
+  pointer-events: none;
 }
 
 .dayHeader:hover,
@@ -707,6 +724,9 @@
 .allDayLabel,
 .allDayGrid {
   min-height: 34px;
+}
+
+.allDayGrid {
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-surface);
 }
@@ -716,6 +736,7 @@
   z-index: 2;
   left: 0;
   padding: 9px 9px 0 0;
+  background: var(--color-bg-app);
   color: var(--color-text-tertiary);
   font-size: 0.625rem;
   text-align: right;
@@ -724,7 +745,7 @@
 .allDayColumn {
   min-width: 0;
   padding: 4px;
-  border-left: 1px solid var(--color-border-subtle);
+  border-left: 1px solid var(--color-day-line);
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -737,7 +758,6 @@
   user-select: none;
   -webkit-user-select: none;
   background: var(--color-bg-app);
-  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .hourLabels span {
@@ -755,6 +775,11 @@
   transform: translateY(2px);
 }
 
+.timelineCanvas {
+  /* Day edges sit well under the hour lines, so the grid reads as rows first. */
+  --color-day-line: color-mix(in srgb, var(--color-border-subtle) 50%, transparent);
+}
+
 .dayColumns {
   height: calc(24 * var(--hour-height));
   border-bottom: 1px solid var(--color-border-subtle);
@@ -765,21 +790,45 @@
 }
 
 .dayColumn {
+  --column-fill: var(--color-bg-app);
   position: relative;
   min-width: 0;
-  border-left: 1px solid var(--color-border-subtle);
+  border-left: 1px solid var(--color-day-line);
+}
+
+.dayColumn:first-child,
+.allDayColumn:first-child {
+  border-left-color: transparent;
 }
 
 .todayColumn {
+  --column-fill: color-mix(in srgb, var(--color-accent) 2.5%, var(--color-bg-app));
   background: color-mix(in srgb, var(--color-accent) 2.5%, transparent);
 }
 
-/* Time outside the user's working hours: a faint hatch, under grid lines and events. */
+/*
+ * Time outside the user's working hours: a faint hatch, under grid lines and
+ * events. It covers the day edge beside it, and every band draws its hatch
+ * from the grid's own origin, so shading runs unbroken across adjacent days.
+ */
 .offHoursBand {
   position: absolute;
   right: 0;
   left: 0;
+  overflow: hidden;
   pointer-events: none;
+  background: var(--column-fill);
+  box-shadow: -1px 0 0 var(--column-fill);
+}
+
+.offHoursBand::before {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--band-top));
+  /* One column step is this band's width plus the 1px day edge. */
+  left: calc(-1 * var(--column-index) * (100% + 1px));
+  width: calc(var(--day-count) * (100% + 1px));
+  height: calc(24 * var(--hour-height));
   background: repeating-linear-gradient(
     135deg,
     color-mix(in srgb, var(--color-border-subtle) 55%, transparent) 0 1px,

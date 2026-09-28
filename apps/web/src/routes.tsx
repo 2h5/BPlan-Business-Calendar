@@ -8,6 +8,7 @@ import { CustomizePage } from './pages/CustomizePage';
 import { IntegrationsCallbackPage } from './pages/IntegrationsCallbackPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { PricingPage } from './pages/PricingPage';
+import { ProductPage } from './pages/ProductPage';
 import { SearchPage } from './pages/SearchPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignInPage } from './pages/SignInPage';
@@ -30,6 +31,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<RootRoute />} />
       <Route path="/login" element={<SignInPage />} />
+      <Route path="/product" element={<ProductPage />} />
       <Route path="/pricing" element={<PricingPage />} />
 
       <Route element={<ProtectedRoute />}>

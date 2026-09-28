@@ -18,12 +18,13 @@ interface PricingDecalsProps {
 }
 
 /**
- * The soft background pills on the pricing page. In `enter` mode they drift
- * in; in `exit` mode they play the same motion in reverse so a page reached
- * from pricing can let them leave instead of vanishing on route change.
+ * The pricing page's atmosphere: an overhead light, a low side wash, and
+ * film grain. In `enter` mode they settle in; in `exit` mode they play
+ * the same motion in reverse so a page reached from pricing can let them
+ * leave instead of vanishing on route change.
  */
 export function PricingDecals({ mode, onExited }: PricingDecalsProps) {
-  const rightRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
 
   // Layout-effect cleanups of the outgoing route run before the incoming
   // route's layout effects in the same commit, so the next page sees this.
@@ -35,9 +36,9 @@ export function PricingDecals({ mode, onExited }: PricingDecalsProps) {
     };
   }, [mode]);
 
-  // The right-hand pill is the last to finish leaving.
+  // Every layer leaves over the same duration; the glow stands in for all.
   const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
-    if (mode === 'exit' && event.target === rightRef.current && !event.pseudoElement) {
+    if (mode === 'exit' && event.target === glowRef.current) {
       onExited?.();
     }
   };
@@ -48,8 +49,9 @@ export function PricingDecals({ mode, onExited }: PricingDecalsProps) {
       aria-hidden="true"
       onAnimationEnd={handleAnimationEnd}
     >
-      <div className={styles.leftShapes} />
-      <div ref={rightRef} className={styles.rightShapes} />
+      <div ref={glowRef} className={styles.glow} />
+      <div className={styles.wash} />
+      <div className={styles.grain} />
     </div>
   );
 }

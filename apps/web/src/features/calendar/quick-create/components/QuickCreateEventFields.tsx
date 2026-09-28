@@ -9,6 +9,7 @@ import { Select } from '../../../../components/forms/Select';
 import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateEventFieldsProps {
+  weekStartsOn?: number;
   startDate: string;
   startDateDisplay: string;
   onStartDateChange: (value: string) => void;
@@ -32,6 +33,7 @@ interface QuickCreateEventFieldsProps {
 }
 
 export function QuickCreateEventFields({
+  weekStartsOn,
   startDate,
   startDateDisplay,
   onStartDateChange,
@@ -78,6 +80,7 @@ export function QuickCreateEventFields({
               displayValue={startDateDisplay}
               onChange={onStartDateChange}
               ariaLabel={`Date: ${startDateDisplay}`}
+              weekStartsOn={weekStartsOn}
             />
 
             <div

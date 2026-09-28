@@ -1,0 +1,144 @@
+.story {
+  position: relative;
+  width: min(100% - 2.5rem, 1180px);
+  margin: 0 auto;
+  padding: clamp(3rem, 6vw, 4.75rem) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  align-items: center;
+  gap: clamp(3rem, 7vw, 6.5rem);
+}
+
+.reverse {
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+}
+
+.reverse .copy {
+  order: 2;
+}
+
+.copy {
+  max-width: 440px;
+}
+
+.eyebrow,
+.title,
+.body,
+.points li {
+  opacity: 0;
+  filter: blur(6px);
+  transform: translate3d(0, 18px, 0);
+  transition:
+    opacity 900ms var(--ease-out),
+    filter 900ms var(--ease-out),
+    transform 1100ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+[data-revealed='true'] .eyebrow,
+[data-revealed='true'] .title,
+[data-revealed='true'] .body,
+[data-revealed='true'] .points li {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.eyebrow {
+  margin-bottom: 1.1rem;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  color: var(--ink);
+  font-size: clamp(2rem, 3.6vw, 3.05rem);
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+.title em {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.body {
+  margin-top: 1.25rem;
+  color: var(--muted);
+  font-size: 1.075rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.points {
+  margin-top: 1.75rem;
+  display: grid;
+  gap: 0.8rem;
+  list-style: none;
+}
+
+.points li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--ink-2);
+  font-size: 0.96rem;
+  font-weight: 500;
+}
+
+.points svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--accent);
+}
+
+.visual {
+  position: relative;
+  min-width: 0;
+  opacity: 0;
+  transform: translate3d(0, 40px, 0) scale(0.97);
+  transition:
+    opacity 1100ms var(--ease-out) 220ms,
+    transform 1400ms var(--ease-out) 220ms;
+}
+
+[data-revealed='true'] .visual {
+  opacity: 1;
+  transform: none;
+}
+
+@media (max-width: 920px) {
+  .story,
+  .reverse {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3rem;
+  }
+
+  .reverse .copy {
+    order: 0;
+  }
+
+  .copy {
+    max-width: 560px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eyebrow,
+  .title,
+  .body,
+  .points li,
+  .visual {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    transition: none;
+  }
+}

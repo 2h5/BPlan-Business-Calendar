@@ -1,0 +1,163 @@
+.panel {
+  max-width: 560px;
+  padding: 1.25rem 1.5rem 1.5rem 0.9rem;
+  border-radius: 24px;
+}
+
+.header {
+  margin: 0 0 1rem 0.6rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--faint);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.header b {
+  color: var(--accent);
+}
+
+.engine {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.timeline {
+  position: relative;
+  height: 400px;
+}
+
+.hour {
+  position: absolute;
+  right: 0;
+  left: 0;
+}
+
+.existing {
+  left: 60px;
+  right: 24%;
+  transition:
+    box-shadow 260ms ease,
+    background-color 260ms ease;
+}
+
+/* The event the dragged block is touching glows red with it. */
+.existing[data-hit='true'] {
+  background: color-mix(in srgb, #e5484d 12%, #ffffff);
+  box-shadow: 0 0 0 1.5px rgba(229, 72, 77, 0.55);
+}
+
+.moving {
+  position: absolute;
+  top: calc(var(--top) * 100%);
+  right: 6%;
+  left: 38%;
+  z-index: 5;
+  padding: 0.35rem 0.6rem;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 9%, #ffffff);
+  color: color-mix(in srgb, var(--accent) 45%, #0b1433);
+  box-shadow:
+    0 2px 4px rgba(23, 60, 140, 0.08),
+    0 18px 34px -10px color-mix(in srgb, var(--accent) 35%, transparent);
+  transform: rotate(-1.2deg) scale(1.03);
+  transition:
+    border-color 240ms ease,
+    background-color 240ms ease,
+    color 240ms ease,
+    box-shadow 420ms var(--ease-out),
+    transform 420ms var(--ease-out);
+  font-size: 0.74rem;
+}
+
+.moving[data-conflict='true'] {
+  border-color: rgba(229, 72, 77, 0.85);
+  background: rgba(255, 238, 239, 0.96);
+  color: #8c1d22;
+  animation: nudge 360ms ease;
+}
+
+.moving[data-dropped='true'] {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, #ffffff);
+  box-shadow: 0 1px 2px rgba(23, 60, 140, 0.1);
+  transform: none;
+}
+
+.movingTitle {
+  display: block;
+  font-weight: 700;
+}
+
+.movingTime {
+  display: block;
+  opacity: 0.75;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.verdict {
+  position: absolute;
+  right: -4px;
+  bottom: calc(100% + 8px);
+  padding: 0.3rem 0.65rem 0.3rem 0.45rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(20, 42, 92, 0.07),
+    0 8px 20px -6px rgba(28, 58, 120, 0.25);
+  color: #16865a;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: color 240ms ease;
+}
+
+.verdict[data-conflict='true'] {
+  color: #c9383e;
+}
+
+.verdict svg {
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes nudge {
+  30% {
+    translate: -3px 0;
+  }
+
+  60% {
+    translate: 3px 0;
+  }
+}
+
+@media (max-width: 920px) {
+  .panel {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 540px) {
+  .existing {
+    right: 8%;
+  }
+
+  .moving {
+    left: 30%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moving {
+    animation: none;
+    transition: none;
+  }
+}

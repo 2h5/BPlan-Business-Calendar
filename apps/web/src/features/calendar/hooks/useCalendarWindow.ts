@@ -2,10 +2,11 @@ import type { Calendar, HourCycle, WorkingHours } from '@cal/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
+import { DEFAULT_WEEK_STARTS_ON, useCalendarProfile } from './useCalendarProfile';
 import { useCalendars } from './useCalendars';
 import { queryKeys } from '../../../lib/query/query-client';
 import { useAuth } from '../../auth';
-import { fetchCalendarProfile, fetchEventsInWindow } from '../api/calendar.api';
+import { fetchEventsInWindow } from '../api/calendar.api';
 import { buildCalendarOccurrences, type EventOccurrence } from '../utils/calendar-occurrences';
 import {
   type CalendarViewMode,
@@ -38,14 +39,9 @@ export function useCalendarWindow(
   const { isAuthenticated } = useAuth();
   const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-  const profileQuery = useQuery({
-    queryKey: queryKeys.profile(),
-    queryFn: fetchCalendarProfile,
-    enabled: isAuthenticated,
-    staleTime: 5 * 60_000,
-  });
+  const profileQuery = useCalendarProfile();
   const timeZone = profileQuery.data?.timezone ?? deviceTimeZone;
-  const weekStartsOn = profileQuery.data?.weekStartsOn ?? 1;
+  const weekStartsOn = profileQuery.data?.weekStartsOn ?? DEFAULT_WEEK_STARTS_ON;
   const hourCycle = profileQuery.data?.hourCycle ?? 'h12';
 
   const window = useMemo(
@@ -59,7 +55,9 @@ export function useCalendarWindow(
   const eventsQuery = useQuery({
     queryKey: queryKeys.events.window(startIso, endIso),
     queryFn: () => fetchEventsInWindow(new Date(startIso), new Date(endIso)),
-    enabled: isAuthenticated,
+    // The window depends on the profile's time zone and week start; wait for
+    // them rather than fetching a fallback window first.
+    enabled: isAuthenticated && profileQuery.isSuccess,
     placeholderData: (previous) => previous,
   });
 
