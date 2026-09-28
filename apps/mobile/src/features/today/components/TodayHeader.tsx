@@ -2,6 +2,8 @@ import { Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 
+import { TimeOfDayIcon } from './TimeOfDayIcon';
+
 export interface TodayHeaderProps {
   /** "Wednesday, September 23". */
   dateLabel: string;
@@ -27,12 +29,7 @@ export function TodayHeader({ dateLabel, greeting, isDaytime, onSearch }: TodayH
           <Text variant="display" accessibilityRole="header">
             Today
           </Text>
-          <Ionicons
-            name={isDaytime ? 'sunny' : 'moon'}
-            size={isDaytime ? 26 : 22}
-            color={theme.colors.warning}
-            accessibilityLabel={isDaytime ? 'Daytime' : 'Nighttime'}
-          />
+          <TimeOfDayIcon isDaytime={isDaytime} />
         </View>
         <Text variant="footnote" color="secondary" numberOfLines={1}>
           {`${dateLabel} · ${greeting}`}

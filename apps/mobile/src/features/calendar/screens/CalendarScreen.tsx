@@ -2,7 +2,9 @@ import { addZonedDays, toZonedDateKey } from '@cal/domain';
 import { ErrorState, IconButton, LoadingState, SegmentedControl, useTheme } from '@cal/ui';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TAB_BAR_CLEARANCE } from '../../../components/app-shell/floating-layout';
 import { type CalendarViewMode, useCalendarViewStore } from '../../../store/calendar-view.store';
 import { useEventEditorStore } from '../../../store/event-editor.store';
 import { AgendaList } from '../components/agenda-view/AgendaList';
@@ -54,6 +56,10 @@ const MONTHS = [
  */
 export function CalendarScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  // The page runs under the floating tab bar; scrolling content pads by this
+  // so its end can scroll clear of the bar, while fixed views stop above it.
+  const bottomInset = insets.bottom + TAB_BAR_CLEARANCE + theme.spacing.lg;
   const agendaRefresh = useAgendaRefresh();
   const mode = useCalendarViewStore((state) => state.mode);
   const setMode = useCalendarViewStore((state) => state.setMode);
@@ -179,6 +185,7 @@ export function CalendarScreen() {
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
           onPressSlot={(start) => openNewEvent(start)}
           onMoveOccurrence={moveOccurrence}
+          bottomInset={bottomInset}
         />
       ) : mode === 'week' ? (
         <WeekGrid
@@ -193,32 +200,35 @@ export function CalendarScreen() {
           onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
           onPressSlot={(start) => openNewEvent(start)}
           onMoveOccurrence={moveOccurrence}
+          bottomInset={bottomInset}
         />
       ) : mode === 'month' ? (
         // Swiping drags the neighbouring months into view; the grid sizes its
         // rows to the height left, so it fills the screen instead of scrolling.
-        <MonthPager
-          monthIndex={monthIndexOf(selectedDateKey)}
-          onChangeMonth={shift}
-          byDateKey={byDateKey}
-          timeZone={timeZone}
-          now={now}
-          selectedDateKey={selectedDateKey}
-          weekStartsOn={weekStartsOn}
-          onSelectDate={(dateKey) => {
-            setSelectedDateKey(dateKey);
-            setMode('day');
-          }}
-          onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
-          onMoveOccurrence={moveOccurrenceByDays}
-          formatDayTarget={(occurrence, dayDelta) =>
-            formatDayShiftTarget(occurrence.start, dayDelta, timeZone)
-          }
-        />
+        <View style={{ flex: 1, paddingBottom: bottomInset }}>
+          <MonthPager
+            monthIndex={monthIndexOf(selectedDateKey)}
+            onChangeMonth={shift}
+            byDateKey={byDateKey}
+            timeZone={timeZone}
+            now={now}
+            selectedDateKey={selectedDateKey}
+            weekStartsOn={weekStartsOn}
+            onSelectDate={(dateKey) => {
+              setSelectedDateKey(dateKey);
+              setMode('day');
+            }}
+            onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
+            onMoveOccurrence={moveOccurrenceByDays}
+            formatDayTarget={(occurrence, dayDelta) =>
+              formatDayShiftTarget(occurrence.start, dayDelta, timeZone)
+            }
+          />
+        </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: theme.spacing.xxl }}
+          contentContainerStyle={{ paddingBottom: bottomInset }}
           refreshControl={
             <RefreshControl
               refreshing={agendaRefresh.refreshing}

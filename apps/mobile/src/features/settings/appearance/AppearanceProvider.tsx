@@ -17,6 +17,7 @@ import {
   resolveThemeMode,
   type ThemeMode,
 } from './theme-mode';
+import { beginThemeCrossfade, finishThemeCrossfade } from '../../../../modules/theme-crossfade';
 import { logError } from '../../../lib/logger';
 
 export interface AppearanceContextValue {
@@ -26,6 +27,9 @@ export interface AppearanceContextValue {
   scheme: ColorScheme;
   setMode: (mode: ThemeMode) => void;
 }
+
+/** The web's theme cross-fade (`::view-transition-*` in global.css). */
+const CROSSFADE_MS = 320;
 
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
 
@@ -59,9 +63,20 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /**
+   * Changes the palette as one smooth cross-fade, as the web does: native code
+   * covers the window with a snapshot of the old theme, the new one paints
+   * underneath, and the snapshot fades out. Without the native module (or
+   * with Reduce Motion) the change is instant.
+   */
   const setMode = useCallback((next: ThemeMode) => {
-    setModeState(next);
     void AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(logError);
+
+    void (async () => {
+      const covered = await beginThemeCrossfade();
+      setModeState(next);
+      if (covered) afterNextPaint(() => finishThemeCrossfade(CROSSFADE_MS));
+    })();
   }, []);
 
   const scheme = resolveThemeMode(mode, systemScheme);
@@ -92,4 +107,14 @@ export function useAppearance(): AppearanceContextValue {
   const context = useContext(AppearanceContext);
   if (!context) throw new Error('useAppearance must be used inside <AppearanceProvider>');
   return context;
+}
+
+/**
+ * Runs once the re-render has reached the screen: two frames for React to
+ * commit, and a beat more for the native chrome that follows
+ * `Appearance.setColorScheme` — fading the snapshot any earlier shows the
+ * repaint happening.
+ */
+function afterNextPaint(callback: () => void) {
+  requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(callback, 32)));
 }

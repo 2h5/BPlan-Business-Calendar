@@ -32,6 +32,11 @@ const WEEKDAY_NAMES = [
 ];
 
 export interface DayTimelineProps {
+  /**
+   * Room below midnight, so the timeline scrolls clear of the floating tab
+   * bar and an event running past midnight can spill into it.
+   */
+  bottomInset?: number;
   dateKey: string;
   byDateKey: Map<string, EventOccurrence[]>;
   timeZone: string;
@@ -76,6 +81,7 @@ export function DayTimeline({
   onPressSlot,
   onChangeDay,
   onMoveOccurrence,
+  bottomInset = 0,
 }: DayTimelineProps) {
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
@@ -191,6 +197,9 @@ export function DayTimeline({
               height: HOUR_HEIGHT,
               borderTopWidth: 1,
               borderTopColor: theme.colors.gridLine,
+              // Midnight closes the day; below it is only overflow room.
+              borderBottomWidth: hour === 23 ? 1 : 0,
+              borderBottomColor: theme.colors.gridLine,
             }}
             onStartShouldSetResponder={() => !!onPressSlot}
             onResponderRelease={() => onPressSlot?.(new Date(page.dayStartMs + hour * 3_600_000))}
@@ -283,7 +292,7 @@ export function DayTimeline({
         ) : null}
 
         <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false}>
-          <View style={{ height: 24 * HOUR_HEIGHT, flexDirection: 'row' }}>
+          <View style={{ height: 24 * HOUR_HEIGHT + bottomInset, flexDirection: 'row' }}>
             <View style={{ width: GUTTER_WIDTH }}>
               {Array.from({ length: 24 }, (_, hour) => (
                 <View

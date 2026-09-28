@@ -23,7 +23,15 @@ export function HeaderBackButton({ label }: HeaderBackButtonProps) {
       accessibilityLabel={label}
       hitSlop={8}
       onPress={() => router.back()}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 4 }}
+      // The chevron glyph carries its own inset on the left, so the right side
+      // takes the extra padding that centres the content in the glass pill.
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        paddingLeft: 4,
+        paddingRight: 8,
+      }}
     >
       <Ionicons name="chevron-back" size={24} color={theme.colors.textPrimary} />
       <Text style={{ ...theme.typography.body, color: theme.colors.textPrimary }}>{label}</Text>

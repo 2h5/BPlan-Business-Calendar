@@ -36,11 +36,14 @@ const ACTIVE_DESCRIPTION = 'Your Pro subscription is active with full access to 
  * this card used to do, left them with no way to check what they are on.
  */
 export function PlanCard() {
-  const { isPro, isLoading, info } = usePlanState();
+  const { isPro, isLoading, isUnavailable, info, retry } = usePlanState();
 
   // Not knowing yet is not the same as being on the free plan, and guessing
   // wrong in either direction misinforms someone about what they pay for.
   if (isLoading) return null;
+  // A failed read used to hide the card for good — an auth hiccup at launch is
+  // never retried — so the plan seemed to vanish. Keep the card and offer a retry.
+  if (isUnavailable) return <PlanUnavailableRow onRetry={retry} />;
 
   return isPro ? <ProStatusCard info={info} /> : <UpgradeRow />;
 }
@@ -52,6 +55,7 @@ export function PlanCard() {
  */
 function ProStatusCard({ info }: { info: SubscriptionStatusInfo }) {
   const theme = useTheme();
+  const openPlans = usePaywallStore((state) => state.open);
 
   const dotColor: Record<SubscriptionStatusInfo['badgeVariant'], string> = {
     neutral: theme.colors.textTertiary,
@@ -62,8 +66,22 @@ function ProStatusCard({ info }: { info: SubscriptionStatusInfo }) {
   const dot = dotColor[info.badgeVariant];
 
   return (
-    <Card eyebrow="Plan">
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
+    <Card eyebrow="Plan" padded={false}>
+      {/* Opens the plans page, where a subscriber sees what Pro includes. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${PLAN_NAME}, ${info.state}. View plan details`}
+        onPress={openPlans}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: theme.spacing.md,
+            padding: theme.spacing.xl,
+          },
+          pressed && { backgroundColor: theme.colors.hover },
+        ]}
+      >
         <View
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
@@ -88,7 +106,43 @@ function ProStatusCard({ info }: { info: SubscriptionStatusInfo }) {
             {ACTIVE_DESCRIPTION}
           </Text>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+      </Pressable>
+    </Card>
+  );
+}
+
+function PlanUnavailableRow({ onRetry }: { onRetry: () => void }) {
+  const theme = useTheme();
+
+  return (
+    <Card eyebrow="Plan" padded={false}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Couldn't load your plan. Try again"
+        onPress={onRetry}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            minHeight: theme.hitSlopSize + theme.spacing.sm,
+            paddingVertical: theme.spacing.md,
+            paddingHorizontal: theme.spacing.xl,
+            gap: theme.spacing.md,
+          },
+          pressed && { backgroundColor: theme.colors.hover },
+        ]}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="bodyStrong">{PLAN_NAME}</Text>
+          <Text variant="footnote" color="secondary">
+            Couldn't load your plan.
+          </Text>
+        </View>
+        <Text variant="footnote" color="accent">
+          Try again
+        </Text>
+      </Pressable>
     </Card>
   );
 }

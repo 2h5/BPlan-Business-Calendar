@@ -98,7 +98,7 @@ export function CalendarEditorSheet({
 
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="footnote" color="secondary">
-            Colour
+            Color
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
             {CALENDAR_COLORS.map((option) => {
@@ -132,7 +132,7 @@ export function CalendarEditorSheet({
         </View>
 
         <Text variant="footnote" color="tertiary">
-          Events take their calendar&apos;s colour unless you give them one of their own.
+          Events take their calendar&apos;s color unless you give them one of their own.
         </Text>
       </View>
     </BottomSheet>

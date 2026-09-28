@@ -1,15 +1,18 @@
 import { type SignUpInput, signUpSchema } from '@cal/schemas';
 import { Button, Screen, Text, TextField, useTheme } from '@cal/ui';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 
 import { APP_NAME } from '../../../lib/brand';
 import { toAppError } from '../../../lib/errors/app-error';
 import { AppleSignInButton } from '../components/AppleSignInButton';
+import { AuthBackdrop } from '../components/AuthBackdrop';
 import { AuthDivider } from '../components/AuthDivider';
 import { AuthHeader } from '../components/AuthHeader';
+import { AuthSwitchLink } from '../components/AuthSwitchLink';
+import { FieldIcon } from '../components/FieldIcon';
+import { PasswordField } from '../components/PasswordField';
 import { useAuthActions } from '../hooks/useAuthActions';
 
 export function SignUpScreen() {
@@ -24,14 +27,15 @@ export function SignUpScreen() {
   const submitError = signUp.error ? toAppError(signUp.error) : null;
 
   return (
-    <Screen>
+    <Screen backdrop={<AuthBackdrop />}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ gap: theme.spacing.xxl }}
       >
         <AuthHeader
           eyebrow={`${APP_NAME} workspace`}
-          title="Create your account"
+          title="Create your"
+          titleAccent="account"
           subtitle="Your calendar and your to-do list, finally in the same place."
         />
 
@@ -49,6 +53,7 @@ export function SignUpScreen() {
                 autoComplete="name"
                 textContentType="name"
                 placeholder="Alex Rivera"
+                leading={<FieldIcon name="person-outline" />}
               />
             )}
           />
@@ -68,6 +73,7 @@ export function SignUpScreen() {
                 keyboardType="email-address"
                 textContentType="emailAddress"
                 placeholder="you@example.com"
+                leading={<FieldIcon name="mail-outline" />}
               />
             )}
           />
@@ -76,17 +82,16 @@ export function SignUpScreen() {
             control={control}
             name="password"
             render={({ field, fieldState }) => (
-              <TextField
+              <PasswordField
                 label="Password"
                 value={field.value}
                 onChangeText={field.onChange}
                 onBlur={field.onBlur}
                 error={fieldState.error?.message}
                 hint="At least 8 characters."
-                secureTextEntry
                 autoComplete="new-password"
                 textContentType="newPassword"
-                placeholder="••••••••"
+                placeholder="Create a password"
               />
             )}
           />
@@ -109,13 +114,7 @@ export function SignUpScreen() {
 
         <AppleSignInButton onPress={() => apple.mutate()} disabled={apple.isPending} />
 
-        <View style={{ alignItems: 'center' }}>
-          <Link href="/(auth)/sign-in">
-            <Text variant="subhead" color="accent">
-              I already have an account
-            </Text>
-          </Link>
-        </View>
+        <AuthSwitchLink prompt="Already have an account?" action="Sign in" href="/(auth)/sign-in" />
       </KeyboardAvoidingView>
     </Screen>
   );

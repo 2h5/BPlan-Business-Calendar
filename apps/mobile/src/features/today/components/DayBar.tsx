@@ -1,18 +1,24 @@
 import type { HourCycle } from '@cal/schemas';
 import { Text, useTheme } from '@cal/ui';
-import { View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 
 import { formatHourMark, type DayBarModel } from '../utils/day-bar';
 
 export interface DayBarProps {
   model: DayBarModel;
   hourCycle: HourCycle;
+  /** Opens the event behind a busy segment, by the segment's key. */
+  onOpenSegment?: (key: string) => void;
+  /** Spoken name for a busy segment, e.g. "Standup, 9:00 AM – 9:30 AM". */
+  describeSegment?: (key: string) => string;
 }
 
 const BAR_HEIGHT = 10;
 const LABEL_WIDTH = 32;
 /** Events that have already ended recede so what is still ahead reads first. */
 const PAST_OPACITY = 0.4;
+/** The bar is thin; taps within this reach above and below still land on an event. */
+const TAP_SLOP = 14;
 
 /**
  * The day at a glance as one horizontal strip: events as solid blocks in
@@ -21,7 +27,7 @@ const PAST_OPACITY = 0.4;
  * cannot be mistaken for an event, whatever colour a calendar uses. Layout is
  * decided by `buildDayBar`; this only draws it.
  */
-export function DayBar({ model, hourCycle }: DayBarProps) {
+export function DayBar({ model, hourCycle, onOpenSegment, describeSegment }: DayBarProps) {
   const theme = useTheme();
 
   const freeSlot: ViewStyle = {
@@ -33,36 +39,59 @@ export function DayBar({ model, hourCycle }: DayBarProps) {
   return (
     <View style={{ gap: theme.spacing.xs }}>
       <View
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
         style={{
           height: BAR_HEIGHT,
           borderRadius: BAR_HEIGHT / 2,
           backgroundColor: theme.colors.surfaceElevated,
         }}
       >
-        {model.segments.map((segment) => (
-          <View
-            key={segment.key}
-            style={[
-              {
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: `${segment.left}%`,
-                width: `${segment.width}%`,
-                borderRadius: 3,
-              },
-              segment.kind === 'free'
-                ? freeSlot
-                : {
-                    backgroundColor: segment.color ?? theme.colors.accent,
-                    opacity: segment.past ? PAST_OPACITY : 1,
-                  },
-            ]}
-          />
-        ))}
+        {model.segments.map((segment) => {
+          const style: ViewStyle[] = [
+            {
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${segment.left}%`,
+              width: `${segment.width}%`,
+              borderRadius: 3,
+            },
+            segment.kind === 'free'
+              ? freeSlot
+              : {
+                  backgroundColor: segment.color ?? theme.colors.accent,
+                  opacity: segment.past ? PAST_OPACITY : 1,
+                },
+          ];
+
+          if (segment.kind === 'busy' && onOpenSegment) {
+            const label = describeSegment?.(segment.key);
+            return (
+              <Pressable
+                key={segment.key}
+                accessibilityRole="button"
+                accessibilityLabel={label ? `Open ${label}` : 'Open event'}
+                hitSlop={{ top: TAP_SLOP, bottom: TAP_SLOP }}
+                onPress={() => onOpenSegment(segment.key)}
+                style={({ pressed }) => [
+                  ...style,
+                  pressed ? { opacity: (segment.past ? PAST_OPACITY : 1) * 0.6 } : null,
+                ]}
+              />
+            );
+          }
+          return (
+            <View
+              key={segment.key}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={style}
+            />
+          );
+        })}
         <View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           style={{
             position: 'absolute',
             top: -3,

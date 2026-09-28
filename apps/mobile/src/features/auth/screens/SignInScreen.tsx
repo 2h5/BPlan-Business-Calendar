@@ -1,15 +1,18 @@
 import { type SignInInput, signInSchema } from '@cal/schemas';
 import { Button, Screen, Text, TextField, useTheme } from '@cal/ui';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 
 import { APP_NAME } from '../../../lib/brand';
 import { toAppError } from '../../../lib/errors/app-error';
 import { AppleSignInButton } from '../components/AppleSignInButton';
+import { AuthBackdrop } from '../components/AuthBackdrop';
 import { AuthDivider } from '../components/AuthDivider';
 import { AuthHeader } from '../components/AuthHeader';
+import { AuthSwitchLink } from '../components/AuthSwitchLink';
+import { FieldIcon } from '../components/FieldIcon';
+import { PasswordField } from '../components/PasswordField';
 import { useAuthActions } from '../hooks/useAuthActions';
 
 export function SignInScreen() {
@@ -24,14 +27,15 @@ export function SignInScreen() {
   const submitError = signIn.error ? toAppError(signIn.error) : null;
 
   return (
-    <Screen>
+    <Screen backdrop={<AuthBackdrop />}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ gap: theme.spacing.xxl }}
       >
         <AuthHeader
           eyebrow={`${APP_NAME} workspace`}
-          title="Welcome back"
+          title="Welcome"
+          titleAccent="back"
           subtitle="Sign in to continue to your calendar and tasks."
         />
 
@@ -51,6 +55,7 @@ export function SignInScreen() {
                 keyboardType="email-address"
                 textContentType="emailAddress"
                 placeholder="you@example.com"
+                leading={<FieldIcon name="mail-outline" />}
                 returnKeyType="next"
               />
             )}
@@ -60,16 +65,15 @@ export function SignInScreen() {
             control={control}
             name="password"
             render={({ field, fieldState }) => (
-              <TextField
+              <PasswordField
                 label="Password"
                 value={field.value}
                 onChangeText={field.onChange}
                 onBlur={field.onBlur}
                 error={fieldState.error?.message}
-                secureTextEntry
                 autoComplete="current-password"
                 textContentType="password"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 returnKeyType="go"
                 onSubmitEditing={handleSubmit((values) => signIn.mutate(values))}
               />
@@ -95,13 +99,11 @@ export function SignInScreen() {
 
         <AppleSignInButton onPress={() => apple.mutate()} disabled={apple.isPending} />
 
-        <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
-          <Link href="/(auth)/sign-up">
-            <Text variant="subhead" color="accent">
-              Create an account
-            </Text>
-          </Link>
-        </View>
+        <AuthSwitchLink
+          prompt="Don’t have an account?"
+          action="Create an account"
+          href="/(auth)/sign-up"
+        />
       </KeyboardAvoidingView>
     </Screen>
   );

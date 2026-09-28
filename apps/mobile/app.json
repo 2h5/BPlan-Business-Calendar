@@ -40,7 +40,14 @@
           "dark": { "backgroundColor": "#0B0D12" },
           "resizeMode": "contain"
         }
-      ]
+      ],
+      [
+        "./plugins/with-pod-deployment-target",
+        {
+          "minimum": "15.1"
+        }
+      ],
+      "./plugins/with-scene-delegate"
     ],
     "experiments": {
       "typedRoutes": true

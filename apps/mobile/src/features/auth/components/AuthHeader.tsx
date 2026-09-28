@@ -1,50 +1,55 @@
 import { Text, useTheme } from '@cal/ui';
-import { View } from 'react-native';
+import { Text as RNText, View } from 'react-native';
 
+import { BrandLogo } from './BrandLogo';
 import { APP_NAME } from '../../../lib/brand';
 
 export interface AuthHeaderProps {
-  /** Small accent line above the title. */
+  /** Small, widely tracked accent line above the title. */
   eyebrow: string;
   title: string;
+  /** Trailing words of the title, drawn in the accent colour. */
+  titleAccent?: string;
   subtitle: string;
 }
 
 /**
- * The web sign-in page's masthead: the brand lockup pinned to the leading edge,
- * then a centred eyebrow / title / subtitle stack above the form.
+ * The sign-in masthead: the brand lockup centred above an eyebrow, a bold
+ * headline with its last word in blue, and a line of context.
  */
-export function AuthHeader({ eyebrow, title, subtitle }: AuthHeaderProps) {
+export function AuthHeader({ eyebrow, title, titleAccent, subtitle }: AuthHeaderProps) {
   const theme = useTheme();
 
   return (
-    <View style={{ gap: theme.spacing.xxxl }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: theme.radius.md,
-            backgroundColor: theme.colors.accent,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text variant="subhead" color="onAccent" style={{ fontWeight: '700' }}>
-            B
-          </Text>
-        </View>
-        <Text variant="headline">{APP_NAME}</Text>
+    <View style={{ alignItems: 'center', gap: theme.spacing.xxxl }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+        <BrandLogo size={34} />
+        <Text variant="title2" style={{ fontWeight: '700', letterSpacing: -0.6 }}>
+          {APP_NAME}
+        </Text>
       </View>
 
-      <View style={{ gap: theme.spacing.xs, alignItems: 'center' }}>
-        <Text variant="caption" color="accent" uppercase>
+      <View style={{ alignItems: 'center', gap: theme.spacing.sm }}>
+        <Text variant="caption" color="accent" uppercase style={{ letterSpacing: 2.4 }}>
           {eyebrow}
         </Text>
-        <Text variant="title1" align="center">
+        <Text
+          variant="display"
+          align="center"
+          accessibilityRole="header"
+          style={{ fontSize: 34, lineHeight: 40, fontWeight: '700', letterSpacing: -1.2 }}
+        >
           {title}
+          {titleAccent ? (
+            <RNText style={{ color: theme.colors.accent }}>{` ${titleAccent}`}</RNText>
+          ) : null}
         </Text>
-        <Text variant="callout" color="secondary" align="center">
+        <Text
+          variant="callout"
+          color="secondary"
+          align="center"
+          style={{ fontSize: 17, lineHeight: 24, maxWidth: 300 }}
+        >
           {subtitle}
         </Text>
       </View>

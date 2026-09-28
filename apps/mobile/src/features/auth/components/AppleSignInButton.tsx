@@ -29,7 +29,7 @@ export function AppleSignInButton({ onPress, disabled }: AppleSignInButtonProps)
       buttonStyle={
         theme.scheme === 'dark'
           ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-          : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+          : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
       }
       cornerRadius={theme.radius.md}
       style={[styles.button, disabled && styles.disabled]}

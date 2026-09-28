@@ -1,5 +1,12 @@
 import { forwardRef, useState, type ReactNode } from 'react';
-import { TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native';
+import {
+  Text as RNText,
+  TextInput,
+  type TextInputProps,
+  type TextStyle,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { Text } from '../text/Text';
 import { useTheme } from '../theme/ThemeProvider';
@@ -19,11 +26,31 @@ export interface TextFieldProps extends Omit<TextInputProps, 'style'> {
 const FOCUS_RING_WIDTH = 3;
 
 export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
-  { label, error, hint, leading, trailing, containerStyle, onFocus, onBlur, ...rest },
+  {
+    label,
+    error,
+    hint,
+    leading,
+    trailing,
+    containerStyle,
+    onFocus,
+    onBlur,
+    onChangeText,
+    placeholder,
+    ...rest
+  },
   ref,
 ) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
+  const [uncontrolledText, setUncontrolledText] = useState(rest.defaultValue ?? '');
+  const isEmpty = (rest.value ?? uncontrolledText).length === 0;
+  // iOS draws a single-line field's native placeholder a couple of points below
+  // where typed text sits, so single-line fields draw their own in its place.
+  const ownPlaceholder = !rest.multiline && !!placeholder;
+  const textStyle = rest.multiline
+    ? theme.typography.callout
+    : singleLine(theme.typography.callout);
 
   const borderColor = error
     ? theme.colors.danger
@@ -68,25 +95,56 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           }}
         >
           {leading}
-          <TextInput
-            ref={ref}
-            accessibilityLabel={label}
-            placeholderTextColor={theme.colors.textTertiary}
-            selectionColor={theme.colors.accent}
-            onFocus={(event) => {
-              setFocused(true);
-              onFocus?.(event);
-            }}
-            onBlur={(event) => {
-              setFocused(false);
-              onBlur?.(event);
-            }}
-            style={[
-              rest.multiline ? theme.typography.callout : singleLine(theme.typography.callout),
-              { flex: 1, color: theme.colors.textPrimary, paddingVertical: theme.spacing.sm },
-            ]}
-            {...rest}
-          />
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            {ownPlaceholder && isEmpty ? (
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  justifyContent: 'center',
+                }}
+              >
+                <RNText
+                  numberOfLines={1}
+                  allowFontScaling={rest.allowFontScaling}
+                  style={[textStyle, { color: theme.colors.textTertiary }]}
+                >
+                  {placeholder}
+                </RNText>
+              </View>
+            ) : null}
+            <TextInput
+              ref={ref}
+              accessibilityLabel={label}
+              accessibilityHint={ownPlaceholder ? placeholder : undefined}
+              placeholder={ownPlaceholder ? undefined : placeholder}
+              placeholderTextColor={theme.colors.textTertiary}
+              onChangeText={(text) => {
+                setUncontrolledText(text);
+                onChangeText?.(text);
+              }}
+              selectionColor={theme.colors.accent}
+              onFocus={(event) => {
+                setFocused(true);
+                onFocus?.(event);
+              }}
+              onBlur={(event) => {
+                setFocused(false);
+                onBlur?.(event);
+              }}
+              style={[
+                textStyle,
+                { color: theme.colors.textPrimary, paddingVertical: theme.spacing.sm },
+              ]}
+              {...rest}
+            />
+          </View>
           {trailing}
         </View>
       </View>

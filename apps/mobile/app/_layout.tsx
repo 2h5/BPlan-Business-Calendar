@@ -75,16 +75,9 @@ function RootStack() {
         }}
       />
       {/* Search opens over whichever tab you were on, so it is a stack screen
-          rather than a hidden tab — a hidden tab is not a navigable route. */}
-      <Stack.Screen
-        name="search"
-        options={{
-          headerShown: true,
-          title: 'Search',
-          headerLeft: () => <HeaderBackButton label="Back" />,
-          animation: 'default',
-        }}
-      />
+          rather than a hidden tab — a hidden tab is not a navigable route. It
+          draws its own top bar so the backdrop reaches the top edge. */}
+      <Stack.Screen name="search" options={{ animation: 'default' }} />
     </Stack>
   );
 }

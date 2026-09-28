@@ -1,11 +1,9 @@
-import { Screen } from '@cal/ui';
-
+import { useAuth } from '../src/features/auth';
 import { SearchScreen } from '../src/features/search/screens/SearchScreen';
 
 export default function SearchScreenRoute() {
-  return (
-    <Screen belowHeader>
-      <SearchScreen />
-    </Screen>
-  );
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return null;
+
+  return <SearchScreen />;
 }

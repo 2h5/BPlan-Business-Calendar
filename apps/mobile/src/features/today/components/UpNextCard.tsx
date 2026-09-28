@@ -23,6 +23,9 @@ export interface UpNextCardProps {
   allDayCount: number;
   dayBar: DayBarModel | null;
   hourCycle: HourCycle;
+  /** Opens the event behind a day-bar segment, by its key. */
+  onOpenSegment?: (key: string) => void;
+  describeSegment?: (key: string) => string;
 }
 
 /**
@@ -49,6 +52,8 @@ export function UpNextCard({
   allDayCount,
   dayBar,
   hourCycle,
+  onOpenSegment,
+  describeSegment,
 }: UpNextCardProps) {
   const theme = useTheme();
 
@@ -124,7 +129,14 @@ export function UpNextCard({
         ) : null}
       </View>
 
-      {dayBar ? <DayBar model={dayBar} hourCycle={hourCycle} /> : null}
+      {dayBar ? (
+        <DayBar
+          model={dayBar}
+          hourCycle={hourCycle}
+          onOpenSegment={onOpenSegment}
+          describeSegment={describeSegment}
+        />
+      ) : null}
     </View>
   );
 }

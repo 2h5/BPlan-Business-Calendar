@@ -24,8 +24,15 @@ export interface ScreenProps {
   belowHeader?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
+  /**
+   * Extra room below the content for chrome that floats over it, such as a
+   * tab bar, so the last rows can scroll clear of it.
+   */
+  bottomClearance?: number;
   /** Pinned above the safe-area bottom inset, e.g. a primary action. */
   footer?: ReactNode;
+  /** Decoration drawn over the page colour and behind the content. */
+  backdrop?: ReactNode;
   contentStyle?: ViewStyle;
   testID?: string;
 }
@@ -42,7 +49,9 @@ export function Screen({
   belowHeader = false,
   onRefresh,
   refreshing = false,
+  bottomClearance = 0,
   footer,
+  backdrop,
   contentStyle,
   testID,
 }: ScreenProps) {
@@ -52,13 +61,14 @@ export function Screen({
   const inner: ViewStyle = {
     paddingHorizontal: padded ? theme.screenPadding : 0,
     paddingTop: belowHeader ? theme.spacing.lg : insets.top + theme.spacing.sm,
-    paddingBottom: footer ? theme.spacing.lg : insets.bottom + theme.spacing.xxl,
+    paddingBottom: footer ? theme.spacing.lg : insets.bottom + theme.spacing.xxl + bottomClearance,
     gap: theme.spacing.xl,
   };
 
   return (
     <View testID={testID} style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.scheme === 'dark' ? 'light-content' : 'dark-content'} />
+      {backdrop}
 
       {scrollable ? (
         <ScrollView
