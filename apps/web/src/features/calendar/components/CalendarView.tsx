@@ -258,6 +258,12 @@ export function CalendarView() {
     [result.calendars, rememberOpeningControl, setToast],
   );
 
+  /** The calendar quick-create picks first, so a drag previews the draft it turns into. */
+  const newEventColor = useMemo(() => {
+    const writable = result.calendars.filter((calendar) => !calendar.isReadOnly);
+    return (writable.find((calendar) => calendar.isDefault) ?? writable[0])?.color;
+  }, [result.calendars]);
+
   const activeDraftEvent = useMemo(() => {
     if (!quickCreateState.isOpen || quickCreateState.editingOccurrence) return null;
     return {
@@ -383,7 +389,6 @@ export function CalendarView() {
           heading={heading}
           isFetching={result.isFetching && !result.isLoading}
           calendars={result.calendars}
-          timeZone={timeZone}
           onToggleVisibility={handleToggleVisibility}
           onCreateCalendar={() => {
             rememberOpeningControl();
@@ -498,6 +503,7 @@ export function CalendarView() {
                   workingHours={result.workingHours}
                   revealEventId={requestedEventId}
                   showEventDetails={showEventDetails}
+                  selectionColor={newEventColor}
                   showWorkingHours={showWorkingHours}
                 />
               )}

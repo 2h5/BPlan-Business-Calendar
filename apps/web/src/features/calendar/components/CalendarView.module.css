@@ -290,12 +290,10 @@
   z-index: 30;
   width: 250px;
   max-width: 90vw;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-surface-raised);
-  box-shadow:
-    0 12px 36px -4px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-popover);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -457,17 +455,6 @@
 .dropdownEditButton:hover {
   background: var(--color-hover);
   color: var(--color-text-primary);
-}
-
-.dropdownFooter {
-  padding: 8px 12px;
-  border-top: 1px solid var(--color-border-subtle);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--color-text-tertiary);
-  font-size: 0.6875rem;
-  background: var(--color-bg-surface);
 }
 
 .newEventButton,
@@ -744,6 +731,8 @@
   position: sticky;
   z-index: 2;
   left: 0;
+  user-select: none;
+  -webkit-user-select: none;
   background: var(--color-bg-app);
   border-bottom: 1px solid var(--color-border-subtle);
 }
@@ -767,6 +756,9 @@
   height: calc(24 * var(--hour-height));
   border-bottom: 1px solid var(--color-border-subtle);
   overflow: hidden;
+  /* Dragging across the grid picks a time range, never text. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dayColumn {
@@ -2499,14 +2491,15 @@
   left: 2px;
   right: 2px;
   border-radius: var(--radius-sm);
-  background: var(--color-accent-subtle);
-  border: 2px dashed var(--color-accent);
+  background: color-mix(in srgb, var(--event-color, var(--color-accent)) 14%, transparent);
+  border: 1.5px dashed var(--event-color, var(--color-accent));
   z-index: 10;
   pointer-events: none;
   padding: 2px 6px;
   font-size: var(--font-size-xs);
-  color: var(--color-accent);
+  color: var(--color-text-primary);
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -2517,7 +2510,7 @@
   left: 2px;
   right: 2px;
   border-radius: var(--radius-sm);
-  background: var(--color-accent-subtle);
+  background: color-mix(in srgb, var(--event-color, var(--color-accent)) 14%, transparent);
   border: 1.5px dashed var(--event-color, var(--color-accent));
   z-index: 10;
   pointer-events: none;
@@ -2532,16 +2525,35 @@
   overflow: hidden;
 }
 
-.draftTimelineEventTitle {
-  font-weight: var(--font-weight-medium);
+.draftTimelineEventTitle,
+.draftTimelineEventTime {
+  flex-shrink: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.draftTimelineEventTitle {
+  font-weight: var(--font-weight-medium);
+}
+
 .draftTimelineEventTime {
   font-size: 0.6875rem;
   color: var(--color-text-secondary);
+}
+
+/* Too short for two lines: title and time share one, each truncating in a narrow column. */
+.draftTimelineEventShort {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: 0;
+}
+
+.draftTimelineEventShort .draftTimelineEventTitle,
+.draftTimelineEventShort .draftTimelineEventTime {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .monthEventDraft {

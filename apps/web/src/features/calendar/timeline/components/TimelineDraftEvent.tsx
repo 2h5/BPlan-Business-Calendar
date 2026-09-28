@@ -18,6 +18,9 @@ export interface TimelineDraftEventProps extends DraftAppearance {
   hourCycle: HourCycle;
 }
 
+/** Below this height (px) the title and time no longer fit on separate lines. */
+const TWO_LINE_MIN_HEIGHT = 40;
+
 /** The unsaved quick-create draft as a timed block in a day column. */
 export function TimelineDraftEvent({
   startMinute,
@@ -29,12 +32,17 @@ export function TimelineDraftEvent({
   calendarColor,
   isClosing,
 }: TimelineDraftEventProps) {
+  const height = Math.max(22, ((endMinute - startMinute) / 60) * hourHeight - 2);
   return (
     <div
       data-quick-create-draft="true"
-      className={`${styles.draftTimelineEvent} ${
-        isClosing ? styles.draftTimelineEventBubbleExit : styles.draftTimelineEventBubbleEnter
-      }`}
+      className={[
+        styles.draftTimelineEvent,
+        height < TWO_LINE_MIN_HEIGHT && styles.draftTimelineEventShort,
+        isClosing ? styles.draftTimelineEventBubbleExit : styles.draftTimelineEventBubbleEnter,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={
         {
           top: (startMinute / 60) * hourHeight,
@@ -43,7 +51,7 @@ export function TimelineDraftEvent({
             width: `calc(${placement.width * 100}% - 4px)`,
             right: 'auto',
           }),
-          height: Math.max(22, ((endMinute - startMinute) / 60) * hourHeight - 2),
+          height,
           '--event-color': calendarColor || 'var(--color-accent)',
         } as React.CSSProperties
       }

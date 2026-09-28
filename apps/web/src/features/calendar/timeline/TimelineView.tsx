@@ -47,6 +47,8 @@ export interface TimelineViewProps {
   showEventDetails?: boolean;
   /** Shade the time outside `workingHours`. Snapping to working hours applies either way. */
   showWorkingHours?: boolean;
+  /** Color of the calendar a new event lands in, so a drag-selection previews the draft it becomes. */
+  selectionColor?: string;
 }
 
 /** Shortest event, in minutes on the grid, that has room for the details line. */
@@ -71,6 +73,7 @@ export function TimelineView({
   revealEventId = null,
   showEventDetails = false,
   showWorkingHours = true,
+  selectionColor,
 }: TimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isWeek = dateKeys.length > 1;
@@ -357,14 +360,18 @@ export function TimelineView({
                 {dragSelection && dragSelection.dateKey === dateKey && (
                   <div
                     className={styles.dragSelectionIndicator}
-                    style={{
-                      top: (dragSelection.startMinute / 60) * hourHeight,
-                      height: Math.max(
-                        20,
-                        ((dragSelection.endMinute - dragSelection.startMinute) / 60) * hourHeight -
-                          2,
-                      ),
-                    }}
+                    style={
+                      {
+                        top: (dragSelection.startMinute / 60) * hourHeight,
+                        height: Math.max(
+                          20,
+                          ((dragSelection.endMinute - dragSelection.startMinute) / 60) *
+                            hourHeight -
+                            2,
+                        ),
+                        ...(selectionColor && { '--event-color': selectionColor }),
+                      } as React.CSSProperties
+                    }
                   >
                     <span>
                       {formatMinute(dragSelection.startMinute, hourCycle)} –{' '}

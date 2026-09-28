@@ -5,6 +5,7 @@
   --color-bg-surface: #13171e;
   --color-bg-surface-raised: #181d26;
   --color-bg-surface-elevated: #1d2330;
+  --color-bg-popover: #1d2330;
   --color-bg-surface-pressed: #252c39;
   --color-bg-input: #0f131a;
   --color-bg-overlay: rgba(7, 9, 13, 0.72);
@@ -89,6 +90,7 @@
   --color-bg-surface: #ffffff;
   --color-bg-surface-raised: #f9fbfe;
   --color-bg-surface-elevated: #edf4fc;
+  --color-bg-popover: #ffffff;
   --color-bg-surface-pressed: #e4edf8;
   --color-bg-input: #ffffff;
   --color-bg-overlay: rgba(11, 20, 51, 0.26);
@@ -135,6 +137,7 @@
     --color-bg-surface: #ffffff;
     --color-bg-surface-raised: #f9fbfe;
     --color-bg-surface-elevated: #edf4fc;
+    --color-bg-popover: #ffffff;
     --color-bg-surface-pressed: #e4edf8;
     --color-bg-input: #ffffff;
     --color-bg-overlay: rgba(11, 20, 51, 0.26);

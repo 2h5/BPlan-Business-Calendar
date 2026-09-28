@@ -44,7 +44,7 @@ describe('TimelineDraftEvent', () => {
     );
 
     expect(html).toContain(
-      `class="${styles.draftTimelineEvent} ${styles.draftTimelineEventBubbleExit}"`,
+      `class="${styles.draftTimelineEvent} ${styles.draftTimelineEventShort} ${styles.draftTimelineEventBubbleExit}"`,
     );
     expect(html).toContain('style="top:486px;height:22px;--event-color:var(--color-accent)"');
     expect(html).toContain('(New event)');

@@ -41,7 +41,6 @@ function renderToolbar(overrides: Partial<Props> = {}) {
     heading: 'September 2026',
     isFetching: false,
     calendars,
-    timeZone: 'America/New_York',
     onToggleVisibility: vi.fn(),
     onCreateCalendar: vi.fn(),
     onEditCalendar: vi.fn(),
@@ -103,7 +102,6 @@ describe('CalendarToolbar calendars menu', () => {
     );
     expect(menu).toHaveTextContent('Default · BPlan');
     expect(menu).toHaveTextContent('BPlan · Read only');
-    expect(menu).toHaveTextContent('America/New York');
   });
 
   it('closes over 150 ms, or sooner on its own animation end', () => {
