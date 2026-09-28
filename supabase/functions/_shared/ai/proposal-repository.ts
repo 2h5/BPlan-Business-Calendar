@@ -42,6 +42,7 @@ export interface PersistedAiSuggestion extends AiSuggestionToPersist {
 
 export interface AiRequestUpdate {
   status?: 'pending' | 'proposed' | 'failed';
+  requestKind?: 'find_time' | 'move_event';
   rawText?: string | null;
   adHocTitle?: string | null;
   adHocDurationMinutes?: number | null;
@@ -109,6 +110,7 @@ export function supabaseAiScheduleRepository(admin: SupabaseClient): AiScheduleR
     async updateRequest(userId, requestId, patch) {
       const payload: Record<string, unknown> = {};
       if (patch.status !== undefined) payload.status = patch.status;
+      if (patch.requestKind !== undefined) payload.request_kind = patch.requestKind;
       if (patch.rawText !== undefined) payload.raw_text = patch.rawText;
       if (patch.adHocTitle !== undefined) payload.ad_hoc_title = patch.adHocTitle;
       if (patch.adHocDurationMinutes !== undefined) {

@@ -2,6 +2,7 @@ import {
   isValidCalendarDate,
   occasionIntentSchema,
   schedulingIntentSchema,
+  type DateIntent,
   type SchedulingIntent,
   type WeekdayName,
 } from '@cal/schemas/scheduling';
@@ -10,7 +11,7 @@ import { EdgeError } from '../errors/index.ts';
 
 export const AI_INTENT_PROMPT_VERSION = 'find-time-intent-v2';
 
-const IMPOSSIBLE_DATE_QUESTION = "That date doesn't exist. Which date did you mean?";
+export const IMPOSSIBLE_DATE_QUESTION = "That date doesn't exist. Which date did you mean?";
 
 export interface AiIntentUsage {
   inputTokens: number | null;
@@ -390,10 +391,118 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     }
   }
 
-  // Convert and strictly validate date
-  let date: SchedulingIntent['date'];
-  let impossibleDate = false;
-  const d = requireRecord(raw.date, 'Date intent');
+  const { date, impossibleDate } = parseDateIntentOutput(raw.date);
+
+  const rawOccasion = raw.occasion;
+  const occasion = rawOccasion === null ? null : occasionIntentSchema.safeParse(rawOccasion);
+  if (occasion !== null && !occasion.success) {
+    throw new EdgeError('AI_INVALID_OUTPUT', 'Intent field occasion is invalid.', 502);
+  }
+
+  const time = parseTimeIntentOutput(raw.time);
+
+  const requiresClarification = raw.requiresClarification || impossibleDate;
+  const modelQuestion =
+    typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
+      ? raw.clarificationQuestion.trim()
+      : null;
+  const clarificationQuestion =
+    impossibleDate && !(raw.requiresClarification && modelQuestion)
+      ? IMPOSSIBLE_DATE_QUESTION
+      : modelQuestion;
+
+  if (requiresClarification && !clarificationQuestion) {
+    throw new EdgeError(
+      'AI_INVALID_OUTPUT',
+      'A non-empty clarification question is required when requiresClarification is true.',
+      502,
+    );
+  }
+
+  const normalized = {
+    title: typeof raw.title === 'string' ? raw.title.trim() : '',
+    duration,
+    date,
+    time,
+    occasion: occasion === null ? null : occasion.data,
+    location: typeof raw.location === 'string' && raw.location.trim() ? raw.location.trim() : null,
+    description:
+      typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null,
+    requiresClarification,
+    clarificationQuestion,
+  };
+
+  const parsed = schedulingIntentSchema.safeParse(normalized);
+  if (!parsed.success) {
+    throw new EdgeError(
+      'AI_INVALID_OUTPUT',
+      `The AI returned an invalid scheduling intent: ${parsed.error.issues[0]?.message ?? 'Unknown'}`,
+      502,
+    );
+  }
+
+  return parsed.data;
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `${label} must be a valid object.`, 502);
+  }
+  return value as Record<string, unknown>;
+}
+
+export function rejectUnexpectedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+): void {
+  const allowedKeys = new Set(allowed);
+  const unexpected = Object.keys(value).find((key) => !allowedKeys.has(key));
+  if (unexpected) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `The AI returned an unexpected ${label} field.`, 502);
+  }
+}
+
+function validateOptionalInteger(
+  value: Record<string, unknown>,
+  key: string,
+  min: number,
+  max: number,
+): void {
+  const candidate = value[key];
+  const upperBound = key.toLowerCase().endsWith('hour') ? 23 : max;
+  if (
+    candidate !== null &&
+    candidate !== undefined &&
+    (typeof candidate !== 'number' ||
+      !Number.isInteger(candidate) ||
+      candidate < min ||
+      candidate > upperBound)
+  ) {
+    throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is out of range.`, 502);
+  }
+}
+
+function validateOptionalEnum(
+  value: Record<string, unknown>,
+  key: string,
+  allowed: readonly string[],
+): void {
+  const candidate = value[key];
+  if (candidate !== null && candidate !== undefined) {
+    if (typeof candidate !== 'string' || !allowed.includes(candidate)) {
+      throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is invalid.`, 502);
+    }
+  }
+}
+
+/** Shared strict-mode date conversion. Callers handle impossible dates as clarification. */
+export function parseDateIntentOutput(value: unknown): {
+  date: DateIntent;
+  impossibleDate: boolean;
+} {
+  let date: DateIntent;
+  const d = requireRecord(value, 'Date intent');
   rejectUnexpectedKeys(d, DATE_KEYS, 'date');
   validateOptionalEnum(d, 'weekday', [
     'monday',
@@ -472,15 +581,12 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
       );
     }
     if (!isValidCalendarDate(d.date)) {
-      // A well-formed but nonexistent date ("February 30th") is a user error,
-      // not a model failure: ask which date was meant instead of failing.
-      impossibleDate = true;
-      date = { type: 'unconstrained' };
-    } else if (d.type === 'explicit_date') {
-      date = { type: 'explicit_date', date: d.date };
-    } else {
-      date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
+      return { date: { type: 'unconstrained' }, impossibleDate: true };
     }
+    date =
+      d.type === 'explicit_date'
+        ? { type: 'explicit_date', date: d.date }
+        : { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
   } else {
     throw new EdgeError(
       'AI_INVALID_OUTPUT',
@@ -489,18 +595,14 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  const rawOccasion = raw.occasion;
-  const occasion = rawOccasion === null ? null : occasionIntentSchema.safeParse(rawOccasion);
-  if (occasion !== null && !occasion.success) {
-    throw new EdgeError('AI_INVALID_OUTPUT', 'Intent field occasion is invalid.', 502);
-  }
+  return { date, impossibleDate: false };
+}
 
-  // Convert and strictly validate time
+/** The time counterpart of `parseDateIntentOutput`. */
+export function parseTimeIntentOutput(value: unknown): SchedulingIntent['time'] {
   let time: SchedulingIntent['time'];
-  const t = { ...requireRecord(raw.time, 'Time intent') };
+  const t = { ...requireRecord(value, 'Time intent') };
   rejectUnexpectedKeys(t, TIME_KEYS, 'time');
-  // An hour-only phrase ("after 4") means on the hour; the flattened schema
-  // lets the model emit a null minute, which is not a reason to fail.
   for (const [hourKey, minuteKey] of [
     ['hour', 'minute'],
     ['startHour', 'startMinute'],
@@ -608,97 +710,5 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     );
   }
 
-  const requiresClarification = raw.requiresClarification || impossibleDate;
-  const modelQuestion =
-    typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
-      ? raw.clarificationQuestion.trim()
-      : null;
-  const clarificationQuestion =
-    impossibleDate && !(raw.requiresClarification && modelQuestion)
-      ? IMPOSSIBLE_DATE_QUESTION
-      : modelQuestion;
-
-  if (requiresClarification && !clarificationQuestion) {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      'A non-empty clarification question is required when requiresClarification is true.',
-      502,
-    );
-  }
-
-  const normalized = {
-    title: typeof raw.title === 'string' ? raw.title.trim() : '',
-    duration,
-    date,
-    time,
-    occasion: occasion === null ? null : occasion.data,
-    location: typeof raw.location === 'string' && raw.location.trim() ? raw.location.trim() : null,
-    description:
-      typeof raw.description === 'string' && raw.description.trim() ? raw.description.trim() : null,
-    requiresClarification,
-    clarificationQuestion,
-  };
-
-  const parsed = schedulingIntentSchema.safeParse(normalized);
-  if (!parsed.success) {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      `The AI returned an invalid scheduling intent: ${parsed.error.issues[0]?.message ?? 'Unknown'}`,
-      502,
-    );
-  }
-
-  return parsed.data;
-}
-
-function requireRecord(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new EdgeError('AI_INVALID_OUTPUT', `${label} must be a valid object.`, 502);
-  }
-  return value as Record<string, unknown>;
-}
-
-function rejectUnexpectedKeys(
-  value: Record<string, unknown>,
-  allowed: readonly string[],
-  label: string,
-): void {
-  const allowedKeys = new Set(allowed);
-  const unexpected = Object.keys(value).find((key) => !allowedKeys.has(key));
-  if (unexpected) {
-    throw new EdgeError('AI_INVALID_OUTPUT', `The AI returned an unexpected ${label} field.`, 502);
-  }
-}
-
-function validateOptionalInteger(
-  value: Record<string, unknown>,
-  key: string,
-  min: number,
-  max: number,
-): void {
-  const candidate = value[key];
-  const upperBound = key.toLowerCase().endsWith('hour') ? 23 : max;
-  if (
-    candidate !== null &&
-    candidate !== undefined &&
-    (typeof candidate !== 'number' ||
-      !Number.isInteger(candidate) ||
-      candidate < min ||
-      candidate > upperBound)
-  ) {
-    throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is out of range.`, 502);
-  }
-}
-
-function validateOptionalEnum(
-  value: Record<string, unknown>,
-  key: string,
-  allowed: readonly string[],
-): void {
-  const candidate = value[key];
-  if (candidate !== null && candidate !== undefined) {
-    if (typeof candidate !== 'string' || !allowed.includes(candidate)) {
-      throw new EdgeError('AI_INVALID_OUTPUT', `Intent field ${key} is invalid.`, 502);
-    }
-  }
+  return time;
 }
