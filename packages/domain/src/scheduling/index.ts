@@ -3,3 +3,4 @@ export * from './calendar-events.ts';
 export * from './intent.ts';
 export * from './intent-resolution.ts';
 export * from './semantic-time.ts';
+export * from './event-edit.ts';

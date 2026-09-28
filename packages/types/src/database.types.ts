@@ -64,6 +64,7 @@ export type Database = {
           provider: string | null
           raw_text: string | null
           reasoning_tokens: number | null
+          request_kind: string
           status: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id: string | null
           target_calendar_version: string | null
@@ -102,6 +103,7 @@ export type Database = {
           provider?: string | null
           raw_text?: string | null
           reasoning_tokens?: number | null
+          request_kind?: string
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
           target_calendar_version?: string | null
@@ -140,6 +142,7 @@ export type Database = {
           provider?: string | null
           raw_text?: string | null
           reasoning_tokens?: number | null
+          request_kind?: string
           status?: Database["public"]["Enums"]["ai_request_status"]
           target_calendar_id?: string | null
           target_calendar_version?: string | null

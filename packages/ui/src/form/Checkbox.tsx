@@ -14,6 +14,10 @@ export interface CheckboxProps {
   onChange: (checked: boolean) => void;
   /** Overrides the fill. Defaults to the success tone the web uses. */
   color?: string;
+  /** Overrides the unchecked ring, e.g. to hint at priority or lateness. */
+  ringColor?: string;
+  /** A circle instead of the default rounded square. */
+  round?: boolean;
   size?: number;
   disabled?: boolean;
   accessibilityLabel: string;
@@ -35,6 +39,8 @@ export function Checkbox({
   checked,
   onChange,
   color,
+  ringColor,
+  round = false,
   size = 20,
   disabled = false,
   accessibilityLabel,
@@ -43,6 +49,7 @@ export function Checkbox({
 }: CheckboxProps) {
   const theme = useTheme();
   const tint = color ?? theme.colors.success;
+  const ring = ringColor ?? theme.colors.borderStrong;
 
   const progress = useDerivedValue(
     () => withTiming(checked ? 1 : 0, { duration: theme.motion.duration.fast }),
@@ -51,7 +58,7 @@ export function Checkbox({
 
   const boxStyle = useAnimatedStyle(() => ({
     backgroundColor: progress.value > 0.5 ? tint : 'transparent',
-    borderColor: progress.value > 0.5 ? tint : theme.colors.borderStrong,
+    borderColor: progress.value > 0.5 ? tint : ring,
   }));
 
   const tickStyle = useAnimatedStyle(() => ({
@@ -76,7 +83,7 @@ export function Checkbox({
           {
             width: size,
             height: size,
-            borderRadius: Math.max(4, Math.round(size * 0.24)),
+            borderRadius: round ? size / 2 : Math.max(4, Math.round(size * 0.24)),
             borderWidth: 1.5,
             alignItems: 'center',
             justifyContent: 'center',

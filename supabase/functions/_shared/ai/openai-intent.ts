@@ -7,6 +7,7 @@ import {
   INTENT_INSTRUCTIONS,
   validateAiSchedulingIntent,
   type AiIntentInput,
+  type AiIntentMetadata,
   type AiIntentProvider,
   type AiIntentResult,
 } from './intent.ts';
@@ -75,37 +76,74 @@ export function createOpenAiIntentProvider(
   config: OpenAiIntentConfig,
   deps: OpenAiIntentDeps = {},
 ): AiIntentProvider {
-  const fetcher = deps.fetch ?? fetch;
-  const now = deps.now ?? (() => Date.now());
-  const sleep = deps.sleep ?? defaultSleep;
-
   return {
     provider: 'openai',
     model: config.model,
     parseSchedulingIntent: async (input: AiIntentInput) => {
-      const startedAt = now();
-      const deadline = startedAt + config.timeoutMs;
-      const response = await sendWithRetry(config, input, { fetcher, now, sleep, deadline });
-      const body = await readResponse(response);
-      const rawJson = parseOutputJson(body);
-      const intent = validateAiSchedulingIntent(rawJson);
-
-      return {
-        intent,
-        metadata: {
-          provider: 'openai',
-          model: body.model,
-          responseId: body.id,
+      const { json, metadata } = await requestOpenAiStructuredOutput(
+        config,
+        {
+          instructions: INTENT_INSTRUCTIONS,
+          schemaName: 'ai_scheduling_intent',
+          schema: AI_INTENT_JSON_SCHEMA,
           promptVersion: AI_INTENT_PROMPT_VERSION,
-          latencyMs: Math.max(0, now() - startedAt),
-          usage: {
-            inputTokens: body.usage?.input_tokens ?? null,
-            outputTokens: body.usage?.output_tokens ?? null,
-            reasoningTokens: body.usage?.output_tokens_details?.reasoning_tokens ?? null,
-            totalTokens: body.usage?.total_tokens ?? null,
+          input: {
+            rawText: input.rawText,
+            timezone: input.timezone,
+            currentLocalDate: input.currentLocalDate,
+            currentLocalTime: input.currentLocalTime,
           },
         },
-      } satisfies AiIntentResult;
+        deps,
+      );
+
+      return { intent: validateAiSchedulingIntent(json), metadata } satisfies AiIntentResult;
+    },
+  };
+}
+
+export interface StructuredOutputRequest {
+  instructions: string;
+  schemaName: string;
+  schema: unknown;
+  promptVersion: string;
+  /** Serialised as the single user input; untrusted text goes inside it. */
+  input: unknown;
+}
+
+/**
+ * One strict-JSON Responses API call with the shared timeout, retry, refusal,
+ * and usage handling. Every intent prompt goes through here, so they cannot
+ * differ in how a slow or malformed response fails.
+ */
+export async function requestOpenAiStructuredOutput(
+  config: OpenAiIntentConfig,
+  request: StructuredOutputRequest,
+  deps: OpenAiIntentDeps = {},
+): Promise<{ json: unknown; metadata: AiIntentMetadata }> {
+  const fetcher = deps.fetch ?? fetch;
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? defaultSleep;
+
+  const startedAt = now();
+  const deadline = startedAt + config.timeoutMs;
+  const response = await sendWithRetry(config, request, { fetcher, now, sleep, deadline });
+  const body = await readResponse(response);
+
+  return {
+    json: parseOutputJson(body),
+    metadata: {
+      provider: 'openai',
+      model: body.model,
+      responseId: body.id,
+      promptVersion: request.promptVersion,
+      latencyMs: Math.max(0, now() - startedAt),
+      usage: {
+        inputTokens: body.usage?.input_tokens ?? null,
+        outputTokens: body.usage?.output_tokens ?? null,
+        reasoningTokens: body.usage?.output_tokens_details?.reasoning_tokens ?? null,
+        totalTokens: body.usage?.total_tokens ?? null,
+      },
     },
   };
 }
@@ -166,7 +204,7 @@ interface RequestDeps {
 
 async function sendWithRetry(
   config: OpenAiIntentConfig,
-  input: AiIntentInput,
+  request: StructuredOutputRequest,
   deps: RequestDeps,
 ): Promise<Response> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -181,7 +219,7 @@ async function sendWithRetry(
           Authorization: `Bearer ${config.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody(config, input)),
+        body: JSON.stringify(requestBody(config, request)),
         signal: AbortSignal.timeout(Math.max(1, remaining)),
       });
     } catch {
@@ -199,24 +237,19 @@ async function sendWithRetry(
   throw providerUnavailable();
 }
 
-function requestBody(config: OpenAiIntentConfig, input: AiIntentInput): unknown {
+function requestBody(config: OpenAiIntentConfig, request: StructuredOutputRequest): unknown {
   return {
     model: config.model,
     store: false,
     reasoning: { effort: config.reasoningEffort },
-    instructions: INTENT_INSTRUCTIONS,
-    input: JSON.stringify({
-      rawText: input.rawText,
-      timezone: input.timezone,
-      currentLocalDate: input.currentLocalDate,
-      currentLocalTime: input.currentLocalTime,
-    }),
+    instructions: request.instructions,
+    input: JSON.stringify(request.input),
     text: {
       format: {
         type: 'json_schema',
-        name: 'ai_scheduling_intent',
+        name: request.schemaName,
         strict: true,
-        schema: AI_INTENT_JSON_SCHEMA,
+        schema: request.schema,
       },
       verbosity: 'low',
     },
