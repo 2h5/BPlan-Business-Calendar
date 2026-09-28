@@ -208,13 +208,19 @@
   background: var(--color-bg-surface-raised);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 18px 48px rgba(0, 0, 0, 0.42);
+    0 4px 14px rgba(0, 0, 0, 0.14),
+    var(--shadow-lg);
+  /* The reveal clip reaches past the edges so it never cuts off the shadow. */
+  --panel-shadow-bleed: 96px;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transform: translateY(-7px) scale(0.985);
   transform-origin: top right;
-  clip-path: inset(0 0 100% 0 round var(--radius-lg));
+  clip-path: inset(
+    calc(-1 * var(--panel-shadow-bleed)) calc(-1 * var(--panel-shadow-bleed)) 100%
+      calc(-1 * var(--panel-shadow-bleed))
+  );
   transition:
     opacity 140ms ease,
     transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -227,7 +233,7 @@
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0) scale(1);
-  clip-path: inset(0 0 0 0 round var(--radius-lg));
+  clip-path: inset(calc(-1 * var(--panel-shadow-bleed)));
   transition:
     opacity 150ms ease 70ms,
     transform 230ms cubic-bezier(0.22, 1, 0.36, 1) 50ms,
