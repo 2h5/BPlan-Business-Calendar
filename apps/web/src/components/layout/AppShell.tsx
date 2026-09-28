@@ -7,6 +7,7 @@ import { initialSidebarCollapsed, writeSidebarCollapsed } from './sidebar-collap
 import { WORKSPACE_NAV, type WorkspaceNavItem } from './workspace-nav';
 import { signOut, useAuth } from '../../features/auth';
 import { ProfileAvatar } from '../../features/settings/components/ProfileAvatar';
+import { useApplyAccent } from '../../features/settings/hooks/useAccent';
 import { useAppPreferences } from '../../features/settings/hooks/useAppPreferences';
 import { useDragReorder } from '../../features/settings/hooks/useDragReorder';
 import { useProfile } from '../../features/settings/hooks/useSettings';
@@ -108,6 +109,7 @@ export function AppShell() {
   const { email } = useAuth();
   const { data: profile } = useProfile();
   const { preferences, setPreference } = useAppPreferences();
+  useApplyAccent();
   const {
     accountMenuTrigger,
     showPlanInSidebar,
@@ -313,17 +315,12 @@ export function AppShell() {
               <path d="M3 12h26" stroke="var(--color-bg-sidebar)" strokeWidth="2" />
               <path
                 d="m10 20 4 4 8-9"
-                stroke="var(--color-on-accent)"
+                stroke="#ffffff"
                 strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              <path
-                d="M10 3v5M22 3v5"
-                stroke="var(--color-on-accent)"
-                strokeWidth="2.4"
-                strokeLinecap="round"
-              />
+              <path d="M10 3v5M22 3v5" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" />
             </svg>
           </div>
           <span className={styles.brandName}>BPlan</span>

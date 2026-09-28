@@ -68,7 +68,8 @@
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  color: var(--color-accent);
+  /* The logo stays BPlan blue whatever accent the user picks. */
+  color: var(--color-brand);
   transition:
     opacity 160ms ease-out,
     transform 220ms var(--sidebar-ease);
@@ -303,14 +304,14 @@
 }
 
 .navItemHighlight:not(.navItemActive) {
-  background: rgba(23, 104, 242, 0.06);
-  border: 1px solid rgba(23, 104, 242, 0.16);
+  background: rgba(var(--color-accent-rgb), 0.06);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.16);
   color: var(--color-text-primary);
 }
 
 .navItemHighlight:not(.navItemActive):hover {
-  background: rgba(23, 104, 242, 0.12);
-  border-color: rgba(23, 104, 242, 0.3);
+  background: rgba(var(--color-accent-rgb), 0.12);
+  border-color: rgba(var(--color-accent-rgb), 0.3);
   color: var(--color-text-primary);
 }
 
@@ -322,7 +323,7 @@
   margin-left: auto;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
-  background: rgba(23, 104, 242, 0.14);
+  background: rgba(var(--color-accent-rgb), 0.14);
   color: var(--color-accent);
   font-size: 0.625rem;
   font-weight: var(--font-weight-bold);
@@ -332,7 +333,7 @@
 }
 
 .navItemActive .navBadge {
-  background: rgba(23, 104, 242, 0.22);
+  background: rgba(var(--color-accent-rgb), 0.22);
 }
 
 .navIcon {

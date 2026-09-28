@@ -17,7 +17,18 @@ describe('parseAppPreferences', () => {
       calendarHotkeys: { enabled: true, day: 'd', week: 'w', month: 'm' },
       showEventDetails: false,
       showWorkingHours: true,
+      accentColor: '#1768f2',
     });
+  });
+
+  it('keeps a valid accent color, normalised to lowercase', () => {
+    expect(parseAppPreferences({ accentColor: '#DB2777' }).accentColor).toBe('#db2777');
+  });
+
+  it('falls back to BPlan blue for a malformed accent color', () => {
+    for (const accentColor of ['red', '#fff', '#12345g', 42, null]) {
+      expect(parseAppPreferences({ accentColor }).accentColor).toBe('#1768f2');
+    }
   });
 
   it('keeps shortcuts off for users who turned them off', () => {
@@ -45,6 +56,7 @@ describe('parseAppPreferences', () => {
       calendarHotkeys: { enabled: true, day: 'x', week: 'w', month: 'm' },
       showEventDetails: false,
       showWorkingHours: true,
+      accentColor: '#1768f2',
     });
     expect(parseAppPreferences({ accountMenuTrigger: 'long-press' }).accountMenuTrigger).toBe(
       'click',

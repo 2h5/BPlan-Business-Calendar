@@ -26,6 +26,9 @@ vi.mock('./ConnectionsSection', () => ({
   ConnectionsSection: () => <div data-testid="connections-section" />,
 }));
 
+vi.mock('./AccentPicker', () => ({
+  AccentPicker: () => null,
+}));
 vi.mock('./AccountPanel', () => ({
   AccountPanel: () => <div data-testid="account-panel" />,
 }));

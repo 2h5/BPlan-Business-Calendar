@@ -2,6 +2,7 @@ import type { HourCycle, Profile, WorkingHours } from '@cal/schemas';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
+import { AccentPicker } from './AccentPicker';
 import { AccountPanel } from './AccountPanel';
 import { ConnectionsSection } from './ConnectionsSection';
 import { ProfilePhotoField } from './ProfilePhotoField';
@@ -240,6 +241,7 @@ export function SettingsView() {
                 </div>
               </button>
             </div>
+            <AccentPicker />
           </section>
 
           <Link to="/settings/customize" className={`${styles.section} ${styles.customizeLink}`}>

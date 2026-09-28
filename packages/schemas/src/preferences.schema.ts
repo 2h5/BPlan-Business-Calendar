@@ -10,8 +10,8 @@
  *
  * Web-only today: `accountMenuTrigger`, `showPlanInSidebar`,
  * `showSearchInSidebar`, `workspaceOrder`, and `sidebarOnLaunch` (sidebar),
- * `calendarHotkeys` (keyboard), and `showEventDetails` and `showWorkingHours`
- * (calendar).
+ * `calendarHotkeys` (keyboard), `showEventDetails` and `showWorkingHours`
+ * (calendar), and `accentColor` (appearance).
  */
 
 export type CalendarHotkeyView = 'day' | 'week' | 'month';
@@ -32,6 +32,15 @@ const calendarHotkeysSchema = z
     month: hotkeySchema.catch(DEFAULT_CALENDAR_HOTKEYS.month),
   })
   .catch({ enabled: true, ...DEFAULT_CALENDAR_HOTKEYS });
+
+/** BPlan blue. Also the brand color, which never follows the user's accent. */
+export const DEFAULT_ACCENT_COLOR = '#1768f2';
+
+/** A six-digit hex color, normalised to lowercase. */
+export const accentColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .transform((value) => value.toLowerCase());
 
 export const WORKSPACE_TABS = ['today', 'calendar', 'tasks', 'search'] as const;
 export type WorkspaceTab = (typeof WORKSPACE_TABS)[number];
@@ -67,6 +76,9 @@ export const appPreferencesSchema = z.object({
   showEventDetails: z.boolean().catch(false),
   // Day and week views: shade the time outside the user's working hours.
   showWorkingHours: z.boolean().catch(true),
+  // Accent color for the signed-in app. Custom (non-preset) colors are Pro-only;
+  // that rule is applied where the accent is resolved, not here.
+  accentColor: accentColorSchema.catch(DEFAULT_ACCENT_COLOR),
 });
 
 export type AppPreferences = z.infer<typeof appPreferencesSchema>;

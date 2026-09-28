@@ -1,0 +1,181 @@
+.picker {
+  padding: var(--space-5) var(--space-6) var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+  display: grid;
+  gap: var(--space-4);
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-1);
+}
+.heading strong {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.heading span {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.swatch {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  cursor: pointer;
+  /* An inner hairline keeps pale colors visible against the card. */
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.swatch:hover {
+  transform: scale(1.08);
+}
+.swatch[aria-checked='true'],
+.customSelected {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.08),
+    0 0 0 2px var(--color-bg-surface),
+    0 0 0 4px var(--color-text-tertiary);
+}
+.swatch:focus-visible,
+.customSwatch:has(.colorInput:focus-visible) {
+  outline: 2px solid var(--color-focus-accent);
+  outline-offset: 3px;
+}
+
+.check {
+  width: 16px;
+  height: 16px;
+}
+
+.customSwatch {
+  background: conic-gradient(
+    from 0deg,
+    #ef4444,
+    #f59e0b,
+    #eab308,
+    #22c55e,
+    #06b6d4,
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #ef4444
+  );
+}
+.customSwatch:has(.colorInput:disabled) {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* The native input covers the swatch so a click anywhere opens the picker. */
+.colorInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.lockedSwatch {
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-secondary);
+  border: 1px dashed var(--color-border-strong);
+  box-shadow: none;
+}
+.lockedSwatch svg {
+  width: 14px;
+  height: 14px;
+}
+
+.footer {
+  min-height: var(--control-height-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.hexField {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.hexField input {
+  width: 96px;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  text-transform: lowercase;
+}
+.hexField input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.upsell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+.upsell a {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.proBadge {
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.reset {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.reset:hover {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swatch {
+    transition: none;
+  }
+  .swatch:hover {
+    transform: none;
+  }
+}
