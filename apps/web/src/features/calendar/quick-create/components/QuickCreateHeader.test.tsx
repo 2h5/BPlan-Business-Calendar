@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { QuickCreateHeader } from './QuickCreateHeader';
+import { QuickCreateTypeTabs } from './QuickCreateTypeTabs';
 
 const props = {
   isEditing: false,
@@ -22,6 +23,16 @@ interface ButtonProps {
   children?: ReactNode;
   'aria-label'?: string;
   onClick?: () => void;
+}
+
+function findElement<P>(node: ReactNode, type: unknown): ReactElement<P> | undefined {
+  if (!isValidElement<P & { children?: ReactNode }>(node)) return undefined;
+  if (node.type === type) return node;
+  for (const child of Children.toArray(node.props.children)) {
+    const match = findElement<P>(child, type);
+    if (match) return match;
+  }
+  return undefined;
 }
 
 function findButton(node: ReactNode, label: string): ReactElement<ButtonProps> | undefined {
@@ -97,9 +108,16 @@ describe('QuickCreateHeader', () => {
 
   it('routes each control to its supplied callback', () => {
     const header = QuickCreateHeader({ ...props, showDelete: true, isDeleteConfirmOpen: true });
+    const tabs = findElement<Parameters<typeof QuickCreateTypeTabs>[0]>(
+      header,
+      QuickCreateTypeTabs,
+    );
+    tabs?.props.onSelectEvent();
+    tabs?.props.onSelectTask();
+    expect(props.onSelectEvent).toHaveBeenCalledOnce();
+    expect(props.onSelectTask).toHaveBeenCalledOnce();
+
     const actions = [
-      ['Event', props.onSelectEvent],
-      ['Task', props.onSelectTask],
       ['Delete event', props.onToggleDeleteConfirm],
       ['Cancel', props.onCancelDelete],
       ['Delete', props.onConfirmDelete],

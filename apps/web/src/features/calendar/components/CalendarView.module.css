@@ -515,25 +515,28 @@
 
 .iconButton:hover,
 .todayButton:hover,
-.viewButton:hover,
 .closeButton:hover {
   background: var(--color-hover);
   color: var(--color-text-primary);
 }
 
 .viewSwitcher {
+  position: relative;
   padding: 2px;
+  border-color: var(--color-segment-border);
+  background: var(--color-segment-track);
 }
 
 .viewButton {
+  position: relative;
   min-width: 52px;
   padding: 0 var(--space-2);
   border-radius: calc(var(--radius-sm) - 1px);
+  transition: color var(--transition-fast);
 }
 
+.viewButton:hover,
 .viewButtonActive {
-  background: var(--color-bg-surface-elevated);
-  box-shadow: var(--shadow-sm);
   color: var(--color-text-primary);
 }
 

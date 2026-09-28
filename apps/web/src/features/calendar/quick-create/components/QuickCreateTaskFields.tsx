@@ -6,6 +6,8 @@ import {
   type TimePickerOption,
 } from './QuickCreatePickers';
 import { Select } from '../../../../components/forms/Select';
+import { SegmentIndicator } from '../../../../components/segmented/SegmentIndicator';
+import { useSegmentIndicator } from '../../../../components/segmented/useSegmentIndicator';
 import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateTaskFieldsProps {
@@ -43,6 +45,7 @@ export function QuickCreateTaskFields({
   description,
   onDescriptionChange,
 }: QuickCreateTaskFieldsProps) {
+  const priorityRef = useSegmentIndicator<HTMLDivElement>(taskPriority);
   return (
     <>
       {/* Task Mode Details */}
@@ -157,11 +160,18 @@ export function QuickCreateTaskFields({
           </svg>
         </span>
 
-        <div className={styles.priorityGroup} role="group" aria-label="Task priority">
+        <div
+          ref={priorityRef}
+          className={styles.priorityGroup}
+          role="group"
+          aria-label="Task priority"
+        >
+          <SegmentIndicator />
           {(['low', 'normal', 'high', 'urgent'] as const).map((p) => (
             <button
               key={p}
               type="button"
+              aria-pressed={taskPriority === p}
               className={`${styles.priorityButton} ${taskPriority === p ? styles.priorityButtonActive : ''}`}
               onClick={() => onTaskPriorityChange(p)}
             >

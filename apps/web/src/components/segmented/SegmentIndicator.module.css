@@ -1,0 +1,40 @@
+/*
+ * A white pill that glides between options on a recessed track, sized to
+ * whichever option is selected. Position and size come from
+ * `useSegmentIndicator`; each control sets its track from the
+ * `--color-segment-*` tokens and, if needed, its radius.
+ */
+.indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: var(--segment-width, 0);
+  height: var(--segment-height, 0);
+  border-radius: calc(var(--radius-sm) - 1px);
+  background: var(--color-segment-thumb);
+  box-shadow:
+    0 0 0 1px var(--color-segment-thumb-ring),
+    var(--shadow-sm);
+  transform: translate(var(--segment-x, 0), var(--segment-y, 0));
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-segment-selected] > .indicator {
+  opacity: 1;
+}
+
+[data-segment-ready] > .indicator {
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--transition-fast);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-segment-ready] > .indicator {
+    transition: opacity var(--transition-fast);
+  }
+}

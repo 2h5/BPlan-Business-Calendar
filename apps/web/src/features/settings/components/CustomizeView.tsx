@@ -8,6 +8,8 @@ import { Link } from 'react-router-dom';
 import styles from './CustomizeView.module.css';
 import { HotkeyBindingRow } from './HotkeyBindingRow';
 import { WorkspaceOrderList } from './WorkspaceOrderList';
+import { SegmentIndicator } from '../../../components/segmented/SegmentIndicator';
+import { useSegmentIndicator } from '../../../components/segmented/useSegmentIndicator';
 import { useAppPreferences } from '../hooks/useAppPreferences';
 import { defaultCalendarHotkeys, hotkeyOwner } from '../utils/app-preferences';
 
@@ -74,44 +76,24 @@ export function CustomizeView() {
               <strong>Open the account menu on</strong>
               <span>How Settings and Sign out appear from your name in the bottom-left.</span>
             </div>
-            <div className={styles.segmented} role="radiogroup" aria-label="Open account menu on">
-              {ACCOUNT_MENU_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={accountMenuTrigger === option.value}
-                  className={accountMenuTrigger === option.value ? styles.segmentActive : ''}
-                  onClick={() => setPreference('accountMenuTrigger', option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Open account menu on"
+              options={ACCOUNT_MENU_OPTIONS}
+              value={accountMenuTrigger}
+              onChange={(value) => setPreference('accountMenuTrigger', value)}
+            />
           </div>
           <div className={styles.row}>
             <div className={styles.rowText}>
               <strong>When the app opens</strong>
               <span>Start with the sidebar as you last left it, or always open or collapsed.</span>
             </div>
-            <div
-              className={styles.segmented}
-              role="radiogroup"
-              aria-label="Sidebar when the app opens"
-            >
-              {SIDEBAR_ON_LAUNCH_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={sidebarOnLaunch === option.value}
-                  className={sidebarOnLaunch === option.value ? styles.segmentActive : ''}
-                  onClick={() => setPreference('sidebarOnLaunch', option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="Sidebar when the app opens"
+              options={SIDEBAR_ON_LAUNCH_OPTIONS}
+              value={sidebarOnLaunch}
+              onChange={(value) => setPreference('sidebarOnLaunch', value)}
+            />
           </div>
           <div className={styles.row}>
             <div className={styles.rowText}>
@@ -282,5 +264,33 @@ function ChevronLeftIcon() {
     >
       <polyline points="15 18 9 12 15 6" />
     </svg>
+  );
+}
+
+interface SegmentedProps<T extends string> {
+  label: string;
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+function Segmented<T extends string>({ label, options, value, onChange }: SegmentedProps<T>) {
+  const ref = useSegmentIndicator<HTMLDivElement>(value);
+  return (
+    <div ref={ref} className={styles.segmented} role="radiogroup" aria-label={label}>
+      <SegmentIndicator />
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={value === option.value}
+          className={value === option.value ? styles.segmentActive : ''}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }

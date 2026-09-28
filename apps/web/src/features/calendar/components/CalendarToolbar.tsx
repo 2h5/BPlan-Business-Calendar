@@ -2,6 +2,8 @@ import type { Calendar } from '@cal/schemas';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import styles from './CalendarView.module.css';
+import { SegmentIndicator } from '../../../components/segmented/SegmentIndicator';
+import { useSegmentIndicator } from '../../../components/segmented/useSegmentIndicator';
 import type { CalendarViewMode } from '../utils/calendar-window';
 
 interface CalendarToolbarProps {
@@ -77,6 +79,7 @@ export function CalendarToolbar({
   onCreateEvent,
 }: CalendarToolbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const viewSwitcherRef = useSegmentIndicator<HTMLDivElement>(mode);
   const [isClosing, setIsClosing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const menuWrapperRef = useRef<HTMLDivElement>(null);
@@ -332,7 +335,8 @@ export function CalendarToolbar({
           </button>
         </div>
 
-        <div className={styles.viewSwitcher} aria-label="Calendar view">
+        <div ref={viewSwitcherRef} className={styles.viewSwitcher} aria-label="Calendar view">
+          <SegmentIndicator />
           {MODES.map((item) => (
             <button
               key={item.value}

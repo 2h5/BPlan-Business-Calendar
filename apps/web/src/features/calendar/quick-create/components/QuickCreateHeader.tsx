@@ -1,3 +1,4 @@
+import { QuickCreateTypeTabs } from './QuickCreateTypeTabs';
 import styles from '../QuickCreatePopover.module.css';
 
 interface QuickCreateHeaderProps {
@@ -32,26 +33,11 @@ export function QuickCreateHeader({
       {isEditing ? (
         <span className={styles.editingLabel}>Edit event</span>
       ) : (
-        <div className={styles.typeTabs} role="tablist" aria-label="Creation type">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'event'}
-            className={`${styles.tabButton} ${mode === 'event' ? styles.tabButtonActive : ''}`}
-            onClick={onSelectEvent}
-          >
-            Event
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode === 'task'}
-            className={`${styles.tabButton} ${mode === 'task' ? styles.tabButtonActive : ''}`}
-            onClick={onSelectTask}
-          >
-            Task
-          </button>
-        </div>
+        <QuickCreateTypeTabs
+          mode={mode}
+          onSelectEvent={onSelectEvent}
+          onSelectTask={onSelectTask}
+        />
       )}
 
       <div className={styles.headerRight}>
