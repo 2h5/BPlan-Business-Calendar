@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 
 import styles from './PricingPage.module.css';
 import { PublicPricingView } from '../features/billing/components/PublicPricingView';
-import { PricingDecals, PublicHeader } from '../features/public-site';
+import { PricingDecals, PublicHeader, useScrollToTopOnEnter } from '../features/public-site';
 
 export function PricingPage() {
+  useScrollToTopOnEnter();
+
   useEffect(() => {
     document.title = 'BPlan | Pricing';
   }, []);
