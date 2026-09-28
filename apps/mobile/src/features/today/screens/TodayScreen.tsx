@@ -145,6 +145,15 @@ export function TodayScreen() {
   const live = next ? now.getTime() >= next.start : false;
   const minutesUntilNext = next ? Math.max(0, Math.round((next.start - now.getTime()) / 60000)) : 0;
   const time = (ms: number) => formatTimeOfDay(new Date(ms), timeZone, hourCycle);
+  const timedByKey = new Map(timed.map((item) => [item.key, item]));
+  const openSegment = (key: string) => {
+    const item = timedByKey.get(key);
+    if (item) openEvent(item.event.id);
+  };
+  const describeSegment = (key: string) => {
+    const item = timedByKey.get(key);
+    return item ? `${item.event.title}, ${time(item.start)} – ${time(item.end)}` : 'Event';
+  };
 
   const eyebrow = next
     ? live
@@ -196,6 +205,8 @@ export function TodayScreen() {
           allDayCount={allDay.length}
           dayBar={dayBar}
           hourCycle={hourCycle}
+          onOpenSegment={openSegment}
+          describeSegment={describeSegment}
         />
 
         <FindTimeBar timeZone={timeZone} />

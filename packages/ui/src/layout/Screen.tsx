@@ -31,6 +31,8 @@ export interface ScreenProps {
   bottomClearance?: number;
   /** Pinned above the safe-area bottom inset, e.g. a primary action. */
   footer?: ReactNode;
+  /** Decoration drawn over the page colour and behind the content. */
+  backdrop?: ReactNode;
   contentStyle?: ViewStyle;
   testID?: string;
 }
@@ -49,6 +51,7 @@ export function Screen({
   refreshing = false,
   bottomClearance = 0,
   footer,
+  backdrop,
   contentStyle,
   testID,
 }: ScreenProps) {
@@ -65,6 +68,7 @@ export function Screen({
   return (
     <View testID={testID} style={[styles.root, { backgroundColor: theme.colors.background }]}>
       <StatusBar barStyle={theme.scheme === 'dark' ? 'light-content' : 'dark-content'} />
+      {backdrop}
 
       {scrollable ? (
         <ScrollView

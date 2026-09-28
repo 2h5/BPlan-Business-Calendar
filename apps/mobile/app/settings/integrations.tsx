@@ -1,5 +1,6 @@
 import { Screen } from '@cal/ui';
 
+import { useAuth } from '../../src/features/auth';
 import { IntegrationsScreen } from '../../src/features/integrations';
 
 /**
@@ -7,6 +8,9 @@ import { IntegrationsScreen } from '../../src/features/integrations';
  * `calendarapp://settings/integrations`, which resolves to this route.
  */
 export default function IntegrationsRoute() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return null;
+
   return (
     <Screen belowHeader>
       <IntegrationsScreen />

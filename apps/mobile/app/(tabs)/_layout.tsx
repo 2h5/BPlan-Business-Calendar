@@ -1,8 +1,15 @@
 import { useTheme } from '@cal/ui';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 
+import { useAuth } from '../../src/features/auth';
+
 export default function TabsLayout() {
   const theme = useTheme();
+  const { isAuthenticated } = useAuth();
+
+  // Signing out clears the session a moment before AuthGate navigates away;
+  // unmount the tabs first so no screen renders signed-out data hooks.
+  if (!isAuthenticated) return null;
 
   return (
     <NativeTabs
