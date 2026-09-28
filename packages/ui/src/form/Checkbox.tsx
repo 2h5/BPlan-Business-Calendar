@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
-  useDerivedValue,
+  useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
@@ -51,19 +52,30 @@ export function Checkbox({
   const tint = color ?? theme.colors.success;
   const ring = ringColor ?? theme.colors.borderStrong;
 
-  const progress = useDerivedValue(
-    () => withTiming(checked ? 1 : 0, { duration: theme.motion.duration.fast }),
-    [checked],
-  );
+  // Shared values set from an effect, not a derived value returning an
+  // animation, so the box follows `checked` in both directions.
+  const progress = useSharedValue(checked ? 1 : 0);
+  const tickScale = useSharedValue(checked ? 1 : 0.4);
+  const { duration, spring } = theme.motion;
+
+  useEffect(() => {
+    progress.value = withTiming(checked ? 1 : 0, { duration: duration.fast });
+    tickScale.value = withSpring(checked ? 1 : 0.4, spring);
+  }, [checked, duration.fast, progress, spring, tickScale]);
 
   const boxStyle = useAnimatedStyle(() => ({
-    backgroundColor: progress.value > 0.5 ? tint : 'transparent',
     borderColor: progress.value > 0.5 ? tint : ring,
   }));
 
+  // The fill is its own layer that fades, rather than an animated
+  // `backgroundColor`: Reanimated turns 'transparent' into 0, which the native
+  // side drops, so an unticked box stayed filled.
+  const fillStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+  const radius = round ? size / 2 : Math.max(4, Math.round(size * 0.24));
+
   const tickStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
-    transform: [{ scale: withSpring(checked ? 1 : 0.4, theme.motion.spring) }],
+    transform: [{ scale: tickScale.value }],
   }));
 
   return (
@@ -83,8 +95,9 @@ export function Checkbox({
           {
             width: size,
             height: size,
-            borderRadius: round ? size / 2 : Math.max(4, Math.round(size * 0.24)),
+            borderRadius: radius,
             borderWidth: 1.5,
+            overflow: 'hidden',
             alignItems: 'center',
             justifyContent: 'center',
             opacity: disabled ? 0.5 : 1,
@@ -92,6 +105,7 @@ export function Checkbox({
           boxStyle,
         ]}
       >
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: tint }, fillStyle]} />
         <AnimatedIonicons
           name="checkmark"
           size={size * 0.62}

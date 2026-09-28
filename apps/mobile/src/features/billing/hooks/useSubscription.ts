@@ -24,22 +24,26 @@ export interface PlanState {
   info: SubscriptionStatusInfo;
   /** Full access. Anything else — free, paused, expired — is not Pro. */
   isPro: boolean;
-  /** True until the entitlement is known, so nothing is decided too early. */
+  /** True until the first answer arrives, so nothing is decided too early. */
   isLoading: boolean;
+  /** The entitlement could not be read and there is no earlier answer to show. */
+  isUnavailable: boolean;
+  retry: () => void;
 }
 
 /** What plan the account is on, read the same way the web reads it. */
 export function usePlanState(): PlanState {
-  const { data, isPending, isError } = useSubscription();
+  const { data, isPending, isError, isFetching, refetch } = useSubscription();
   const info = getSubscriptionStatusInfo(data ?? null);
 
   return {
     info,
     isPro: info.state === 'active',
-    // An error is not proof of anything, so treat it as still unknown rather
-    // than telling someone who pays for Pro to upgrade. A failed *refetch* is
-    // different: the last answer still stands, so the card should not vanish
-    // because someone pressed refresh without signal.
-    isLoading: isPending || (isError && data === undefined),
+    isLoading: isPending && !isError,
+    // An error is not proof of anything, so it must not read as the free plan
+    // and tell someone who pays for Pro to upgrade. A failed *refetch* is
+    // different: the last answer still stands.
+    isUnavailable: isError && data === undefined && !isFetching,
+    retry: () => void refetch(),
   };
 }

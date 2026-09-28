@@ -10,6 +10,7 @@ import { LiquidGlassCloseButton } from './LiquidGlassCloseButton';
 import { RollingPrice } from './RollingPrice';
 import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
+import { usePlanState } from '../hooks/useSubscription';
 
 /** What the hero feature promises, in the words the website uses. */
 const HERO = PRO_PLAN.features.find((feature) => feature.isHero);
@@ -31,6 +32,9 @@ export function ProUpgradeModal() {
   const insets = useSafeAreaInsets();
   const isOpen = usePaywallStore((state) => state.isOpen);
   const close = usePaywallStore((state) => state.close);
+  // A subscriber opens this from the Plan card to see what they pay for, so it
+  // says "Current plan" where it would otherwise sell, as the web page does.
+  const { isPro } = usePlanState();
 
   /** Set when the upgrade button is pressed — see the note it reveals. */
   const [showPurchaseNote, setShowPurchaseNote] = useState(false);
@@ -275,25 +279,49 @@ export function ProUpgradeModal() {
             borderTopColor: theme.colors.borderSubtle,
           }}
         >
-          {/* The button names the price it would charge, so the choice above
-              cannot be lost by the time the decision is made. */}
-          <Button
-            label={
-              isAnnual
-                ? `Upgrade to Pro — $${PRO_PLAN.annualPrice.toFixed(2)}/year`
-                : `Upgrade to Pro — $${PRO_PLAN.monthlyPrice.toFixed(2)}/month`
-            }
-            fullWidth
-            onPress={() => setShowPurchaseNote(true)}
-          />
-          {showPurchaseNote ? (
+          {isPro ? (
+            <View
+              accessibilityRole="text"
+              style={{
+                minHeight: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.radius.md,
+                borderWidth: theme.borderWidth.hairline,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surfaceRaised,
+              }}
+            >
+              <Text variant="bodyStrong" color="success">
+                Current plan
+              </Text>
+            </View>
+          ) : (
+            // The button names the price it would charge, so the choice above
+            // cannot be lost by the time the decision is made.
+            <Button
+              label={
+                isAnnual
+                  ? `Upgrade to Pro — $${PRO_PLAN.annualPrice.toFixed(2)}/year`
+                  : `Upgrade to Pro — $${PRO_PLAN.monthlyPrice.toFixed(2)}/month`
+              }
+              fullWidth
+              onPress={() => setShowPurchaseNote(true)}
+            />
+          )}
+          {!isPro && showPurchaseNote ? (
             // Honest rather than decorative: there is no purchase SDK in this
             // build, so the button cannot open a real checkout yet.
             <Text variant="footnote" color="tertiary" align="center">
               In-app purchase is not set up in this build yet.
             </Text>
           ) : null}
-          <Button label="Maybe later" variant="ghost" fullWidth onPress={dismiss} />
+          <Button
+            label={isPro ? 'Done' : 'Maybe later'}
+            variant="ghost"
+            fullWidth
+            onPress={dismiss}
+          />
         </View>
       </View>
     </Modal>

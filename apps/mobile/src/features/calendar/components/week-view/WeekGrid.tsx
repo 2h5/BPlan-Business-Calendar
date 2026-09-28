@@ -24,6 +24,11 @@ const HOUR_HEIGHT = 44;
 const GUTTER_WIDTH = 44;
 
 export interface WeekGridProps {
+  /**
+   * Room below midnight, so the timeline scrolls clear of the floating tab
+   * bar and the last hours stay reachable.
+   */
+  bottomInset?: number;
   byDateKey: Map<string, EventOccurrence[]>;
   timeZone: string;
   hourCycle: HourCycle;
@@ -66,6 +71,7 @@ export function WeekGrid({
   onPressSlot,
   onChangeWeek,
   onMoveOccurrence,
+  bottomInset = 0,
 }: WeekGridProps) {
   const theme = useTheme();
   const todayKey = toZonedDateKey(now, timeZone);
@@ -202,6 +208,8 @@ export function WeekGrid({
               height: HOUR_HEIGHT,
               borderTopWidth: 1,
               borderTopColor: theme.colors.gridLine,
+              borderBottomWidth: hour === 23 ? 1 : 0,
+              borderBottomColor: theme.colors.gridLine,
             }}
             onStartShouldSetResponder={() => !!onPressSlot}
             onResponderRelease={() => onPressSlot?.(slotStart(hour))}
@@ -289,7 +297,7 @@ export function WeekGrid({
           showsVerticalScrollIndicator={false}
           contentOffset={{ x: 0, y: HOUR_HEIGHT * 7 }}
         >
-          <View style={{ height: 24 * HOUR_HEIGHT, flexDirection: 'row' }}>
+          <View style={{ height: 24 * HOUR_HEIGHT + bottomInset, flexDirection: 'row' }}>
             <View style={{ width: GUTTER_WIDTH }}>
               {Array.from({ length: 24 }, (_, hour) => (
                 <View

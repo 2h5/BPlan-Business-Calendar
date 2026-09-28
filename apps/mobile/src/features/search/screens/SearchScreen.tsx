@@ -1,164 +1,133 @@
-import { describeTaskDue, formatTimeOfDay } from '@cal/domain';
-import {
-  Card,
-  Divider,
-  EmptyState,
-  ErrorState,
-  ListRow,
-  LoadingState,
-  SectionHeader,
-  TextField,
-  useTheme,
-} from '@cal/ui';
-import { Ionicons } from '@expo/vector-icons';
-import { Fragment, useDeferredValue, useState } from 'react';
-import { View } from 'react-native';
+import { Text, useTheme } from '@cal/ui';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StatusBar, View } from 'react-native';
+import Animated, { Easing, FadeIn, LinearTransition } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassBackButton } from '../../../components/app-shell/GlassBackButton';
 import { useEventEditorStore } from '../../../store/event-editor.store';
 import { useTaskEditorStore } from '../../../store/task-editor.store';
 import { useProfile } from '../../settings/hooks/useProfile';
+import { useTaskLists } from '../../tasks/hooks/useTasks';
+import { SearchBackdrop } from '../components/SearchBackdrop';
+import { SearchField } from '../components/SearchField';
+import { SearchResults } from '../components/SearchResults';
 import { useSearch } from '../hooks/useSearch';
+import {
+  buildSearchSections,
+  resolveSearchStatus,
+  type SearchResultItem,
+} from '../utils/search-results';
 
-/** Search internal events and tasks by the words users actually remember. */
+/** Matches the web page: long enough to skip mid-word queries, short enough to feel live. */
+const DEBOUNCE_MS = 220;
+
+/** The panel grows and shrinks to each new view, as the web viewport does. */
+const PANEL_RESIZE = LinearTransition.duration(280).easing(Easing.bezier(0.22, 1, 0.36, 1));
+
+/** Search events and tasks by the words users actually remember. */
 export function SearchScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const deferredQuery = useDeferredValue(query.trim());
-  const search = useSearch(deferredQuery);
+  const normalized = query.trim();
+  const [debounced, setDebounced] = useState('');
+  const search = useSearch(debounced);
   const { data: profile } = useProfile();
-  const timeZone = profile?.timezone ?? 'UTC';
-  const hourCycle = profile?.hourCycle ?? 'h23';
+  const lists = useTaskLists();
   const openEvent = useEventEditorStore((state) => state.openEvent);
   const openTask = useTaskEditorStore((state) => state.openTask);
-  const now = new Date();
-  const normalizedQuery = query.trim();
+  const timeZone = profile?.timezone ?? 'UTC';
+  const hourCycle = profile?.hourCycle ?? 'h23';
 
-  const content = () => {
-    if (normalizedQuery.length === 0) {
-      return (
-        <EmptyState
-          icon="search-outline"
-          title="Search everything"
-          message="Find any event or task by title, note, or location."
-        />
-      );
-    }
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(normalized), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [normalized]);
 
-    if (normalizedQuery.length < 2) {
-      return (
-        <EmptyState
-          icon="search-outline"
-          title="Keep typing"
-          message="Search starts after two characters."
-        />
-      );
-    }
+  const sections = useMemo(
+    () =>
+      search.data && debounced.length >= 2
+        ? buildSearchSections(search.data, {
+            query: debounced,
+            now: new Date(),
+            timeZone,
+            hourCycle,
+            lists: lists.data ?? [],
+          })
+        : [],
+    [debounced, hourCycle, lists.data, search.data, timeZone],
+  );
+  const itemCount = sections.reduce((count, section) => count + section.items.length, 0);
 
-    if (search.isLoading || search.isFetching) return <LoadingState label="Searching" />;
+  const isSearching = normalized.length >= 2 && (debounced !== normalized || search.isFetching);
+  const status = resolveSearchStatus({
+    query: normalized,
+    isSearching,
+    isError: search.isError,
+    itemCount,
+  });
 
-    if (search.isError) {
-      return (
-        <ErrorState
-          title="Search could not load"
-          message="Check your connection and try again."
-          onRetry={() => void search.refetch()}
-        />
-      );
-    }
-
-    const events = search.data?.events ?? [];
-    const tasks = search.data?.tasks ?? [];
-    const calendars = new Map(
-      (search.data?.calendars ?? []).map((calendar) => [calendar.id, calendar]),
-    );
-
-    if (events.length === 0 && tasks.length === 0) {
-      return (
-        <EmptyState
-          icon="search-outline"
-          title="No matches"
-          message={`Nothing matched “${normalizedQuery}”. Try a title, note, or location.`}
-        />
-      );
-    }
-
-    return (
-      <View style={{ gap: theme.spacing.xl }}>
-        {events.length > 0 ? (
-          <View style={{ gap: theme.spacing.md }}>
-            <SectionHeader title="Events" count={events.length} />
-            <Card padded={false}>
-              {events.map((event, index) => (
-                <Fragment key={event.id}>
-                  {index > 0 ? <Divider inset /> : null}
-                  <ListRow
-                    title={event.title}
-                    subtitle={
-                      [calendars.get(event.calendarId)?.name, event.location]
-                        .filter(Boolean)
-                        .join(' · ') || 'Calendar event'
-                    }
-                    meta={
-                      event.allDay
-                        ? 'All day'
-                        : formatTimeOfDay(new Date(event.startAt), timeZone, hourCycle)
-                    }
-                    leading={
-                      <Ionicons name="calendar-outline" size={19} color={theme.colors.accent} />
-                    }
-                    accentColor={calendars.get(event.calendarId)?.color}
-                    onPress={() => openEvent(event.id)}
-                  />
-                </Fragment>
-              ))}
-            </Card>
-          </View>
-        ) : null}
-
-        {tasks.length > 0 ? (
-          <View style={{ gap: theme.spacing.md }}>
-            <SectionHeader title="Tasks" count={tasks.length} />
-            <Card padded={false}>
-              {tasks.map((task, index) => {
-                const due =
-                  task.status === 'completed'
-                    ? 'Completed'
-                    : describeTaskDue(task, { now, timeZone, hourCycle }).text || 'No due date';
-
-                return (
-                  <Fragment key={task.id}>
-                    {index > 0 ? <Divider inset /> : null}
-                    <ListRow
-                      title={task.title}
-                      subtitle={task.description ?? 'Task'}
-                      meta={due}
-                      leading={
-                        <Ionicons name="checkbox-outline" size={19} color={theme.colors.accent} />
-                      }
-                      onPress={() => openTask(task.id)}
-                    />
-                  </Fragment>
-                );
-              })}
-            </Card>
-          </View>
-        ) : null}
-      </View>
-    );
-  };
+  const openItem = (item: SearchResultItem) =>
+    item.kind === 'event' ? openEvent(item.id) : openTask(item.id);
 
   return (
-    <View style={{ gap: theme.spacing.lg }}>
-      <TextField
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search events and tasks"
-        autoCorrect={false}
-        returnKeyType="search"
-        leading={<Ionicons name="search" size={18} color={theme.colors.textTertiary} />}
-      />
+    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <StatusBar barStyle={theme.scheme === 'dark' ? 'light-content' : 'dark-content'} />
+      <SearchBackdrop />
 
-      <View>{content()}</View>
+      <View
+        style={{
+          paddingTop: insets.top + theme.spacing.xs,
+          paddingHorizontal: theme.spacing.lg,
+          paddingBottom: theme.spacing.sm,
+        }}
+      >
+        <GlassBackButton />
+      </View>
+
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: theme.screenPadding,
+          paddingTop: theme.spacing.md,
+          paddingBottom: insets.bottom + theme.spacing.xxl,
+          gap: theme.spacing.xl,
+        }}
+      >
+        <Animated.View entering={FadeIn.duration(240)} style={{ gap: theme.spacing.xs }}>
+          <Text variant="title1" accessibilityRole="header">
+            Find anything
+          </Text>
+          <Text variant="footnote" color="tertiary">
+            Tasks and events across your BPlan workspace.
+          </Text>
+        </Animated.View>
+
+        <SearchField value={query} onChangeText={setQuery} isSearching={isSearching} />
+
+        <Animated.View
+          layout={PANEL_RESIZE}
+          style={{
+            overflow: 'hidden',
+            borderRadius: theme.radius.xl,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor: theme.colors.borderSubtle,
+            backgroundColor: theme.colors.surface,
+          }}
+        >
+          <SearchResults
+            status={status}
+            query={debounced}
+            sections={sections}
+            isRefreshing={isSearching}
+            onOpen={openItem}
+            onRetry={() => void search.refetch()}
+          />
+        </Animated.View>
+      </ScrollView>
     </View>
   );
 }

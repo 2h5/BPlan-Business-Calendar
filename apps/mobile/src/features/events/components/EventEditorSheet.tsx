@@ -402,7 +402,7 @@ export function EventEditorSheet({
 
         <View style={{ gap: theme.spacing.sm }}>
           <Text variant="subhead" color="secondary">
-            Colour
+            Color
           </Text>
           <View
             style={{

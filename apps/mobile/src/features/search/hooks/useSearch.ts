@@ -14,5 +14,8 @@ export function useSearch(query: string) {
     queryFn: () => searchEverything(normalized),
     enabled: isAuthenticated && normalized.length >= 2,
     staleTime: 30_000,
+    // Keep the last results on screen while the next query loads, so the
+    // panel resizes once instead of collapsing to a skeleton per keystroke.
+    placeholderData: (previous) => previous,
   });
 }
