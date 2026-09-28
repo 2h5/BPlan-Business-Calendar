@@ -4,7 +4,6 @@ import {
   schedulingIntentSchema,
   type DateIntent,
   type SchedulingIntent,
-  type TimeIntent,
   type WeekdayName,
 } from '@cal/schemas/scheduling';
 
@@ -12,7 +11,7 @@ import { EdgeError } from '../errors/index.ts';
 
 export const AI_INTENT_PROMPT_VERSION = 'find-time-intent-v2';
 
-const IMPOSSIBLE_DATE_QUESTION = "That date doesn't exist. Which date did you mean?";
+export const IMPOSSIBLE_DATE_QUESTION = "That date doesn't exist. Which date did you mean?";
 
 export interface AiIntentUsage {
   inputTokens: number | null;
@@ -392,104 +391,7 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     }
   }
 
-  // Convert and strictly validate date
-  let date: SchedulingIntent['date'];
-  let impossibleDate = false;
-  const d = requireRecord(raw.date, 'Date intent');
-  rejectUnexpectedKeys(d, DATE_KEYS, 'date');
-  validateOptionalEnum(d, 'weekday', [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-  ]);
-  validateOptionalEnum(d, 'modifier', ['this', 'next', 'none']);
-  validateOptionalEnum(d, 'preference', ['early', 'middle', 'late', 'any']);
-  if (d.date !== null && d.date !== undefined && typeof d.date !== 'string') {
-    throw new EdgeError('AI_INVALID_OUTPUT', 'Date value must be a string or null.', 502);
-  }
-  if (typeof d.date === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) {
-    throw new EdgeError('AI_INVALID_OUTPUT', 'Date value must use YYYY-MM-DD format.', 502);
-  }
-  const rawPreference =
-    typeof d.preference === 'string' && ['early', 'middle', 'late', 'any'].includes(d.preference)
-      ? (d.preference as 'early' | 'middle' | 'late' | 'any')
-      : undefined;
-
-  if (d.type === 'unconstrained') {
-    date = { type: 'unconstrained' };
-  } else if (d.type === 'today') {
-    date = { type: 'today' };
-  } else if (d.type === 'tomorrow') {
-    date = { type: 'tomorrow' };
-  } else if (d.type === 'weekday') {
-    const validWeekdays = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    if (typeof d.weekday !== 'string' || !validWeekdays.includes(d.weekday)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Weekday date intent requires a valid weekday name.',
-        502,
-      );
-    }
-    const modifier = d.modifier === 'this' || d.modifier === 'next' ? d.modifier : 'none';
-    date = {
-      type: 'weekday',
-      weekday: d.weekday as WeekdayName,
-      modifier,
-    };
-  } else if (d.type === 'weekend') {
-    const modifier = d.modifier === 'this' || d.modifier === 'next' ? d.modifier : 'none';
-    const preference =
-      rawPreference === 'early' || rawPreference === 'late' ? rawPreference : 'any';
-    date = {
-      type: 'weekend',
-      modifier,
-      preference,
-    };
-  } else if (d.type === 'relative_week') {
-    const modifier = d.modifier === 'next' ? 'next' : 'this';
-    const preference = rawPreference ?? 'any';
-    date = {
-      type: 'relative_week',
-      modifier,
-      preference,
-    };
-  } else if (d.type === 'explicit_date' || d.type === 'week_of') {
-    if (typeof d.date !== 'string') {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Explicit date intent requires a calendar date in YYYY-MM-DD format.',
-        502,
-      );
-    }
-    if (!isValidCalendarDate(d.date)) {
-      // A well-formed but nonexistent date ("February 30th") is a user error,
-      // not a model failure: ask which date was meant instead of failing.
-      impossibleDate = true;
-      date = { type: 'unconstrained' };
-    } else if (d.type === 'explicit_date') {
-      date = { type: 'explicit_date', date: d.date };
-    } else {
-      date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
-    }
-  } else {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      `Unknown or malformed date intent type: ${String(d.type)}.`,
-      502,
-    );
-  }
+  const { date, impossibleDate } = parseDateIntentOutput(raw.date);
 
   const rawOccasion = raw.occasion;
   const occasion = rawOccasion === null ? null : occasionIntentSchema.safeParse(rawOccasion);
@@ -497,118 +399,7 @@ export function validateAiSchedulingIntent(rawOutput: unknown): SchedulingIntent
     throw new EdgeError('AI_INVALID_OUTPUT', 'Intent field occasion is invalid.', 502);
   }
 
-  // Convert and strictly validate time
-  let time: SchedulingIntent['time'];
-  const t = { ...requireRecord(raw.time, 'Time intent') };
-  rejectUnexpectedKeys(t, TIME_KEYS, 'time');
-  // An hour-only phrase ("after 4") means on the hour; the flattened schema
-  // lets the model emit a null minute, which is not a reason to fail.
-  for (const [hourKey, minuteKey] of [
-    ['hour', 'minute'],
-    ['startHour', 'startMinute'],
-    ['endHour', 'endMinute'],
-  ] as const) {
-    if (typeof t[hourKey] === 'number' && (t[minuteKey] === null || t[minuteKey] === undefined)) {
-      t[minuteKey] = 0;
-    }
-  }
-  for (const key of [
-    'hour',
-    'minute',
-    'startHour',
-    'startMinute',
-    'endHour',
-    'endMinute',
-  ] as const) {
-    validateOptionalInteger(t, key, 0, key.includes('Hour') ? 23 : 59);
-  }
-  validateOptionalEnum(t, 'preference', ['morning', 'afternoon', 'evening']);
-  const isValidHour = (h: unknown): h is number =>
-    typeof h === 'number' && Number.isInteger(h) && h >= 0 && h <= 23;
-  const isValidMinute = (m: unknown): m is number =>
-    typeof m === 'number' && Number.isInteger(m) && m >= 0 && m <= 59;
-
-  if (t.type === 'unconstrained') {
-    time = { type: 'unconstrained' };
-  } else if (t.type === 'exact_time') {
-    if (!isValidHour(t.hour) || !isValidMinute(t.minute)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Exact time requires valid hour (0..23) and minute (0..59).',
-        502,
-      );
-    }
-    time = { type: 'exact_time', hour: t.hour, minute: t.minute };
-  } else if (t.type === 'around_time') {
-    if (!isValidHour(t.hour) || !isValidMinute(t.minute)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Around time requires valid hour (0..23) and minute (0..59).',
-        502,
-      );
-    }
-    time = { type: 'around_time', hour: t.hour, minute: t.minute };
-  } else if (t.type === 'after_time') {
-    if (!isValidHour(t.hour) || !isValidMinute(t.minute)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'After time requires valid hour (0..23) and minute (0..59).',
-        502,
-      );
-    }
-    time = { type: 'after_time', hour: t.hour, minute: t.minute };
-  } else if (t.type === 'before_time') {
-    if (!isValidHour(t.hour) || !isValidMinute(t.minute)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Before time requires valid hour (0..23) and minute (0..59).',
-        502,
-      );
-    }
-    time = { type: 'before_time', hour: t.hour, minute: t.minute };
-  } else if (t.type === 'between_times') {
-    if (
-      !isValidHour(t.startHour) ||
-      !isValidMinute(t.startMinute) ||
-      !isValidHour(t.endHour) ||
-      !isValidMinute(t.endMinute) ||
-      t.endHour * 60 + t.endMinute <= t.startHour * 60 + t.startMinute
-    ) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Between times requires valid start and end times with end > start.',
-        502,
-      );
-    }
-    time = {
-      type: 'between_times',
-      startHour: t.startHour,
-      startMinute: t.startMinute,
-      endHour: t.endHour,
-      endMinute: t.endMinute,
-    };
-  } else if (t.type === 'time_of_day') {
-    if (
-      typeof t.preference !== 'string' ||
-      !['morning', 'afternoon', 'evening'].includes(t.preference)
-    ) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Time of day requires valid preference (morning, afternoon, evening).',
-        502,
-      );
-    }
-    time = {
-      type: 'time_of_day',
-      preference: t.preference as 'morning' | 'afternoon' | 'evening',
-    };
-  } else {
-    throw new EdgeError(
-      'AI_INVALID_OUTPUT',
-      `Unknown or malformed time intent type: ${String(t.type)}.`,
-      502,
-    );
-  }
+  const time = parseTimeIntentOutput(raw.time);
 
   const requiresClarification = raw.requiresClarification || impossibleDate;
   const modelQuestion =
@@ -705,12 +496,11 @@ function validateOptionalEnum(
   }
 }
 
-/**
- * Converts the model's strict-mode date object (every key present, unused ones
- * null) into a DateIntent, failing closed on anything malformed. Shared by
- * every prompt that asks the model for a date.
- */
-export function parseDateIntentOutput(value: unknown): DateIntent {
+/** Shared strict-mode date conversion. Callers handle impossible dates as clarification. */
+export function parseDateIntentOutput(value: unknown): {
+  date: DateIntent;
+  impossibleDate: boolean;
+} {
   let date: DateIntent;
   const d = requireRecord(value, 'Date intent');
   rejectUnexpectedKeys(d, DATE_KEYS, 'date');
@@ -782,24 +572,21 @@ export function parseDateIntentOutput(value: unknown): DateIntent {
       modifier,
       preference,
     };
-  } else if (d.type === 'explicit_date') {
-    if (typeof d.date !== 'string' || !isValidCalendarDate(d.date)) {
+  } else if (d.type === 'explicit_date' || d.type === 'week_of') {
+    if (typeof d.date !== 'string') {
       throw new EdgeError(
         'AI_INVALID_OUTPUT',
-        'Explicit date intent requires a valid calendar date in YYYY-MM-DD format.',
+        'Explicit date intent requires a calendar date in YYYY-MM-DD format.',
         502,
       );
     }
-    date = { type: 'explicit_date', date: d.date };
-  } else if (d.type === 'week_of') {
-    if (typeof d.date !== 'string' || !isValidCalendarDate(d.date)) {
-      throw new EdgeError(
-        'AI_INVALID_OUTPUT',
-        'Week-of date intent requires a valid calendar date in YYYY-MM-DD format.',
-        502,
-      );
+    if (!isValidCalendarDate(d.date)) {
+      return { date: { type: 'unconstrained' }, impossibleDate: true };
     }
-    date = { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
+    date =
+      d.type === 'explicit_date'
+        ? { type: 'explicit_date', date: d.date }
+        : { type: 'week_of', date: d.date, preference: rawPreference ?? 'any' };
   } else {
     throw new EdgeError(
       'AI_INVALID_OUTPUT',
@@ -808,12 +595,12 @@ export function parseDateIntentOutput(value: unknown): DateIntent {
     );
   }
 
-  return date;
+  return { date, impossibleDate: false };
 }
 
 /** The time counterpart of `parseDateIntentOutput`. */
-export function parseTimeIntentOutput(value: unknown): TimeIntent {
-  let time: TimeIntent;
+export function parseTimeIntentOutput(value: unknown): SchedulingIntent['time'] {
+  let time: SchedulingIntent['time'];
   const t = { ...requireRecord(value, 'Time intent') };
   rejectUnexpectedKeys(t, TIME_KEYS, 'time');
   for (const [hourKey, minuteKey] of [

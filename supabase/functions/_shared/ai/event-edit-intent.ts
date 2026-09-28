@@ -3,6 +3,7 @@ import { type EventEditIntent, eventEditIntentSchema } from '@cal/schemas/schedu
 import { EdgeError } from '../errors/index.ts';
 import {
   AI_INTENT_JSON_SCHEMA,
+  IMPOSSIBLE_DATE_QUESTION,
   type AiIntentInput,
   type AiIntentMetadata,
   parseDateIntentOutput,
@@ -141,18 +142,26 @@ export function validateAiEventEditIntent(rawOutput: unknown): EventEditIntent {
     throw invalidOutput('clarificationQuestion must be a string or null.');
   }
 
-  const question =
+  const modelQuestion =
     typeof raw.clarificationQuestion === 'string' && raw.clarificationQuestion.trim()
       ? raw.clarificationQuestion.trim()
       : null;
+  const currentDate = raw.currentDate === null ? null : parseDateIntentOutput(raw.currentDate);
+  const newDate = raw.newDate === null ? null : parseDateIntentOutput(raw.newDate);
+  const impossibleDate = Boolean(currentDate?.impossibleDate || newDate?.impossibleDate);
+  const requiresClarification = raw.requiresClarification || impossibleDate;
+  const question =
+    impossibleDate && !(raw.requiresClarification && modelQuestion)
+      ? IMPOSSIBLE_DATE_QUESTION
+      : modelQuestion;
 
   const parsed = eventEditIntentSchema.safeParse({
     // A clarification may leave the event unnamed; the schema still needs text.
-    eventQuery: raw.eventQuery.trim() || (raw.requiresClarification ? 'event' : ''),
-    currentDate: raw.currentDate === null ? null : parseDateIntentOutput(raw.currentDate),
-    newDate: raw.newDate === null ? null : parseDateIntentOutput(raw.newDate),
+    eventQuery: raw.eventQuery.trim() || (requiresClarification ? 'event' : ''),
+    currentDate: currentDate?.date ?? null,
+    newDate: newDate?.date ?? null,
     newTime: raw.newTime === null ? null : parseTimeIntentOutput(raw.newTime),
-    requiresClarification: raw.requiresClarification,
+    requiresClarification,
     clarificationQuestion: question,
   });
   if (!parsed.success) {

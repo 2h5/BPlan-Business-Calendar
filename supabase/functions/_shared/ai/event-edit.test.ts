@@ -272,6 +272,40 @@ Deno.test('validates the model output, converting strict-mode nulls', () => {
   assertEquals(parsed.newTime, null);
 });
 
+Deno.test('asks for clarification when an edit names an impossible calendar date', () => {
+  for (const field of ['currentDate', 'newDate'] as const) {
+    const parsed = validateAiEventEditIntent({
+      eventQuery: 'dentist',
+      currentDate: null,
+      newDate: null,
+      newTime: { type: 'exact_time', hour: 15, minute: null },
+      requiresClarification: false,
+      clarificationQuestion: null,
+      [field]: { type: 'explicit_date', date: '2026-02-30' },
+    });
+
+    assertEquals(parsed.requiresClarification, true);
+    assertEquals(parsed.clarificationQuestion, "That date doesn't exist. Which date did you mean?");
+    assertEquals(parsed.newTime, { type: 'exact_time', hour: 15, minute: 0 });
+  }
+});
+
+Deno.test('rejects malformed edit dates while keeping user mistakes clarifiable', () => {
+  const error = assertThrows(
+    () =>
+      validateAiEventEditIntent({
+        eventQuery: 'dentist',
+        currentDate: null,
+        newDate: { type: 'explicit_date', date: 'February 30' },
+        newTime: null,
+        requiresClarification: false,
+        clarificationQuestion: null,
+      }),
+    EdgeError,
+  );
+  assertEquals(error.code, 'AI_INVALID_OUTPUT');
+});
+
 Deno.test('rejects model output with extra or missing fields', () => {
   const base = {
     eventQuery: 'dentist',
