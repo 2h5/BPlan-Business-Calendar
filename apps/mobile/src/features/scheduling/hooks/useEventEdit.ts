@@ -1,9 +1,10 @@
 import { useMutation } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { APP_NAME } from '../../../lib/brand';
 import { useEventLoader, useMoveEvent } from '../../events/hooks/useEvents';
 import { proposeEventEdit, type AiEventMoveOption } from '../api/event-edit.api';
+import { applyMoveProposal } from '../utils/event-move-proposal';
 
 export interface EventEditState {
   /** Moves the server computed, best match first; empty until it answers. */
@@ -31,16 +32,22 @@ export function useEventEdit(): EventEditState {
   const loadEvent = useEventLoader();
   const moveEvent = useMoveEvent();
 
+  // A second tap before the disabled state renders would otherwise start a
+  // second save, whose staleness check then fails against the first one's move.
+  const saving = useRef(false);
+
   const proposal = useMutation({ mutationFn: (text: string) => proposeEventEdit(text) });
   const confirmation = useMutation({
-    mutationFn: async (option: AiEventMoveOption) => {
-      const event = await loadEvent(option.eventId);
-      await moveEvent.mutateAsync({
-        event,
-        startAt: option.after.startAt,
-        endAt: option.after.endAt,
-      });
-      return option;
+    // The proposal's `after` was computed from its `before`. If the event has
+    // changed since, applying it would overwrite that change, so ask again.
+    mutationFn: (option: AiEventMoveOption) =>
+      applyMoveProposal(option, {
+        loadEvent,
+        moveEvent: async (payload) => void (await moveEvent.mutateAsync(payload)),
+      }),
+    // On the mutation itself, not per call, so it runs even after a reset.
+    onSettled: () => {
+      saving.current = false;
     },
   });
 
@@ -56,7 +63,14 @@ export function useEventEdit(): EventEditState {
     [propose, resetConfirmation],
   );
 
-  const confirm = useCallback((option: AiEventMoveOption) => save(option), [save]);
+  const confirm = useCallback(
+    (option: AiEventMoveOption) => {
+      if (saving.current) return;
+      saving.current = true;
+      save(option);
+    },
+    [save],
+  );
 
   const reset = useCallback(() => {
     resetProposal();
@@ -65,9 +79,11 @@ export function useEventEdit(): EventEditState {
 
   const data = proposal.data;
   const error = proposal.error ?? confirmation.error;
+  // A stale proposal cannot be retried as-is, so stop offering it.
+  const isStale = codeOf(confirmation.error) === 'AI_PROPOSAL_STALE';
 
   return {
-    options: data?.status === 'proposed' && !confirmation.data ? data.options : [],
+    options: data?.status === 'proposed' && !confirmation.data && !isStale ? data.options : [],
     clarificationQuestion:
       data?.status === 'clarification_required' ? data.clarificationQuestion : null,
     moved: confirmation.data ?? null,
@@ -82,7 +98,11 @@ export function useEventEdit(): EventEditState {
 }
 
 function messageForError(error: unknown, whileSaving: boolean): string {
-  if (whileSaving) return 'Could not move that event. Check your connection and try again.';
+  if (whileSaving) {
+    return codeOf(error) === 'AI_PROPOSAL_STALE'
+      ? 'That event changed or was removed since this was suggested, so nothing was moved. Ask again to see a fresh suggestion.'
+      : 'Could not move that event. Check your connection and try again.';
+  }
 
   switch (codeOf(error)) {
     case 'AI_EVENT_NOT_FOUND':

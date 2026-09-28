@@ -48,8 +48,10 @@ export function useEvent(id: string | null) {
 }
 
 /**
- * Loads one event on demand — from the cache when it is fresh — for flows
- * that hold only an id, such as confirming an AI-proposed move.
+ * Loads one event on demand, always from the server, for flows that hold only
+ * an id and must act on its current state, such as confirming an AI-proposed
+ * move. `staleTime: 0` matters: the default would return a cached copy up to
+ * 30 seconds old, which is exactly the state such a flow must not trust.
  */
 export function useEventLoader() {
   const queryClient = useQueryClient();
@@ -57,6 +59,7 @@ export function useEventLoader() {
     queryClient.fetchQuery({
       queryKey: queryKeys.events.detail(id),
       queryFn: () => fetchEvent(id),
+      staleTime: 0,
     });
 }
 
