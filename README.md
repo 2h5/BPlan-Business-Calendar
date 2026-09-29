@@ -115,8 +115,11 @@ paid period, expiration revoked Pro, and a fresh annual sandbox subscription
 renewed naturally into an extended active period across RevenueCat, the
 Supabase mirror and ledger, and server authorization. Billing automation
 Phases 5 and 6 are complete for the reviewed sandbox contract. RevenueCat
-convergence hardening is merged into `main` and verified locally. Its new
-migration and functions have not been deployed to hosted Supabase. Production
+convergence hardening is deployed to the hosted sandbox/dev project
+(2026-09-29): the migration, webhook v8, `revenuecat-reconcile`, and
+`revenuecat-refresh`. Scheduled reconciliation is not yet configured. The
+monthly lifecycle is proven live on 2026-09-29: purchase, natural renewal,
+cancellation retaining paid access, and expiration revoking Pro. Production
 billing remains intentionally disabled.
 
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)

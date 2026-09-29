@@ -215,5 +215,7 @@ again used the disposable `calendar-audit` stack only.
   dev-only Vitest/Vite/esbuild advisories; the next Expo SDK patch for Metro/
   postcss/image-size; React Navigation for `decode-uri-component`.
 - Existing open tracks: Microsoft live lifecycle matrix, hosted AI
-  configuration/E2E, RevenueCat convergence rollout, seller/legal documents,
-  production Stripe/RevenueCat.
+  configuration/E2E, RevenueCat scheduled reconciliation (the convergence
+  migration and functions reached the sandbox/dev project on 2026-09-29, but
+  `pg_cron`/`pg_net`, Vault secrets, and the reconcile/refresh Edge secrets are
+  not set), seller/legal documents, production Stripe/RevenueCat.

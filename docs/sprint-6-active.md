@@ -2771,3 +2771,24 @@ No purchase, cancellation, refund, extension, credential rotation, hosted
 subscription write, or fabricated provider delivery was performed for this
 audit. Phase 6 engineering acceptance is complete for the reviewed sandbox
 contract. Production billing remains disabled.
+
+### Billing hosted convergence repair and monthly lifecycle — 2026-09-29
+
+**PROVEN LIVE:** the hosted sandbox/dev project's migration history had
+`20260924000001_revenuecat_convergence` recorded but not applied and
+`20260924000003_profile_avatars` applied but not recorded. After a backup and
+a local rehearsal over a copy of the hosted data, the history was repaired,
+`20260924000001` and `20260925000001` were applied, and `revenuecat-webhook`
+v8, `revenuecat-reconcile`, and `revenuecat-refresh` were deployed. Billing row
+counts were unchanged. The earlier PENDING natural delivery is now observed:
+every monthly event below was applied by webhook v8.
+
+Lifecycle commands now take `--plan monthly|annual`. On one fresh identity, a
+monthly sandbox purchase converged without retry, the subscription renewed
+naturally (RevenueCat bills about 30 seconds early and reports
+`has_already_renewed`; the observer now accepts it), one guarded cancellation
+kept paid access until the period end, and expiration revoked Pro across
+RevenueCat, the mirror, and server authorization. Details are in
+[the automation plan](revenuecat-automation-plan.md#monthly-lifecycle-checkpoint--2026-09-29).
+Scheduled reconciliation still needs `pg_cron`/`pg_net`, Vault secrets, and
+three Edge secrets. Production billing remains disabled.
