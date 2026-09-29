@@ -654,6 +654,125 @@ describe('monthly natural renewal comparison', () => {
   });
 });
 
+describe('monthly natural renewal observer loop', () => {
+  const timing = RENEWAL_OBSERVATION_TIMING.monthly;
+  const initial = () => monthly();
+  const renewed = () =>
+    monthly({
+      now: MONTHLY_END + 60_000,
+      startsAt: MONTHLY_END,
+      endsAt: MONTHLY_END + 5 * 60_000,
+      ledger: [event('RENEWAL', 5), event('INITIAL_PURCHASE', 0)],
+    });
+
+  /** Drive the real loop; every sleep advances a fake clock, and reads follow it. */
+  async function observe(state: (time: number) => ReturnType<typeof fixtures>) {
+    let time = START + 2 * 60_000;
+    let polls = 0;
+    const output: string[] = [];
+    const code = await runBillingRenewalReadOnly(
+      ['--plan', 'monthly'],
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        now: () => time,
+        sleep: async (ms) => {
+          polls += 1;
+          time += ms;
+        },
+        readProvider: async () => ({ ok: true as const, data: state(time).provider }),
+        readSupabase: async () => ({ ok: true as const, data: state(time).supabase }),
+      },
+    );
+    return { code, text: output.join('\n'), time, polls };
+  }
+
+  it('passes once the period advances and the mirror catches up a little later', async () => {
+    const mirrorCatchesUpAt = MONTHLY_END + 40_000;
+    const result = await observe((time) => {
+      if (time < MONTHLY_END) return initial();
+      // The provider renewed, but the webhook has not reached the mirror yet.
+      if (time < mirrorCatchesUpAt) return { ...renewed(), supabase: initial().supabase };
+      return renewed();
+    });
+    expect(result.code).toBe(0);
+    expect(result.text).toContain('RevenueCat monthly natural renewal (read-only)\nResult: PASS');
+    expect(result.text).toContain('Applied lifecycle transitions: INITIAL_PURCHASE > RENEWAL');
+    expect(result.time).toBeGreaterThanOrEqual(mirrorCatchesUpAt);
+    expect(result.text).not.toContain(USER);
+  });
+
+  it('reports RENEWAL_NOT_OBSERVED once the observation window closes', async () => {
+    const result = await observe(() => initial());
+    expect(result.code).toBe(1);
+    expect(result.text).toContain('Failure: RENEWAL_NOT_OBSERVED');
+    expect(result.time).toBeLessThanOrEqual(
+      MONTHLY_END + timing.maxAfterOriginalEndMs + timing.pollIntervalMs,
+    );
+  });
+
+  it('gives a late renewal its full convergence window before failing', async () => {
+    const firstSeen = MONTHLY_END + timing.maxAfterOriginalEndMs - 5_000;
+    const result = await observe((time) =>
+      time < firstSeen ? initial() : { ...renewed(), supabase: initial().supabase },
+    );
+    expect(result.code).toBe(1);
+    expect(result.text).toContain('Failure: RENEWAL_AUTHORITY');
+    expect(result.text).not.toContain('RENEWAL_NOT_OBSERVED');
+    expect(result.time - firstSeen).toBeGreaterThanOrEqual(
+      timing.convergenceMs - timing.pollIntervalMs,
+    );
+  });
+
+  it('fails on subscription identity drift', async () => {
+    const result = await observe((time) => {
+      if (time < MONTHLY_END - 60_000) return initial();
+      const drifted = initial();
+      return {
+        ...drifted,
+        provider: {
+          ...drifted.provider,
+          subscriptions: [{ ...drifted.provider.subscriptions[0]!, id: 'other' }],
+        },
+      };
+    });
+    expect(result.code).toBe(1);
+    expect(result.text).toContain('Failure: RENEWAL_IDENTITY');
+  });
+
+  it('fails on authority disagreement before the boundary but tolerates it inside the grace', async () => {
+    const serverOff = (fixture: ReturnType<typeof fixtures>) => ({
+      ...fixture,
+      supabase: { ...fixture.supabase, serverAuthorized: false },
+    });
+    const early = await observe((time) =>
+      time < START + 3 * 60_000 ? initial() : serverOff(initial()),
+    );
+    expect(early.code).toBe(1);
+    expect(early.text).toContain('Failure: RENEWAL_PRE_BOUNDARY_AUTHORITY');
+
+    const graceStart = MONTHLY_END - timing.boundaryGraceMs;
+    const late = await observe((time) => {
+      if (time < graceStart) return initial();
+      if (time < MONTHLY_END) return serverOff(initial());
+      return renewed();
+    });
+    expect(late.code).toBe(0);
+  });
+
+  it('refuses a cancelled start without polling', async () => {
+    const result = await observe(() =>
+      monthly({
+        renewalStatus: 'will_not_renew',
+        ledger: [event('CANCELLATION', 1), event('INITIAL_PURCHASE', 0)],
+      }),
+    );
+    expect(result.code).toBe(1);
+    expect(result.text).toContain('Failure: RENEWAL_INITIAL_STATE');
+    expect(result.polls).toBe(0);
+  });
+});
+
 describe('lifecycle plan selection', () => {
   it('accepts exactly one --plan monthly or --plan annual', () => {
     expect(parseLifecyclePlan(['--plan', 'monthly'])).toBe('monthly');

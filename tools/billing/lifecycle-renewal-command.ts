@@ -7,8 +7,14 @@ import {
   parseLifecyclePlan,
   type RenewalReport,
 } from './lifecycle';
-import { createRevenueCatAssertionAdapter } from './revenuecat-assertions';
-import { createSupabaseAssertionAdapter } from './supabase-assertions';
+import {
+  createRevenueCatAssertionAdapter,
+  type RevenueCatAssertionAdapter,
+} from './revenuecat-assertions';
+import {
+  createSupabaseAssertionAdapter,
+  type SupabaseAssertionAdapter,
+} from './supabase-assertions';
 
 interface RenewalObservationTiming {
   readonly pollIntervalMs: number;
@@ -74,12 +80,23 @@ function format(report: RenewalReport): string {
   ].join('\n');
 }
 
+interface RenewalCommandDependencies {
+  readonly readProvider?: RevenueCatAssertionAdapter['readUser'];
+  readonly readSupabase?: SupabaseAssertionAdapter['readUser'];
+  readonly now?: () => number;
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
 /** One bounded observation; this command never submits a provider or database write. */
 export async function runBillingRenewalReadOnly(
   argv: readonly string[] = process.argv.slice(2),
   environment: EnvironmentRecord = process.env,
   write: (value: string) => void = (value) => process.stdout.write(`${value}\n`),
+  dependencies: RenewalCommandDependencies = {},
 ): Promise<number> {
+  const clock = dependencies.now ?? Date.now;
+  const sleep =
+    dependencies.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const plan = parseLifecyclePlan(argv);
   if (!plan) {
     write(`${renewalHeader(null)}\nResult: FAIL\nFailure: ARGUMENT_INVALID`);
@@ -101,23 +118,27 @@ export async function runBillingRenewalReadOnly(
     return 1;
   }
   const timing = RENEWAL_OBSERVATION_TIMING[plan];
-  const revenueCat = createRevenueCatAssertionAdapter({ apiKey: config.revenueCatApiKey });
-  const supabase = createSupabaseAssertionAdapter({
-    url: config.supabaseUrl,
-    serviceRoleKey: config.supabaseServiceRoleKey,
-  });
+  const readProvider =
+    dependencies.readProvider ??
+    createRevenueCatAssertionAdapter({ apiKey: config.revenueCatApiKey }).readUser;
+  const readSupabase =
+    dependencies.readSupabase ??
+    createSupabaseAssertionAdapter({
+      url: config.supabaseUrl,
+      serviceRoleKey: config.supabaseServiceRoleKey,
+    }).readUser;
   const userId = config.testUserId;
-  const initialProvider = await revenueCat.readUser(userId);
+  const initialProvider = await readProvider(userId);
   if (!initialProvider.ok) {
     write(`${header}\nResult: FAIL\nFailure: ${initialProvider.error.code}`);
     return 1;
   }
-  const initialSupabase = await supabase.readUser(userId);
+  const initialSupabase = await readSupabase(userId);
   if (!initialSupabase.ok) {
     write(`${header}\nResult: FAIL\nFailure: ${initialSupabase.error.code}`);
     return 1;
   }
-  const initialNow = new Date();
+  const initialNow = new Date(clock());
   const initial = inspectLifecycle(plan, initialProvider.data, initialSupabase.data, initialNow);
   if (!isRenewalObservationStart(initial) || !initial.periodEndsAt) {
     write(`${header}\nResult: FAIL\nFailure: RENEWAL_INITIAL_STATE`);
@@ -129,20 +150,17 @@ export async function runBillingRenewalReadOnly(
   const originalEnd = Date.parse(initial.periodEndsAt);
   let firstAdvancedAt: number | undefined;
   // Once the period advances, the convergence window bounds the loop instead.
-  while (
-    firstAdvancedAt !== undefined ||
-    Date.now() <= originalEnd + timing.maxAfterOriginalEndMs
-  ) {
-    await new Promise((resolve) => setTimeout(resolve, timing.pollIntervalMs));
-    const provider = await revenueCat.readUser(userId);
-    const mirror = await supabase.readUser(userId);
+  while (firstAdvancedAt !== undefined || clock() <= originalEnd + timing.maxAfterOriginalEndMs) {
+    await sleep(timing.pollIntervalMs);
+    const provider = await readProvider(userId);
+    const mirror = await readSupabase(userId);
     if (!provider.ok || !mirror.ok) {
       write(
         `${header}\nResult: FAIL\nFailure: ${!provider.ok ? provider.error.code : !mirror.ok ? mirror.error.code : 'READ_FAILED'}`,
       );
       return 1;
     }
-    const now = new Date();
+    const now = new Date(clock());
     const currentSub = provider.data.subscriptions[0];
     if (
       provider.data.projectId !== initialProvider.data.projectId ||
