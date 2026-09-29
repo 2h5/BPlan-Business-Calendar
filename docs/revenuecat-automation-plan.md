@@ -1248,11 +1248,32 @@ the extended Supabase mirror, the applied `INITIAL_PURCHASE > RENEWAL >
 RENEWAL` ledger, and server authorization all active. No test UUID, URL,
 secret, or payment detail is recorded here.
 
-**PENDING:** a live monthly cancellation through expiration needs the
-separately authorized `billing:lifecycle:cancel -- --plan monthly` with a
-distinct `REVENUECAT_MUTATION_API_KEY`, which the local wrapper does not yet
-pass through. The two new monthly Environment secrets must be provisioned
-before the monthly workflow operations can run.
+**PROVEN LIVE — monthly cancellation through expiration, 2026-09-29:** a new
+v2 key with only Customer information → Subscriptions read & write was
+provisioned as `REVENUECAT_MUTATION_API_KEY`; the local wrapper now passes it
+to `sandbox-cancel` mode only, because the tooling rejects it in every other
+mode. On the same identity, after three natural renewals, the separately
+authorized `billing:lifecycle:cancel -- --plan monthly` re-read the active,
+renewing subscription and submitted exactly one cancellation (22:10:21 UTC).
+Read-only reconciliation 27 seconds later showed `cancelled-active`:
+`will_not_renew`, an applied `CANCELLATION`, and RevenueCat Pro, the Supabase
+mirror, and server authorization still active until 22:12:51.
+
+About 15 seconds after the boundary, RevenueCat Pro, the mirror, and server
+authorization had all ended access while the provider subscription record
+still read `active`, so one read reported `LIFECYCLE_PROVIDER_INCONSISTENT`.
+From 22:13:30 onward every read passed as `expired`: the subscription was
+`expired` without Pro, the mirror was expired, server authorization was false,
+and the ledger ended `CANCELLATION > EXPIRATION`, applied by the webhook, with
+no stale, deferred, or duplicate rows. Access was never granted past the paid
+period. **Monthly lifecycle is proven live**: purchase, natural renewal,
+cancellation retaining paid access, and expiration revoking it.
+
+**Remaining operator items:** delete the cancellation key once it is no longer
+needed, provision the two monthly Environment secrets before dispatching the
+monthly workflow operations, and set `REVENUECAT_READONLY_API_KEY`,
+`REVENUECAT_PROJECT_ID`, and `BILLING_RECONCILE_CRON_SECRET` (plus enable
+`pg_cron` and `pg_net`) before relying on scheduled reconciliation.
 
 ### Phase 5 — manually triggered GitHub Actions integration
 

@@ -236,7 +236,15 @@ monthly period is five minutes. RevenueCat applies each renewal about 30
 seconds early and reports `has_already_renewed` until the period rolls over;
 the observer accepts that. A natural renewal of the same subscription then
 passed with provider, extended mirror, ledger, and server authorization in
-agreement. Monthly cancellation through expiration remains pending.
+agreement. On the same identity, one guarded `billing:lifecycle:cancel --
+--plan monthly` submission kept paid access through the period end
+(`cancelled-active`), and expiration then revoked Pro across RevenueCat, the
+mirror, and server authorization, with the ledger ending
+`CANCELLATION > EXPIRATION`. RevenueCat's subscription record can read
+`active` for a few seconds after the boundary while every access authority has
+already ended access; a read in that window fails closed. The local wrapper
+passes `REVENUECAT_MUTATION_API_KEY` only in `sandbox-cancel` mode. **Monthly
+lifecycle is proven live.**
 
 ## Historical pause checkpoint — 2026-09-19
 
