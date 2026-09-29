@@ -42,23 +42,26 @@ protected lifecycle read-only workflow passed. Those observations predate this
 hardening branch and do not prove the new reconciliation functions or migration
 are hosted.
 
-**UPDATE 2026-09-29:** the migration, webhook v8, `revenuecat-reconcile`, and
-`revenuecat-refresh` are now deployed to the sandbox/dev project; see the
-monthly lifecycle checkpoint for the hosted repair and what remains
-unconfigured. The paragraph below is the original 2026-09-24 state.
+**PROVEN HOSTED 2026-09-29:** the convergence migration, webhook v8,
+`revenuecat-reconcile`, and `revenuecat-refresh` are deployed to the
+sandbox/dev project, and real CANCELLATION and EXPIRATION deliveries were
+applied by webhook v8 (see the
+[monthly lifecycle checkpoint](#monthly-lifecycle-checkpoint--2026-09-29)).
 
-**PENDING external/provider evidence:** The new migration, webhook revision,
-`revenuecat-reconcile`, and `revenuecat-refresh` have not been deployed.
-Follow the deployment order and schedule installation in
-[Convergence operations](revenuecat-stripe-setup.md#convergence-operations).
-After deployment, observe: `ensure_revenuecat_reconcile_schedule()` returning
-`INSTALLED`, a successful scheduled run in `revenuecat_billing_health()`, a
-real RevenueCat v2 read (including whether `/customers/{uuid}` resolves an
-aliased customer), a real CANCELLATION or refund delivery followed by its
-reconciliation, and a signed-in refresh. Confirm the provisioned
-`REVENUECAT_READONLY_API_KEY` is read-only in the RevenueCat dashboard; nothing
-in code can. Do not manufacture a purchase or event to fill that evidence gap.
-Production checkout and legal release gates remain separate and disabled.
+**PENDING external/provider evidence:** the reconcile and refresh functions are
+not configured (no `REVENUECAT_READONLY_API_KEY`, `REVENUECAT_PROJECT_ID`, or
+`BILLING_RECONCILE_CRON_SECRET`; `pg_cron` and `pg_net` are off). Follow the
+setup in [Hosted operations](revenuecat-stripe-setup.md#hosted-operations),
+then observe: `ensure_revenuecat_reconcile_schedule()` returning `INSTALLED`, a
+successful scheduled run in `revenuecat_billing_health()`, a real RevenueCat v2
+read (including whether `/customers/{uuid}` resolves an aliased customer), the
+reconciliation queued by a real CANCELLATION completing, and a signed-in
+refresh. Confirm the provisioned `REVENUECAT_READONLY_API_KEY` is read-only in
+the RevenueCat dashboard; nothing in code can. Do not manufacture a purchase or
+event to fill that evidence gap. Production checkout and legal release gates
+remain separate and disabled. The runbook's
+[lifecycle reference](revenuecat-stripe-setup.md#subscription-lifecycle-reference)
+lists every event type with its handling and evidence level.
 
 The earlier CLI-first decision below concerns sandbox acceptance tooling. The
 new server-side GET adapter serves ongoing entitlement convergence and does not

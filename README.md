@@ -120,7 +120,9 @@ convergence hardening is deployed to the hosted sandbox/dev project
 `revenuecat-refresh`. Scheduled reconciliation is not yet configured. The
 monthly lifecycle is proven live on 2026-09-29: purchase, natural renewal,
 cancellation retaining paid access, and expiration revoking Pro. Production
-billing remains intentionally disabled.
+billing remains intentionally disabled. How each subscription event affects
+access, and how it is proven, is in the
+[billing runbook's lifecycle reference](docs/revenuecat-stripe-setup.md#subscription-lifecycle-reference).
 
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
