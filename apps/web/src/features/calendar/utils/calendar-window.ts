@@ -8,6 +8,9 @@ import {
 
 export type CalendarViewMode = 'day' | 'week' | 'month';
 
+/** Matches `profiles.week_starts_on`'s default: Sunday. */
+export const DEFAULT_WEEK_STARTS_ON = 0;
+
 export interface CalendarWindow {
   start: Date;
   end: Date;

@@ -10,7 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 
 import styles from './QuickCreatePickers.module.css';
-import { DEFAULT_WEEK_STARTS_ON } from '../../hooks/useCalendarProfile';
+import { DEFAULT_WEEK_STARTS_ON } from '../../utils/calendar-window';
 import type { TimePickerOption } from '../utils/quick-create-time';
 
 export { formatDurationBetweenTimes } from '../utils/quick-create-time';

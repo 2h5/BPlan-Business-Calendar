@@ -2,13 +2,14 @@ import type { Calendar, HourCycle, WorkingHours } from '@cal/schemas';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { DEFAULT_WEEK_STARTS_ON, useCalendarProfile } from './useCalendarProfile';
+import { useCalendarProfile } from './useCalendarProfile';
 import { useCalendars } from './useCalendars';
 import { queryKeys } from '../../../lib/query/query-client';
 import { useAuth } from '../../auth';
 import { fetchEventsInWindow } from '../api/calendar.api';
 import { buildCalendarOccurrences, type EventOccurrence } from '../utils/calendar-occurrences';
 import {
+  DEFAULT_WEEK_STARTS_ON,
   type CalendarViewMode,
   type CalendarWindow,
   windowForView,
