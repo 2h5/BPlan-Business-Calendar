@@ -46,6 +46,13 @@ export const RENEWAL_OBSERVATION_TIMING: Readonly<Record<BillingPlan, RenewalObs
   },
 };
 
+/**
+ * RevenueCat bills a sandbox renewal shortly before the period boundary and
+ * reports `has_already_renewed` until the new period starts (observed live on
+ * 2026-09-29 about 30 seconds early for a monthly period).
+ */
+const PRE_BOUNDARY_RENEWAL_STATES = new Set(['will_renew', 'has_already_renewed']);
+
 /** The provider may briefly report a transitional state at the period boundary. */
 export function isStablePreRenewalWindow(
   now: number,
@@ -200,7 +207,8 @@ export async function runBillingRenewalReadOnly(
       return 1;
     } else if (
       stable &&
-      (currentSub.status !== 'active' || currentSub.autoRenewalStatus !== 'will_renew')
+      (currentSub.status !== 'active' ||
+        !PRE_BOUNDARY_RENEWAL_STATES.has(currentSub.autoRenewalStatus ?? ''))
     ) {
       write(`${header}\nResult: FAIL\nFailure: RENEWAL_PROVIDER_STATE`);
       return 1;

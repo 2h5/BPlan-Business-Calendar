@@ -760,6 +760,43 @@ describe('monthly natural renewal observer loop', () => {
     expect(late.code).toBe(0);
   });
 
+  it('accepts RevenueCat billing the renewal early, before the period rolls over', async () => {
+    // Observed live on 2026-09-29: about 30 seconds before the boundary the
+    // RENEWAL is applied everywhere and the provider reports
+    // has_already_renewed with an extended end but the original period.
+    const earlyRenewalAt = MONTHLY_END - 40_000;
+    const earlyRenewal = () => {
+      const early = monthly({
+        now: earlyRenewalAt,
+        ledger: [event('RENEWAL', 4), event('INITIAL_PURCHASE', 0)],
+      });
+      const [sub] = early.provider.subscriptions;
+      const [row] = early.supabase.mirrorRows;
+      if (!sub || !row) throw new Error('fixture has a subscription and mirror row');
+      const extendedEnd = MONTHLY_END + 5 * 60_000;
+      return {
+        ...early,
+        provider: {
+          ...early.provider,
+          subscriptions: [
+            { ...sub, endsAt: extendedEnd, autoRenewalStatus: 'has_already_renewed' },
+          ],
+        },
+        supabase: {
+          ...early.supabase,
+          mirrorRows: [{ ...row, expires_at: new Date(extendedEnd).toISOString() }],
+        },
+      };
+    };
+    const result = await observe((time) => {
+      if (time < earlyRenewalAt) return initial();
+      if (time < MONTHLY_END) return earlyRenewal();
+      return renewed();
+    });
+    expect(result.code).toBe(0);
+    expect(result.text).not.toContain('RENEWAL_PROVIDER_STATE');
+  });
+
   it('refuses a cancelled start without polling', async () => {
     const result = await observe(() =>
       monthly({

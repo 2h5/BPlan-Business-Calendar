@@ -42,6 +42,11 @@ protected lifecycle read-only workflow passed. Those observations predate this
 hardening branch and do not prove the new reconciliation functions or migration
 are hosted.
 
+**UPDATE 2026-09-29:** the migration, webhook v8, `revenuecat-reconcile`, and
+`revenuecat-refresh` are now deployed to the sandbox/dev project; see the
+monthly lifecycle checkpoint for the hosted repair and what remains
+unconfigured. The paragraph below is the original 2026-09-24 state.
+
 **PENDING external/provider evidence:** The new migration, webhook revision,
 `revenuecat-reconcile`, and `revenuecat-refresh` have not been deployed.
 Follow the deployment order and schedule installation in
@@ -1202,13 +1207,52 @@ The manual workflow passes `--plan annual` to the existing
 `BILLING_MONTHLY_RENEWAL_TEST_USER_ID` Environment secrets. Cancellation
 remains local-only, not a workflow operation.
 
-**PENDING external evidence:** the five-minute monthly sandbox period is an
-assumption from RevenueCat's accelerated sandbox behavior and the observed
-one-hour annual period; confirm it on the first live observation. A live
-monthly cancellation-through-expiration and natural renewal each need a
-separately authorized monthly sandbox purchase on a dedicated identity, and the
-two new Environment secrets must be provisioned before the monthly workflow
-operations can run. Nothing live was run for this checkpoint.
+**HOSTED REPAIR — 2026-09-29:** a read-only probe found the sandbox/dev
+project's migration history swapped: `20260924000001_revenuecat_convergence`
+was recorded as applied but none of its columns or tables existed, while
+`20260924000003_profile_avatars` was fully applied (bucket and four policies
+identical to the file) but unrecorded. `revenuecat-webhook` was still version 6
+and neither `revenuecat-reconcile` nor `revenuecat-refresh` was deployed. After
+a schema-and-data backup (kept outside the repository) and a local rehearsal
+that recreated the hosted state, loaded a copy of its data, applied the two
+missing migrations in hosted order, and passed all 340 pgTAP checks, the
+operator repaired the two history rows, applied `20260924000001` and
+`20260925000001`, set `REVENUECAT_ENVIRONMENT=SANDBOX`, and deployed
+`revenuecat-webhook` (v8, `verify_jwt=false`), `revenuecat-reconcile` (v1,
+`verify_jwt=false`), and `revenuecat-refresh` (v1, `verify_jwt=true`).
+Read-only checks then found every convergence column and table present,
+billing row counts unchanged (5 subscriptions, 74 events, 42 applied), and a
+405 from a webhook GET. `pg_cron` and `pg_net` are not enabled on the project,
+so no schedule was installed and none was removed. The reconcile and refresh
+functions still need `REVENUECAT_READONLY_API_KEY`, `REVENUECAT_PROJECT_ID`,
+and `BILLING_RECONCILE_CRON_SECRET`, and report `NOT_CONFIGURED` until then.
+
+**PROVEN LIVE — monthly purchase and natural renewal, 2026-09-29:** a fresh
+Auth identity passed the free baseline across every authority. One monthly
+sandbox submit action was attempted; browser submission was `UNKNOWN`, and
+read-only authority reconciliation confirmed the purchase without retry. The
+accelerated monthly period is exactly five minutes (21:52:51–21:57:51 UTC). It
+was also the first live delivery through webhook v8: `INITIAL_PURCHASE` was
+applied by the webhook with no stale, deferred, or duplicate ledger rows.
+
+RevenueCat billed the first renewal about 30 seconds before the boundary: the
+`RENEWAL` was applied, the provider end and mirror expiry both moved to
+22:02:51, and the provider reported `has_already_renewed` while the period had
+not yet rolled over. The first observer run treated that state as
+`RENEWAL_PROVIDER_STATE`; the observer now accepts `has_already_renewed`
+before the boundary (with a fake-clock regression test), and the earlier annual
+boundary failure was most likely the same behavior. The next run started on
+the already renewed subscription and passed: the same subscription and Product
+advanced from 21:57:51–22:02:51 to 22:02:51–22:07:51 UTC, with RevenueCat Pro,
+the extended Supabase mirror, the applied `INITIAL_PURCHASE > RENEWAL >
+RENEWAL` ledger, and server authorization all active. No test UUID, URL,
+secret, or payment detail is recorded here.
+
+**PENDING:** a live monthly cancellation through expiration needs the
+separately authorized `billing:lifecycle:cancel -- --plan monthly` with a
+distinct `REVENUECAT_MUTATION_API_KEY`, which the local wrapper does not yet
+pass through. The two new monthly Environment secrets must be provisioned
+before the monthly workflow operations can run.
 
 ### Phase 5 — manually triggered GitHub Actions integration
 

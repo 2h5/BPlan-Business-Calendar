@@ -227,9 +227,16 @@ grace, up to 2 minutes to observe the renewal and 2 more to converge) ends
 before a second five-minute boundary. The manual workflow adds
 `monthly-lifecycle-read-only` and `monthly-renewal-read-only`, which need the
 new `BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID` and
-`BILLING_MONTHLY_RENEWAL_TEST_USER_ID` Environment secrets. A live monthly
-run needs a separately authorized monthly purchase on a dedicated identity; no
-monthly cancellation, expiration, or renewal has been observed live yet.
+`BILLING_MONTHLY_RENEWAL_TEST_USER_ID` Environment secrets.
+
+**Monthly live checkpoint, 2026-09-29:** after the hosted convergence repair
+(see the automation plan), one fresh identity passed the free baseline and one
+monthly sandbox purchase converged through webhook v8 without retry. The
+monthly period is five minutes. RevenueCat applies each renewal about 30
+seconds early and reports `has_already_renewed` until the period rolls over;
+the observer accepts that. A natural renewal of the same subscription then
+passed with provider, extended mirror, ledger, and server authorization in
+agreement. Monthly cancellation through expiration remains pending.
 
 ## Historical pause checkpoint — 2026-09-19
 
