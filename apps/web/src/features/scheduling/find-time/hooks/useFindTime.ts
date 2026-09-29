@@ -8,6 +8,7 @@ import {
   type FindTimeProposal,
   type FindTimeReadback,
 } from '../api/find-time.api';
+import { clearBannerRecord } from '../utils/scheduled-notice-storage';
 
 export const FIND_TIME_SESSION_KEY = 'bplan_find_time_session';
 export const FIND_TIME_DRAFT_KEY = 'bplan_find_time_draft';
@@ -220,11 +221,17 @@ export function resetFindTime(): void {
   });
 }
 
-export function _resetFindTimeStoreForTesting(): void {
+/**
+ * Forgets everything Find Time holds for the signed-in user: the in-memory
+ * store, any in-flight request's result, and the session-stored draft,
+ * results, and scheduled banner. Called when the account changes.
+ */
+export function discardFindTimeSession(): void {
   currentRequestId += 1;
   inFlightPromise = null;
   storeState = null;
   clearStoredFindTimeDraft();
+  clearBannerRecord();
   try {
     if (typeof window !== 'undefined' && window.sessionStorage) {
       window.sessionStorage.removeItem(FIND_TIME_SESSION_KEY);
@@ -232,6 +239,11 @@ export function _resetFindTimeStoreForTesting(): void {
   } catch {
     // Ignore
   }
+  notifyListeners();
+}
+
+export function _resetFindTimeStoreForTesting(): void {
+  discardFindTimeSession();
 }
 
 /**

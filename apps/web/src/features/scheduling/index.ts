@@ -1,6 +1,6 @@
 export { FindTimeBox } from './find-time/components/FindTimeBox';
 export { useConfirmSlot } from './find-time/hooks/useConfirmSlot';
-export { useFindTime } from './find-time/hooks/useFindTime';
+export { discardFindTimeSession, useFindTime } from './find-time/hooks/useFindTime';
 export type {
   FindTimeConfirmation,
   FindTimeProposal,

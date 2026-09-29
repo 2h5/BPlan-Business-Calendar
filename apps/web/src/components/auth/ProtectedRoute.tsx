@@ -1,9 +1,10 @@
+import { Fragment } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../../features/auth';
 
 export function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, userId } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -29,5 +30,11 @@ export function ProtectedRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  return <Outlet />;
+  // Keyed by user so an account switch remounts every signed-in screen:
+  // no component state from the previous account survives.
+  return (
+    <Fragment key={userId}>
+      <Outlet />
+    </Fragment>
+  );
 }
