@@ -91,6 +91,8 @@ describe('manual RevenueCat billing workflow safety', () => {
     expect(operationInput).toContain('- annual-assertion');
     expect(operationInput).toContain('- lifecycle-read-only');
     expect(operationInput).toContain('- annual-renewal-read-only');
+    expect(operationInput).toContain('- monthly-lifecycle-read-only');
+    expect(operationInput).toContain('- monthly-renewal-read-only');
     expect(operationInput).not.toMatch(/production/i);
     expect(dispatch).not.toMatch(/production/i);
     expect(dispatch).not.toMatch(/^\x20{6}(target_environment|environment):$/m);
@@ -107,6 +109,17 @@ describe('manual RevenueCat billing workflow safety', () => {
     expect(timeoutMinutes).toBeGreaterThanOrEqual(90);
   });
 
+  it('passes an explicit plan to every lifecycle command', () => {
+    const lifecycleRuns = workflow.match(/run: pnpm billing:lifecycle:[a-z-]+.*$/gm) ?? [];
+
+    expect(lifecycleRuns).toEqual([
+      'run: pnpm billing:lifecycle:read-only -- --plan annual',
+      'run: pnpm billing:lifecycle:renewal -- --plan annual',
+      'run: pnpm billing:lifecycle:read-only -- --plan monthly',
+      'run: pnpm billing:lifecycle:renewal -- --plan monthly',
+    ]);
+  });
+
   it('gets credentials and test identities only from GitHub Environment secrets', () => {
     for (const secret of [
       'REVENUECAT_API_KEY',
@@ -116,6 +129,8 @@ describe('manual RevenueCat billing workflow safety', () => {
       'BILLING_ANNUAL_TEST_USER_ID',
       'BILLING_LIFECYCLE_TEST_USER_ID',
       'BILLING_RENEWAL_TEST_USER_ID',
+      'BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID',
+      'BILLING_MONTHLY_RENEWAL_TEST_USER_ID',
       'BILLING_PURCHASE_TEST_USER_ID',
       'BILLING_REVENUECAT_SANDBOX_PURCHASE_URL',
     ]) {

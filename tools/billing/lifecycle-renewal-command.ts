@@ -1,25 +1,63 @@
 import { isBillingUserId, loadBillingEnvironment, type EnvironmentRecord } from './config';
+import type { BillingPlan } from './contract';
 import {
-  inspectAnnualLifecycle,
-  inspectAnnualRenewal,
-  type AnnualRenewalReport,
+  inspectLifecycle,
+  inspectRenewal,
+  isRenewalObservationStart,
+  parseLifecyclePlan,
+  type RenewalReport,
 } from './lifecycle';
 import { createRevenueCatAssertionAdapter } from './revenuecat-assertions';
 import { createSupabaseAssertionAdapter } from './supabase-assertions';
 
-const POLL_INTERVAL_MS = 30_000;
-const CONVERGENCE_MS = 5 * 60_000;
-const MAX_AFTER_ORIGINAL_END_MS = 10 * 60_000;
-const BOUNDARY_GRACE_MS = 60_000;
-
-/** The provider may briefly report a transitional state at the period boundary. */
-export function isStablePreRenewalWindow(now: number, originalEnd: number): boolean {
-  return now < originalEnd - BOUNDARY_GRACE_MS;
+interface RenewalObservationTiming {
+  readonly pollIntervalMs: number;
+  /** How long authorities may take to agree after the provider period first advances. */
+  readonly convergenceMs: number;
+  /** How long after the original period end a renewal may still first appear. */
+  readonly maxAfterOriginalEndMs: number;
+  /** The provider may briefly report a transitional state this close to the boundary. */
+  readonly boundaryGraceMs: number;
 }
 
-function format(report: AnnualRenewalReport): string {
+/**
+ * RevenueCat sandbox periods are accelerated: an annual period lasts about an
+ * hour and a monthly period a few minutes. Monthly windows stay shorter than
+ * one period so a second renewal cannot land inside a single observation.
+ */
+export const RENEWAL_OBSERVATION_TIMING: Readonly<Record<BillingPlan, RenewalObservationTiming>> = {
+  annual: {
+    pollIntervalMs: 30_000,
+    convergenceMs: 5 * 60_000,
+    maxAfterOriginalEndMs: 10 * 60_000,
+    boundaryGraceMs: 60_000,
+  },
+  monthly: {
+    pollIntervalMs: 10_000,
+    convergenceMs: 2 * 60_000,
+    maxAfterOriginalEndMs: 2 * 60_000,
+    boundaryGraceMs: 30_000,
+  },
+};
+
+/** The provider may briefly report a transitional state at the period boundary. */
+export function isStablePreRenewalWindow(
+  now: number,
+  originalEnd: number,
+  boundaryGraceMs: number,
+): boolean {
+  return now < originalEnd - boundaryGraceMs;
+}
+
+export function renewalHeader(plan: BillingPlan | null): string {
+  return plan
+    ? `RevenueCat ${plan} natural renewal (read-only)`
+    : 'RevenueCat natural renewal (read-only)';
+}
+
+function format(report: RenewalReport): string {
   return [
-    'RevenueCat annual natural renewal (read-only)',
+    renewalHeader(report.plan),
     `Result: ${report.ok ? 'PASS' : 'FAIL'}`,
     `Product: ${report.storeIdentifier ?? 'UNKNOWN'}`,
     `Renewal state: ${report.autoRenewalStatus ?? 'UNKNOWN'}`,
@@ -37,12 +75,18 @@ function format(report: AnnualRenewalReport): string {
 }
 
 /** One bounded observation; this command never submits a provider or database write. */
-export async function runBillingAnnualRenewalReadOnly(
+export async function runBillingRenewalReadOnly(
+  argv: readonly string[] = process.argv.slice(2),
   environment: EnvironmentRecord = process.env,
   write: (value: string) => void = (value) => process.stdout.write(`${value}\n`),
 ): Promise<number> {
+  const plan = parseLifecyclePlan(argv);
+  if (!plan) {
+    write(`${renewalHeader(null)}\nResult: FAIL\nFailure: ARGUMENT_INVALID`);
+    return 1;
+  }
   const { config, issues } = loadBillingEnvironment(environment);
-  const header = 'RevenueCat annual natural renewal (read-only)';
+  const header = renewalHeader(plan);
   if (
     issues.length > 0 ||
     config.mode !== 'live-readonly' ||
@@ -56,6 +100,7 @@ export async function runBillingAnnualRenewalReadOnly(
     write(`${header}\nResult: FAIL\nFailure: CONFIGURATION`);
     return 1;
   }
+  const timing = RENEWAL_OBSERVATION_TIMING[plan];
   const revenueCat = createRevenueCatAssertionAdapter({ apiKey: config.revenueCatApiKey });
   const supabase = createSupabaseAssertionAdapter({
     url: config.supabaseUrl,
@@ -73,16 +118,8 @@ export async function runBillingAnnualRenewalReadOnly(
     return 1;
   }
   const initialNow = new Date();
-  const initial = inspectAnnualLifecycle(initialProvider.data, initialSupabase.data, initialNow);
-  if (
-    !initial.ok ||
-    initial.state !== 'active' ||
-    initial.renewed ||
-    initial.cancelled ||
-    initial.autoRenewalStatus !== 'will_renew' ||
-    initial.ledgerTransitions.join('>') !== 'INITIAL_PURCHASE' ||
-    !initial.periodEndsAt
-  ) {
+  const initial = inspectLifecycle(plan, initialProvider.data, initialSupabase.data, initialNow);
+  if (!isRenewalObservationStart(initial) || !initial.periodEndsAt) {
     write(`${header}\nResult: FAIL\nFailure: RENEWAL_INITIAL_STATE`);
     return 1;
   }
@@ -91,8 +128,12 @@ export async function runBillingAnnualRenewalReadOnly(
   );
   const originalEnd = Date.parse(initial.periodEndsAt);
   let firstAdvancedAt: number | undefined;
-  while (Date.now() <= originalEnd + MAX_AFTER_ORIGINAL_END_MS) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  // Once the period advances, the convergence window bounds the loop instead.
+  while (
+    firstAdvancedAt !== undefined ||
+    Date.now() <= originalEnd + timing.maxAfterOriginalEndMs
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, timing.pollIntervalMs));
     const provider = await revenueCat.readUser(userId);
     const mirror = await supabase.readUser(userId);
     if (!provider.ok || !mirror.ok) {
@@ -116,9 +157,11 @@ export async function runBillingAnnualRenewalReadOnly(
     }
     const advanced =
       currentSub.currentPeriodEndsAt !== null && currentSub.currentPeriodEndsAt > originalEnd;
+    const stable = isStablePreRenewalWindow(now.getTime(), originalEnd, timing.boundaryGraceMs);
     if (advanced) {
       firstAdvancedAt ??= now.getTime();
-      const report = inspectAnnualRenewal(
+      const report = inspectRenewal(
+        plan,
         initialProvider.data,
         initialSupabase.data,
         provider.data,
@@ -130,18 +173,15 @@ export async function runBillingAnnualRenewalReadOnly(
         write(format(report));
         return 0;
       }
-      if (now.getTime() - firstAdvancedAt >= CONVERGENCE_MS) {
+      if (now.getTime() - firstAdvancedAt >= timing.convergenceMs) {
         write(format(report));
         return 1;
       }
-    } else if (
-      isStablePreRenewalWindow(now.getTime(), originalEnd) &&
-      !inspectAnnualLifecycle(provider.data, mirror.data, now).ok
-    ) {
+    } else if (stable && !inspectLifecycle(plan, provider.data, mirror.data, now).ok) {
       write(`${header}\nResult: FAIL\nFailure: RENEWAL_PRE_BOUNDARY_AUTHORITY`);
       return 1;
     } else if (
-      isStablePreRenewalWindow(now.getTime(), originalEnd) &&
+      stable &&
       (currentSub.status !== 'active' || currentSub.autoRenewalStatus !== 'will_renew')
     ) {
       write(`${header}\nResult: FAIL\nFailure: RENEWAL_PROVIDER_STATE`);

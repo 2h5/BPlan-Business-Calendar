@@ -1170,6 +1170,46 @@ provider-side duplicate delivery was not manufactured or claimed live.
 Production billing remains disabled. Phase 5 subsequently passed its protected
 live GitHub read-only dispatch, as recorded below.
 
+#### Monthly lifecycle checkpoint — 2026-09-29
+
+**PROVEN LOCAL:** the lifecycle commands are plan-scoped. `billing:lifecycle:read-only`,
+`billing:lifecycle:renewal`, and `billing:lifecycle:cancel` each require exactly
+`--plan monthly` or `--plan annual`; anything else fails with
+`ARGUMENT_INVALID` before an adapter is created. `inspectLifecycle` and
+`inspectRenewal` compare the subscription's store identifier with the selected
+plan's contract Product, so a monthly run against an annual subscription (or
+the reverse) fails with `LIFECYCLE_IDENTITY`, and the cancellation guard
+refuses it before the single write. Reports name the plan and print
+`Plan product match`.
+
+Accelerated monthly sandbox periods are about five minutes, so the first
+renewal usually lands before an operator can start an observer. The renewal
+comparison therefore accepts a start whose applied history is
+`INITIAL_PURCHASE` followed only by `RENEWAL`s (never cancelled), and requires
+the later snapshot to keep that history and add exactly one later applied
+`RENEWAL`. The annual observer keeps its 30-second poll, 60-second boundary
+grace, 10-minute observation, and 5-minute convergence windows. The monthly
+observer uses 10-second polls, 30-second grace, 2 minutes to first observe the
+advanced period, and 2 minutes to converge, so one observation ends before a
+second monthly boundary. Once the period advances, the convergence window
+alone bounds the loop, so a late renewal is no longer misreported as
+`RENEWAL_NOT_OBSERVED`.
+
+The manual workflow passes `--plan annual` to the existing
+`lifecycle-read-only` and `annual-renewal-read-only` operations and adds
+`monthly-lifecycle-read-only` and `monthly-renewal-read-only`, backed by new
+`BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID` and
+`BILLING_MONTHLY_RENEWAL_TEST_USER_ID` Environment secrets. Cancellation
+remains local-only, not a workflow operation.
+
+**PENDING external evidence:** the five-minute monthly sandbox period is an
+assumption from RevenueCat's accelerated sandbox behavior and the observed
+one-hour annual period; confirm it on the first live observation. A live
+monthly cancellation-through-expiration and natural renewal each need a
+separately authorized monthly sandbox purchase on a dedicated identity, and the
+two new Environment secrets must be provisioned before the monthly workflow
+operations can run. Nothing live was run for this checkpoint.
+
 ### Phase 5 — manually triggered GitHub Actions integration
 
 - Goal: make the live sandbox suite repeatable from a protected manual workflow.
@@ -1217,6 +1257,8 @@ Environment secrets:
 - `BILLING_ANNUAL_TEST_USER_ID`
 - `BILLING_LIFECYCLE_TEST_USER_ID`
 - `BILLING_RENEWAL_TEST_USER_ID`
+- `BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID` (added 2026-09-29)
+- `BILLING_MONTHLY_RENEWAL_TEST_USER_ID` (added 2026-09-29)
 - `BILLING_PURCHASE_TEST_USER_ID` (only if purchase is enabled)
 - `BILLING_REVENUECAT_SANDBOX_PURCHASE_URL` (only if purchase is enabled)
 

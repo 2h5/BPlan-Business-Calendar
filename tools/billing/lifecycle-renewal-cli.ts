@@ -1,12 +1,15 @@
-import { runBillingAnnualRenewalReadOnly } from './lifecycle-renewal-command';
+import { parseLifecyclePlan } from './lifecycle';
+import { renewalHeader, runBillingRenewalReadOnly } from './lifecycle-renewal-command';
 
-void runBillingAnnualRenewalReadOnly().then(
+const argv = process.argv.slice(2);
+
+void runBillingRenewalReadOnly(argv).then(
   (code) => {
     process.exitCode = code;
   },
   () => {
     process.stdout.write(
-      'RevenueCat annual natural renewal (read-only)\nResult: FAIL\nFailure: READ_FAILED\n',
+      `${renewalHeader(parseLifecyclePlan(argv))}\nResult: FAIL\nFailure: READ_FAILED\n`,
     );
     process.exitCode = 1;
   },

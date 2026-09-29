@@ -207,6 +207,30 @@ with `RENEWAL_PROVIDER_STATE`; immediate read-only reconciliation passed, and bo
 handling was added with offline tests. No natural duplicate or stale delivery
 was observed. Phase 4 is complete; production billing remains disabled.
 
+**Monthly lifecycle tooling, 2026-09-29 (PROVEN LOCAL; live monthly lifecycle
+PENDING):** every lifecycle command now requires exactly one explicit
+`--plan monthly|annual` and checks the matching Product
+(`bplan_pro_monthly` or `bplan_pro_yearly`); a missing or unexpected argument
+fails with `ARGUMENT_INVALID` before any read or write. The annual evidence
+above is unchanged and its commands now run with `--plan annual`.
+
+```text
+pnpm billing:lifecycle:read-only -- --plan monthly
+pnpm billing:lifecycle:renewal   -- --plan monthly
+pnpm billing:lifecycle:cancel    -- --plan monthly   # sandbox-cancel, separately authorized
+```
+
+Monthly sandbox periods are only minutes long, so the renewal observer accepts
+a start that already has earlier applied renewals and requires exactly one new
+applied `RENEWAL`. Its monthly window (10-second polls, 30-second boundary
+grace, up to 2 minutes to observe the renewal and 2 more to converge) ends
+before a second five-minute boundary. The manual workflow adds
+`monthly-lifecycle-read-only` and `monthly-renewal-read-only`, which need the
+new `BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID` and
+`BILLING_MONTHLY_RENEWAL_TEST_USER_ID` Environment secrets. A live monthly
+run needs a separately authorized monthly purchase on a dedicated identity; no
+monthly cancellation, expiration, or renewal has been observed live yet.
+
 ## Historical pause checkpoint — 2026-09-19
 
 At this checkpoint, billing work was paused after exactly one separately

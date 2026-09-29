@@ -1,9 +1,10 @@
-import { BILLING_CONTRACT } from './contract';
+import { BILLING_CONTRACT, type BillingPlan } from './contract';
 import type { RevenueCatUserSnapshot } from './revenuecat-assertions';
 import type { SupabaseUserSnapshot } from './supabase-assertions';
 
 export interface LifecycleReport {
   readonly ok: boolean;
+  readonly plan: BillingPlan;
   readonly state: 'active' | 'cancelled-active' | 'expired' | 'unknown';
   readonly renewed: boolean;
   readonly cancelled: boolean;
@@ -13,7 +14,7 @@ export interface LifecycleReport {
   readonly providerSubscriptionCount: number;
   readonly mirrorRowCount: number;
   readonly ledgerEventCount: number;
-  readonly annualProductMatch: boolean;
+  readonly planProductMatch: boolean;
   readonly latestAppliedLedgerEventType: string | null;
   readonly storeIdentifier: string | null;
   readonly subscriptionStatus: string | null;
@@ -56,8 +57,15 @@ function iso(value: number | null): string | null {
   return value === null ? null : new Date(value).toISOString();
 }
 
-/** Reconcile one annual sandbox subscription without changing provider or database state. */
-export function inspectAnnualLifecycle(
+/** Parse the one required `--plan monthly|annual` argument of a lifecycle command. */
+export function parseLifecyclePlan(argv: readonly string[]): BillingPlan | null {
+  if (argv.length !== 2 || argv[0] !== '--plan') return null;
+  return argv[1] === 'monthly' || argv[1] === 'annual' ? argv[1] : null;
+}
+
+/** Reconcile one sandbox subscription of the selected plan without changing provider or database state. */
+export function inspectLifecycle(
+  plan: BillingPlan,
   provider: RevenueCatUserSnapshot,
   supabase: SupabaseUserSnapshot,
   now: Date,
@@ -71,8 +79,10 @@ export function inspectAnnualLifecycle(
   const latestApplied = [...events].reverse().find((event) => event.applied);
   const renewed = transitions.includes('RENEWAL');
   const cancelled = transitions.includes('CANCELLATION');
+  const productId = BILLING_CONTRACT.products[plan].id;
   const base: LifecycleReport = {
     ok: false,
+    plan,
     state: 'unknown',
     renewed,
     cancelled,
@@ -82,7 +92,7 @@ export function inspectAnnualLifecycle(
     providerSubscriptionCount: provider.subscriptions.length,
     mirrorRowCount: supabase.mirrorRows.length,
     ledgerEventCount: events.length,
-    annualProductMatch: sub?.storeIdentifier === BILLING_CONTRACT.products.annual.id,
+    planProductMatch: sub?.storeIdentifier === productId,
     latestAppliedLedgerEventType: latestApplied?.event_type ?? null,
     storeIdentifier: sub?.storeIdentifier ?? null,
     subscriptionStatus: sub?.status ?? null,
@@ -115,7 +125,7 @@ export function inspectAnnualLifecycle(
   if (
     !provider.customerExists ||
     sub.environment !== 'sandbox' ||
-    sub.storeIdentifier !== BILLING_CONTRACT.products.annual.id ||
+    sub.storeIdentifier !== productId ||
     row.provider !== 'revenuecat' ||
     row.entitlement !== BILLING_CONTRACT.entitlement
   ) {
@@ -190,15 +200,19 @@ export function inspectAnnualLifecycle(
   };
 }
 
+export function lifecycleHeader(plan: BillingPlan | null): string {
+  return plan ? `RevenueCat ${plan} lifecycle (read-only)` : 'RevenueCat lifecycle (read-only)';
+}
+
 export function formatLifecycleReport(report: LifecycleReport): string {
   return [
-    'RevenueCat annual lifecycle (read-only)',
+    lifecycleHeader(report.plan),
     `Result: ${report.ok ? 'PASS' : 'FAIL'}`,
     ...(report.failure ? [`Failure: ${report.failure}`] : []),
     `Provider subscriptions: ${report.providerSubscriptionCount}`,
     `Supabase mirror rows: ${report.mirrorRowCount}`,
     `Ledger events: ${report.ledgerEventCount}`,
-    `Annual product match: ${report.annualProductMatch ? 'YES' : 'NO'}`,
+    `Plan product match: ${report.planProductMatch ? 'YES' : 'NO'}`,
     `State: ${report.state}`,
     `Product: ${report.storeIdentifier ?? 'UNKNOWN'}`,
     `Subscription status: ${report.subscriptionStatus ?? 'UNKNOWN'}`,
@@ -222,8 +236,27 @@ export function formatLifecycleReport(report: LifecycleReport): string {
   ].join('\n');
 }
 
-export interface AnnualRenewalReport {
+/**
+ * A renewal observation starts from an active, renewing, never-cancelled
+ * subscription whose applied history is the initial purchase plus any earlier
+ * renewals. Accelerated monthly sandbox periods are minutes long, so the first
+ * renewal has often happened before an operator can start the observer.
+ */
+export function isRenewalObservationStart(report: LifecycleReport): boolean {
+  const [first, ...rest] = report.ledgerTransitions;
+  return (
+    report.ok &&
+    report.state === 'active' &&
+    !report.cancelled &&
+    report.autoRenewalStatus === 'will_renew' &&
+    first === 'INITIAL_PURCHASE' &&
+    rest.every((transition) => transition === 'RENEWAL')
+  );
+}
+
+export interface RenewalReport {
   readonly ok: boolean;
+  readonly plan: BillingPlan;
   readonly storeIdentifier: string | null;
   readonly autoRenewalStatus: string | null;
   readonly originalPeriodStartsAt: string | null;
@@ -240,21 +273,27 @@ export interface AnnualRenewalReport {
   readonly failure?: string;
 }
 
-/** Compare two read-only authority snapshots around one natural sandbox renewal. */
-export function inspectAnnualRenewal(
+/**
+ * Compare two read-only authority snapshots around one natural sandbox renewal.
+ * The renewed snapshot must keep the initial applied history and add exactly
+ * one later applied RENEWAL.
+ */
+export function inspectRenewal(
+  plan: BillingPlan,
   initialProvider: RevenueCatUserSnapshot,
   initialSupabase: SupabaseUserSnapshot,
   renewedProvider: RevenueCatUserSnapshot,
   renewedSupabase: SupabaseUserSnapshot,
   initialNow: Date,
   renewedNow: Date,
-): AnnualRenewalReport {
-  const initial = inspectAnnualLifecycle(initialProvider, initialSupabase, initialNow);
-  const renewed = inspectAnnualLifecycle(renewedProvider, renewedSupabase, renewedNow);
+): RenewalReport {
+  const initial = inspectLifecycle(plan, initialProvider, initialSupabase, initialNow);
+  const renewed = inspectLifecycle(plan, renewedProvider, renewedSupabase, renewedNow);
   const before = initialProvider.subscriptions[0];
   const after = renewedProvider.subscriptions[0];
-  const base: AnnualRenewalReport = {
+  const base: RenewalReport = {
     ok: false,
+    plan,
     storeIdentifier: renewed.storeIdentifier,
     autoRenewalStatus: renewed.autoRenewalStatus,
     originalPeriodStartsAt: initial.periodStartsAt,
@@ -269,15 +308,8 @@ export function inspectAnnualRenewal(
     mirrorPro: renewed.mirrorPro,
     serverPro: renewed.serverPro,
   };
-  const fail = (failure: string): AnnualRenewalReport => ({ ...base, failure });
-  if (
-    !initial.ok ||
-    initial.state !== 'active' ||
-    initial.renewed ||
-    initial.cancelled ||
-    before?.autoRenewalStatus !== 'will_renew' ||
-    initial.ledgerTransitions.join('>') !== 'INITIAL_PURCHASE'
-  )
+  const fail = (failure: string): RenewalReport => ({ ...base, failure });
+  if (!isRenewalObservationStart(initial) || before?.autoRenewalStatus !== 'will_renew')
     return fail('RENEWAL_INITIAL_STATE');
   if (
     initialProvider.projectId !== renewedProvider.projectId ||
@@ -314,13 +346,16 @@ export function inspectAnnualRenewal(
     Date.parse(renewedSupabase.mirrorRows[0]?.expires_at ?? '') !== after.currentPeriodEndsAt
   )
     return fail('RENEWAL_PERIOD');
+  const appliedBefore = [...initialSupabase.ledgerRows].reverse().filter((event) => event.applied);
   const applied = [...renewedSupabase.ledgerRows].reverse().filter((event) => event.applied);
+  const previous = applied[applied.length - 2];
+  const renewal = applied[applied.length - 1];
   if (
-    applied.length !== 2 ||
-    applied[0]?.event_type !== 'INITIAL_PURCHASE' ||
-    applied[1]?.event_type !== 'RENEWAL' ||
-    Date.parse(applied[1].event_at) <= Date.parse(applied[0].event_at) ||
-    initialSupabase.ledgerRows[0]?.event_id !== applied[0].event_id
+    applied.length !== appliedBefore.length + 1 ||
+    appliedBefore.some((event, index) => applied[index]?.event_id !== event.event_id) ||
+    !previous ||
+    renewal?.event_type !== 'RENEWAL' ||
+    Date.parse(renewal.event_at) <= Date.parse(previous.event_at)
   )
     return fail('RENEWAL_LEDGER');
   return { ...base, ok: true };

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatLifecycleReport, inspectAnnualLifecycle, inspectAnnualRenewal } from './lifecycle';
+import {
+  formatLifecycleReport,
+  inspectLifecycle,
+  inspectRenewal,
+  parseLifecyclePlan,
+} from './lifecycle';
 import {
   formatLifecycleReadOnlyFailure,
   formatLifecycleUnexpectedFailure,
@@ -8,7 +13,8 @@ import {
 } from './lifecycle-command';
 import {
   isStablePreRenewalWindow,
-  runBillingAnnualRenewalReadOnly,
+  RENEWAL_OBSERVATION_TIMING,
+  runBillingRenewalReadOnly,
 } from './lifecycle-renewal-command';
 import type { RevenueCatUserSnapshot } from './revenuecat-assertions';
 import {
@@ -43,6 +49,7 @@ function fixtures(
     givesAccess?: boolean;
     renewalStatus?: string | null;
     ledger?: SubscriptionLedgerRow[];
+    storeIdentifier?: string;
   } = {},
 ): { provider: RevenueCatUserSnapshot; supabase: SupabaseUserSnapshot; now: Date } {
   const startsAt = options.startsAt ?? START;
@@ -60,7 +67,7 @@ function fixtures(
         {
           id: 'subscription',
           productId: 'product',
-          storeIdentifier: 'bplan_pro_yearly',
+          storeIdentifier: options.storeIdentifier ?? 'bplan_pro_yearly',
           store: 'rc_billing',
           environment: 'sandbox',
           status: options.status ?? 'active',
@@ -99,12 +106,13 @@ function fixtures(
 
 describe('annual lifecycle read-only reconciliation', () => {
   it('accepts a coherent active annual period', () => {
-    const result = inspectAnnualLifecycle(...values(fixtures()));
+    const result = inspectLifecycle('annual', ...values(fixtures()));
     expect(result).toMatchObject({ ok: true, state: 'active', renewed: false, cancelled: false });
   });
 
   it('keeps access after an observed cancellation until the paid period ends', () => {
-    const result = inspectAnnualLifecycle(
+    const result = inspectLifecycle(
+      'annual',
       ...values(
         fixtures({
           renewalStatus: 'will_not_renew',
@@ -123,7 +131,8 @@ describe('annual lifecycle read-only reconciliation', () => {
   });
 
   it('recognizes a renewed period with extended Pro access', () => {
-    const result = inspectAnnualLifecycle(
+    const result = inspectLifecycle(
+      'annual',
       ...values(
         fixtures({
           now: END + 30 * 60_000,
@@ -137,7 +146,8 @@ describe('annual lifecycle read-only reconciliation', () => {
   });
 
   it('requires expiration to revoke Pro across all authorities', () => {
-    const result = inspectAnnualLifecycle(
+    const result = inspectLifecycle(
+      'annual',
       ...values(
         fixtures({
           now: END + 60_000,
@@ -167,7 +177,8 @@ describe('annual lifecycle read-only reconciliation', () => {
   it('rejects a mirror or server that disagrees with RevenueCat', () => {
     const fixture = fixtures();
     expect(
-      inspectAnnualLifecycle(
+      inspectLifecycle(
+        'annual',
         fixture.provider,
         { ...fixture.supabase, serverAuthorized: false },
         fixture.now,
@@ -180,7 +191,8 @@ describe('annual lifecycle read-only reconciliation', () => {
       ledger: [event('INITIAL_PURCHASE', 0), event('INITIAL_PURCHASE', 0)],
     });
     expect(
-      inspectAnnualLifecycle(
+      inspectLifecycle(
+        'annual',
         fixture.provider,
         { ...fixture.supabase, ledgerCoherent: false },
         fixture.now,
@@ -195,7 +207,7 @@ describe('annual lifecycle read-only reconciliation', () => {
       endsAt: END + 60 * 60_000,
       ledger: [event('RENEWAL', 60), event('EXPIRATION', 30, false), event('INITIAL_PURCHASE', 0)],
     });
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: true,
       state: 'active',
       renewed: true,
@@ -212,7 +224,7 @@ describe('annual lifecycle read-only reconciliation', () => {
         { ...event('INITIAL_PURCHASE', 0), duplicate_deliveries: 1 },
       ],
     });
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: true,
       renewed: false,
       ledgerTransitions: ['INITIAL_PURCHASE'],
@@ -229,7 +241,7 @@ describe('annual lifecycle read-only reconciliation', () => {
       givesAccess: false,
       ledger: [event('RECONCILIATION', 65), event('INITIAL_PURCHASE', 0)],
     });
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: true,
       state: 'expired',
       latestAppliedLedgerEventType: 'RECONCILIATION',
@@ -251,7 +263,7 @@ describe('annual lifecycle read-only reconciliation', () => {
       ...fixture.supabase,
       mirrorRows: [{ ...row, expires_at: new Date(START + 65 * 60_000).toISOString() }],
     };
-    expect(inspectAnnualLifecycle(fixture.provider, revoked, fixture.now)).toMatchObject({
+    expect(inspectLifecycle('annual', fixture.provider, revoked, fixture.now)).toMatchObject({
       ok: true,
       state: 'expired',
       mirrorAuthority: 'reconciliation',
@@ -272,7 +284,7 @@ describe('annual lifecycle read-only reconciliation', () => {
         ...fixture.supabase,
         mirrorRows: [{ ...row, expires_at: new Date(expiresAt).toISOString() }],
       };
-      expect(inspectAnnualLifecycle(fixture.provider, mirror, fixture.now)).toMatchObject({
+      expect(inspectLifecycle('annual', fixture.provider, mirror, fixture.now)).toMatchObject({
         ok: false,
         failure: 'LIFECYCLE_AUTHORITY_MISMATCH',
       });
@@ -292,11 +304,11 @@ describe('annual lifecycle read-only reconciliation', () => {
       ...fixture.supabase,
       mirrorRows: [{ ...row, expires_at: new Date(END + 60_000).toISOString() }],
     };
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: true,
       mirrorAuthority: 'webhook',
     });
-    expect(inspectAnnualLifecycle(fixture.provider, late, fixture.now)).toMatchObject({
+    expect(inspectLifecycle('annual', fixture.provider, late, fixture.now)).toMatchObject({
       ok: false,
       failure: 'LIFECYCLE_AUTHORITY_MISMATCH',
     });
@@ -304,12 +316,12 @@ describe('annual lifecycle read-only reconciliation', () => {
 
   it('fails closed for missing period or renewal fields and contradictory provider access', () => {
     const fixture = fixtures({ renewalStatus: null });
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: false,
       failure: 'LIFECYCLE_PROVIDER_MALFORMED',
     });
     const contradictory = fixtures({ status: 'expired', givesAccess: true });
-    expect(inspectAnnualLifecycle(...values(contradictory))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(contradictory))).toMatchObject({
       ok: false,
       failure: 'LIFECYCLE_PROVIDER_INCONSISTENT',
     });
@@ -317,7 +329,7 @@ describe('annual lifecycle read-only reconciliation', () => {
 
   it('requires a cancellation event before claiming cancelled-but-active', () => {
     const fixture = fixtures({ renewalStatus: 'will_not_renew' });
-    expect(inspectAnnualLifecycle(...values(fixture))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(fixture))).toMatchObject({
       ok: false,
       failure: 'LIFECYCLE_CANCELLATION_UNPROVEN',
     });
@@ -329,7 +341,7 @@ describe('annual lifecycle read-only reconciliation', () => {
         event('INITIAL_PURCHASE', 0),
       ],
     });
-    expect(inspectAnnualLifecycle(...values(uncancelled))).toMatchObject({
+    expect(inspectLifecycle('annual', ...values(uncancelled))).toMatchObject({
       ok: false,
       failure: 'LIFECYCLE_CANCELLATION_UNPROVEN',
     });
@@ -338,9 +350,9 @@ describe('annual lifecycle read-only reconciliation', () => {
 
 describe('annual natural renewal comparison', () => {
   it('allows a short provider transition at the renewal boundary, then still bounds polling', () => {
-    expect(isStablePreRenewalWindow(END - 2 * 60_000, END)).toBe(true);
-    expect(isStablePreRenewalWindow(END - 30_000, END)).toBe(false);
-    expect(isStablePreRenewalWindow(END + 30_000, END)).toBe(false);
+    expect(isStablePreRenewalWindow(END - 2 * 60_000, END, 60_000)).toBe(true);
+    expect(isStablePreRenewalWindow(END - 30_000, END, 60_000)).toBe(false);
+    expect(isStablePreRenewalWindow(END + 30_000, END, 60_000)).toBe(false);
   });
   function pair() {
     const initial = fixtures();
@@ -354,7 +366,8 @@ describe('annual natural renewal comparison', () => {
   }
 
   function compare(initial: ReturnType<typeof fixtures>, renewed: ReturnType<typeof fixtures>) {
-    return inspectAnnualRenewal(
+    return inspectRenewal(
+      'annual',
       initial.provider,
       initial.supabase,
       renewed.provider,
@@ -497,10 +510,220 @@ describe('annual natural renewal comparison', () => {
   });
 });
 
+const MONTHLY_END = START + 5 * 60_000;
+
+function monthly(options: Parameters<typeof fixtures>[0] = {}) {
+  return fixtures({
+    now: START + 2 * 60_000,
+    endsAt: MONTHLY_END,
+    storeIdentifier: 'bplan_pro_monthly',
+    ...options,
+  });
+}
+
+describe('monthly lifecycle read-only reconciliation', () => {
+  it('accepts a coherent active monthly period and reports the plan', () => {
+    const report = inspectLifecycle('monthly', ...values(monthly()));
+    expect(report).toMatchObject({
+      ok: true,
+      plan: 'monthly',
+      state: 'active',
+      planProductMatch: true,
+      storeIdentifier: 'bplan_pro_monthly',
+    });
+    const lines = formatLifecycleReport(report).split('\n');
+    expect(lines[0]).toBe('RevenueCat monthly lifecycle (read-only)');
+    expect(lines).toContain('Plan product match: YES');
+  });
+
+  it('keeps monthly access after cancellation, then revokes it at expiration', () => {
+    const cancelled = monthly({
+      renewalStatus: 'will_not_renew',
+      ledger: [event('CANCELLATION', 1), event('INITIAL_PURCHASE', 0)],
+    });
+    expect(inspectLifecycle('monthly', ...values(cancelled))).toMatchObject({
+      ok: true,
+      state: 'cancelled-active',
+      providerPro: true,
+      mirrorPro: true,
+      serverPro: true,
+    });
+    const expired = monthly({
+      now: MONTHLY_END + 30_000,
+      status: 'expired',
+      givesAccess: false,
+      renewalStatus: 'will_not_renew',
+      ledger: [event('EXPIRATION', 5), event('CANCELLATION', 1), event('INITIAL_PURCHASE', 0)],
+    });
+    expect(inspectLifecycle('monthly', ...values(expired))).toMatchObject({
+      ok: true,
+      state: 'expired',
+      ledgerTransitions: ['INITIAL_PURCHASE', 'CANCELLATION', 'EXPIRATION'],
+      providerPro: false,
+      mirrorPro: false,
+      serverPro: false,
+    });
+  });
+
+  it('rejects a subscription whose Product belongs to the other plan', () => {
+    expect(inspectLifecycle('annual', ...values(monthly()))).toMatchObject({
+      ok: false,
+      planProductMatch: false,
+      failure: 'LIFECYCLE_IDENTITY',
+    });
+    expect(inspectLifecycle('monthly', ...values(fixtures()))).toMatchObject({
+      ok: false,
+      planProductMatch: false,
+      failure: 'LIFECYCLE_IDENTITY',
+    });
+  });
+});
+
+describe('monthly natural renewal comparison', () => {
+  // Accelerated monthly periods renew before an observer can usually start,
+  // so the initial snapshot may already carry earlier renewals.
+  function pair(initialLedger: SubscriptionLedgerRow[]) {
+    const initial = monthly({ ledger: initialLedger });
+    const renewed = monthly({
+      now: MONTHLY_END + 60_000,
+      startsAt: MONTHLY_END,
+      endsAt: MONTHLY_END + 5 * 60_000,
+      ledger: [event('RENEWAL', 5), ...initialLedger],
+    });
+    return { initial, renewed };
+  }
+
+  function compare(initial: ReturnType<typeof fixtures>, renewed: ReturnType<typeof fixtures>) {
+    return inspectRenewal(
+      'monthly',
+      initial.provider,
+      initial.supabase,
+      renewed.provider,
+      renewed.supabase,
+      initial.now,
+      renewed.now,
+    );
+  }
+
+  it('proves one renewal from a fresh purchase', () => {
+    const { initial, renewed } = pair([event('INITIAL_PURCHASE', 0)]);
+    expect(compare(initial, renewed)).toMatchObject({
+      ok: true,
+      plan: 'monthly',
+      storeIdentifier: 'bplan_pro_monthly',
+      ledgerTransitions: ['INITIAL_PURCHASE', 'RENEWAL'],
+    });
+  });
+
+  it('proves one further renewal from an already renewed subscription', () => {
+    const { initial, renewed } = pair([event('RENEWAL', -1), event('INITIAL_PURCHASE', -6)]);
+    expect(compare(initial, renewed)).toMatchObject({
+      ok: true,
+      ledgerTransitions: ['INITIAL_PURCHASE', 'RENEWAL', 'RENEWAL'],
+    });
+  });
+
+  it('rejects two new renewals, a rewritten history, or a cancelled start', () => {
+    const { initial, renewed } = pair([event('INITIAL_PURCHASE', 0)]);
+    const twice = [event('RENEWAL', 5), event('RENEWAL', 4), event('INITIAL_PURCHASE', 0)];
+    const rewritten = [event('RENEWAL', 5), event('INITIAL_PURCHASE', 1)];
+    for (const ledger of [twice, rewritten]) {
+      expect(
+        compare(initial, {
+          ...renewed,
+          supabase: { ...renewed.supabase, ledgerRows: ledger },
+        }),
+      ).toMatchObject({ ok: false, failure: 'RENEWAL_LEDGER' });
+    }
+    const uncancelledStart = monthly({
+      ledger: [event('UNCANCELLATION', 2), event('CANCELLATION', 1), event('INITIAL_PURCHASE', 0)],
+    });
+    expect(compare(uncancelledStart, renewed)).toMatchObject({
+      ok: false,
+      failure: 'RENEWAL_INITIAL_STATE',
+    });
+  });
+
+  it('keeps one monthly observation shorter than one accelerated monthly period', () => {
+    const timing = RENEWAL_OBSERVATION_TIMING.monthly;
+    // A renewal first seen at the latest allowed moment must converge before
+    // the next five-minute sandbox boundary could add a second renewal.
+    expect(timing.maxAfterOriginalEndMs + timing.convergenceMs).toBeLessThan(5 * 60_000);
+    expect(timing.pollIntervalMs).toBeLessThan(timing.boundaryGraceMs);
+    expect(RENEWAL_OBSERVATION_TIMING.annual.pollIntervalMs).toBe(30_000);
+  });
+});
+
+describe('lifecycle plan selection', () => {
+  it('accepts exactly one --plan monthly or --plan annual', () => {
+    expect(parseLifecyclePlan(['--plan', 'monthly'])).toBe('monthly');
+    expect(parseLifecyclePlan(['--plan', 'annual'])).toBe('annual');
+    for (const argv of [
+      [],
+      ['--plan'],
+      ['--plan', 'yearly'],
+      ['monthly'],
+      ['--plan', 'monthly', '--plan', 'annual'],
+    ]) {
+      expect(parseLifecyclePlan(argv)).toBeNull();
+    }
+  });
+
+  it('refuses to read any authority without an explicit plan', async () => {
+    let reads = 0;
+    const output: string[] = [];
+    const result = await runBillingLifecycleReadOnly(
+      [],
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => {
+          reads += 1;
+          throw new Error('must not read');
+        },
+      },
+    );
+    expect(result).toBe(1);
+    expect(reads).toBe(0);
+    expect(output).toEqual([
+      'RevenueCat lifecycle (read-only)\nResult: FAIL\nFailure: ARGUMENT_INVALID',
+    ]);
+
+    output.length = 0;
+    expect(
+      await runBillingRenewalReadOnly(['--plan', 'weekly'], lifecycleEnvironment(), (value) =>
+        output.push(value),
+      ),
+    ).toBe(1);
+    expect(output).toEqual([
+      'RevenueCat natural renewal (read-only)\nResult: FAIL\nFailure: ARGUMENT_INVALID',
+    ]);
+  });
+
+  it('runs the read-only monthly command end to end with injected authorities', async () => {
+    const fixture = monthly();
+    const output: string[] = [];
+    const result = await runBillingLifecycleReadOnly(
+      ['--plan', 'monthly'],
+      lifecycleEnvironment(),
+      (value) => output.push(value),
+      {
+        readProvider: async () => ({ ok: true as const, data: fixture.provider }),
+        readSupabase: async () => ({ ok: true as const, data: fixture.supabase }),
+        now: () => fixture.now,
+      },
+    );
+    expect(result).toBe(0);
+    expect(output.join('\n')).toContain('RevenueCat monthly lifecycle (read-only)\nResult: PASS');
+    expect(output.join('\n')).not.toContain(USER);
+  });
+});
+
 describe('annual lifecycle command safety', () => {
   it('puts lifecycle failure and safe structural diagnostics before detailed state', () => {
     const fixture = fixtures();
-    const report = inspectAnnualLifecycle(
+    const report = inspectLifecycle(
+      'annual',
       fixture.provider,
       { ...fixture.supabase, serverAuthorized: false },
       fixture.now,
@@ -514,7 +737,7 @@ describe('annual lifecycle command safety', () => {
       'Provider subscriptions: 1',
       'Supabase mirror rows: 1',
       'Ledger events: 1',
-      'Annual product match: YES',
+      'Plan product match: YES',
     ]);
     expect(lines).toContain('Latest applied ledger event: INITIAL_PURCHASE');
     expect(lines).toContain('Mirror written by: webhook');
@@ -524,12 +747,15 @@ describe('annual lifecycle command safety', () => {
   });
 
   it('prints the failing RevenueCat operation without raw provider details', () => {
-    const output = formatLifecycleReadOnlyFailure({
-      category: 'REVENUECAT_PROJECT',
-      code: 'CLI_GENERAL_ERROR',
-      message: 'provider output must stay hidden',
-      providerOperation: 'projects-list',
-    });
+    const output = formatLifecycleReadOnlyFailure(
+      {
+        category: 'REVENUECAT_PROJECT',
+        code: 'CLI_GENERAL_ERROR',
+        message: 'provider output must stay hidden',
+        providerOperation: 'projects-list',
+      },
+      'annual',
+    );
 
     expect(output).toContain('Failure: CLI_GENERAL_ERROR');
     expect(output).toContain('RevenueCat operation: projects-list');
@@ -537,7 +763,7 @@ describe('annual lifecycle command safety', () => {
   });
 
   it('uses a stable safe code when the CLI promise rejects unexpectedly', () => {
-    expect(formatLifecycleUnexpectedFailure()).toBe(
+    expect(formatLifecycleUnexpectedFailure('annual')).toBe(
       'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_UNEXPECTED',
     );
   });
@@ -546,6 +772,7 @@ describe('annual lifecycle command safety', () => {
     const thrownValue = `provider exception ${USER} https://provider-secret.example/key`;
     const output: string[] = [];
     const result = await runBillingLifecycleReadOnly(
+      ['--plan', 'annual'],
       lifecycleEnvironment(),
       (value) => output.push(value),
       {
@@ -569,6 +796,7 @@ describe('annual lifecycle command safety', () => {
     const fixture = fixtures();
     const output: string[] = [];
     const result = await runBillingLifecycleReadOnly(
+      ['--plan', 'annual'],
       lifecycleEnvironment(),
       (value) => output.push(value),
       {
@@ -605,6 +833,7 @@ describe('annual lifecycle command safety', () => {
     const output: string[] = [];
 
     const result = await runBillingLifecycleReadOnly(
+      ['--plan', 'annual'],
       lifecycleEnvironment(),
       (value) => output.push(value),
       {
@@ -628,6 +857,7 @@ describe('annual lifecycle command safety', () => {
     const thrownValue = `reconciliation exception ${USER} https://reconciliation-secret.example/raw`;
     const output: string[] = [];
     const reconciliationResult = await runBillingLifecycleReadOnly(
+      ['--plan', 'annual'],
       lifecycleEnvironment(),
       (value) => output.push(value),
       {
@@ -649,6 +879,7 @@ describe('annual lifecycle command safety', () => {
 
     output.length = 0;
     const formattingResult = await runBillingLifecycleReadOnly(
+      ['--plan', 'annual'],
       lifecycleEnvironment(),
       (value) => output.push(value),
       {
@@ -681,7 +912,11 @@ describe('annual lifecycle command safety', () => {
       { ...base, BILLING_AUTOMATION_MODE: 'sandbox-purchase', BILLING_AUTOMATION_ENV: 'sandbox' },
     ]) {
       const output: string[] = [];
-      expect(await runBillingLifecycleReadOnly(environment, (value) => output.push(value))).toBe(1);
+      expect(
+        await runBillingLifecycleReadOnly(['--plan', 'annual'], environment, (value) =>
+          output.push(value),
+        ),
+      ).toBe(1);
       expect(output.join('\n')).toContain('Failure: CONFIGURATION');
     }
   });
@@ -699,7 +934,9 @@ describe('annual lifecycle command safety', () => {
     ]) {
       const output: string[] = [];
       expect(
-        await runBillingAnnualRenewalReadOnly(environment, (value) => output.push(value)),
+        await runBillingRenewalReadOnly(['--plan', 'annual'], environment, (value) =>
+          output.push(value),
+        ),
       ).toBe(1);
       expect(output.join('\n')).toContain('Failure: CONFIGURATION');
     }

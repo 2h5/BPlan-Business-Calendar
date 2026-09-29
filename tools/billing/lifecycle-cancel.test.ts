@@ -21,7 +21,8 @@ const report: LifecycleReport = {
   providerSubscriptionCount: 1,
   mirrorRowCount: 1,
   ledgerEventCount: 1,
-  annualProductMatch: true,
+  plan: 'annual',
+  planProductMatch: true,
   latestAppliedLedgerEventType: 'INITIAL_PURCHASE',
   storeIdentifier: 'bplan_pro_yearly',
   subscriptionStatus: 'active',
@@ -101,27 +102,38 @@ const environment = {
 
 describe('sandbox cancellation guards', () => {
   it('accepts only the exact renewing annual subscription and active authority chain', () => {
-    expect(cancellationGuard(report, provider, USER)).toBeNull();
+    expect(cancellationGuard('annual', report, provider, USER)).toBeNull();
     expect(
       cancellationGuard(
+        'annual',
         { ...report, renewed: true, ledgerTransitions: ['INITIAL_PURCHASE', 'RENEWAL'] },
         provider,
         USER,
       ),
     ).toBeNull();
-    expect(cancellationGuard({ ...report, state: 'expired' }, provider, USER)).not.toBeNull();
-    expect(cancellationGuard({ ...report, mirrorPro: false }, provider, USER)).not.toBeNull();
-    expect(cancellationGuard(report, { ...provider, subscriptions: [] }, USER)).not.toBeNull();
+    expect(
+      cancellationGuard('annual', { ...report, state: 'expired' }, provider, USER),
+    ).not.toBeNull();
+    expect(
+      cancellationGuard('annual', { ...report, mirrorPro: false }, provider, USER),
+    ).not.toBeNull();
+    expect(
+      cancellationGuard('annual', report, { ...provider, subscriptions: [] }, USER),
+    ).not.toBeNull();
     expect(
       cancellationGuard(
+        'annual',
         report,
         { ...provider, subscriptions: [...provider.subscriptions, ...provider.subscriptions] },
         USER,
       ),
     ).not.toBeNull();
-    expect(cancellationGuard(report, { ...provider, customerId: 'other' }, USER)).not.toBeNull();
+    expect(
+      cancellationGuard('annual', report, { ...provider, customerId: 'other' }, USER),
+    ).not.toBeNull();
     expect(
       cancellationGuard(
+        'annual',
         report,
         {
           ...provider,
@@ -134,6 +146,7 @@ describe('sandbox cancellation guards', () => {
     ).not.toBeNull();
     expect(
       cancellationGuard(
+        'annual',
         report,
         {
           ...provider,
@@ -144,6 +157,7 @@ describe('sandbox cancellation guards', () => {
     ).not.toBeNull();
     expect(
       cancellationGuard(
+        'annual',
         report,
         {
           ...provider,
@@ -163,6 +177,7 @@ describe('sandbox cancellation guards', () => {
     ]) {
       expect(
         await runSandboxCancellation(
+          ['--plan', 'annual'],
           {
             BILLING_AUTOMATION_MODE: mode,
             BILLING_AUTOMATION_ENV: target,
@@ -212,12 +227,17 @@ describe('sandbox cancellation guards', () => {
     const cancel = vi.fn(async () => ({ ok: true as const }));
     const output: string[] = [];
     expect(
-      await runSandboxCancellation(environment, (value) => output.push(value), {
-        readProvider,
-        readSupabase,
-        cancel,
-        now: () => new Date('2026-09-22T00:30:00Z'),
-      }),
+      await runSandboxCancellation(
+        ['--plan', 'annual'],
+        environment,
+        (value) => output.push(value),
+        {
+          readProvider,
+          readSupabase,
+          cancel,
+          now: () => new Date('2026-09-22T00:30:00Z'),
+        },
+      ),
     ).toBe(0);
     expect(readProvider).toHaveBeenCalledTimes(2);
     expect(readSupabase).toHaveBeenCalledTimes(1);
@@ -243,10 +263,15 @@ describe('sandbox cancellation guards', () => {
     ]) {
       const output: string[] = [];
       expect(
-        await runSandboxCancellation(candidate, (value) => output.push(value), {
-          readProvider,
-          cancel,
-        }),
+        await runSandboxCancellation(
+          ['--plan', 'annual'],
+          candidate,
+          (value) => output.push(value),
+          {
+            readProvider,
+            cancel,
+          },
+        ),
       ).toBe(1);
       expect(output.join('\n')).toContain('Failure: CONFIGURATION');
     }
@@ -267,13 +292,88 @@ describe('sandbox cancellation guards', () => {
       });
     const cancel = vi.fn();
     expect(
-      await runSandboxCancellation(environment, () => undefined, {
+      await runSandboxCancellation(['--plan', 'annual'], environment, () => undefined, {
         readProvider,
         readSupabase: async () => ({ ok: true, data: supabase }),
         cancel,
         now: () => new Date('2026-09-22T00:30:00Z'),
       }),
     ).toBe(1);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('guards a monthly cancellation by the monthly Product and rejects the annual one', () => {
+    const monthlyProvider: RevenueCatUserSnapshot = {
+      ...provider,
+      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly' }],
+    };
+    const monthlyReport: LifecycleReport = {
+      ...report,
+      plan: 'monthly',
+      storeIdentifier: 'bplan_pro_monthly',
+    };
+    expect(cancellationGuard('monthly', monthlyReport, monthlyProvider, USER)).toBeNull();
+    expect(cancellationGuard('monthly', monthlyReport, provider, USER)).toBe('CANCELLATION_GUARD');
+  });
+
+  it('submits one monthly cancellation after the same guarded reads', async () => {
+    const monthlyProvider: RevenueCatUserSnapshot = {
+      ...provider,
+      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly' }],
+    };
+    const cancel = vi.fn(async () => ({ ok: true as const }));
+    const output: string[] = [];
+    expect(
+      await runSandboxCancellation(
+        ['--plan', 'monthly'],
+        environment,
+        (value) => output.push(value),
+        {
+          readProvider: async () => ({ ok: true as const, data: monthlyProvider }),
+          readSupabase: async () => ({ ok: true as const, data: supabase }),
+          cancel,
+          now: () => new Date('2026-09-22T00:30:00Z'),
+        },
+      ),
+    ).toBe(0);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(output.join('\n')).toContain('Plan: monthly');
+  });
+
+  it('refuses a monthly-plan run against an annual subscription without submitting', async () => {
+    const cancel = vi.fn();
+    const output: string[] = [];
+    expect(
+      await runSandboxCancellation(
+        ['--plan', 'monthly'],
+        environment,
+        (value) => output.push(value),
+        {
+          readProvider: async () => ({ ok: true as const, data: provider }),
+          readSupabase: async () => ({ ok: true as const, data: supabase }),
+          cancel,
+          now: () => new Date('2026-09-22T00:30:00Z'),
+        },
+      ),
+    ).toBe(1);
+    expect(output.join('\n')).toContain('Failure: LIFECYCLE_IDENTITY');
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it('requires exactly one explicit plan before reading or cancelling', async () => {
+    const readProvider = vi.fn();
+    const cancel = vi.fn();
+    for (const argv of [[], ['--plan'], ['--plan', 'weekly'], ['--plan', 'monthly', '--yes']]) {
+      const output: string[] = [];
+      expect(
+        await runSandboxCancellation(argv, environment, (value) => output.push(value), {
+          readProvider,
+          cancel,
+        }),
+      ).toBe(1);
+      expect(output.join('\n')).toContain('Failure: ARGUMENT_INVALID');
+    }
+    expect(readProvider).not.toHaveBeenCalled();
     expect(cancel).not.toHaveBeenCalled();
   });
 });

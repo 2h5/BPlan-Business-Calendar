@@ -1,6 +1,12 @@
 import type { BillingAssertionFailure, BillingAssertionResult } from './assertion-types';
 import { isBillingUserId, loadBillingEnvironment, type EnvironmentRecord } from './config';
-import { formatLifecycleReport, inspectAnnualLifecycle } from './lifecycle';
+import type { BillingPlan } from './contract';
+import {
+  formatLifecycleReport,
+  inspectLifecycle,
+  lifecycleHeader,
+  parseLifecyclePlan,
+} from './lifecycle';
 import {
   createRevenueCatAssertionAdapter,
   type RevenueCatAssertionAdapter,
@@ -20,16 +26,22 @@ type LifecycleStageUnexpectedFailureCode =
 interface LifecycleCommandDependencies {
   readonly readProvider?: RevenueCatAssertionAdapter['readUser'];
   readonly readSupabase?: SupabaseAssertionAdapter['readUser'];
-  readonly inspect?: typeof inspectAnnualLifecycle;
+  readonly inspect?: typeof inspectLifecycle;
   readonly formatReport?: typeof formatLifecycleReport;
   readonly now?: () => Date;
 }
 
 export async function runBillingLifecycleReadOnly(
+  argv: readonly string[] = process.argv.slice(2),
   environment: EnvironmentRecord = process.env,
   write: (value: string) => void = (value) => process.stdout.write(`${value}\n`),
   dependencies: LifecycleCommandDependencies = {},
 ): Promise<number> {
+  const plan = parseLifecyclePlan(argv);
+  if (!plan) {
+    write(`${lifecycleHeader(null)}\nResult: FAIL\nFailure: ARGUMENT_INVALID`);
+    return 1;
+  }
   const loaded = loadBillingEnvironment(environment);
   const config = loaded.config;
   if (
@@ -42,7 +54,7 @@ export async function runBillingLifecycleReadOnly(
     !config.supabaseUrl ||
     !config.supabaseServiceRoleKey
   ) {
-    write('RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: CONFIGURATION');
+    write(`${lifecycleHeader(plan)}\nResult: FAIL\nFailure: CONFIGURATION`);
     return 1;
   }
 
@@ -53,11 +65,11 @@ export async function runBillingLifecycleReadOnly(
       createRevenueCatAssertionAdapter({ apiKey: config.revenueCatApiKey }).readUser;
     provider = await readProvider(config.testUserId);
   } catch {
-    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_PROVIDER_UNEXPECTED'));
+    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_PROVIDER_UNEXPECTED', plan));
     return 1;
   }
   if (!provider.ok) {
-    write(formatLifecycleReadOnlyFailure(provider.error));
+    write(formatLifecycleReadOnlyFailure(provider.error, plan));
     return 1;
   }
   let supabase: BillingAssertionResult<SupabaseUserSnapshot>;
@@ -70,49 +82,54 @@ export async function runBillingLifecycleReadOnly(
       }).readUser;
     supabase = await readSupabase(config.testUserId);
   } catch {
-    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_SUPABASE_UNEXPECTED'));
+    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_SUPABASE_UNEXPECTED', plan));
     return 1;
   }
   if (!supabase.ok) {
-    write(`RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: ${supabase.error.code}`);
+    write(`${lifecycleHeader(plan)}\nResult: FAIL\nFailure: ${supabase.error.code}`);
     return 1;
   }
-  let report: ReturnType<typeof inspectAnnualLifecycle>;
+  let report: ReturnType<typeof inspectLifecycle>;
   try {
-    report = (dependencies.inspect ?? inspectAnnualLifecycle)(
+    report = (dependencies.inspect ?? inspectLifecycle)(
+      plan,
       provider.data,
       supabase.data,
       (dependencies.now ?? (() => new Date()))(),
     );
   } catch {
-    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_RECONCILIATION_UNEXPECTED'));
+    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_RECONCILIATION_UNEXPECTED', plan));
     return 1;
   }
   let formattedReport: string;
   try {
     formattedReport = (dependencies.formatReport ?? formatLifecycleReport)(report);
   } catch {
-    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_RECONCILIATION_UNEXPECTED'));
+    write(formatLifecycleStageUnexpectedFailure('LIFECYCLE_RECONCILIATION_UNEXPECTED', plan));
     return 1;
   }
   write(formattedReport);
   return report.ok ? 0 : 1;
 }
 
-export function formatLifecycleReadOnlyFailure(error: BillingAssertionFailure): string {
+export function formatLifecycleReadOnlyFailure(
+  error: BillingAssertionFailure,
+  plan: BillingPlan | null,
+): string {
   const operation =
     error.providerOperation === undefined
       ? ''
       : `\nRevenueCat operation: ${error.providerOperation}`;
-  return `RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: ${error.code}${operation}`;
+  return `${lifecycleHeader(plan)}\nResult: FAIL\nFailure: ${error.code}${operation}`;
 }
 
-export function formatLifecycleUnexpectedFailure(): string {
-  return 'RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: LIFECYCLE_UNEXPECTED';
+export function formatLifecycleUnexpectedFailure(plan: BillingPlan | null): string {
+  return `${lifecycleHeader(plan)}\nResult: FAIL\nFailure: LIFECYCLE_UNEXPECTED`;
 }
 
 export function formatLifecycleStageUnexpectedFailure(
   code: LifecycleStageUnexpectedFailureCode,
+  plan: BillingPlan | null,
 ): string {
-  return `RevenueCat annual lifecycle (read-only)\nResult: FAIL\nFailure: ${code}`;
+  return `${lifecycleHeader(plan)}\nResult: FAIL\nFailure: ${code}`;
 }

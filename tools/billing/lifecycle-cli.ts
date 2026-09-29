@@ -1,11 +1,14 @@
+import { parseLifecyclePlan } from './lifecycle';
 import { formatLifecycleUnexpectedFailure, runBillingLifecycleReadOnly } from './lifecycle-command';
 
-void runBillingLifecycleReadOnly().then(
+const argv = process.argv.slice(2);
+
+void runBillingLifecycleReadOnly(argv).then(
   (code) => {
     process.exitCode = code;
   },
   () => {
-    process.stdout.write(`${formatLifecycleUnexpectedFailure()}\n`);
+    process.stdout.write(`${formatLifecycleUnexpectedFailure(parseLifecyclePlan(argv))}\n`);
     process.exitCode = 1;
   },
 );

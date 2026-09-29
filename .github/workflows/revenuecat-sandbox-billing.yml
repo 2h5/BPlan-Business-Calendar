@@ -13,6 +13,8 @@ on:
           - annual-assertion
           - lifecycle-read-only
           - annual-renewal-read-only
+          - monthly-lifecycle-read-only
+          - monthly-renewal-read-only
           - sandbox-purchase
         default: preflight
       purchase_plan:
@@ -52,7 +54,7 @@ jobs:
           BILLING_PURCHASE_CONFIRMED: ${{ inputs.confirm_sandbox_purchase }}
         run: |
           case "$BILLING_OPERATION" in
-            preflight|monthly-assertion|annual-assertion|lifecycle-read-only|annual-renewal-read-only|sandbox-purchase) ;;
+            preflight|monthly-assertion|annual-assertion|lifecycle-read-only|annual-renewal-read-only|monthly-lifecycle-read-only|monthly-renewal-read-only|sandbox-purchase) ;;
             *) echo "::error::Unsupported billing operation."; exit 1 ;;
           esac
           case "$BILLING_PURCHASE_PLAN" in
@@ -126,7 +128,7 @@ jobs:
           BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
           BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
           REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
-        run: pnpm billing:lifecycle:read-only
+        run: pnpm billing:lifecycle:read-only -- --plan annual
 
       - name: Annual natural renewal read-only observation
         if: ${{ inputs.operation == 'annual-renewal-read-only' }}
@@ -137,7 +139,29 @@ jobs:
           BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
           BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
           REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
-        run: pnpm billing:lifecycle:renewal
+        run: pnpm billing:lifecycle:renewal -- --plan annual
+
+      - name: Monthly lifecycle read-only assertion
+        if: ${{ inputs.operation == 'monthly-lifecycle-read-only' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:lifecycle:read-only -- --plan monthly
+
+      - name: Monthly natural renewal read-only observation
+        if: ${{ inputs.operation == 'monthly-renewal-read-only' }}
+        env:
+          BILLING_AUTOMATION_ENV: sandbox
+          BILLING_AUTOMATION_MODE: live-readonly
+          BILLING_TEST_USER_ID: ${{ secrets.BILLING_MONTHLY_RENEWAL_TEST_USER_ID }}
+          BILLING_SUPABASE_URL: ${{ secrets.BILLING_SUPABASE_URL }}
+          BILLING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BILLING_SUPABASE_SERVICE_ROLE_KEY }}
+          REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY }}
+        run: pnpm billing:lifecycle:renewal -- --plan monthly
 
       - name: Locate preinstalled Chrome for sandbox purchase
         id: chrome

@@ -1,6 +1,6 @@
 import { isBillingUserId, loadBillingEnvironment, type EnvironmentRecord } from './config';
-import { BILLING_CONTRACT } from './contract';
-import { inspectAnnualLifecycle, type LifecycleReport } from './lifecycle';
+import { BILLING_CONTRACT, type BillingPlan } from './contract';
+import { inspectLifecycle, parseLifecyclePlan, type LifecycleReport } from './lifecycle';
 import {
   createRevenueCatAssertionAdapter,
   type RevenueCatUserSnapshot,
@@ -9,6 +9,7 @@ import { cancelRevenueCatSandboxSubscriptionOnce } from './revenuecat-cli';
 import { createSupabaseAssertionAdapter } from './supabase-assertions';
 
 export function cancellationGuard(
+  plan: BillingPlan,
   report: LifecycleReport,
   provider: RevenueCatUserSnapshot,
   configuredUserId: string,
@@ -27,7 +28,7 @@ export function cancellationGuard(
   if (
     subscription.environment !== 'sandbox' ||
     subscription.store !== 'rc_billing' ||
-    subscription.storeIdentifier !== BILLING_CONTRACT.products.annual.id ||
+    subscription.storeIdentifier !== BILLING_CONTRACT.products[plan].id ||
     subscription.status !== 'active' ||
     !subscription.givesAccess ||
     !subscription.grantsPro ||
@@ -42,6 +43,7 @@ export function cancellationGuard(
 }
 
 export async function runSandboxCancellation(
+  argv: readonly string[] = process.argv.slice(2),
   environment: EnvironmentRecord = process.env,
   write: (value: string) => void = (value) => process.stdout.write(`${value}\n`),
   dependencies: {
@@ -56,6 +58,8 @@ export async function runSandboxCancellation(
     write(`RevenueCat sandbox cancellation\nResult: FAIL\nFailure: ${code}`);
     return 1;
   };
+  const plan = parseLifecyclePlan(argv);
+  if (!plan) return fail('ARGUMENT_INVALID');
   if (
     issues.length ||
     config.mode !== 'sandbox-cancel' ||
@@ -82,12 +86,13 @@ export async function runSandboxCancellation(
   if (!provider.ok) return fail(provider.error.code);
   const supabase = await readSupabase(config.testUserId);
   if (!supabase.ok) return fail(supabase.error.code);
-  const report = inspectAnnualLifecycle(
+  const report = inspectLifecycle(
+    plan,
     provider.data,
     supabase.data,
     (dependencies.now ?? (() => new Date()))(),
   );
-  const guard = cancellationGuard(report, provider.data, config.testUserId);
+  const guard = cancellationGuard(plan, report, provider.data, config.testUserId);
   if (guard) return fail(guard);
 
   // Re-read immediately before submitting. Any state or identity drift fails closed.
@@ -120,7 +125,7 @@ export async function runSandboxCancellation(
     { apiKey: config.revenueCatMutationApiKey },
   );
   write(
-    `RevenueCat sandbox cancellation\nSubmission: ONE\nResult: ${result.ok ? 'SUBMITTED' : 'AMBIGUOUS_OR_FAILED'}${result.ok ? '' : `\nFailure: ${result.error.code}`}`,
+    `RevenueCat sandbox cancellation\nPlan: ${plan}\nSubmission: ONE\nResult: ${result.ok ? 'SUBMITTED' : 'AMBIGUOUS_OR_FAILED'}${result.ok ? '' : `\nFailure: ${result.error.code}`}`,
   );
   return result.ok ? 0 : 1;
 }
