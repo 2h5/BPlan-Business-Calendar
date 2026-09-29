@@ -20,8 +20,9 @@ export interface InitialScrollInput {
 }
 
 /**
- * The hour a timeline first scrolls to: a linked event if there is one, otherwise shortly
- * before now on today, otherwise the start of a typical working day.
+ * The hour a timeline first scrolls to: a linked event if there is one (the very top for an
+ * all-day event, so its row is on screen), otherwise shortly before now on today, otherwise
+ * the start of a typical working day.
  */
 export function initialScrollHour({
   dateKeys,
@@ -34,7 +35,9 @@ export function initialScrollHour({
   if (revealEventId) {
     const occurrence = dateKeys
       .flatMap((dateKey) => byDateKey.get(dateKey) ?? [])
-      .find((item) => item.event.id === revealEventId && !item.event.allDay);
+      .find((item) => item.event.id === revealEventId);
+    // All-day events sit in the row above the hours, which only shows at the top.
+    if (occurrence?.event.allDay) return 0;
     if (occurrence) {
       const start = new Date(occurrence.start);
       // An event that began before the visible days is drawn from the top of the first day.

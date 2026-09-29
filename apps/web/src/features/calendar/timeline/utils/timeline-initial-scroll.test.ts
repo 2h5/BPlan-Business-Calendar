@@ -62,11 +62,17 @@ describe('initialScrollHour', () => {
     expect(initialScrollHour(input({ byDateKey, revealEventId: 'overnight' }))).toBe(0);
   });
 
-  it('falls back to now for all-day or missing linked events', () => {
+  it('scrolls to the top for a linked all-day event, where its row sits', () => {
     const holiday = occurrence('holiday', '2026-09-24T00:00:00.000Z', true);
     const byDateKey = new Map([['2026-09-24', [holiday]]]);
+    const afternoon = new Date('2026-09-24T15:00:00.000Z');
 
-    expect(initialScrollHour(input({ byDateKey, revealEventId: 'holiday' }))).toBe(7);
-    expect(initialScrollHour(input({ byDateKey, revealEventId: 'missing' }))).toBe(7);
+    expect(initialScrollHour(input({ byDateKey, revealEventId: 'holiday', now: afternoon }))).toBe(
+      0,
+    );
+  });
+
+  it('falls back to now for a missing linked event', () => {
+    expect(initialScrollHour(input({ revealEventId: 'missing' }))).toBe(7);
   });
 });
