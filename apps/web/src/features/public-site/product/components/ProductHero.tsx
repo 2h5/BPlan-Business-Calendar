@@ -99,7 +99,7 @@ export function ProductHero() {
           <span className={styles.dayBar}>
             <i style={{ left: '10%', width: '5%', background: '#B2E0EF' }} />
             <i style={{ left: '20%', width: '15%', background: '#C9B1F4' }} />
-            <i style={{ left: '50%', width: '10%', background: '#FBBE7E' }} />
+            <i style={{ left: '50%', width: '10%', background: '#96EFCC' }} />
             <i style={{ left: '65%', width: '10%', background: '#FAB2C3' }} />
             <b style={{ left: '36.7%' }} />
           </span>

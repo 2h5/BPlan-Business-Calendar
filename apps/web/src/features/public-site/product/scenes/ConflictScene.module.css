@@ -1,4 +1,7 @@
+/* The demo surface is always light, so it pins the app's light warning. */
 .panel {
+  --demo-warning: #a66a12;
+
   max-width: 560px;
   padding: 1.25rem 1.5rem 1.5rem 0.9rem;
   border-radius: 24px;
@@ -39,15 +42,14 @@
 .existing {
   left: 60px;
   right: 24%;
-  transition:
-    box-shadow 260ms ease,
-    background-color 260ms ease;
 }
 
-/* The event the dragged block is touching glows red with it. */
-.existing[data-hit='true'] {
-  background: color-mix(in srgb, #e5484d 12%, #ffffff);
-  box-shadow: 0 0 0 1.5px rgba(229, 72, 77, 0.55);
+/* A block too short for padded two-line text centres it instead. */
+.existing[data-short='true'] {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-block: 0;
 }
 
 .moving {
@@ -75,9 +77,9 @@
 }
 
 .moving[data-conflict='true'] {
-  border-color: rgba(229, 72, 77, 0.85);
-  background: rgba(255, 238, 239, 0.96);
-  color: #8c1d22;
+  border-color: color-mix(in srgb, var(--demo-warning) 75%, transparent);
+  background: color-mix(in srgb, var(--demo-warning) 12%, #ffffff);
+  color: color-mix(in srgb, var(--demo-warning) 70%, #1a1200);
   animation: nudge 360ms ease;
 }
 
@@ -121,7 +123,7 @@
 }
 
 .verdict[data-conflict='true'] {
-  color: #c9383e;
+  color: var(--demo-warning);
 }
 
 .verdict svg {

@@ -61,7 +61,7 @@
 }
 
 .items {
-  margin-top: clamp(3rem, 6vw, 4.75rem);
+  margin-top: clamp(2.5rem, 5vw, 4rem);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(2rem, 4vw, 3.5rem);
@@ -91,59 +91,6 @@
   flex-direction: column;
   justify-content: center;
   gap: 0.6rem;
-}
-
-/* Search */
-.search {
-  height: 38px;
-  padding: 0 0.8rem;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #ffffff;
-  box-shadow: var(--shadow-float);
-  color: var(--ink);
-  font-size: 0.84rem;
-  font-weight: 500;
-}
-
-.search svg {
-  width: 15px;
-  height: 15px;
-  color: var(--faint);
-}
-
-.search i {
-  display: inline-block;
-  width: 1.5px;
-  height: 1em;
-  margin-left: 1px;
-  vertical-align: -0.15em;
-  background: var(--accent);
-  animation: blink 1s steps(1) infinite;
-}
-
-.results {
-  padding: 0 0.3rem;
-  display: grid;
-  gap: 0.35rem;
-  color: var(--ink-2);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.results mark {
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-}
-
-.results small {
-  margin-left: 0.3rem;
-  color: var(--faint);
-  font-size: 0.7rem;
-  font-weight: 500;
 }
 
 /* Accent swatches */
@@ -181,7 +128,16 @@
   outline-offset: 4px;
 }
 
+/* Only the swatches count toward layout, so they centre like the other
+   illustrations; the hint hangs below them. */
+.palette {
+  position: relative;
+}
+
 .tryIt {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
   color: var(--faint);
   font-size: 0.76rem;
 }
@@ -283,12 +239,6 @@
   animation-delay: 2.4s;
 }
 
-@keyframes blink {
-  50% {
-    opacity: 0;
-  }
-}
-
 @keyframes travel {
   from {
     left: 0;
@@ -357,7 +307,6 @@
     transition: none;
   }
 
-  .search i,
   .wire i,
   .keys kbd {
     animation: none;

@@ -83,7 +83,7 @@ export function ProductView() {
             Ask for time. <em>Get real slots.</em>
           </>
         }
-        body="Type what you need the way you'd say it. BPlan reads the length and timing, finds every opening that's genuinely free, and lays out the best few. One click books it."
+        body="Type what you need the way you'd say it. BPlan reads the length and timing, finds every opening that's free, and lays out the best few. One click books it."
         reverse
       >
         {({ visible }) => <FindTimeScene playing={visible} />}

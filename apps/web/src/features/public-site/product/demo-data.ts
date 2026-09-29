@@ -58,7 +58,7 @@ export const DEMO_EVENTS: readonly DemoEvent[] = [
     start: at(13),
     end: at(14),
     title: 'Lunch with Maya',
-    color: 'apricot',
+    color: 'mint',
   },
   {
     id: 'tue-design',

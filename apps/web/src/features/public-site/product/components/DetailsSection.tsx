@@ -4,6 +4,7 @@ import { useRef, type CSSProperties } from 'react';
 import styles from './DetailsSection.module.css';
 import { GoogleGlyph } from '../../../../components/brand/BrandGlyphs';
 import { useInView } from '../hooks/useScenePlayback';
+import { SearchScene } from '../scenes/SearchScene';
 
 const SWATCHES = ACCENT_PRESETS.slice(0, 6);
 
@@ -19,7 +20,7 @@ interface DetailsSectionProps {
  */
 export function DetailsSection({ accent, onAccentChange }: DetailsSectionProps) {
   const ref = useRef<HTMLElement>(null);
-  const { revealed } = useInView(ref, { threshold: 0.2 });
+  const { revealed, visible } = useInView(ref, { threshold: 0.2 });
 
   return (
     <section
@@ -38,21 +39,7 @@ export function DetailsSection({ accent, onAccentChange }: DetailsSectionProps) 
       <ul className={styles.items}>
         <li style={{ '--i': 0 } as CSSProperties}>
           <div className={styles.art} aria-hidden="true">
-            <div className={styles.search}>
-              <SearchGlyph />
-              <span>
-                review
-                <i />
-              </span>
-            </div>
-            <div className={styles.results}>
-              <span>
-                Design <mark>review</mark> <small>Tue · 2:30 PM</small>
-              </span>
-              <span>
-                Roadmap <mark>review</mark> <small>Mon · 11 AM</small>
-              </span>
-            </div>
+            <SearchScene playing={visible} />
           </div>
           <h3>Search everything</h3>
           <p>Find any event or task in a few keystrokes.</p>
@@ -60,19 +47,21 @@ export function DetailsSection({ accent, onAccentChange }: DetailsSectionProps) 
 
         <li style={{ '--i': 1 } as CSSProperties}>
           <div className={styles.art}>
-            <div className={styles.swatches} role="group" aria-label="Try an accent colour">
-              {SWATCHES.map((swatch) => (
-                <button
-                  key={swatch.id}
-                  type="button"
-                  aria-label={swatch.name}
-                  aria-pressed={accent === swatch.color}
-                  style={{ '--swatch': swatch.color } as CSSProperties}
-                  onClick={() => onAccentChange(swatch.color)}
-                />
-              ))}
+            <div className={styles.palette}>
+              <div className={styles.swatches} role="group" aria-label="Try an accent colour">
+                {SWATCHES.map((swatch) => (
+                  <button
+                    key={swatch.id}
+                    type="button"
+                    aria-label={swatch.name}
+                    aria-pressed={accent === swatch.color}
+                    style={{ '--swatch': swatch.color } as CSSProperties}
+                    onClick={() => onAccentChange(swatch.color)}
+                  />
+                ))}
+              </div>
+              <span className={styles.tryIt}>Try one. This page follows.</span>
             </div>
-            <span className={styles.tryIt}>Try one. This page follows.</span>
           </div>
           <h3>Make it yours</h3>
           <p>Pick an accent and light or dark mode. Every screen follows along.</p>
@@ -108,14 +97,5 @@ export function DetailsSection({ accent, onAccentChange }: DetailsSectionProps) 
         </li>
       </ul>
     </section>
-  );
-}
-
-function SearchGlyph() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none">
-      <circle cx="7" cy="7" r="4.3" stroke="currentColor" strokeWidth="1.6" />
-      <path d="m10.3 10.3 3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
   );
 }

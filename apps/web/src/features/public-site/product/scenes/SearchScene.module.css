@@ -1,0 +1,189 @@
+/* Only the field counts toward layout, so it centres like the other
+   illustrations; results hang below it. */
+.scene {
+  --row-h: 22px;
+
+  position: relative;
+}
+
+.field {
+  height: 38px;
+  padding: 0 0.55rem 0 0.8rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  box-shadow: var(--shadow-float);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 500;
+  transition: box-shadow 320ms var(--ease-out);
+}
+
+/* The field lights up with the accent while there is a query in it. */
+.field[data-active='true'] {
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 35%, transparent),
+    var(--shadow-float);
+}
+
+.field svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--faint);
+  transition: color 320ms ease;
+}
+
+.field[data-active='true'] svg {
+  color: var(--accent);
+}
+
+.query {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.placeholder {
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: var(--accent);
+}
+
+/* Solid while keys are going in, blinking once the query rests. */
+.caret[data-typing='false'] {
+  animation: blink 1s steps(1) infinite;
+}
+
+.count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.35rem;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 200ms ease,
+    transform 260ms var(--ease-out);
+}
+
+.count[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+  animation: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.results {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0.3rem;
+  left: 0.3rem;
+  height: calc(var(--row-h) * 2);
+}
+
+.row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--row-h);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, calc(var(--row) * var(--row-h) + 6px), 0);
+  transition:
+    opacity 120ms ease,
+    transform 420ms var(--ease-out);
+}
+
+/* Rows arrive a beat after leavers clear, so the two never cross. */
+.row[data-shown='true'] {
+  opacity: 1;
+  transform: translate3d(0, calc(var(--row) * var(--row-h)), 0);
+  transition:
+    opacity 260ms ease 90ms,
+    transform 420ms var(--ease-out);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.check {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border: 1.5px solid var(--faint);
+  border-radius: 3px;
+}
+
+.title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.row small {
+  flex: none;
+  color: var(--faint);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field,
+  .field svg,
+  .count,
+  .row {
+    animation: none;
+    transition: none;
+  }
+
+  .caret[data-typing='false'] {
+    animation: none;
+  }
+}

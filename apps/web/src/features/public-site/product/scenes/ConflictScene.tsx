@@ -122,7 +122,7 @@ export function ConflictScene({ playing }: { playing: boolean }) {
             <div
               key={event.id}
               className={`${demo.event} ${styles.existing}`}
-              data-hit={state.conflict?.id === event.id}
+              data-short={event.end - start < 45}
               style={
                 {
                   top: `${fraction(start) * 100}%`,
