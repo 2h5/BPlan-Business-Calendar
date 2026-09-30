@@ -116,6 +116,9 @@ jobs:
       - name: RevenueCat billing race tests
         run: pnpm billing:test:race:local
 
+      - name: Find Time confirmation race tests
+        run: pnpm scheduling:test:race:local
+
       - name: Check generated types are current
         run: |
           supabase gen types typescript --local > /tmp/database.types.ts

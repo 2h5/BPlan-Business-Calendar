@@ -38,7 +38,8 @@
     "db:types": "supabase gen types typescript --local > packages/types/src/database.types.ts",
     "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "release:check-bundle": "node tools/release/check-client-bundle.mjs",
-    "release:test": "vitest run tools/release"
+    "release:test": "vitest run tools/release",
+    "scheduling:test:race:local": "node tools/scheduling/confirmation-race.local.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.12.0",
