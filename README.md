@@ -12,44 +12,51 @@ Architecture decisions live in [`docs/`](docs/). Coding rules are in
 
 ---
 
-## Project checkpoint — 2026-09-25
+## Project checkpoint — 2026-09-30
 
 ```text
 CORE PRODUCT
-├─ Mobile core ........................ COMPLETE
-├─ Mobile Find Time UX ................ IN PROGRESS / AWAITING PUSHED CHECKPOINT
-├─ Web core / Phases 0–6 .............. COMPLETE + HARDENED
-├─ Web Find Time UX .................... COMPLETE / PROPOSE + CONFIRM
-├─ Google Calendar integration ........ IMPLEMENTED / MAJOR LIVE FLOWS VERIFIED
-└─ Microsoft integration .............. IMPLEMENTED / LIVE LIFECYCLE GAPS REMAIN
+├─ Mobile core ............................... COMPLETE
+├─ Mobile Find Time UX ....................... COMPLETE / PUSHED (2ce5087)
+├─ Web core / Phases 0–6 ..................... COMPLETE + HARDENED + RESTRUCTURED
+├─ Web DOM component tests ................... ADDED
+├─ Web Find Time UX .......................... COMPLETE / PROPOSE + CONFIRM
+├─ Google Calendar integration ............... IMPLEMENTED / MAJOR LIVE FLOWS VERIFIED
+└─ Microsoft integration ..................... IMPLEMENTED / LIVE LIFECYCLE GAPS REMAIN
 
 AI / SCHEDULING
-├─ Deterministic + semantic-time rules . IMPLEMENTED + HARDENED
-├─ Find Time propose/confirm backend .. IMPLEMENTED + HARDENED
-├─ Live Luna Low vs Medium evaluation . COMPLETE
-└─ Intent + ranking model ............. LUNA LOW SELECTED
+├─ Deterministic + semantic-time rules ....... IMPLEMENTED + HARDENED
+├─ Find Time propose/confirm backend ......... IMPLEMENTED + HARDENED
+├─ AI event-move proposals (mobile) .......... IMPLEMENTED / STALE-SAFE
+├─ Live Luna Low vs Medium evaluation ........ COMPLETE
+├─ Intent + ranking model .................... LUNA LOW SELECTED
+└─ Phase 7 adversarial sweep ................. COMPLETE (2026-09-30)
 
 BILLING / PRO
-├─ RevenueCat webhook/mirror/Pro gate . IMPLEMENTED
-├─ Web checkout + subscription UI ..... IMPLEMENTED
-├─ Monthly + annual sandbox chains .... PROVEN LIVE
-├─ Lifecycle + automation Phases 4–6 . COMPLETE
-├─ Convergence hardening on main ...... IMPLEMENTED / VERIFIED LOCALLY
-└─ Production billing .................. INTENTIONALLY DISABLED
+├─ RevenueCat webhook/mirror/Pro gate ........ IMPLEMENTED / SHARED + TESTED GATE
+├─ Web checkout + subscription UI ............ IMPLEMENTED
+├─ Monthly + annual sandbox lifecycles ....... PROVEN LIVE (BUY/RENEW/CANCEL/EXPIRE)
+├─ Lifecycle + automation Phases 4–6 ......... COMPLETE / PLAN-SCOPED
+├─ Convergence hardening ..................... DEPLOYED TO SANDBOX/DEV (2026-09-29)
+├─ Mobile purchase/restore ................... PENDING (MOBILE REVENUECAT SDK)
+└─ Production billing ........................ INTENTIONALLY DISABLED
 
 RELEASE / EXTERNAL
-├─ Microsoft live lifecycle matrix ..... PENDING
-├─ Hosted AI config/deployment/E2E ..... PENDING
-├─ RevenueCat convergence rollout ..... PENDING HOSTED DEPLOYMENT
-├─ Seller / final legal docs ........... PENDING
-├─ Production Stripe / RevenueCat ...... PENDING
-└─ Production release hardening ........ PASS 2 DONE / HOSTED CRON INSTALL PENDING
+├─ Microsoft live lifecycle matrix ........... PENDING
+├─ Hosted AI config/deployment/E2E ........... PENDING
+├─ RevenueCat scheduled reconciliation ....... PENDING SECRETS + PG_CRON/PG_NET
+├─ Seller / final legal docs ................. PENDING
+├─ Production Stripe / RevenueCat ............ PENDING
+├─ Dependency advisories ..................... VITEST 4 DONE / REST PINNED BY EXPO 54
+└─ Production release hardening .............. PASS 2 DONE / HOSTED CRON INSTALL PENDING
 
 CURRENT STATE
-├─ Core mobile/web product and Find Time backend/web UX are implemented.
-├─ Luna Low is selected; sandbox billing Phases 4–6 and convergence code are complete.
-└─ Open tracks: mobile Find Time, hosted AI E2E, RevenueCat convergence rollout,
-   Microsoft lifecycle verification, release hardening, and legal/billing gates.
+├─ Core mobile/web product and Find Time (backend, web, mobile) are implemented.
+├─ Phase 7 sweep is done; monthly and annual billing lifecycles are proven live,
+│  and convergence code is deployed to the hosted sandbox/dev project.
+└─ Open tracks: hosted AI E2E, RevenueCat scheduled reconciliation, mobile
+   purchase/restore, Microsoft lifecycle verification, release hardening, and
+   legal/billing gates.
 ```
 
 ## Current status
@@ -68,9 +75,12 @@ rules constrain deterministic candidates for breakfast, brunch, lunch, dinner,
 drinks, and morning/afternoon/evening before ranking. The live Luna Low vs
 Medium evaluation is complete, and Luna Low was selected for both intent
 parsing and candidate ranking. Hosted AI configuration, deployment, and
-end-to-end verification remain pending. Mobile Find Time remains **IN PROGRESS /
-AWAITING PUSHED CHECKPOINT** until its separate track records a pushed
-completion checkpoint.
+end-to-end verification remain pending. Mobile Find Time is **COMPLETE** and
+pushed on `main` (checkpoint `2ce5087`, audited 2026-09-30); the same bar also
+proposes moves for existing events. Its only open state, purchase restored,
+waits on mobile RevenueCat purchase/restore. The Phase 7 adversarial sweep is
+complete (2026-09-30): the Pro gate is shared and tested, and concurrent
+confirmations are covered by a race harness in CI.
 
 ### Calendar integrations
 
@@ -144,14 +154,15 @@ external-verification evidence.
 | Semantic-time scheduling            | Implemented and hardened                              |
 | Find Time backend                   | Implemented and hardened                              |
 | Find Time web UX                    | Complete; propose + confirm                           |
-| Find Time mobile UX                 | In progress; awaiting pushed checkpoint               |
+| Find Time mobile UX                 | Complete; pushed (`2ce5087`)                          |
 | Luna Low vs Medium evaluation       | Complete; Luna Low selected for intent/ranking        |
+| Phase 7 adversarial sweep           | Complete (2026-09-30)                                 |
 | Hosted AI deployment/E2E            | Pending                                               |
 | RevenueCat webhook/mirror/Pro gate  | Implemented                                           |
-| Monthly + annual billing E2E        | Proven live                                           |
+| Monthly + annual billing lifecycle  | Proven live                                           |
 | Billing automation                  | Phases 4–6 complete for sandbox                       |
-| RevenueCat convergence              | Merged into main; verified locally                    |
-| Convergence hosted rollout          | Pending                                               |
+| RevenueCat convergence              | Deployed to sandbox/dev; scheduled reconcile pending  |
+| Mobile purchase/restore             | Pending; needs mobile RevenueCat SDK                  |
 | Seller/legal and production billing | Pending; billing intentionally disabled               |
 | Production release hardening        | Passes 1–2 fixed in code; hosted cron install pending |
 
