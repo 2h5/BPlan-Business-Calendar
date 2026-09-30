@@ -14,8 +14,8 @@ describe('subscription-display', () => {
       expect(FREE_PLAN.id).toBe('free');
       expect(PRO_PLAN.id).toBe('pro');
       expect(FREE_PLAN.monthlyPrice).toBe(0);
-      expect(PRO_PLAN.monthlyPrice).toBe(4.99);
-      expect(PRO_PLAN.annualPrice).toBe(49.99);
+      expect(PRO_PLAN.monthlyPrice).toBe(2.99);
+      expect(PRO_PLAN.annualPrice).toBe(29.99);
     });
 
     it('prominently marks Find Time with AI as the hero feature of Pro', () => {
@@ -99,12 +99,12 @@ describe('subscription-display', () => {
 
   describe('calculateBillingIntervalSavings', () => {
     it('calculates annual savings percentage against 12 monthly payments correctly', () => {
-      const savings = calculateBillingIntervalSavings(4.99, 49.99);
-      // 4.99 * 12 = 59.88. 59.88 - 49.99 = 9.89. 9.89 / 59.88 ≈ 16.5% -> 17% or 16%
-      expect(savings.monthlyAnnualized).toBe(59.88);
-      expect(savings.annualTotal).toBe(49.99);
-      expect(savings.savingsDollars).toBe(9.89);
-      expect(savings.savingsPercentage).toBeGreaterThanOrEqual(16);
+      const savings = calculateBillingIntervalSavings(2.99, 29.99);
+      // 2.99 * 12 = 35.88. 35.88 - 29.99 = 5.89. 5.89 / 35.88 ≈ 16.4% -> 16%
+      expect(savings.monthlyAnnualized).toBe(35.88);
+      expect(savings.annualTotal).toBe(29.99);
+      expect(savings.savingsDollars).toBe(5.89);
+      expect(savings.savingsPercentage).toBe(16);
     });
 
     it('handles zero or equal pricing gracefully', () => {

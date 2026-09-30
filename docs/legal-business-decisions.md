@@ -17,24 +17,21 @@ chosen and the final Terms and Privacy Policy are approved and published.
 | Public business address      | TBD — do not publish a personal or home address                                             | Open                   |
 | Minimum age                  | 18+                                                                                         | Set                    |
 | Currency                     | USD                                                                                         | Set                    |
-| Monthly plan                 | $2.99/month — lowering from $4.99 (decided 2026-09-30, not yet applied)                     | Decided, not applied   |
-| Annual plan                  | TBD — to be derived from the $2.99 monthly price (was $49.99/year)                          | Open                   |
+| Monthly plan                 | $2.99/month (was $4.99; changed 2026-09-30)                                                 | Set                    |
+| Annual plan                  | $29.99/year — about 16% off 12 × $2.99 (was $49.99; changed 2026-09-30)                     | Set                    |
 | Trial / introductory pricing | None at launch                                                                              | Set                    |
 | Support                      | info.bplanai@gmail.com                                                                      | Set                    |
 | Effective date               | TBD — use the launch date                                                                   | Open                   |
 
-### Price change — pending
+### Price change — 2026-09-30
 
-Monthly Pro is moving to $2.99. The annual price is not chosen yet. Until both
-are final, the live values are still $4.99 and $49.99 in:
-
-- `packages/domain/src/billing/subscription-display.ts` (`PRO_PLAN`, shared by
-  web and mobile) and its tests in
-  `apps/web/src/features/billing/utils/subscription-display.test.ts`
-- `apps/web/public/terms.html` (launch pricing clause)
-- RevenueCat Web Billing products `bplan_pro_monthly` / `bplan_pro_yearly`
-- the App Store products, when they are created
-  ([mobile billing plan](mobile-billing-plan.md))
+Pro moved from $4.99/$49.99 to $2.99/month and $29.99/year. The code
+(`PRO_PLAN` in `packages/domain/src/billing/subscription-display.ts`) and the
+web Terms page carry the new prices. **Still pending, in the dashboards:** the
+RevenueCat Web Billing products `bplan_pro_monthly` and `bplan_pro_yearly` are
+still priced $4.99 and $49.99 (see the
+[billing runbook](revenuecat-stripe-setup.md#products-and-offering)), and the
+App Store products do not exist yet ([mobile billing plan](mobile-billing-plan.md)).
 
 ## Pro scope verified in the repository
 

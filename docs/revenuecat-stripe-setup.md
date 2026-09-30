@@ -27,8 +27,12 @@ and the dated evidence log behind every claim here) is in
 - Payment gateway: **Stripe**
 - Apple App Store and Google Play: not configured
 - Currency: USD
-- Monthly plan: **$4.99/month**
-- Annual plan: **$49.99/year**
+- Monthly plan: **$2.99/month** (changed from $4.99 on 2026-09-30)
+- Annual plan: **$29.99/year** (changed from $49.99 on 2026-09-30)
+
+**Pending dashboard change:** the sandbox products below are still priced at
+$4.99 and $49.99. Update them in RevenueCat before the next live purchase
+run; the lifecycle tooling checks product identifiers, not prices.
 
 ## Dashboard configuration
 

@@ -27,10 +27,9 @@ Web billing, the server, and the proven sandbox lifecycles are recorded in
 
 ## 2. Money per subscriber
 
-**Price is changing:** monthly is moving from $4.99 to **$2.99**, and the annual
-price is not decided yet (see
-[`legal-business-decisions.md`](legal-business-decisions.md#price-change--pending)).
-Create the App Store products only after both are final.
+Prices (set 2026-09-30, see
+[`legal-business-decisions.md`](legal-business-decisions.md)): **$2.99/month**
+and **$29.99/year**.
 
 At $2.99/month:
 
@@ -41,13 +40,14 @@ At $2.99/month:
 | Apple, standard (30%, only above $1M/yr) | ~$2.09 (70%) |
 
 At $2.99, Stripe's flat 30¢ per charge makes web and Apple almost equal on
-monthly (about 6¢ apart). Annual candidates, for reference:
+monthly (about 6¢ apart).
 
-| Annual price             | Discount vs 12 × $2.99 ($35.88) | Web keeps | Apple (15%) keeps |
-| ------------------------ | ------------------------------- | --------- | ----------------- |
-| $29.99 ("2 months free") | 16%                             | ~$28.82   | ~$25.49           |
-| $24.99                   | 30%                             | ~$23.97   | ~$21.24           |
-| $19.99                   | 44%                             | ~$19.11   | ~$16.99           |
+At $29.99/year (about 16% off 12 × $2.99 = $35.88):
+
+| Route                               | You keep      |
+| ----------------------------------- | ------------- |
+| Web (Stripe 2.9% + $0.30)           | ~$28.82 (96%) |
+| Apple, Small Business Program (15%) | ~$25.49 (85%) |
 
 Notes that hold at any price:
 
@@ -249,7 +249,6 @@ Sources:
 
 ## 7. Open questions
 
-- Final annual price, derived from $2.99 monthly (§2).
 - Android: same shape with Google Play (15% on subscriptions). Not planned yet.
 - Do we show a free-trial or intro offer on Apple? It changes the App Store
   products and the paywall copy.

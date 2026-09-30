@@ -63,8 +63,8 @@ export const PRO_PLAN: PlanTier = {
   name: 'Pro',
   badge: 'Most Popular',
   tagline: 'Supercharge your schedule with intelligent AI-assisted time finding',
-  monthlyPrice: 4.99,
-  annualPrice: 49.99,
+  monthlyPrice: 2.99,
+  annualPrice: 29.99,
   priceNote: 'Billed monthly or annually',
   features: [
     {

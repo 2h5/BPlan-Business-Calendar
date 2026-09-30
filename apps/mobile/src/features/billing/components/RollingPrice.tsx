@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 export interface RollingPriceProps {
-  /** The price as shown, e.g. `$49.99`. */
+  /** The price as shown, e.g. `$29.99`. */
   value: string;
   /** The same price as a number — its direction of travel decides the roll. */
   amount: number;

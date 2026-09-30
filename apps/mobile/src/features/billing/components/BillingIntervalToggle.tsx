@@ -17,7 +17,7 @@ export type BillingInterval = 'monthly' | 'annual';
 export interface BillingIntervalToggleProps {
   value: BillingInterval;
   onChange: (value: BillingInterval) => void;
-  /** Whole percent saved by paying annually, e.g. 17 for "Save 17%". */
+  /** Whole percent saved by paying annually, e.g. 16 for "Save 16%". */
   savingsPercentage: number;
 }
 
