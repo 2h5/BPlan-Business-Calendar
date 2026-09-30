@@ -193,6 +193,29 @@ again used the disposable `calendar-audit` stack only.
 - Client-side logging is development-only (mobile `logger.ts`, web query
   client).
 
+## Dependency follow-up — 2026-09-30
+
+- Vitest `^2.1.2` → `^4.1.11` (root, web, domain). This removes the Vitest
+  critical/moderate advisories and the nested `vite@5`/`esbuild@0.21`; Vitest
+  now uses the app's `vite@6.4.3`. No test or config changes were needed.
+- Vitest 2 had been loading `@types/node` into the billing CLI's typecheck,
+  hiding that `tools/billing/node-shims.d.ts` lacked `process.cwd`,
+  `readFileSync`, `path.resolve`/`relative`, and iterable `URLSearchParams`
+  used by its tests. The shims and `tools/billing/tsconfig.json` (`DOM.Iterable`)
+  now declare them.
+- New advisories since Pass 2 in `brace-expansion` (ESLint/Metro tooling) and
+  `undici` (Expo CLI) were cleared by in-range lockfile updates
+  (`pnpm up -r --depth Infinity brace-expansion undici`); no manifest ranges
+  changed.
+- `pnpm audit` is now 4 high, 4 moderate, down from 1 low, 8 moderate, 11
+  high after the Vitest bump and before the lockfile refresh. Everything left
+  is pinned by Expo SDK 54 (`expo@54.0.37` is the latest 54 patch): postcss
+  8.4.49 via `@expo/metro-config`, image-size 1.x, uuid 7 (fixes are major
+  bumps), and the triaged `decode-uri-component`.
+- Verification: `pnpm verify` passed (domain 389, mobile 45, web 881,
+  billing 223, release 8; build and client-bundle scan clean), and
+  `expo export --platform ios` bundled successfully.
+
 ## External verification still required
 
 - Hosted: enable `pg_cron` and `pg_net`, create Vault secrets
@@ -211,9 +234,9 @@ again used the disposable `calendar-audit` stack only.
   Mobile has no build-time equivalent yet, so its guard runs at app start.
 - Keep `VITE_BILLING_MODE` at `disabled` or `production` in the production Pages
   environment; `sandbox` now fails the production build by design.
-- Dependency follow-ups (not release-blocking): Vitest 2 → 4 to clear the
-  dev-only Vitest/Vite/esbuild advisories; the next Expo SDK patch for Metro/
-  postcss/image-size; React Navigation for `decode-uri-component`.
+- Dependency follow-ups (not release-blocking): the next Expo SDK release for
+  Metro/postcss/image-size/uuid; React Navigation for `decode-uri-component`.
+  Vitest is done (see the 2026-09-30 follow-up above).
 - Existing open tracks: Microsoft live lifecycle matrix, hosted AI
   configuration/E2E, RevenueCat scheduled reconciliation (the convergence
   migration and functions reached the sandbox/dev project on 2026-09-29, but
