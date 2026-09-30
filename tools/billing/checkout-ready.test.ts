@@ -20,8 +20,8 @@ const READY_ENV = {
 
 describe('sandbox checkout URL contract', () => {
   it.each([
-    ['monthly', '$rc_monthly', 'bplan_pro_monthly'],
-    ['annual', '$rc_annual', 'bplan_pro_yearly'],
+    ['monthly', '$rc_monthly', 'bplan_pro_monthly_v2'],
+    ['annual', '$rc_annual', 'bplan_pro_yearly_v2'],
   ] as const)(
     'builds the identified %s package URL from the frozen contract',
     (plan, packageId, productId) => {

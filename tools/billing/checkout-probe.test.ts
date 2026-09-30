@@ -107,7 +107,7 @@ describe('sandbox checkout probe safety boundary', () => {
       targetEnvironment: 'sandbox',
       userId: USER_ID,
       packageId: '$rc_monthly',
-      productId: 'bplan_pro_monthly',
+      productId: 'bplan_pro_monthly_v2',
       url: `https://pay.rev.cat/sandbox/test-token/${USER_ID}?package_id=%24rc_monthly&email=bcalai-billing-sandbox%40example.com`,
     });
   });

@@ -30,9 +30,10 @@ and the dated evidence log behind every claim here) is in
 - Monthly plan: **$2.99/month** (changed from $4.99 on 2026-09-30)
 - Annual plan: **$29.99/year** (changed from $49.99 on 2026-09-30)
 
-**Pending dashboard change:** the sandbox products below are still priced at
-$4.99 and $49.99. Update them in RevenueCat before the next live purchase
-run; the lifecycle tooling checks product identifiers, not prices.
+The dashboard carries these prices as of 2026-09-30 on new products
+(`bplan_pro_monthly_v2`, `bplan_pro_yearly_v2`). RevenueCat Web Billing cannot
+edit a saved price, so the old products were replaced in the offering rather
+than changed; see [Products and offering](#products-and-offering).
 
 ## Dashboard configuration
 
@@ -69,23 +70,31 @@ use it unless code and database are changed together.
 
 ### Products and offering
 
-| Product identifier  | Display name      | Interval |  Price | Entitlement | RevenueCat Product |
-| ------------------- | ----------------- | -------- | -----: | ----------- | ------------------ |
-| `bplan_pro_monthly` | BPlan Pro Monthly | Monthly  |  $4.99 | `pro`       | —                  |
-| `bplan_pro_yearly`  | BPlan Pro Yearly  | Yearly   | $49.99 | `pro`       | `prod3c26a548d0`   |
+| Product identifier     | Display name         | Interval |  Price | Entitlement | RevenueCat Product | In `bplan_web` |
+| ---------------------- | -------------------- | -------- | -----: | ----------- | ------------------ | -------------- |
+| `bplan_pro_monthly_v2` | BPlan Pro Monthly v2 | Monthly  |  $2.99 | `pro`       | `prodb7b30ea037`   | `$rc_monthly`  |
+| `bplan_pro_yearly_v2`  | BPlan Pro Yearly v2  | Yearly   | $29.99 | `pro`       | `prodec4afacddb`   | `$rc_annual`   |
+| `bplan_pro_monthly`    | BPlan Pro Monthly    | Monthly  |  $4.99 | `pro`       | `prod66de8f0e3b`   | No (retired)   |
+| `bplan_pro_yearly`     | BPlan Pro Yearly     | Yearly   | $49.99 | `pro`       | `prod3c26a548d0`   | No (retired)   |
+
+The retired products stay attached to `pro` so existing sandbox subscriptions
+on them keep their entitlement; they are no longer offered. Do not delete them
+while any subscription references them. Earlier live evidence in
+[`revenuecat-automation-plan.md`](revenuecat-automation-plan.md) was recorded
+against the retired IDs.
 
 Both use the customer-facing name `BPlan Pro` and the description
 `Full access to BPlan Business Calendar.` A subscription's `product_id` is the
 RevenueCat Product resource ID; its `store_identifier` is the product
 identifier above. Plan checks compare the store identifier.
 
-| Offering item       | Value                               |
-| ------------------- | ----------------------------------- |
-| Offering identifier | `bplan_web`                         |
-| Display name        | `BPlan Pro Plans`                   |
-| Offering ID         | `ofrng560c7ad85b`                   |
-| Monthly package     | `$rc_monthly` → `bplan_pro_monthly` |
-| Annual package      | `$rc_annual` → `bplan_pro_yearly`   |
+| Offering item       | Value                                  |
+| ------------------- | -------------------------------------- |
+| Offering identifier | `bplan_web`                            |
+| Display name        | `BPlan Pro Plans`                      |
+| Offering ID         | `ofrng560c7ad85b`                      |
+| Monthly package     | `$rc_monthly` → `bplan_pro_monthly_v2` |
+| Annual package      | `$rc_annual` → `bplan_pro_yearly_v2`   |
 
 ## How access is decided
 

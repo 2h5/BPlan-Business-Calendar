@@ -145,7 +145,7 @@ The current repository already has a substantial billing foundation:
 
 | Area                       | Evidence and current state                                                                                                                                                                                                                                                                                                       | Verification boundary                                                                                                                                                                                                                                                                    |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RevenueCat project/catalog | The setup runbook records project `BPlan: Business Calendar`, project ID `d455e7e9`, web config `app48a77253da`, offering `bplan_web` / `ofrng560c7ad85b`, products `bplan_pro_monthly` and `bplan_pro_yearly`, and application entitlement `pro`.                                                                               | Phase 2B2 proved exactly one live exact-name project and used its discovered canonical ID for the run. The historical runbook ID remains **UNVERIFIED FOR LIVE V2 USE** and is never used as a provider selector; the canonical ID remains runtime-discovered rather than frozen in Git. |
+| RevenueCat project/catalog | The setup runbook records project `BPlan: Business Calendar`, project ID `d455e7e9`, web config `app48a77253da`, offering `bplan_web` / `ofrng560c7ad85b`, products `bplan_pro_monthly_v2` and `bplan_pro_yearly_v2` (since 2026-09-30; `bplan_pro_monthly` / `bplan_pro_yearly` before), and application entitlement `pro`.     | Phase 2B2 proved exactly one live exact-name project and used its discovered canonical ID for the run. The historical runbook ID remains **UNVERIFIED FOR LIVE V2 USE** and is never used as a provider selector; the canonical ID remains runtime-discovered rather than frozen in Git. |
 | Hosted purchase link       | `apps/web` accepts `VITE_REVENUECAT_WEB_PURCHASE_URL` and appends the authenticated Supabase UUID as the RevenueCat app-user path segment.                                                                                                                                                                                       | The link is external configuration and is not stored as a secret in Git. Its live availability and catalog response remain unverified by automation.                                                                                                                                     |
 | RevenueCat webhook         | `supabase/functions/revenuecat-webhook/` validates the shared secret, parses webhook payloads with Zod, ignores anonymous/non-UUID users safely, handles entitlement events, and delegates ordering/idempotency to the database mirror. `supabase/config.toml` disables JWT verification for this secret-authenticated function. | Handler behavior is covered by focused Deno tests. The setup runbook records that the hosted TEST webhook returned 2xx; Batch 1 does not repeat that live check.                                                                                                                         |
 | Subscription mirror        | `subscriptions` is the client-readable projection. `subscription_events` is an RLS-enabled server-only ledger. `process_revenuecat_event` atomically claims the event ID, calls the ordered mirror writer, and records the final ledger outcome.                                                                                 | Local migration/pgTAP and two-session race coverage exist. The first real monthly purchase proved the earlier hosted mirror and ledger through read-only authority reconciliation; the atomic code is deployed hosted, but a new provider delivery has not been observed.                |
@@ -393,8 +393,10 @@ pnpm billing:assert-user -- --expect active-pro --plan monthly|annual
 invalid, duplicate, or free-expectation plan arguments fail with the stable
 categories `PLAN_MISSING`, `PLAN_INVALID`, `PLAN_DUPLICATE`, and
 `PLAN_NOT_ALLOWED_FOR_FREE`. A plan-scoped active-Pro assertion reuses the
-Product-resource resolution and requires store identifier `bplan_pro_monthly`
-for monthly or `bplan_pro_yearly` for annual. The original implementation checkpoint is
+Product-resource resolution and requires the contract's store identifier for the plan: `bplan_pro_monthly_v2`
+for monthly or `bplan_pro_yearly_v2` for annual (since 2026-09-30; live
+evidence below was recorded against the retired `bplan_pro_monthly` /
+`bplan_pro_yearly`). The original implementation checkpoint is
 `18ff339288fb7163244c1dc45a92790af6f864f2`; focused tests (29),
 `pnpm billing:test` (136), billing typecheck/build, `pnpm verify`, and
 `git diff --check` passed there.
@@ -1177,6 +1179,17 @@ verify sequential replay deduplication and stale/out-of-order protection;
 provider-side duplicate delivery was not manufactured or claimed live.
 Production billing remains disabled. Phase 5 subsequently passed its protected
 live GitHub read-only dispatch, as recorded below.
+
+#### Price change — 2026-09-30
+
+Pro moved to $2.99/month and $29.99/year. RevenueCat Web Billing cannot edit a
+saved price, so new products `bplan_pro_monthly_v2` and `bplan_pro_yearly_v2`
+replaced the old ones in `bplan_web`, and `BILLING_CONTRACT` follows them. The
+old products stay attached to `pro` for existing sandbox subscriptions. **Not
+yet proven live on the new products:** a purchase, renewal, cancellation, or
+expiration. The next live run will be the first. Existing sandbox test
+identities subscribed to the old products now fail the plan's product-match
+check by design; use fresh identities.
 
 #### Monthly lifecycle checkpoint — 2026-09-29
 

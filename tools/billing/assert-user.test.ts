@@ -150,7 +150,7 @@ function providerRunner(
               data: {
                 id,
                 object: 'product',
-                store_identifier: id === 'prod_lifetime' ? 'lifetime' : 'bplan_pro_monthly',
+                store_identifier: id === 'prod_lifetime' ? 'lifetime' : 'bplan_pro_monthly_v2',
               },
             });
     } else {
@@ -183,7 +183,7 @@ function activeProvider(overrides: Partial<RevenueCatUserSnapshot> = {}): Revenu
       {
         id: 'sub_1',
         productId: 'prod_monthly',
-        storeIdentifier: 'bplan_pro_monthly',
+        storeIdentifier: 'bplan_pro_monthly_v2',
         store: 'rc_billing',
         environment: 'sandbox',
         status: 'active',
@@ -209,7 +209,7 @@ function planSubscription(
     ...activeProvider().subscriptions[0]!,
     id,
     productId: plan === 'monthly' ? 'prod_monthly' : 'prod_annual',
-    storeIdentifier: plan === 'monthly' ? 'bplan_pro_monthly' : 'bplan_pro_yearly',
+    storeIdentifier: plan === 'monthly' ? 'bplan_pro_monthly_v2' : 'bplan_pro_yearly_v2',
     ...overrides,
   };
 }
@@ -445,13 +445,15 @@ describe('RevenueCat user assertion adapter', () => {
       customer: customerProfile({ subscriptions: [annual] }),
       subscription: { data: annual },
       product: {
-        data: { id: 'prod_annual', object: 'product', store_identifier: 'bplan_pro_yearly' },
+        data: { id: 'prod_annual', object: 'product', store_identifier: 'bplan_pro_yearly_v2' },
       },
     });
     const result = await fake.adapter.readUser(USER_ID);
     expect(result).toMatchObject({
       ok: true,
-      data: { subscriptions: [{ productId: 'prod_annual', storeIdentifier: 'bplan_pro_yearly' }] },
+      data: {
+        subscriptions: [{ productId: 'prod_annual', storeIdentifier: 'bplan_pro_yearly_v2' }],
+      },
     });
     expect(fake.invocations.filter((item) => item.argv[0] === 'products')).toHaveLength(1);
   });
@@ -473,7 +475,7 @@ describe('RevenueCat user assertion adapter', () => {
   it('rejects a Product response whose internal ID differs from the subscription reference', async () => {
     const result = await providerAdapter({
       product: {
-        data: { id: 'prod_other', object: 'product', store_identifier: 'bplan_pro_monthly' },
+        data: { id: 'prod_other', object: 'product', store_identifier: 'bplan_pro_monthly_v2' },
       },
     }).adapter.readUser(USER_ID);
     expect(result).toMatchObject({
@@ -489,7 +491,7 @@ describe('RevenueCat user assertion adapter', () => {
       customer: customerProfile({ subscriptions: [first, second] }),
       subscription: (id: string) => ({ data: id === 'sub_one' ? first : second }),
       product: {
-        data: { id: 'prod_one', object: 'product', store_identifier: 'bplan_pro_monthly' },
+        data: { id: 'prod_one', object: 'product', store_identifier: 'bplan_pro_monthly_v2' },
       },
     });
     expect((await shared.adapter.readUser(USER_ID)).ok).toBe(true);
@@ -500,7 +502,7 @@ describe('RevenueCat user assertion adapter', () => {
       customer: customerProfile({ subscriptions: [first, another] }),
       subscription: (id: string) => ({ data: id === 'sub_one' ? first : another }),
       product: (id: string) => ({
-        data: { id, object: 'product', store_identifier: 'bplan_pro_monthly' },
+        data: { id, object: 'product', store_identifier: 'bplan_pro_monthly_v2' },
       }),
     }).adapter.readUser(USER_ID);
     expect(ambiguous).toMatchObject({
@@ -718,7 +720,7 @@ describe('cross-layer billing consistency', () => {
           {
             ...activeProvider().subscriptions[0]!,
             productId: 'prod_monthly',
-            storeIdentifier: 'bplan_pro_monthly',
+            storeIdentifier: 'bplan_pro_monthly_v2',
           },
         ],
       }),
@@ -736,7 +738,7 @@ describe('cross-layer billing consistency', () => {
         {
           ...activeProvider().subscriptions[0]!,
           productId: 'prod_monthly',
-          storeIdentifier: 'bplan_pro_monthly',
+          storeIdentifier: 'bplan_pro_monthly_v2',
         },
       ],
     });
@@ -745,7 +747,7 @@ describe('cross-layer billing consistency', () => {
         {
           ...activeProvider().subscriptions[0]!,
           productId: 'prod_annual',
-          storeIdentifier: 'bplan_pro_yearly',
+          storeIdentifier: 'bplan_pro_yearly_v2',
         },
       ],
     });

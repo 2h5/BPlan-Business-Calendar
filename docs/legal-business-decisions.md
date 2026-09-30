@@ -26,12 +26,12 @@ chosen and the final Terms and Privacy Policy are approved and published.
 ### Price change — 2026-09-30
 
 Pro moved from $4.99/$49.99 to $2.99/month and $29.99/year. The code
-(`PRO_PLAN` in `packages/domain/src/billing/subscription-display.ts`) and the
-web Terms page carry the new prices. **Still pending, in the dashboards:** the
-RevenueCat Web Billing products `bplan_pro_monthly` and `bplan_pro_yearly` are
-still priced $4.99 and $49.99 (see the
-[billing runbook](revenuecat-stripe-setup.md#products-and-offering)), and the
-App Store products do not exist yet ([mobile billing plan](mobile-billing-plan.md)).
+(`PRO_PLAN` in `packages/domain/src/billing/subscription-display.ts`), the web
+Terms page, and the RevenueCat Web Billing products carry the new prices. The
+dashboard could not edit a saved price, so the web offering now uses new
+products `bplan_pro_monthly_v2` and `bplan_pro_yearly_v2` (see the
+[billing runbook](revenuecat-stripe-setup.md#products-and-offering)). The App
+Store products do not exist yet ([mobile billing plan](mobile-billing-plan.md)).
 
 ## Pro scope verified in the repository
 

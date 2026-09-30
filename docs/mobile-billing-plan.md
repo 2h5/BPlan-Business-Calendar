@@ -119,7 +119,7 @@ Sources:
 - [ ] Subscription group with two auto-renewable subscriptions, monthly and
       annual, at the final prices (§2). Suggested IDs: `bplan_pro_monthly_ios`,
       `bplan_pro_yearly_ios` (store product IDs must be unique per store; the
-      web ones are `bplan_pro_monthly` / `bplan_pro_yearly`).
+      web ones are `bplan_pro_monthly_v2` / `bplan_pro_yearly_v2`).
 - [ ] RevenueCat: add the App Store app to the existing project.
 - [ ] RevenueCat: **In-App Purchase key** (App Store Connect → Users and Access
       → Integrations → In-App Purchase: Issuer ID, Key ID, `.p8`). Required;

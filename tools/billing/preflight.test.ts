@@ -32,8 +32,8 @@ describe('billing preflight foundation', () => {
     expect(BILLING_CONTRACT.entitlement).toBe('pro');
     expect(BILLING_CONTRACT.offering.identifier).toBe('bplan_web');
     expect(BILLING_CONTRACT.offering.id).toBe('ofrng560c7ad85b');
-    expect(BILLING_CONTRACT.products.monthly.id).toBe('bplan_pro_monthly');
-    expect(BILLING_CONTRACT.products.annual.id).toBe('bplan_pro_yearly');
+    expect(BILLING_CONTRACT.products.monthly.id).toBe('bplan_pro_monthly_v2');
+    expect(BILLING_CONTRACT.products.annual.id).toBe('bplan_pro_yearly_v2');
     expect(REVENUECAT_API_BASE_URL).toBe('https://api.revenuecat.com/v2');
     expect(REVENUECAT_CLI_COMMAND).toBe('rc');
     expect(REVENUECAT_CLI_APPROVED_VERSION).toBe('0.1.1');

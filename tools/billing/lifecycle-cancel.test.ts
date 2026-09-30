@@ -24,7 +24,7 @@ const report: LifecycleReport = {
   plan: 'annual',
   planProductMatch: true,
   latestAppliedLedgerEventType: 'INITIAL_PURCHASE',
-  storeIdentifier: 'bplan_pro_yearly',
+  storeIdentifier: 'bplan_pro_yearly_v2',
   subscriptionStatus: 'active',
   givesAccess: true,
   subscriptionGrantsPro: true,
@@ -48,7 +48,7 @@ const provider: RevenueCatUserSnapshot = {
     {
       id: 'subscription',
       productId: 'product',
-      storeIdentifier: 'bplan_pro_yearly',
+      storeIdentifier: 'bplan_pro_yearly_v2',
       store: 'rc_billing',
       environment: 'sandbox',
       status: 'active',
@@ -150,7 +150,9 @@ describe('sandbox cancellation guards', () => {
         report,
         {
           ...provider,
-          subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly' }],
+          subscriptions: [
+            { ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly_v2' },
+          ],
         },
         USER,
       ),
@@ -305,12 +307,12 @@ describe('sandbox cancellation guards', () => {
   it('guards a monthly cancellation by the monthly Product and rejects the annual one', () => {
     const monthlyProvider: RevenueCatUserSnapshot = {
       ...provider,
-      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly' }],
+      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly_v2' }],
     };
     const monthlyReport: LifecycleReport = {
       ...report,
       plan: 'monthly',
-      storeIdentifier: 'bplan_pro_monthly',
+      storeIdentifier: 'bplan_pro_monthly_v2',
     };
     expect(cancellationGuard('monthly', monthlyReport, monthlyProvider, USER)).toBeNull();
     expect(cancellationGuard('monthly', monthlyReport, provider, USER)).toBe('CANCELLATION_GUARD');
@@ -319,7 +321,7 @@ describe('sandbox cancellation guards', () => {
   it('submits one monthly cancellation after the same guarded reads', async () => {
     const monthlyProvider: RevenueCatUserSnapshot = {
       ...provider,
-      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly' }],
+      subscriptions: [{ ...provider.subscriptions[0]!, storeIdentifier: 'bplan_pro_monthly_v2' }],
     };
     const cancel = vi.fn(async () => ({ ok: true as const }));
     const output: string[] = [];

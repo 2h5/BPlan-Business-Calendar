@@ -32,11 +32,11 @@ export const BILLING_CONTRACT = {
   },
   products: {
     monthly: {
-      id: 'bplan_pro_monthly',
+      id: 'bplan_pro_monthly_v2',
       interval: 'monthly',
     },
     annual: {
-      id: 'bplan_pro_yearly',
+      id: 'bplan_pro_yearly_v2',
       interval: 'annual',
     },
   },

@@ -67,7 +67,7 @@ function fixtures(
         {
           id: 'subscription',
           productId: 'product',
-          storeIdentifier: options.storeIdentifier ?? 'bplan_pro_yearly',
+          storeIdentifier: options.storeIdentifier ?? 'bplan_pro_yearly_v2',
           store: 'rc_billing',
           environment: 'sandbox',
           status: options.status ?? 'active',
@@ -516,7 +516,7 @@ function monthly(options: Parameters<typeof fixtures>[0] = {}) {
   return fixtures({
     now: START + 2 * 60_000,
     endsAt: MONTHLY_END,
-    storeIdentifier: 'bplan_pro_monthly',
+    storeIdentifier: 'bplan_pro_monthly_v2',
     ...options,
   });
 }
@@ -529,7 +529,7 @@ describe('monthly lifecycle read-only reconciliation', () => {
       plan: 'monthly',
       state: 'active',
       planProductMatch: true,
-      storeIdentifier: 'bplan_pro_monthly',
+      storeIdentifier: 'bplan_pro_monthly_v2',
     });
     const lines = formatLifecycleReport(report).split('\n');
     expect(lines[0]).toBe('RevenueCat monthly lifecycle (read-only)');
@@ -610,7 +610,7 @@ describe('monthly natural renewal comparison', () => {
     expect(compare(initial, renewed)).toMatchObject({
       ok: true,
       plan: 'monthly',
-      storeIdentifier: 'bplan_pro_monthly',
+      storeIdentifier: 'bplan_pro_monthly_v2',
       ledgerTransitions: ['INITIAL_PURCHASE', 'RENEWAL'],
     });
   });
