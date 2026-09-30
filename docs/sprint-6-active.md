@@ -1097,6 +1097,11 @@ identity and the final legal documents are approved.
 
 Goal: connect real mobile subscription state to the existing server entitlement architecture.
 
+The mobile purchase/restore work is planned in
+[`mobile-billing-plan.md`](mobile-billing-plan.md): web keeps its own checkout,
+the iPhone app sells through Apple in-app purchase, and both unlock the same
+server-side Pro.
+
 Implement:
 
 - RevenueCat React Native SDK

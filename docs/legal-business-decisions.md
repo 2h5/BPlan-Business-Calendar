@@ -1,7 +1,7 @@
 # BPlan Legal / Business Decision Sheet
 
 Status: **provisional implementation input — not legal sign-off**
-Last reviewed: **2026-09-09**
+Last reviewed: **2026-09-30**
 
 Production paid checkout must remain disabled until the seller identity is
 chosen and the final Terms and Privacy Policy are approved and published.
@@ -17,11 +17,24 @@ chosen and the final Terms and Privacy Policy are approved and published.
 | Public business address      | TBD — do not publish a personal or home address                                             | Open                   |
 | Minimum age                  | 18+                                                                                         | Set                    |
 | Currency                     | USD                                                                                         | Set                    |
-| Monthly plan                 | $4.99/month                                                                                 | Set                    |
-| Annual plan                  | $49.99/year                                                                                 | Set                    |
+| Monthly plan                 | $2.99/month — lowering from $4.99 (decided 2026-09-30, not yet applied)                     | Decided, not applied   |
+| Annual plan                  | TBD — to be derived from the $2.99 monthly price (was $49.99/year)                          | Open                   |
 | Trial / introductory pricing | None at launch                                                                              | Set                    |
 | Support                      | info.bplanai@gmail.com                                                                      | Set                    |
 | Effective date               | TBD — use the launch date                                                                   | Open                   |
+
+### Price change — pending
+
+Monthly Pro is moving to $2.99. The annual price is not chosen yet. Until both
+are final, the live values are still $4.99 and $49.99 in:
+
+- `packages/domain/src/billing/subscription-display.ts` (`PRO_PLAN`, shared by
+  web and mobile) and its tests in
+  `apps/web/src/features/billing/utils/subscription-display.test.ts`
+- `apps/web/public/terms.html` (launch pricing clause)
+- RevenueCat Web Billing products `bplan_pro_monthly` / `bplan_pro_yearly`
+- the App Store products, when they are created
+  ([mobile billing plan](mobile-billing-plan.md))
 
 ## Pro scope verified in the repository
 

@@ -137,7 +137,8 @@ access, and how it is proven, is in the
 Current source-of-truth handoffs are [`docs/sprint-6-active.md`](docs/sprint-6-active.md)
 for mobile/AI work, [`docs/web-active.md`](docs/web-active.md) for the web
 client, and [`docs/revenuecat-automation-plan.md`](docs/revenuecat-automation-plan.md)
-for billing automation, and [`docs/release-hardening.md`](docs/release-hardening.md)
+for billing automation, [`docs/mobile-billing-plan.md`](docs/mobile-billing-plan.md)
+for iPhone in-app purchase, and [`docs/release-hardening.md`](docs/release-hardening.md)
 for release hardening. The Sprint 3 and Sprint 4 trackers are closed
 historical records; the Sprint 5 tracker retains Microsoft
 external-verification evidence.
