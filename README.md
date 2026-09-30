@@ -35,7 +35,8 @@ AI / SCHEDULING
 BILLING / PRO
 ├─ RevenueCat webhook/mirror/Pro gate ........ IMPLEMENTED / SHARED + TESTED GATE
 ├─ Web checkout + subscription UI ............ IMPLEMENTED
-├─ Monthly + annual sandbox lifecycles ....... PROVEN LIVE (BUY/RENEW/CANCEL/EXPIRE)
+├─ Monthly + annual sandbox lifecycles ....... PROVEN LIVE ON OLD $4.99/$49.99 PRODUCTS
+├─ $2.99 / $29.99 web products (v2) .......... LIVE IN SANDBOX / LIFECYCLE NOT YET RUN
 ├─ Lifecycle + automation Phases 4–6 ......... COMPLETE / PLAN-SCOPED
 ├─ Convergence hardening ..................... DEPLOYED TO SANDBOX/DEV (2026-09-29)
 ├─ Mobile purchase/restore ................... PENDING (MOBILE REVENUECAT SDK)
@@ -57,6 +58,12 @@ CURRENT STATE
 └─ Open tracks: hosted AI E2E, RevenueCat scheduled reconciliation, mobile
    purchase/restore, Microsoft lifecycle verification, release hardening, and
    legal/billing gates.
+
+NEXT UP
+├─ 1. Live lifecycle on the $2.99 / $29.99 products (two fresh test accounts)
+│     → docs/revenuecat-automation-plan.md, "Next live run — v2 products"
+└─ 2. iPhone in-app purchase (Apple checkout via RevenueCat)
+      → docs/mobile-billing-plan.md
 ```
 
 ## Current status
@@ -160,7 +167,8 @@ external-verification evidence.
 | Phase 7 adversarial sweep           | Complete (2026-09-30)                                 |
 | Hosted AI deployment/E2E            | Pending                                               |
 | RevenueCat webhook/mirror/Pro gate  | Implemented                                           |
-| Monthly + annual billing lifecycle  | Proven live                                           |
+| Monthly + annual billing lifecycle  | Proven live on the old $4.99/$49.99 products          |
+| $2.99 / $29.99 web products (v2)    | In sandbox offering; live lifecycle not yet run       |
 | Billing automation                  | Phases 4–6 complete for sandbox                       |
 | RevenueCat convergence              | Deployed to sandbox/dev; scheduled reconcile pending  |
 | Mobile purchase/restore             | Pending; needs mobile RevenueCat SDK                  |

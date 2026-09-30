@@ -1191,6 +1191,50 @@ expiration. The next live run will be the first. Existing sandbox test
 identities subscribed to the old products now fail the plan's product-match
 check by design; use fresh identities.
 
+#### Next live run — v2 products (planned, not started)
+
+Goal: prove the $2.99 / $29.99 products the same way the old ones were proven.
+Nothing here has run yet. Each purchase, cancellation, and secret change needs
+separate explicit authorization, as before.
+
+Setup:
+
+- [ ] Create **two fresh test accounts** in the app: one monthly, one annual.
+      An account must hold exactly one subscription, so none of the accounts
+      used on the old products can be reused, and one account cannot cover
+      both plans.
+- [ ] Point the GitHub Environment secrets at them: monthly account →
+      `BILLING_MONTHLY_TEST_USER_ID`, `BILLING_MONTHLY_LIFECYCLE_TEST_USER_ID`,
+      `BILLING_MONTHLY_RENEWAL_TEST_USER_ID`; annual account →
+      `BILLING_ANNUAL_TEST_USER_ID`, `BILLING_LIFECYCLE_TEST_USER_ID`,
+      `BILLING_RENEWAL_TEST_USER_ID`. Set `BILLING_PURCHASE_TEST_USER_ID` to
+      the account being bought for before each purchase.
+
+Read-only first (no purchase):
+
+- [ ] Workflow `preflight`, then `billing:checkout-ready` for each plan:
+      `bplan_web` resolves `$rc_monthly` → `bplan_pro_monthly_v2` and
+      `$rc_annual` → `bplan_pro_yearly_v2`.
+- [ ] Open the web purchase link without paying: it shows $2.99 / $29.99.
+
+Monthly (about 5-minute sandbox periods):
+
+- [ ] Workflow `sandbox-purchase`, `purchase_plan: monthly` (one submit, no
+      retry), then `monthly-assertion`.
+- [ ] Workflow `monthly-renewal-read-only`: one natural renewal observed.
+- [ ] Local `billing:lifecycle:cancel -- --plan monthly` (one guarded
+      cancellation), then `monthly-lifecycle-read-only` until `expired`.
+
+Annual (about 1-hour sandbox periods):
+
+- [ ] Same sequence with `purchase_plan: annual`, `annual-assertion`,
+      `annual-renewal-read-only`, `billing:lifecycle:cancel -- --plan annual`,
+      and `lifecycle-read-only`.
+
+Done when both plans pass purchase, renewal, cancellation retaining paid
+access, and expiration revoking Pro across RevenueCat, the mirror, the ledger,
+and server authorization. Record the result here and in the README tracker.
+
 #### Monthly lifecycle checkpoint — 2026-09-29
 
 **PROVEN LOCAL:** the lifecycle commands are plan-scoped. `billing:lifecycle:read-only`,
