@@ -8,7 +8,7 @@
 - Existing TaskInspector coverage:
   - `taskInspectorForm.test.ts` covers the pure form hydration and payload serialization.
   - `TaskInspectorFields.test.tsx` calls the component as a function to inspect React element props, and uses `renderToStaticMarkup` for HTML. It invokes callback props directly.
-  - `TaskInspector.tsx` itself has no committed test. Its lifecycle was proven equivalent during the refactor by a temporary review harness that replaced React's hooks with a deterministic fake runtime and a stub `document` (see `docs/task-inspector-refactor.md`).
+  - `TaskInspector.tsx` itself has no committed test. Its lifecycle was proven equivalent during the refactor by a temporary review harness that replaced React's hooks with a deterministic fake runtime and a stub `document` (recorded in the Task inspector refactor tracker, removed 2026-09-30; see git history).
 - Behavior that rested only on source/static parity until now:
   - the 230 ms draft-title focus, its `preventScroll` option, and cancellation of the timer;
   - real ref attachment, and focus and caret preservation while typing and re-rendering;
@@ -30,7 +30,7 @@
 | `@testing-library/jest-dom`   | `^6.6.3`  | 6.9.1    |
 
 - `@testing-library/dom` is listed explicitly because it is a required peer of `@testing-library/react` 16 and `user-event` 14.
-- `jsdom` 26 is used rather than 27 because it is well established with Vitest 2 and supports Node 22. RTL 16.3 supports React 19.1.
+- `jsdom` 26 is used rather than 27 because it is well established with Vitest 2 and supports Node 22. RTL 16.3 supports React 19.1. (Vitest was upgraded to 4.1 on 2026-09-30 with no test or config changes; jsdom stays on 26.)
 - `vite.config.ts` is **unchanged**. There is no global environment switch and no global setup file.
 - New shared helper: `apps/web/src/test/dom.ts`. It registers the `jest-dom` matchers for Vitest (including their types) and adds an `afterEach` hook that runs RTL `cleanup()`, restores real timers, and restores spies. RTL cannot auto-register its cleanup because Vitest globals are off.
 

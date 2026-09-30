@@ -14,8 +14,10 @@ flexible organisation. We take the principles, not the pixels.
 
 1. **Dense, but calm.** A week view is information-heavy by nature. Calm comes
    from restraint in colour and generous vertical rhythm, not from showing less.
-2. **Accent sparingly.** One accent colour. If everything is highlighted,
-   nothing is.
+2. **Accent sparingly.** One accent colour at a time. If everything is
+   highlighted, nothing is. On web the user may choose that colour (a preset or
+   a custom hex in Settings, `AccentPicker`); components still reference the
+   `accent` role, never the chosen value.
 3. **Progressive disclosure.** The essential fact first; detail behind a tap.
 4. **Motion communicates.** Every animation marks a state change. Nothing
    animates decoratively.
@@ -63,6 +65,8 @@ keeps capture fast and the context behind it visible.
 - Icon-only controls require `accessibilityLabel` — `IconButton` makes it a
   required prop.
 - Interactive targets are at least 44pt (`theme.hitSlopSize`).
+- Segmented controls are square: a rounded-rect track and thumb, like the
+  calendar view switcher. Never capsule/pill shapes.
 - Haptics only on meaningful state change: task completion, successful capture,
   sign-in. Never on scroll or navigation.
 

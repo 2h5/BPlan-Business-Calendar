@@ -9,6 +9,11 @@ and the full active-Pro authority chain passed on 2026-09-22;
 production billing remains disabled. Mobile Find Time is implemented and
 pushed on `main` (checkpoint `2ce5087`, audited 2026-09-30); its remaining
 gaps depend on mobile purchase/restore and are listed under Phase 6.
+Phase 7's automated adversarial sweep is complete (2026-09-30); Luna Low is
+selected for intent and ranking. Pro prices moved to $2.99/month and
+$29.99/year on 2026-09-30 (new RevenueCat products, not yet proven live).
+Mobile purchase/restore is planned in
+[`mobile-billing-plan.md`](mobile-billing-plan.md).
 
 ### Deterministic scheduling adversarial hardening — 2026-09-15
 

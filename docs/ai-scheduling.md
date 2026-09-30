@@ -1,11 +1,14 @@
 # AI scheduling
 
-Status: **engine, deterministic server Find Time path, provider foundation,
-Phase 3 proposal implementation, and Phase 4 confirmation path are built; full
-verification is tracked in** [`sprint-6-active.md`](sprint-6-active.md). The
-engine is `packages/domain/src/scheduling/availability.ts`. Live model
-evaluation, production model selection, web/mobile Find Time UX, and the real
-RevenueCat purchase E2E remain pending.
+Status (2026-09-30): **engine, proposal, and confirmation paths are built and
+hardened; web and mobile Find Time UX are implemented; the Phase 7 adversarial
+sweep is complete.** Full verification is tracked in
+[`sprint-6-active.md`](sprint-6-active.md). The engine is
+`packages/domain/src/scheduling/availability.ts`. The 2026-09-24 live Low vs
+Medium evaluation selected Luna Low for intent and ranking. Mobile also sends
+AI event-move proposals through `ai-edit-event`, which shares the same Pro gate
+(`requireProEntitlement`). Hosted AI configuration, deployment, and end-to-end
+verification remain pending.
 
 ## Checkpoint — 2026-09-09 (web Find Time box)
 

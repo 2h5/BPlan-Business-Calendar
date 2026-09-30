@@ -1,7 +1,9 @@
 # Web Application — Active Implementation Tracker
 
-Status: WEB PHASES 0–6 COMPLETE + HARDENING; FIND TIME WEB UX AND
-SUBSCRIPTION/UPGRADE PAGE IMPLEMENTED; LIVE AI AND BILLING E2E PENDING
+Status (2026-09-30): WEB PHASES 0–7 COMPLETE; LARGE COMPONENTS DECOMPOSED AND
+FEATURES RESTRUCTURED; DOM TESTS IN PLACE; PRODUCTION HARDENING (PHASE 8),
+HOSTED AI E2E, AND PRODUCTION BILLING PENDING. Latest state:
+[checkpoint 2026-09-30](#checkpoint--2026-09-30).
 
 This document is the single source of truth for web client implementation, architecture boundaries, and handoff.
 
@@ -103,9 +105,9 @@ Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI
   - TanStack Query hooks (`apps/web/src/features/tasks/hooks/useTasks.ts`): queries with 30s stale time, optimistic completion toggle and deletion with error rollback, invalidation on settle.
   - Task grouping hook (`apps/web/src/features/tasks/hooks/useTaskBuckets.ts`): consuming `@cal/domain`'s `bucketTasks` and `compareTasks` to group work into overdue, due today, upcoming, someday, and completed.
   - Desktop-first UI components:
-    - `TaskRow` (`apps/web/src/features/tasks/components/TaskRow.tsx` + CSS Module): accessible row with completion checkbox, title strike-through, priority badges, due date badges with semantic tones, duration pills, list indicators, fixed status, and hover quick actions (snooze, delete).
-    - `TaskListPane` (`apps/web/src/features/tasks/components/TaskListPane.tsx` + CSS Module): desktop left pane with view tabs (Inbox, All, Done), list selector, quick-add form, section headers with item counts, empty and loading states.
-    - `TaskInspector` (`apps/web/src/features/tasks/components/TaskInspector.tsx` + CSS Module): desktop right-side inspector panel for viewing and editing task title, notes, due date & time, duration presets, priority, list assignment, tag assignment, flexibility flag, snooze, delete, and save/cancel actions.
+    - `TaskRow` (`apps/web/src/features/tasks/list/TaskRow.tsx` + CSS Module): accessible row with completion checkbox, title strike-through, priority badges, due date badges with semantic tones, duration pills, list indicators, fixed status, and hover quick actions (snooze, delete).
+    - `TaskListPane` (`apps/web/src/features/tasks/list/TaskListPane.tsx` + CSS Module): desktop left pane with view tabs (Inbox, All, Done), list selector, quick-add form, section headers with item counts, empty and loading states.
+    - `TaskInspector` (`apps/web/src/features/tasks/inspector/TaskInspector.tsx` + CSS Module): desktop right-side inspector panel for viewing and editing task title, notes, due date & time, duration presets, priority, list assignment, tag assignment, flexibility flag, snooze, delete, and save/cancel actions.
     - `TasksView` (`apps/web/src/features/tasks/components/TasksView.tsx` + CSS Module): 2-pane desktop workspace container with responsive layout.
     - AppShell integration (`apps/web/src/components/layout/AppShell.tsx` + CSS Module): full-bleed content layout for `/tasks`.
     - Page integration (`apps/web/src/pages/TasksPage.tsx`): mounts `TasksView`.
@@ -270,6 +272,8 @@ Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI
 
 ### Billing and AI status checkpoint — 2026-09-09
 
+_Superseded by [checkpoint 2026-09-30](#checkpoint--2026-09-30); kept as a dated record._
+
 - **Status:** Web Find Time proposal/confirmation UX and the dedicated
   subscription/upgrade page are implemented; no production billing is enabled.
 - **Implemented:** Settings billing seam, user-scoped subscription read,
@@ -295,23 +299,19 @@ Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI
 ### Web Phase 7 — Find Time
 
 - **Goal:** Consume hardened Sprint 6 proposal endpoint, proposal selection UX, confirmation flow, Pro entitlement rendering (no client-side availability calculation).
-- **Status:** Implemented in code — web proposal + confirmation UX
+- **Status:** Complete — web proposal + confirmation UX (see checkpoint
+  2026-09-30 for what the 2026-09-09 blockers resolved to)
 - **Starting SHA:** `159a409`
 - **Implementation Completed:** `85c96ed` — free-text Find Time proposal and
   confirmation flow, subscription/upgrade page, BPlan UI polish, and
   development rate-limit override support
-- **Tests / Verification:** TBD
+- **Tests / Verification:** Find Time DOM tests added later (see
+  [`dom-component-testing.md`](dom-component-testing.md)); covered by `pnpm verify`.
 - **Pushed SHA:** `85c96ed`
 - **CI:** Not rechecked for this documentation update
-- **Blockers:** Live AI model evaluation, production model selection, exact
-  annual RevenueCat product provenance, billing lifecycle verification,
-  production billing/legal completion, and production hardening. The monthly
-  sandbox authority chain is proven live; the single annual attempt remains
-  unresolved and must not be retried.
-- **Next Action:** Reconcile the annual product/catalog evidence with read-only
-  RevenueCat access, then continue the live-model and lifecycle gates. Keep
-  production checkout disabled until seller identity and final legal documents
-  are confirmed.
+- **Blockers:** None for the web UX. Hosted AI deployment/E2E and production
+  billing remain release gates (see checkpoint 2026-09-30).
+- **Next Action:** Phase 8 production hardening.
 
 ---
 
@@ -327,3 +327,61 @@ Historical implementation checkpoint used for this tracker: `673eb12`. GitHub CI
 - **Blockers:** None
 - **Next Action:** Begin production hardening after the live model, purchase-E2E,
   legal, and deployment gates are resolved
+
+---
+
+## Checkpoint — 2026-09-30
+
+**Resolved since the 2026-09-09 checkpoint**
+
+- Live Luna Low vs Medium evaluation ran (2026-09-24); Luna Low is selected
+  for intent and ranking.
+- The annual RevenueCat product question is settled, and both monthly and
+  annual sandbox lifecycles (purchase, renewal, cancellation, expiration) are
+  proven live on the original products. See
+  [`revenuecat-automation-plan.md`](revenuecat-automation-plan.md).
+- Mobile Find Time exists (checkpoint `2ce5087`).
+- Pro prices moved to $2.99/month and $29.99/year (`PRO_PLAN`), served by new
+  RevenueCat products `bplan_pro_monthly_v2` / `bplan_pro_yearly_v2`; not yet
+  proven live.
+
+**Web work landed 2026-09-19 → 2026-09-30**
+
+- Product: Today glance card and Today search; Search page redesign;
+  Customize settings, profile photos, and user-chosen accent colour; event
+  details; collapsible sidebar and working-hours shading; public product page
+  with feature demos; refreshed sign-in and pricing pages.
+- Correctness: previous account's cached data is dropped on user change;
+  deployed builds refuse sandbox checkout, `http` billing links, privileged
+  Supabase keys, and insecure URLs.
+- Structure: `CalendarView`, `TimelineView`, `QuickCreatePopover`,
+  `FindTimeBox`, `TodayView`, `TaskInspector`, and `TaskListPane` were split
+  into focused components and hooks with behaviour preserved, then
+  `features/**` was regrouped (for example `calendar/timeline`,
+  `calendar/quick-create`, `tasks/inspector`, `tasks/list`,
+  `scheduling/find-time`). The per-refactor trackers were removed on
+  2026-09-30; their history is in git.
+- Testing: DOM component tests (jsdom + Testing Library) cover the task list,
+  Select, Quick Create, Find Time, Today, and the calendar toolbar. The living
+  guide and the list of **known unresolved behaviours** are in
+  [`dom-component-testing.md`](dom-component-testing.md).
+
+**Structural notes carried over from the removed refactor trackers**
+
+- Two tests read files through `__dirname` (`TimelineView.ghost.test.tsx`,
+  `CalendarView.transition.test.tsx`); check them by hand whenever those files
+  move.
+- Settings deep-imports `QuickCreateTimePicker`. If more features reuse the
+  pickers, promote them to a shared web component.
+- Today has its own task presentation (`TodayTaskRow`, `TodayTaskGroups`)
+  beside the Tasks list's `TaskRow`; converging them is product/UI work.
+- Timeline styles still live in `CalendarView.module.css`; splitting out a
+  `TimelineView.module.css` was assessed and skipped because ownership is not
+  clean.
+- Other features import specific Calendar/Tasks hooks and utils directly
+  rather than through root barrels, deliberately.
+
+**Still open:** Phase 8 production hardening; hosted AI configuration,
+deployment, and E2E; RevenueCat scheduled reconciliation; the live lifecycle
+run on the v2 products; seller identity, final legal documents, and production
+billing.

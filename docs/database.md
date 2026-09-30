@@ -16,23 +16,31 @@ Postgres via Supabase. Every table below is created by a migration in
 
 ## Tables and client-facing views
 
-| Object                     | Purpose                             | Client access                                          |
-| -------------------------- | ----------------------------------- | ------------------------------------------------------ |
-| `profiles`                 | Planning preferences, working hours | Own row, full CRUD                                     |
-| `calendars`                | Internal and synced calendars       | Own rows, full CRUD                                    |
-| `events`                   | Events and time blocks              | Own rows, full CRUD; provider writes use server path   |
-| `task_lists`               | Lists / projects                    | Own rows, full CRUD                                    |
-| `tasks`                    | Tasks and reminders                 | Own rows, full CRUD                                    |
-| `tags`, `task_tags`        | Labelling                           | Own rows, via task ownership                           |
-| `provider_accounts`        | Connected Google/Microsoft accounts | Safe-column read only; disconnect via Edge Function    |
-| `provider_accounts_public` | Client-safe connection projection   | Read only                                              |
-| `calendar_sync_states`     | Sync cursors, webhook bookkeeping   | **None**                                               |
-| `sync_jobs`                | Durable retry queue                 | **None in current client grant set**                   |
-| `calendar_sync_health`     | Client-safe sync health view        | Read only                                              |
-| `ai_schedule_requests`     | Find Time requests                  | Read own requests; server-managed                      |
-| `ai_schedule_suggestions`  | Ranked proposals                    | Read own proposed/accepted suggestions; server-managed |
-| `subscriptions`            | RevenueCat entitlement mirror       | Read only                                              |
-| `subscription_events`      | RevenueCat webhook event ledger     | **None; service-role only**                            |
+| Object                       | Purpose                                                                      | Client access                                          |
+| ---------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `profiles`                   | Planning preferences, working hours, app `preferences` (jsonb), `avatar_url` | Own row, full CRUD                                     |
+| `calendars`                  | Internal and synced calendars                                                | Own rows, full CRUD                                    |
+| `events`                     | Events and time blocks (optional `color`)                                    | Own rows, full CRUD; provider writes use server path   |
+| `task_lists`                 | Lists / projects                                                             | Own rows, full CRUD                                    |
+| `tasks`                      | Tasks and reminders                                                          | Own rows, full CRUD                                    |
+| `tags`, `task_tags`          | Labelling                                                                    | Own rows, via task ownership                           |
+| `provider_accounts`          | Connected Google/Microsoft accounts                                          | Safe-column read only; disconnect via Edge Function    |
+| `provider_accounts_public`   | Client-safe connection projection                                            | Read only                                              |
+| `calendar_sync_states`       | Sync cursors, webhook bookkeeping                                            | **None**                                               |
+| `sync_jobs`                  | Durable retry queue                                                          | **None in current client grant set**                   |
+| `calendar_sync_health`       | Client-safe sync health view                                                 | Read only                                              |
+| `ai_schedule_requests`       | Find Time and AI event-edit requests (`request_kind`)                        | Read own requests; server-managed                      |
+| `ai_schedule_suggestions`    | Ranked proposals                                                             | Read own proposed/accepted suggestions; server-managed |
+| `subscriptions`              | RevenueCat entitlement mirror                                                | Read only                                              |
+| `subscription_events`        | RevenueCat webhook event ledger                                              | **None; service-role only**                            |
+| `revenuecat_reconciliations` | Per-user reconcile queue, leases, backoff                                    | **None; server-only**                                  |
+| `revenuecat_provider_state`  | RevenueCat catalog cache and read backoff                                    | **None; server-only**                                  |
+| `ai_rate_limit_overrides`    | Per-user AI rate-limit overrides (e.g. dev accounts)                         | **None; service-role only**                            |
+
+Storage: the public-read `avatars` bucket holds one object per user at
+`avatars/<user id>/avatar` (WebP/JPEG/PNG, 2 MiB cap). Only the owner may
+select, insert, update, or delete their own object; `profiles.avatar_url` stores
+the versioned public URL. See `20260924000003_profile_avatars.sql`.
 
 `oauth_states` is a short-lived, server-only table for OAuth state and PKCE
 verifiers. Its `return_target` is constrained to `mobile` or `web` and defaults
@@ -69,9 +77,9 @@ The current client-facing access is:
 | `provider_accounts_public` | `security_invoker = true` view over the safe projection                                                                 | `SELECT` to `authenticated`                                           | Web and mobile integrations settings                                                |
 | `sync_jobs`                | Legacy own-row `SELECT` policy remains in migration 4                                                                   | No explicit authenticated grant in the current client-grant migration | Not queried by either app; server queue functions only                              |
 | `calendar_sync_health`     | `security_invoker = false` view with an `auth.uid()` owner filter; provider error text is reduced to safe status fields | `SELECT` to `authenticated`                                           | Web and mobile integrations settings                                                |
-| `subscriptions`            | Own-row `SELECT` policy; writes are webhook/server-managed                                                              | `SELECT` to `authenticated`                                           | Web billing status query                                                            |
-| `ai_schedule_requests`     | Own-row `SELECT`; final proposal runtime removes the broad client update policy                                         | `SELECT` to `authenticated`                                           | Reserved for future client proposal UI                                              |
-| `ai_schedule_suggestions`  | `SELECT` only for the user's proposed/accepted requests                                                                 | `SELECT` to `authenticated`                                           | Reserved for future client proposal UI                                              |
+| `subscriptions`            | Own-row `SELECT` policy; writes are webhook/server-managed                                                              | `SELECT` to `authenticated`                                           | Web and mobile billing status query                                                 |
+| `ai_schedule_requests`     | Own-row `SELECT`; final proposal runtime removes the broad client update policy                                         | `SELECT` to `authenticated`                                           | Not queried directly; Find Time goes through `ai-find-time`                         |
+| `ai_schedule_suggestions`  | `SELECT` only for the user's proposed/accepted requests                                                                 | `SELECT` to `authenticated`                                           | Not queried directly; Find Time goes through `ai-find-time`                         |
 | `subscription_events`      | RLS enabled with no client policies                                                                                     | `INSERT, SELECT` to `service_role` only                               | RevenueCat webhook ledger                                                           |
 
 The server-only RevenueCat and AI RPCs are not browser write APIs. Current
@@ -120,6 +128,14 @@ The final migrations add the following fields and constraints:
   counters are non-negative; status is constrained to `pending`, `proposed`,
   `accepted`, `rejected`, or `failed`. An accepted request may reference its
   resulting `accepted_event_id`.
+
+  Later migrations added: free-text Find Time fields (`raw_text`,
+  `ad_hoc_title`, `ad_hoc_duration_minutes`, `ad_hoc_location`,
+  `ad_hoc_description`, `parsed_intent`); intent-model telemetry
+  (`intent_provider`, `intent_model`, `intent_prompt_version`, latency and
+  token counts); and `request_kind` (`find_time` by default, or `move_event`
+  for an AI event-move proposal). `raw_text` is cleared after processing (see the web
+  privacy page).
 
   The task/profile/target-calendar version fields are the snapshots used for
   stale-input checks; the proposal does not copy raw calendar-event content.
