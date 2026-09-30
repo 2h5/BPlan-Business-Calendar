@@ -6,6 +6,7 @@ import { createOpenAiEventEditIntentProvider } from '../_shared/ai/event-edit-in
 import { supabaseEventEditDataSource } from '../_shared/ai/event-edit-repository.ts';
 import { openAiIntentConfigFromEnv } from '../_shared/ai/openai-intent.ts';
 import { supabaseAiScheduleRepository } from '../_shared/ai/proposal-repository.ts';
+import { requireProEntitlement } from '../_shared/billing/entitlement.ts';
 import { EdgeError, withErrorHandling } from '../_shared/errors/index.ts';
 import { jsonResponse, preflight } from '../_shared/http/cors.ts';
 
@@ -27,16 +28,7 @@ const handler = withErrorHandling(async (request) => {
   }
 
   const admin = adminClient();
-  const { data: entitled, error: entitlementError } = await admin.rpc('has_active_entitlement', {
-    p_user_id: user.id,
-    p_entitlement: 'pro',
-  });
-  if (entitlementError) {
-    throw new EdgeError('UNKNOWN', 'Could not verify your subscription.', 500);
-  }
-  if (!entitled) {
-    throw new EdgeError('SUBSCRIPTION_REQUIRED', 'Editing events with AI requires Pro.', 403);
-  }
+  await requireProEntitlement(admin, user.id, 'Editing events with AI requires Pro.');
 
   return jsonResponse(
     await generateAiEventEditProposal(
