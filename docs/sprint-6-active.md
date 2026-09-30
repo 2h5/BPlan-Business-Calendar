@@ -6,8 +6,9 @@ IMPLEMENTED END TO END (PROPOSE + CONFIRM). Billing automation Phases 2B2,
 3A, 3B1, 3B2, and 3C are complete, including proven real monthly and annual
 sandbox purchase chains. The annual Product identity assertion was corrected
 and the full active-Pro authority chain passed on 2026-09-22;
-production billing remains disabled. Mobile Find Time remains in progress on a
-separate collaborator track and is awaiting a pushed completion checkpoint.
+production billing remains disabled. Mobile Find Time is implemented and
+pushed on `main` (checkpoint `2ce5087`, audited 2026-09-30); its remaining
+gaps depend on mobile purchase/restore and are listed under Phase 6.
 
 ### Deterministic scheduling adversarial hardening — 2026-09-15
 
@@ -1154,10 +1155,10 @@ future work.
   assertion and complete authority chain on 2026-09-22, without retry.
 - The only currently scoped Pro capability is Find Time with AI. The broader AI
   feature ideas in the product plan are not launch commitments.
-- The web client invokes the proposal/confirmation endpoints. Mobile Find Time
-  remains in progress on a separate collaborator track and is awaiting a pushed
-  completion checkpoint. The live model comparison and production model choice
-  remain pending.
+- The web and mobile clients both invoke the proposal/confirmation endpoints
+  (mobile checkpoint `2ce5087`; see Phase 6). The live Luna Low vs Medium
+  comparison ran on 2026-09-24 and selected Luna Low; hosted AI deployment and
+  configuration remain pending.
 - Seller identity and final legal documents remain a production billing gate,
   but they do not block future sandbox or UI implementation.
 
@@ -1235,7 +1236,49 @@ manual step and has not been run after that checkpoint.
 
 # Phase 6 — Mobile Find Time UX
 
-Status: IN PROGRESS / AWAITING PUSHED CHECKPOINT
+Status: **IMPLEMENTED AND PUSHED; PURCHASE/RESTORE STATES BLOCKED ON MOBILE
+REVENUECAT (PHASE 5)**
+
+### Audit — 2026-09-30
+
+The collaborator track landed on `main` through `c5e1990` (Today page and
+Find Time), `bc9347b` (server-side text interpretation), `ccc1393` (event
+moves in the same bar), and `2ce5087` (stale event-move refusal, 2026-09-27),
+all contained in `origin/main`. Code lives in
+`apps/mobile/src/features/scheduling/` and is mounted on Today through
+`FindTimeBar`.
+
+Shape: like web, mobile ships the free-text box rather than a per-task
+**Find Time** button. The raw text goes to `ai-find-time`; the phone does not
+compute a window. `find-time.api.ts` Zod-validates proposal, clarification,
+and confirmation payloads, and `ai-function.ts` preserves server error codes.
+
+Exit criteria against the code:
+
+| Criterion                  | Result                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Happy path                 | Implemented: text → readback chips → up to three ranked slots → tap to book → success notice; confirmation invalidates `queryKeys.events.all()` and `queryKeys.tasks.all()`. Not run live. |
+| Failure states             | Loading, clarification, no valid slot, provider unavailable, rate limited, Pro required (with **See Pro plans**), window/timezone errors, confirming (`Booking…`), stale slot, not found.  |
+| No server state in Zustand | Holds; the only store touched is `paywall.store` (modal open flag).                                                                                                                        |
+| TanStack Query             | Holds; propose and confirm are mutations, cache keys come from `queryKeys`.                                                                                                                |
+| Thin routes                | Holds; the route renders `TodayScreen`, which composes `FindTimeBar`.                                                                                                                      |
+| Design-system primitives   | Holds; `@cal/ui` `Text`, `Button`, and theme tokens.                                                                                                                                       |
+| Accessibility              | Considered: labelled field, slot rows are labelled buttons with busy/disabled state, notices use `accessibilityRole="alert"`.                                                              |
+| `pnpm verify` / pushed     | Passes on `main`; checkpoint above.                                                                                                                                                        |
+
+Open gaps, none blocking a web-billing-only release:
+
+- **Purchase restored** and an in-app purchase from the paywall depend on the
+  mobile RevenueCat SDK (Phase 5). Today the upgrade modal explains plans but
+  cannot purchase.
+- Free users learn about the Pro gate only after submitting (server 403 →
+  upgrade prompt); web shows a locked teaser up front.
+- The target calendar name returned by the server is not shown on slot rows.
+- "Task lacks duration/deadline" does not apply to the free-text flow (an
+  unstated duration defaults to 30 minutes); there is no per-task entry point.
+- Retry is resubmitting the same text; there is no dedicated retry button.
+- No mobile unit tests cover `find-time.api.ts`, `useFindTime`, or
+  `useConfirmSlot`; only the event-move utilities are tested.
 
 Goal: expose the complete feature through the existing feature-first mobile architecture.
 
@@ -1321,8 +1364,9 @@ Keep AI branding/subscription treatment consistent with the design system.
 
 Checkpoint SHA:
 
-`TBD` — do not declare this phase complete until the separate collaborator
-track records its pushed completion checkpoint.
+`2ce5087302ee97de8477a2dbffb173756676008a` (latest mobile scheduling commit,
+on `origin/main`; audited 2026-09-30). The purchase-restored state stays open
+until mobile RevenueCat purchase/restore exists.
 
 ---
 
