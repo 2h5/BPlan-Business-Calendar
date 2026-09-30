@@ -1372,9 +1372,73 @@ until mobile RevenueCat purchase/restore exists.
 
 # Phase 7 — Adversarial Verification + Hardening
 
-Status: NOT STARTED
+Status: **AUTOMATED SWEEP COMPLETE (2026-09-30)**. Live-only items (live AI
+E2E, mobile purchase/restore, iOS simulator build) remain open and are listed
+below.
 
 Goal: attempt to break Sprint 6 before declaring it complete.
+
+### Sweep result — 2026-09-30
+
+Each checklist item below was traced to a test that exercises it. Most were
+already covered by the per-phase hardening passes; the sweep added tests only
+where coverage was missing and found one latent defect.
+
+**Defect found and fixed: date-bound pgTAP assertions.**
+`subscription.test.sql` and `revenuecat_atomic.test.sql` asserted
+`has_active_entitlement(...) = true` for mirror rows whose `expires_at` was
+`2026-10-01` or `2026-11-01`. The function compares against the real `now()`,
+so the database suite would have failed from 2026-10-01, then again from
+2026-11-01. Only the expiry arguments moved to 2099; every `event_at`, and
+therefore every ordering and staleness assertion, is unchanged. The Vitest
+and Deno suites were rerun with the clock shifted 120 days ahead (a Node
+`--import` and Deno `--preload` Date shim) and passed unchanged, so no other
+suite has this problem.
+
+**Gaps closed:**
+
+- The Pro gate in `ai-find-time` and `ai-edit-event` was duplicated inline and
+  untested. It is now `requireProEntitlement` in
+  `supabase/functions/_shared/billing/entitlement.ts`, used by both endpoints,
+  with tests in `entitlement.test.ts`. It sends only the verified user id, and
+  anything other than an explicit `true` denies. Before, any truthy value
+  granted access. A lookup error returns a 500, never a grant.
+- Simultaneous confirmations were only tested sequentially (pgTAP runs in one
+  session). `tools/scheduling/confirmation-race.local.mjs`
+  (`pnpm scheduling:test:race:local`, now in CI after the billing race step)
+  drives two real sessions and proves with `pg_blocking_pids` that the second
+  one waited on the first:
+  - a double tap creates one event, and both calls return it;
+  - a rolled-back first attempt does not block the waiting retry;
+  - two slots from one proposal book once, and the other is `stale`;
+  - two proposals for the same hour never double-book, and the later one is
+    `stale`.
+
+Coverage map (`find-time.test.ts`, `proposal.test.ts`, `ranking.test.ts`,
+`openai*.test.ts`, `confirmation.test.ts`, `revenuecat-webhook/*.test.ts`,
+`_shared/billing/entitlement.test.ts`; pgTAP in `supabase/tests/`):
+
+| Area                   | Items and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Authorization          | Cross-user task: "does not distinguish a missing task from another user task". Cross-user suggestion/request: "rejects missing or cross-user suggestions without disclosing them" plus `rls.test.sql` / `security_ownership.test.sql`. Forged entitlement: clients cannot write `subscriptions` or call the writer (`subscription.test.sql`, `revenuecat_atomic.test.sql`) and the gate reads only the mirror (`entitlement.test.ts`). Expired: `subscription.test.sql`, `has_active_entitlement` checks `expires_at > now()`. |
+| AI boundary            | Title/note injection: ranking instructions treat both as untrusted data (`openai.test.ts` sends an injection note); output can only select engine slot ids, and a `reason` is capped at 280 characters and rendered as text. Unknown slot, invented timestamp, malformed JSON, duplicate, invalid rank, more than 5 suggestions: `ranking.test.ts`, `openai.test.ts`. Refusal, timeout, transient retry, 4xx never retried: `openai*.test.ts`.                                                                                 |
+| Scheduling correctness | Event created, task edited/completed/deleted, profile (timezone/working hours) and calendar changes, calendar replaced or read-only, elapsed start, timestamp tampering: `confirmation.test.ts`, `confirmation.test.sql`. DST, exact adjacency, buffers: `find-time.test.ts`, `confirmation_recurrence.test.sql`. Remote provider change: mirrored provider rows block like internal ones (recurrence suite uses `google` rows).                                                                                               |
+| Concurrency            | Double tap and simultaneous confirmations: new race harness. Request retry: each submit claims quota atomically under an advisory lock (`proposal.test.ts`). Webhook retry and duplicate RevenueCat event: `revenuecat_atomic.test.sql`, `pnpm billing:test:race:local`.                                                                                                                                                                                                                                                       |
+| Billing                | Free, active, expired, cancelled-until-expiry, renewal, replay/out-of-order: pgTAP plus the live sandbox chains recorded under Phase 5. Restore purchase: not applicable until mobile RevenueCat exists.                                                                                                                                                                                                                                                                                                                       |
+| Privacy                | The ranking model receives task title, priority, duration, deadline, the user's note, timezone, and slot times only (`buildAiRankingInput`, strict schema). The intent and edit models receive the user's raw text plus local date/time. No attendee, event description, location, email, or token crosses.                                                                                                                                                                                                                    |
+
+Verification (2026-09-30, local `calendar-app` stack after applying the one
+pending local migration, `20260925000002`):
+
+- `pnpm verify`: pass (domain 389, mobile 45, web 881, billing 223, release 8).
+- `deno task check`, `deno lint`: clean. `deno task test`: 363 passed.
+- `supabase test db`: 16 files, 344 tests, pass.
+- `pnpm scheduling:test:race:local`: 4 scenarios pass; fixtures removed.
+- Clock-shifted (+120 days) Vitest and Deno runs: pass.
+
+Not run here: `supabase db reset` (it would wipe the shared local stack; CI
+resets a fresh database) and an iOS simulator build (Windows host; the iOS
+bundle was exported with `expo export --platform ios`).
 
 Audit and test:
 
@@ -1503,20 +1567,20 @@ Record screenshots/log identifiers where useful, but do not commit secrets.
 Sprint 6 is complete only when:
 
 - [ ] paid user can invoke Find Time
-- [ ] free user cannot bypass Pro gate
-- [ ] deterministic engine exclusively determines valid availability
-- [ ] AI only ranks valid generated candidates
-- [ ] structured model output is validated
-- [ ] no-slot path makes no model request
-- [ ] model/provider configuration is server-side
-- [ ] provider/model evaluation is documented
+- [x] free user cannot bypass Pro gate
+- [x] deterministic engine exclusively determines valid availability
+- [x] AI only ranks valid generated candidates
+- [x] structured model output is validated
+- [x] no-slot path makes no model request
+- [x] model/provider configuration is server-side
+- [x] provider/model evaluation is documented
 - [x] proposal persistence works
 - [x] confirmation revalidates availability
 - [x] confirmation is idempotent
 - [x] task/calendar state updates correctly
 - [x] provider-first writes remain intact
 - [ ] RevenueCat purchase/restore implemented
-- [ ] RevenueCat webhook/subscription mirror works
+- [x] RevenueCat webhook/subscription mirror works
 - [x] major security/privacy/adversarial cases tested
 - [x] full automated verification passes
 - [ ] live AI E2E passes
