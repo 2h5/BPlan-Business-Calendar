@@ -100,7 +100,7 @@ select is(
   public.process_revenuecat_event(
     'atomic-renewal', 'RENEWAL', '2026-09-20T00:00:00Z', 'SANDBOX', 'apply',
     'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
-    'active', '2026-11-01T00:00:00Z', null, array['pro'], array[]::uuid[], null, '{}'::jsonb
+    'active', '2099-11-01T00:00:00Z', null, array['pro'], array[]::uuid[], null, '{}'::jsonb
   ), 'APPLIED', 'newer renewal applies'
 );
 select is(
@@ -114,7 +114,7 @@ select is(
   (select status || ' ' || expires_at::text || ' ' || last_event_at::text
      from public.subscriptions
     where user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee' and entitlement = 'pro'),
-  'active 2026-11-01 00:00:00+00 2026-09-20 00:00:00+00',
+  'active 2099-11-01 00:00:00+00 2026-09-20 00:00:00+00',
   'newer status, expiry, and high-water mark remain authoritative'
 );
 select is(

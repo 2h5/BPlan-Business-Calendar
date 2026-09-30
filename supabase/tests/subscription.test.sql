@@ -98,7 +98,7 @@ select ok(
 select ok(
   public.apply_revenuecat_event(
     'dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro', 'active',
-    '2026-10-01T00:00:00Z', '2026-09-01T00:00:00Z', 'cust_1'
+    '2099-10-01T00:00:00Z', '2026-09-01T00:00:00Z', 'cust_1'
   ),
   'an initial purchase applies to the mirror'
 );
@@ -112,7 +112,7 @@ select ok(
 select ok(
   not public.apply_revenuecat_event(
     'dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro', 'active',
-    '2026-10-01T00:00:00Z', '2026-09-01T00:00:00Z', 'cust_1'
+    '2099-10-01T00:00:00Z', '2026-09-01T00:00:00Z', 'cust_1'
   ),
   'replaying an event does not re-apply it'
 );
@@ -121,7 +121,7 @@ select ok(
 select ok(
   public.apply_revenuecat_event(
     'dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro', 'active',
-    '2026-11-01T00:00:00Z', '2026-10-01T00:00:00Z', 'cust_1'
+    '2099-11-01T00:00:00Z', '2026-10-01T00:00:00Z', 'cust_1'
   ),
   'a renewal extends the entitlement'
 );
@@ -178,7 +178,7 @@ select is(
 select ok(
   public.apply_revenuecat_event(
     'dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro', 'active',
-    '2026-11-01T00:00:00Z', '2026-10-15T00:00:00Z', 'cust_1'
+    '2099-11-01T00:00:00Z', '2026-10-15T00:00:00Z', 'cust_1'
   ),
   'a cancellation is recorded without changing status'
 );
@@ -192,7 +192,7 @@ select ok(
 select ok(
   public.apply_revenuecat_event(
     'dddddddd-dddd-dddd-dddd-dddddddddddd', 'pro', 'expired',
-    '2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z', 'cust_1'
+    '2099-11-01T00:00:00Z', '2026-11-01T00:00:00Z', 'cust_1'
   ),
   'an in-order expiration applies'
 );
