@@ -49,7 +49,7 @@ export const DEMO_EVENTS: readonly DemoEvent[] = [
     title: 'Roadmap review',
     color: 'periwinkle',
   },
-  { id: 'mon-1on1', day: 0, start: at(15), end: at(16), title: '1:1 with Priya', color: 'mint' },
+  { id: 'mon-1on1', day: 0, start: at(15), end: at(16), title: '1:1 with manager', color: 'mint' },
   { id: 'tue-standup', day: 1, start: at(9), end: at(9, 30), title: 'Standup', color: 'sky' },
   { id: 'tue-deep', day: 1, start: at(10), end: at(11, 30), title: 'Deep work', color: 'lavender' },
   {
@@ -57,7 +57,7 @@ export const DEMO_EVENTS: readonly DemoEvent[] = [
     day: 1,
     start: at(13),
     end: at(14),
-    title: 'Lunch with Maya',
+    title: 'Lunch with Mom',
     color: 'mint',
   },
   {

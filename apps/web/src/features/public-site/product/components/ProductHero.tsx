@@ -94,7 +94,7 @@ export function ProductHero() {
           <span className={styles.status}>
             <i /> Free now
           </span>
-          <strong>Lunch with Maya</strong>
+          <strong>Lunch with Mom</strong>
           <span className={styles.muted}>in 1 h 20 m · 1:00 PM</span>
           <span className={styles.dayBar}>
             <i style={{ left: '10%', width: '5%', background: '#B2E0EF' }} />
