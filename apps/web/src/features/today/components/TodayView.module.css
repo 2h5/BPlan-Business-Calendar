@@ -161,7 +161,7 @@
 }
 
 .timeOfDaySun {
-  color: var(--color-warning);
+  color: var(--color-sun);
 }
 
 .timeOfDayMoon {

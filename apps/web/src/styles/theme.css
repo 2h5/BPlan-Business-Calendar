@@ -35,6 +35,7 @@
   --color-success-subtle: rgba(60, 200, 139, 0.12);
   --color-warning: #e7b660;
   --color-moon: #e6dfc8;
+  --color-sun: #e7b660;
   --color-warning-subtle: rgba(231, 182, 96, 0.12);
   --color-danger: #ff7d84;
   --color-danger-hover: #ff9298;
@@ -122,6 +123,7 @@
   --color-success-subtle: rgba(22, 134, 90, 0.1);
   --color-warning: #a66a12;
   --color-moon: #7d86a0;
+  --color-sun: #f5b301;
   --color-warning-subtle: rgba(166, 106, 18, 0.1);
   --color-danger: #c94049;
   --color-danger-hover: #ad3039;
@@ -173,6 +175,7 @@
     --color-success-subtle: rgba(22, 134, 90, 0.1);
     --color-warning: #a66a12;
     --color-moon: #7d86a0;
+    --color-sun: #f5b301;
     --color-warning-subtle: rgba(166, 106, 18, 0.1);
     --color-danger: #c94049;
     --color-danger-hover: #ad3039;

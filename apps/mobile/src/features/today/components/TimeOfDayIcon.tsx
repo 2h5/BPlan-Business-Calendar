@@ -60,7 +60,7 @@ export function TimeOfDayIcon({ isDaytime }: TimeOfDayIconProps) {
   }));
 
   const size = isDaytime ? 26 : 22;
-  const color = theme.colors.warning;
+  const color = isDaytime ? theme.colors.sun : theme.colors.moon;
   const halo = size * (1 + HALO_SPREAD * 2);
 
   return (

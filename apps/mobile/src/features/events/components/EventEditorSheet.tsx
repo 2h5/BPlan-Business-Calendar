@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, Switch, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
+import { CollapsibleField } from './CollapsibleField';
 import { RecurrenceField } from './RecurrenceField';
 import { useKeyboardLift } from '../../../lib/keyboard';
 import { useProfile, useUserTimeZone } from '../../settings/hooks/useProfile';
@@ -342,45 +343,49 @@ export function EventEditorSheet({
           />
         </View>
 
-        <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="subhead" color="secondary">
-            Starts
-          </Text>
-          <DatePickerField
-            value={form.start}
-            onChange={(day) => day && handleStartChange(mergeDateAndTime(day, form.start))}
-            format={(date) =>
-              formatDueDate(date, { now: new Date(), timeZone, hourCycle, hasTime: false }).text
-            }
-          />
-          {!form.allDay ? (
+        <View>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="subhead" color="secondary">
+              Starts
+            </Text>
+            <DatePickerField
+              value={form.start}
+              onChange={(day) => day && handleStartChange(mergeDateAndTime(day, form.start))}
+              format={(date) =>
+                formatDueDate(date, { now: new Date(), timeZone, hourCycle, hasTime: false }).text
+              }
+            />
+          </View>
+          <CollapsibleField open={!form.allDay}>
             <TimePickerField
               value={form.start}
               onChange={(time) => time && handleStartChange(mergeDateAndTime(form.start, time))}
               format={(date) => formatTimeOfDay(date, timeZone, hourCycle)}
             />
-          ) : null}
+          </CollapsibleField>
         </View>
 
-        <View style={{ gap: theme.spacing.sm }}>
-          <Text variant="subhead" color="secondary">
-            Ends
-          </Text>
-          <DatePickerField
-            value={form.end}
-            onChange={(day) => day && patch({ end: mergeDateAndTime(day, form.end) })}
-            minimumDate={form.start}
-            format={(date) =>
-              formatDueDate(date, { now: new Date(), timeZone, hourCycle, hasTime: false }).text
-            }
-          />
-          {!form.allDay ? (
+        <View>
+          <View style={{ gap: theme.spacing.sm }}>
+            <Text variant="subhead" color="secondary">
+              Ends
+            </Text>
+            <DatePickerField
+              value={form.end}
+              onChange={(day) => day && patch({ end: mergeDateAndTime(day, form.end) })}
+              minimumDate={form.start}
+              format={(date) =>
+                formatDueDate(date, { now: new Date(), timeZone, hourCycle, hasTime: false }).text
+              }
+            />
+          </View>
+          <CollapsibleField open={!form.allDay}>
             <TimePickerField
               value={form.end}
               onChange={(time) => time && patch({ end: mergeDateAndTime(form.end, time) })}
               format={(date) => formatTimeOfDay(date, timeZone, hourCycle)}
             />
-          ) : null}
+          </CollapsibleField>
         </View>
 
         <View style={{ gap: theme.spacing.sm }}>

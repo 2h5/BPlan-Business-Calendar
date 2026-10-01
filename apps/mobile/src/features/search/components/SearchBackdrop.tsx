@@ -30,24 +30,22 @@ interface Star {
 
 /*
  * The web backdrop's edge marks — the ones it keeps on narrow screens — so the
- * field reads as scattered while the search column stays clear.
+ * field reads as scattered while the search column stays clear. A phone has
+ * far less sky than a desktop, so a few are dropped and the largest are drawn
+ * smaller than the web's.
  */
 const STARS: Star[] = [
-  { kind: 'plus', x: 7, y: 12, size: 12, accent: true },
+  { kind: 'plus', x: 7, y: 12, size: 10, accent: true },
   { kind: 'spark', x: 15, y: 5, size: 9 },
-  { kind: 'spark', x: 4, y: 24, size: 8 },
   { kind: 'dot', x: 10, y: 38, size: 4, accent: true },
-  { kind: 'sparkOutline', x: 6, y: 50, size: 16 },
-  { kind: 'dot', x: 4, y: 62, size: 4 },
+  { kind: 'sparkOutline', x: 6, y: 50, size: 12 },
   { kind: 'spark', x: 8, y: 73, size: 11, accent: true },
   { kind: 'dot', x: 5, y: 81, size: 4 },
   { kind: 'spark', x: 14, y: 90, size: 11, accent: true },
-  { kind: 'spark', x: 94, y: 7, size: 12, accent: true },
+  { kind: 'spark', x: 94, y: 7, size: 10, accent: true },
   { kind: 'dot', x: 85, y: 10, size: 4 },
-  { kind: 'dot', x: 91, y: 19, size: 4 },
   { kind: 'plus', x: 95, y: 33, size: 11 },
-  { kind: 'spark', x: 89, y: 44, size: 12, accent: true },
-  { kind: 'spark', x: 96, y: 56, size: 10, accent: true },
+  { kind: 'spark', x: 89, y: 44, size: 10, accent: true },
   { kind: 'dot', x: 91, y: 66, size: 4 },
 ];
 

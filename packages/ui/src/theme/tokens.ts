@@ -34,8 +34,17 @@ export const radius = {
  */
 export const elevation = {
   none: { shadowOpacity: 0, elevation: 0 },
-  /** Cards sit *in* the page, so they carry no shadow — web `--shadow-sm` is a 1px hairline. */
-  card: { shadowOpacity: 0, elevation: 0 },
+  /**
+   * Card groups lift just off the page: a soft, short shadow under the 1px
+   * edge, there to separate a group from the background rather than float it.
+   */
+  card: {
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   /** Popovers and floating actions — web `--shadow-md`. */
   popover: {
     shadowColor: '#000',

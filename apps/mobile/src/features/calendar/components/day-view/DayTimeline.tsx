@@ -20,6 +20,11 @@ import { EventChip } from '../EventChip';
 import { NowIndicator } from '../NowIndicator';
 
 export const HOUR_HEIGHT = 56;
+/**
+ * Room above midnight's grid line. Each hour label sits centred on its line,
+ * so without it the 12 AM label pokes above the scroll content and is clipped.
+ */
+const TOP_INSET = 12;
 const GUTTER_WIDTH = 52;
 const WEEKDAY_NAMES = [
   'Sunday',
@@ -118,7 +123,7 @@ export function DayTimeline({
       dateKey === todayKey
         ? (minuteOfDay(now, timeZone) / 60) * HOUR_HEIGHT - HOUR_HEIGHT * 2
         : HOUR_HEIGHT * 7;
-    scrollRef.current?.scrollTo({ y: Math.max(0, target), animated: false });
+    scrollRef.current?.scrollTo({ y: Math.max(0, target + TOP_INSET), animated: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see above
   }, []);
 
@@ -291,7 +296,11 @@ export function DayTimeline({
           </View>
         ) : null}
 
-        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollRef}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: TOP_INSET }}
+        >
           <View style={{ height: 24 * HOUR_HEIGHT + bottomInset, flexDirection: 'row' }}>
             <View style={{ width: GUTTER_WIDTH }}>
               {Array.from({ length: 24 }, (_, hour) => (

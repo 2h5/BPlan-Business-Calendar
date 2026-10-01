@@ -3,8 +3,21 @@ import type { TaskList, TaskPriority } from '@cal/schemas';
 import { Chip, Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { type ReactNode, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, TextInput, View } from 'react-native';
+import Animated, {
+  Easing,
+  type EntryExitAnimationFunction,
+  FadeIn,
+  FadeOut,
+  interpolateColor,
+  LayoutAnimationConfig,
+  LinearTransition,
+  useAnimatedStyle,
+  useDerivedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
+import { AddTaskCardFrame } from './AddTaskCardFrame';
 import { useUserTimeZone } from '../../settings/hooks/useProfile';
 import { useCreateTask } from '../hooks/useTasks';
 import { DUE_PRESET_LABELS, type DuePreset, resolveDuePreset } from '../utils/due-presets';
@@ -39,6 +52,26 @@ const PRIORITY_CHIP_LABEL: Record<PriorityChoice, string> = {
   low: 'Low',
 };
 
+const CHANGE_MS = 180;
+const EASE_OUT = Easing.out(Easing.cubic);
+/** Pickers and the error fade in and out while the card resizes around them. */
+const APPEAR = FadeIn.duration(CHANGE_MS);
+const DISAPPEAR = FadeOut.duration(120);
+/** Chips slide aside as a neighbour's label grows or shrinks. */
+const SHIFT = LinearTransition.duration(CHANGE_MS).easing(EASE_OUT);
+
+/** A chip whose value just changed settles in from slightly small and faint. */
+const SETTLE: EntryExitAnimationFunction = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0.4, transform: [{ scale: 0.92 }] },
+    animations: {
+      opacity: withTiming(1, { duration: CHANGE_MS }),
+      transform: [{ scale: withTiming(1, { duration: CHANGE_MS, easing: EASE_OUT }) }],
+    },
+  };
+};
+
 export interface InlineAddTaskProps {
   lists: readonly TaskList[];
   /** The list new tasks land in — whichever list the screen is filtered to. */
@@ -48,49 +81,62 @@ export interface InlineAddTaskProps {
 /**
  * Capture at the top of the list, where the task will appear, instead of a
  * modal. Collapsed it is one "Add a task" row; open, it is the title plus a
- * row of one-tap options. Return adds the task and keeps the field open for
+ * row of one-tap options. The card grows out of the row and folds back into
+ * it, and every change inside it animates rather than snaps. Return adds the task and keeps the field open for
  * the next one, so a burst of captures never leaves the keyboard.
  */
 export function InlineAddTask({ lists, defaultListId }: InlineAddTaskProps) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  // What the card grows out of and folds back into, so the swap is seamless.
+  const [rowHeight, setRowHeight] = useState(44);
 
   // The card mounts only once opened: it needs a signed-in user to save, and
   // the list can render for a moment before the session has been restored.
-  if (open) {
-    return (
-      <AddTaskCard lists={lists} defaultListId={defaultListId} onClose={() => setOpen(false)} />
-    );
-  }
-
+  // The row's entrance is skipped on first render so the screen does not fade it in.
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Add a task"
-      onPress={() => setOpen(true)}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: theme.spacing.md,
-        paddingVertical: theme.spacing.md,
-        borderBottomWidth: theme.borderWidth.hairline,
-        borderBottomColor: theme.colors.borderSubtle,
-        backgroundColor: pressed ? theme.colors.hover : 'transparent',
-      })}
-    >
-      <Ionicons name="add" size={20} color={theme.colors.accent} />
-      <Text variant="callout" color="tertiary">
-        Add a task
-      </Text>
-    </Pressable>
+    <LayoutAnimationConfig skipEntering>
+      {open ? (
+        <AddTaskCard
+          lists={lists}
+          defaultListId={defaultListId}
+          fromHeight={rowHeight}
+          onClose={() => setOpen(false)}
+        />
+      ) : (
+        <Animated.View entering={APPEAR}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a task"
+            onPress={() => setOpen(true)}
+            onLayout={(event) => setRowHeight(event.nativeEvent.layout.height)}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.md,
+              paddingVertical: theme.spacing.md,
+              borderBottomWidth: theme.borderWidth.hairline,
+              borderBottomColor: theme.colors.borderSubtle,
+              backgroundColor: pressed ? theme.colors.hover : 'transparent',
+            })}
+          >
+            <Ionicons name="add" size={20} color={theme.colors.accent} />
+            <Text variant="callout" color="tertiary">
+              Add a task
+            </Text>
+          </Pressable>
+        </Animated.View>
+      )}
+    </LayoutAnimationConfig>
   );
 }
 
 function AddTaskCard({
   lists,
   defaultListId,
+  fromHeight,
   onClose,
-}: InlineAddTaskProps & { onClose: () => void }) {
+}: InlineAddTaskProps & { fromHeight: number; onClose: () => void }) {
   const theme = useTheme();
   const timeZone = useUserTimeZone();
   const createTask = useCreateTask();
@@ -102,6 +148,7 @@ function AddTaskCard({
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | null>(null);
   const [picker, setPicker] = useState<Picker>(null);
   const [error, setError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   const reset = () => {
     setTitle('');
@@ -113,7 +160,11 @@ function AddTaskCard({
     setError(null);
   };
 
-  const close = onClose;
+  // Folds the card back into the row; `onClose` unmounts it once it has.
+  const close = () => {
+    Keyboard.dismiss();
+    setClosing(true);
+  };
 
   const submit = async () => {
     const trimmed = title.trim();
@@ -148,26 +199,9 @@ function AddTaskCard({
   };
 
   return (
-    <View
-      style={{
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.lg,
-        borderWidth: theme.borderWidth.hairline,
-        borderColor: theme.colors.border,
-        padding: theme.spacing.md,
-        gap: theme.spacing.md,
-      }}
-    >
+    <AddTaskCardFrame fromHeight={fromHeight} closing={closing} onClosed={onClose}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
-        <View
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            borderWidth: 1.5,
-            borderColor: priority === 'high' ? theme.colors.warning : theme.colors.borderStrong,
-          }}
-        />
+        <PriorityRing high={priority === 'high'} />
         <TextInput
           value={title}
           onChangeText={(next) => {
@@ -194,39 +228,49 @@ function AddTaskCard({
       </View>
 
       {error ? (
-        <Text variant="footnote" style={{ color: theme.colors.danger }}>
-          {error}
-        </Text>
+        <Animated.View entering={APPEAR} exiting={DISAPPEAR}>
+          <Text variant="footnote" style={{ color: theme.colors.danger }}>
+            {error}
+          </Text>
+        </Animated.View>
       ) : null}
 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm }}>
-        <Chip
-          label={duePreset === 'none' ? 'Date' : DUE_PRESET_LABELS[duePreset]}
-          icon="calendar-outline"
-          selected={duePreset !== 'none' || picker === 'date'}
-          onPress={() => setPicker(picker === 'date' ? null : 'date')}
-        />
-        <Chip
-          label={PRIORITY_CHIP_LABEL[priority]}
-          icon="flag-outline"
-          selected={priority !== 'none'}
-          color={priorityColor[priority]}
-          onPress={() => setPriority(NEXT_PRIORITY[priority])}
-        />
-        {lists.length > 0 ? (
+        <ChipSlot changeKey={`${duePreset}:${picker === 'date'}`}>
           <Chip
-            label={listName}
-            icon="folder-outline"
-            selected={picker === 'list'}
-            onPress={() => setPicker(picker === 'list' ? null : 'list')}
+            label={duePreset === 'none' ? 'Date' : DUE_PRESET_LABELS[duePreset]}
+            icon="calendar-outline"
+            selected={duePreset !== 'none' || picker === 'date'}
+            onPress={() => setPicker(picker === 'date' ? null : 'date')}
           />
+        </ChipSlot>
+        <ChipSlot changeKey={priority}>
+          <Chip
+            label={PRIORITY_CHIP_LABEL[priority]}
+            icon="flag-outline"
+            selected={priority !== 'none'}
+            color={priorityColor[priority]}
+            onPress={() => setPriority(NEXT_PRIORITY[priority])}
+          />
+        </ChipSlot>
+        {lists.length > 0 ? (
+          <ChipSlot changeKey={`${listId}:${picker === 'list'}`}>
+            <Chip
+              label={listName}
+              icon="folder-outline"
+              selected={picker === 'list'}
+              onPress={() => setPicker(picker === 'list' ? null : 'list')}
+            />
+          </ChipSlot>
         ) : null}
-        <Chip
-          label={estimatedMinutes ? formatDuration(estimatedMinutes) : 'Duration'}
-          icon="time-outline"
-          selected={estimatedMinutes !== null || picker === 'duration'}
-          onPress={() => setPicker(picker === 'duration' ? null : 'duration')}
-        />
+        <ChipSlot changeKey={`${estimatedMinutes}:${picker === 'duration'}`}>
+          <Chip
+            label={estimatedMinutes ? formatDuration(estimatedMinutes) : 'Duration'}
+            icon="time-outline"
+            selected={estimatedMinutes !== null || picker === 'duration'}
+            onPress={() => setPicker(picker === 'duration' ? null : 'duration')}
+          />
+        </ChipSlot>
       </View>
 
       {picker === 'date' ? (
@@ -286,14 +330,49 @@ function AddTaskCard({
           ))}
         </OptionRow>
       ) : null}
-    </View>
+    </AddTaskCardFrame>
+  );
+}
+
+/**
+ * Keeps a chip's place in the row animated as its neighbours resize, and
+ * replays the settle whenever `changeKey` — the chip's value — changes.
+ */
+function ChipSlot({ changeKey, children }: { changeKey: string; children: ReactNode }) {
+  return (
+    <Animated.View layout={SHIFT}>
+      <Animated.View key={changeKey} entering={SETTLE}>
+        {children}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** The checkbox ring, easing to the warning colour as high priority comes and goes. */
+function PriorityRing({ high }: { high: boolean }) {
+  const theme = useTheme();
+  const progress = useDerivedValue(() => withTiming(high ? 1 : 0, { duration: CHANGE_MS }));
+  const ringStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(
+      progress.value,
+      [0, 1],
+      [theme.colors.borderStrong, theme.colors.warning],
+    ),
+  }));
+
+  return (
+    <Animated.View
+      style={[{ width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 }, ringStyle]}
+    />
   );
 }
 
 function OptionRow({ children }: { children: ReactNode }) {
   const theme = useTheme();
   return (
-    <View
+    <Animated.View
+      entering={APPEAR}
+      exiting={DISAPPEAR}
       style={{
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -304,6 +383,6 @@ function OptionRow({ children }: { children: ReactNode }) {
       }}
     >
       {children}
-    </View>
+    </Animated.View>
   );
 }

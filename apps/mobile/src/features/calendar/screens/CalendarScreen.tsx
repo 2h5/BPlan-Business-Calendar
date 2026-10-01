@@ -1,14 +1,19 @@
 import { addZonedDays, toZonedDateKey } from '@cal/domain';
-import { ErrorState, IconButton, LoadingState, SegmentedControl, useTheme } from '@cal/ui';
+import { ErrorState, IconButton, LoadingState, useTheme } from '@cal/ui';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TAB_BAR_CLEARANCE } from '../../../components/app-shell/floating-layout';
-import { type CalendarViewMode, useCalendarViewStore } from '../../../store/calendar-view.store';
+import {
+  type CalendarViewMode,
+  useCalendarViewHydrated,
+  useCalendarViewStore,
+} from '../../../store/calendar-view.store';
 import { useEventEditorStore } from '../../../store/event-editor.store';
 import { AgendaList } from '../components/agenda-view/AgendaList';
 import { CalendarHeading } from '../components/CalendarHeading';
+import { CalendarViewSwitcher } from '../components/CalendarViewSwitcher';
 import { DayTimeline } from '../components/day-view/DayTimeline';
 import { MonthPager } from '../components/month-view/MonthPager';
 import { WeekGrid } from '../components/week-view/WeekGrid';
@@ -55,6 +60,14 @@ const MONTHS = [
  * live below it.
  */
 export function CalendarScreen() {
+  // Held back until the saved view is restored: rendering first would show
+  // the default view for a beat and then switch, sliding the switcher across.
+  // Storage answers within a frame or two, so nothing stands in meanwhile.
+  const hydrated = useCalendarViewHydrated();
+  return hydrated ? <CalendarScreenContent /> : null;
+}
+
+function CalendarScreenContent() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   // The page runs under the floating tab bar; scrolling content pads by this
@@ -164,7 +177,7 @@ export function CalendarScreen() {
         />
       </View>
 
-      <SegmentedControl options={MODES} value={mode} onChange={changeMode} />
+      <CalendarViewSwitcher options={MODES} value={mode} onChange={changeMode} />
 
       {isLoading ? (
         <LoadingState label="Loading your calendar" />
@@ -228,7 +241,14 @@ export function CalendarScreen() {
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: bottomInset }}
+          // A scroll view clips to its bounds, so the screen's side padding
+          // moves inside it: the agenda cards' shadows then have room to show
+          // instead of being cut off flush with the cards' edges.
+          style={{ marginHorizontal: -theme.screenPadding }}
+          contentContainerStyle={{
+            paddingHorizontal: theme.screenPadding,
+            paddingBottom: bottomInset,
+          }}
           refreshControl={
             <RefreshControl
               refreshing={agendaRefresh.refreshing}

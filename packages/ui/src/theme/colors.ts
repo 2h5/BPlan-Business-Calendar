@@ -57,6 +57,13 @@ export interface ColorTokens {
   successSubtle: string;
   warning: string;
   warningSubtle: string;
+  /**
+   * The Today sun. Its own colour rather than `warning`, whose light value is
+   * darkened for legible text and reads as dull amber on a decorative glyph.
+   */
+  sun: string;
+  /** The Today moon, the web's `--color-moon`. */
+  moon: string;
   danger: string;
   dangerHover: string;
   dangerSubtle: string;
@@ -102,6 +109,8 @@ export const darkColors: ColorTokens = {
   successSubtle: 'rgba(60, 200, 139, 0.12)',
   warning: '#E7B660',
   warningSubtle: 'rgba(231, 182, 96, 0.12)',
+  sun: '#E7B660',
+  moon: '#E6DFC8',
   danger: '#FF7D84',
   dangerHover: '#FF9298',
   dangerSubtle: 'rgba(255, 111, 120, 0.11)',
@@ -146,6 +155,8 @@ export const lightColors: ColorTokens = {
   successSubtle: 'rgba(22, 134, 90, 0.10)',
   warning: '#A66A12',
   warningSubtle: 'rgba(166, 106, 18, 0.10)',
+  sun: '#F5B301',
+  moon: '#7D86A0',
   danger: '#C94049',
   dangerHover: '#AD3039',
   dangerSubtle: 'rgba(201, 64, 73, 0.085)',

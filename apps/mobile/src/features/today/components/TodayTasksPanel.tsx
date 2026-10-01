@@ -97,71 +97,81 @@ export function TodayTasksPanel({
         ) : null}
       </View>
 
+      {/* The shadow sits on an outer layer: iOS clips a view's own shadow
+          along with its overflow. */}
       <View
         style={{
-          overflow: 'hidden',
           borderRadius: theme.radius.lg,
-          borderWidth: theme.borderWidth.hairline,
-          borderColor: theme.colors.borderSubtle,
           backgroundColor: theme.colors.surface,
+          ...theme.elevation.card,
         }}
       >
-        {open.length === 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={onQuickAdd}
-            style={({ pressed }) => ({
-              gap: 2,
-              padding: theme.spacing.lg,
-              backgroundColor: pressed ? theme.colors.hover : 'transparent',
-            })}
-          >
-            <Text variant="callout">Nothing due today</Text>
-            <Text variant="footnote" color="accent">
-              Add a task
-            </Text>
-          </Pressable>
-        ) : (
-          renderTasks(open)
-        )}
-
-        {completedToday.length > 0 ? (
-          <View
-            style={{
-              borderTopWidth: theme.borderWidth.hairline,
-              borderTopColor: theme.colors.borderSubtle,
-            }}
-          >
+        <View
+          style={{
+            overflow: 'hidden',
+            borderRadius: theme.radius.lg,
+            borderWidth: theme.borderWidth.hairline,
+            borderColor: theme.colors.borderSubtle,
+            backgroundColor: theme.colors.surface,
+          }}
+        >
+          {open.length === 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ expanded: showCompleted }}
-              accessibilityLabel={`Completed today, ${completedToday.length}`}
-              onPress={() => setShowCompleted((visible) => !visible)}
+              onPress={onQuickAdd}
               style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: theme.spacing.sm,
-                paddingVertical: theme.spacing.md,
-                paddingHorizontal: theme.spacing.lg,
+                gap: 2,
+                padding: theme.spacing.lg,
                 backgroundColor: pressed ? theme.colors.hover : 'transparent',
               })}
             >
-              <Ionicons
-                name={showCompleted ? 'chevron-down' : 'chevron-forward'}
-                size={14}
-                color={theme.colors.textTertiary}
-              />
-              <Text variant="footnote" color="secondary" style={{ flex: 1 }}>
-                Completed today
-              </Text>
-              <Text variant="footnote" color="tertiary">
-                {completedToday.length}
+              <Text variant="callout">Nothing due today</Text>
+              <Text variant="footnote" color="accent">
+                Add a task
               </Text>
             </Pressable>
+          ) : (
+            renderTasks(open)
+          )}
 
-            {showCompleted ? <View>{renderTasks(completedToday)}</View> : null}
-          </View>
-        ) : null}
+          {completedToday.length > 0 ? (
+            <View
+              style={{
+                borderTopWidth: theme.borderWidth.hairline,
+                borderTopColor: theme.colors.borderSubtle,
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showCompleted }}
+                accessibilityLabel={`Completed today, ${completedToday.length}`}
+                onPress={() => setShowCompleted((visible) => !visible)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.sm,
+                  paddingVertical: theme.spacing.md,
+                  paddingHorizontal: theme.spacing.lg,
+                  backgroundColor: pressed ? theme.colors.hover : 'transparent',
+                })}
+              >
+                <Ionicons
+                  name={showCompleted ? 'chevron-down' : 'chevron-forward'}
+                  size={14}
+                  color={theme.colors.textTertiary}
+                />
+                <Text variant="footnote" color="secondary" style={{ flex: 1 }}>
+                  Completed today
+                </Text>
+                <Text variant="footnote" color="tertiary">
+                  {completedToday.length}
+                </Text>
+              </Pressable>
+
+              {showCompleted ? <View>{renderTasks(completedToday)}</View> : null}
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
   );

@@ -1,22 +1,47 @@
-import { calculateBillingIntervalSavings, PLAN_COMPARISON, PRO_PLAN } from '@cal/domain';
-import { Badge, Button, Text, useTheme } from '@cal/ui';
+import { calculateBillingIntervalSavings, PRO_PLAN } from '@cal/domain';
+import { Button, Text, useTheme } from '@cal/ui';
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, ScrollView, View } from 'react-native';
+import { Modal, ScrollView, type TextStyle, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BillingIntervalToggle, type BillingInterval } from './BillingIntervalToggle';
-import { GoldText } from './GoldText';
 import { LiquidGlassCloseButton } from './LiquidGlassCloseButton';
+import { PlanTierCard } from './PlanTierCard';
 import { RollingPrice } from './RollingPrice';
+import { UpgradeIllustration } from './UpgradeIllustration';
 import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { usePlanState } from '../hooks/useSubscription';
 
-/** What the hero feature promises, in the words the website uses. */
-const HERO = PRO_PLAN.features.find((feature) => feature.isHero);
-const HERO_PILLS = ['Deterministic verification', '1-click slot booking', 'Timezone aware'];
-/** Reflection interval for the gold text on this page. */
-const CYCLE_MS = 3500;
+/**
+ * Short, side-by-side lists — the long-form descriptions live on the web
+ * pricing page. Every line is something the plan does today.
+ */
+const FREE_FEATURES = [
+  'All calendar views',
+  'Tasks & lists',
+  'Conflict detection',
+  'Google & Apple sync',
+];
+const PRO_FEATURES = [
+  'Everything in Free',
+  'Find Time with AI',
+  'Smart slot ranking',
+  '1-tap booking',
+];
+
+/** The page's one big line: heavier and larger than `display`, as a hero headline. */
+const HEADLINE: TextStyle = {
+  fontSize: 38,
+  lineHeight: 42,
+  fontWeight: '800',
+  letterSpacing: -1,
+};
+const ART_WIDTH = 190;
+/** How far the copy keeps in from the right, clear of the artwork. */
+const COPY_INSET = 112;
+const ART_LIFT = 64;
 
 /** What annual billing saves, as the web page works it out. */
 const SAVINGS = calculateBillingIntervalSavings(PRO_PLAN.monthlyPrice, PRO_PLAN.annualPrice);
@@ -26,6 +51,9 @@ const ANNUAL_PER_MONTH = PRO_PLAN.annualPrice / 12;
 /**
  * The upgrade prompt, mounted at the root so Settings can open it over
  * whichever tab the user is on without making it a navigation destination.
+ *
+ * One promise up top, the two plans side by side, one button. The artwork is
+ * small and quiet on purpose; the plans are what the page is for.
  */
 export function ProUpgradeModal() {
   const theme = useTheme();
@@ -45,6 +73,7 @@ export function ProUpgradeModal() {
   const [interval, setInterval] = useState<BillingInterval>('monthly');
 
   const isAnnual = interval === 'annual';
+  const [closeRowHeight, setCloseRowHeight] = useState(0);
 
   const dismiss = () => {
     setShowPurchaseNote(false);
@@ -62,28 +91,70 @@ export function ProUpgradeModal() {
         }}
       >
         {/* Dismissing lives at the top left, reachable before any of the
-            selling below it. */}
-        <View style={{ paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.sm }}>
+            selling below it. It floats over the page rather than sitting
+            above it, so the artwork can rise level with it. */}
+        <View
+          onLayout={(event) => setCloseRowHeight(event.nativeEvent.layout.height)}
+          style={{
+            position: 'absolute',
+            zIndex: 1,
+            top: insets.top,
+            left: 0,
+            padding: theme.spacing.sm,
+          }}
+        >
           <LiquidGlassCloseButton onPress={dismiss} />
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
+            paddingTop: closeRowHeight,
             paddingHorizontal: theme.spacing.xl,
             paddingBottom: theme.spacing.xl,
-            gap: theme.spacing.lg,
+            gap: theme.spacing.xl,
           }}
         >
-          <View style={{ gap: theme.spacing.xs }}>
-            <View style={{ alignSelf: 'flex-start', marginBottom: theme.spacing.xs }}>
-              <Badge label="Most Popular" tone="accent" />
+          {/* The artwork sits behind the top right and runs off the edge; the
+              copy keeps to the left of it. */}
+          <View>
+            <View
+              style={{
+                position: 'absolute',
+                // Up level with the close button, as in the mockup, so the
+                // subtitle below runs clear of it.
+                top: -Math.min(ART_LIFT, closeRowHeight),
+                right: -theme.spacing.md,
+              }}
+            >
+              <UpgradeIllustration width={ART_WIDTH} />
             </View>
-            <GoldText variant="title1" cycleMs={CYCLE_MS}>
-              {PRO_PLAN_NAME}
-            </GoldText>
-            <Text variant="callout" color="secondary">
-              {PRO_PLAN.tagline}
+
+            <View style={{ gap: theme.spacing.md, paddingRight: COPY_INSET }}>
+              <View
+                style={{
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: theme.spacing.sm,
+                  paddingVertical: 3,
+                  borderRadius: theme.radius.pill,
+                  backgroundColor: theme.colors.accentSubtle,
+                }}
+              >
+                <Text variant="footnote" color="accent">
+                  {isPro ? `You’re on ${PRO_PLAN_NAME}` : `Upgrade to ${PRO_PLAN_NAME}`}
+                </Text>
+              </View>
+              <Text variant="display" accessibilityRole="header" style={HEADLINE}>
+                Find time{'\n'}
+                <Text variant="display" color="accent" style={HEADLINE}>
+                  in seconds.
+                </Text>
+              </Text>
+            </View>
+
+            <Text variant="callout" color="secondary" style={{ marginTop: theme.spacing.md }}>
+              Describe a meeting in plain words. BPlan checks your calendars for conflicts, then AI
+              suggests the best open slots.
             </Text>
           </View>
 
@@ -93,180 +164,28 @@ export function ProUpgradeModal() {
             savingsPercentage={SAVINGS.savingsPercentage}
           />
 
-          <View style={{ gap: theme.spacing.xs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.xs }}>
-              <RollingPrice
-                value={`$${(isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice).toFixed(2)}`}
-                amount={isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice}
-              />
-              <Text variant="body" color="secondary">
-                {isAnnual ? '/ year' : '/ month'}
-              </Text>
-            </View>
-            <Text variant="footnote" color="tertiary">
-              {isAnnual
-                ? `Billed annually ($${ANNUAL_PER_MONTH.toFixed(2)}/mo). Save $${SAVINGS.savingsDollars.toFixed(2)}/year.`
-                : 'Billed monthly. Cancel anytime with no long-term commitment.'}
-            </Text>
-          </View>
-
-          {HERO ? (
-            <View
-              style={{
-                gap: theme.spacing.sm,
-                padding: theme.spacing.lg,
-                borderRadius: theme.radius.lg,
-                borderWidth: theme.borderWidth.hairline,
-                borderColor: theme.colors.accentMuted,
-                backgroundColor: theme.colors.accentSubtle,
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: theme.spacing.sm,
-                }}
-              >
-                <Text variant="bodyStrong" color="accent">
-                  {HERO.name}
-                </Text>
-                <Badge label="Hero feature" tone="accent" />
-              </View>
-
-              <Text variant="footnote" color="secondary">
-                Describe your meeting in plain English. The server deterministically calculates
-                valid, unconflicted slots so times are never hallucinated, then AI ranks and
-                explains the best open opportunities for you.
-              </Text>
-
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs }}>
-                {HERO_PILLS.map((pill) => (
-                  <View
-                    key={pill}
-                    style={{
-                      paddingHorizontal: theme.spacing.sm,
-                      paddingVertical: 4,
-                      borderRadius: theme.radius.pill,
-                      backgroundColor: theme.colors.surfaceRaised,
-                    }}
-                  >
-                    <Text variant="caption" color="secondary">
-                      {`✦ ${pill}`}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          <View style={{ gap: theme.spacing.md }}>
-            {PRO_PLAN.features
-              .filter((feature) => !feature.isHero)
-              .map((feature) => (
-                <View
-                  key={feature.id}
-                  style={{ flexDirection: 'row', gap: theme.spacing.sm, alignItems: 'flex-start' }}
-                >
-                  <Text variant="body" color="success">
-                    ✓
-                  </Text>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text variant="bodyStrong">{feature.name}</Text>
-                    <Text variant="footnote" color="secondary">
-                      {feature.description}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-          </View>
-
-          {PRO_PLAN.futureFeatures && PRO_PLAN.futureFeatures.length > 0 ? (
-            <View
-              style={{
-                gap: theme.spacing.xs,
-                paddingTop: theme.spacing.md,
-                borderTopWidth: theme.borderWidth.hairline,
-                borderTopColor: theme.colors.borderSubtle,
-              }}
-            >
-              <Text variant="caption" color="tertiary">
-                UPCOMING PRO CAPABILITIES
-              </Text>
-              {PRO_PLAN.futureFeatures.map((item) => (
-                <Text key={item} variant="footnote" color="secondary">
-                  {`•  ${item}`}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-
-          <View style={{ gap: theme.spacing.sm }}>
-            <Text variant="bodyStrong">Detailed plan comparison</Text>
-            <Text variant="footnote" color="tertiary">
-              The exact differences between the tiers.
-            </Text>
-
-            <View
-              style={{
-                borderRadius: theme.radius.lg,
-                borderWidth: theme.borderWidth.hairline,
-                borderColor: theme.colors.borderSubtle,
-                overflow: 'hidden',
-              }}
-            >
-              <View
-                style={{
-                  flexDirection: 'row',
-                  paddingVertical: theme.spacing.sm,
-                  paddingHorizontal: theme.spacing.md,
-                  backgroundColor: theme.colors.surfaceRaised,
-                }}
-              >
-                <Text variant="caption" color="tertiary" style={{ flex: 1 }}>
-                  CAPABILITY
-                </Text>
-                <Text variant="caption" color="tertiary" style={{ width: 52, textAlign: 'center' }}>
-                  FREE
-                </Text>
-                <Text variant="caption" color="tertiary" style={{ width: 76, textAlign: 'center' }}>
-                  PRO
-                </Text>
-              </View>
-
-              {PLAN_COMPARISON.map((row, index) => (
-                <View
-                  key={row.id}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: theme.spacing.sm,
-                    paddingHorizontal: theme.spacing.md,
-                    borderTopWidth: index === 0 ? 0 : theme.borderWidth.hairline,
-                    borderTopColor: theme.colors.borderSubtle,
-                  }}
-                >
-                  <Text variant="footnote" style={{ flex: 1 }}>
-                    {row.capability}
-                  </Text>
-                  <Text
-                    variant="footnote"
-                    color={row.inFree ? 'success' : 'tertiary'}
-                    style={{ width: 52, textAlign: 'center' }}
-                  >
-                    {row.inFree ? '✓' : '—'}
-                  </Text>
-                  <Text
-                    variant="caption"
-                    color="success"
-                    style={{ width: 76, textAlign: 'center' }}
-                  >
-                    {row.proLabel ? `✓ ${row.proLabel}` : '✓'}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
+            <PlanTierCard
+              name="Free"
+              summary="The essentials"
+              price={<RollingPrice value="$0" amount={0} />}
+              period={isAnnual ? '/ year' : '/ month'}
+              features={FREE_FEATURES}
+            />
+            <PlanTierCard
+              name="Pro"
+              summary="AI scheduling"
+              badge="Most popular"
+              highlighted
+              price={
+                <RollingPrice
+                  value={`$${(isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice).toFixed(2)}`}
+                  amount={isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice}
+                />
+              }
+              period={isAnnual ? '/ year' : '/ month'}
+              features={PRO_FEATURES}
+            />
           </View>
         </ScrollView>
 
@@ -297,18 +216,22 @@ export function ProUpgradeModal() {
               </Text>
             </View>
           ) : (
-            // The button names the price it would charge, so the choice above
-            // cannot be lost by the time the decision is made.
             <Button
-              label={
-                isAnnual
-                  ? `Upgrade to Pro — $${PRO_PLAN.annualPrice.toFixed(2)}/year`
-                  : `Upgrade to Pro — $${PRO_PLAN.monthlyPrice.toFixed(2)}/month`
-              }
+              label="Continue with Pro"
+              size="lg"
               fullWidth
+              trailingIcon={
+                <Ionicons name="arrow-forward" size={18} color={theme.colors.onAccent} />
+              }
               onPress={() => setShowPurchaseNote(true)}
             />
           )}
+          {/* What the button would charge, so the choice above is never lost. */}
+          <Text variant="footnote" color="tertiary" align="center">
+            {isAnnual
+              ? `$${PRO_PLAN.annualPrice.toFixed(2)} billed yearly ($${ANNUAL_PER_MONTH.toFixed(2)}/mo). Save $${SAVINGS.savingsDollars.toFixed(2)}.`
+              : `$${PRO_PLAN.monthlyPrice.toFixed(2)} billed monthly. Cancel anytime.`}
+          </Text>
           {!isPro && showPurchaseNote ? (
             // Honest rather than decorative: there is no purchase SDK in this
             // build, so the button cannot open a real checkout yet.
@@ -316,12 +239,7 @@ export function ProUpgradeModal() {
               In-app purchase is not set up in this build yet.
             </Text>
           ) : null}
-          <Button
-            label={isPro ? 'Done' : 'Maybe later'}
-            variant="ghost"
-            fullWidth
-            onPress={dismiss}
-          />
+          {isPro ? <Button label="Done" variant="ghost" fullWidth onPress={dismiss} /> : null}
         </View>
       </View>
     </Modal>

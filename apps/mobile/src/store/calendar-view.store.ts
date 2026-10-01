@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -63,3 +64,22 @@ export const useCalendarViewStore = create<CalendarViewState>()(
     },
   ),
 );
+
+/**
+ * Whether the saved view has been read back from device storage. Storage is
+ * asynchronous, so until then the store holds the default view; rendering the
+ * calendar before this would flash that default and then switch.
+ */
+export function useCalendarViewHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => useCalendarViewStore.persist.hasHydrated());
+
+  useEffect(() => {
+    if (useCalendarViewStore.persist.hasHydrated()) {
+      setHydrated(true);
+      return undefined;
+    }
+    return useCalendarViewStore.persist.onFinishHydration(() => setHydrated(true));
+  }, []);
+
+  return hydrated;
+}

@@ -19,9 +19,9 @@ export interface CardProps extends ViewProps {
 }
 
 /**
- * The web's `.section`: a flat surface with a 1px edge, its header divided from
- * the body by a hairline rather than by whitespace. Depth comes from the border
- * and the surface colour, never from a shadow.
+ * The web's `.section`: a surface with a 1px edge, its header divided from the
+ * body by a hairline rather than by whitespace, lifted off the page by the
+ * theme's subtle card shadow.
  */
 export function Card({
   eyebrow,
@@ -42,7 +42,13 @@ export function Card({
     borderRadius: theme.radius.lg,
     borderWidth: theme.borderWidth.hairline,
     borderColor: theme.colors.borderSubtle,
-    // Keeps a `padded={false}` list's row press states inside the rounded edge.
+    ...theme.elevation.card,
+  };
+  // iOS clips a view's own shadow along with its overflow, so the clipping that
+  // keeps a `padded={false}` list's row press states inside the rounded edge
+  // happens one level in, leaving the shadow on the outer surface.
+  const clip: ViewStyle = {
+    borderRadius: theme.radius.lg - theme.borderWidth.hairline,
     overflow: 'hidden',
   };
 
@@ -78,10 +84,10 @@ export function Card({
   ) : null;
 
   const content = (
-    <>
+    <View style={clip}>
       {header}
       <View style={padded ? { padding: theme.spacing.xl } : undefined}>{children}</View>
-    </>
+    </View>
   );
 
   if (onPress) {
