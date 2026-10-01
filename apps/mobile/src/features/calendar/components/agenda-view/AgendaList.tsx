@@ -1,57 +1,43 @@
-import { formatTimeOfDay, resolveEventColor, toZonedDateKey } from '@cal/domain';
+import { toZonedDateKey } from '@cal/domain';
 import type { HourCycle } from '@cal/schemas';
-import { Card, Divider, EmptyState, ListRow, Text, useTheme } from '@cal/ui';
-import { Fragment } from 'react';
+import { Card, EmptyState, Text, useTheme } from '@cal/ui';
 import { View } from 'react-native';
 
+import { AGENDA_RAIL_WIDTH, AgendaDay } from './AgendaDay';
 import type { EventOccurrence } from '../../hooks/useCalendarWindow';
-import { dateKeyToInstant } from '../../utils/window';
-
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+import { formatGapRange, formatWeekOf, planAgendaRows } from '../../utils/agenda';
 
 export interface AgendaListProps {
   dateKeys: readonly string[];
   byDateKey: Map<string, EventOccurrence[]>;
   timeZone: string;
   hourCycle: HourCycle;
+  weekStartsOn: number;
   now: Date;
   onPressOccurrence: (occurrence: EventOccurrence) => void;
 }
 
 /**
- * A chronological list that skips empty days.
+ * A chronological list down a date rail.
  *
- * This is the view that scales to a sparse calendar: rather than scrolling
- * through blank grids, the user sees only days that have something on them.
+ * Days with events get a row; runs of empty days fold into a single line
+ * rather than disappearing, so a quiet stretch still reads as time passing,
+ * and a divider marks each new week.
  */
 export function AgendaList({
   dateKeys,
   byDateKey,
   timeZone,
   hourCycle,
+  weekStartsOn,
   now,
   onPressOccurrence,
 }: AgendaListProps) {
   const theme = useTheme();
   const todayKey = toZonedDateKey(now, timeZone);
+  const occurrencesOn = (dateKey: string) => byDateKey.get(dateKey) ?? [];
 
-  const populated = dateKeys.filter((dateKey) => (byDateKey.get(dateKey) ?? []).length > 0);
-
-  if (populated.length === 0) {
+  if (!dateKeys.some((dateKey) => occurrencesOn(dateKey).length > 0)) {
     return (
       <Card padded={false}>
         <EmptyState
@@ -63,49 +49,64 @@ export function AgendaList({
     );
   }
 
+  const rows = planAgendaRows({
+    dateKeys,
+    isPopulated: (dateKey) => occurrencesOn(dateKey).length > 0,
+    todayKey,
+    timeZone,
+    weekStartsOn,
+  });
+
   return (
-    <View style={{ gap: theme.spacing.xl }}>
-      {populated.map((dateKey) => {
-        const instant = dateKeyToInstant(dateKey, timeZone);
-        const date = new Date(instant);
-        const isToday = dateKey === todayKey;
-        const occurrences = byDateKey.get(dateKey) ?? [];
+    <View>
+      {rows.map((row) => {
+        switch (row.kind) {
+          case 'day':
+            return (
+              <AgendaDay
+                key={row.key}
+                dateKey={row.dateKey}
+                occurrences={occurrencesOn(row.dateKey)}
+                isToday={row.dateKey === todayKey}
+                now={now}
+                timeZone={timeZone}
+                hourCycle={hourCycle}
+                onPressOccurrence={onPressOccurrence}
+              />
+            );
 
-        return (
-          <View key={dateKey} style={{ gap: theme.spacing.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm }}>
-              <Text variant="title3" color={isToday ? 'accent' : 'primary'}>
-                {isToday ? 'Today' : WEEKDAYS[date.getUTCDay()]}
+          case 'week':
+            return (
+              <Text
+                key={row.key}
+                variant="footnote"
+                color="secondary"
+                accessibilityRole="header"
+                style={{ paddingTop: theme.spacing.lg, paddingBottom: theme.spacing.xs }}
+              >
+                {formatWeekOf(row.weekStartKey)}
               </Text>
-              <Text variant="footnote" color="tertiary">
-                {date.getUTCDate()} {MONTHS[date.getUTCMonth()]}
-              </Text>
-            </View>
+            );
 
-            <Card padded={false}>
-              {occurrences.map((occurrence, index) => (
-                <Fragment key={occurrence.key}>
-                  {index > 0 ? <Divider inset /> : null}
-                  <ListRow
-                    title={occurrence.event.title}
-                    subtitle={occurrence.event.location ?? undefined}
-                    meta={
-                      occurrence.event.allDay
-                        ? 'All day'
-                        : formatTimeOfDay(new Date(occurrence.start), timeZone, hourCycle)
-                    }
-                    accentColor={resolveEventColor(
-                      occurrence.event.color,
-                      occurrence.calendar?.color,
-                      theme.colors.accent,
-                    )}
-                    onPress={() => onPressOccurrence(occurrence)}
-                  />
-                </Fragment>
-              ))}
-            </Card>
-          </View>
-        );
+          case 'gap':
+            return (
+              <View
+                key={row.key}
+                style={{
+                  flexDirection: 'row',
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.sm,
+                  borderTopWidth: theme.borderWidth.hairline,
+                  borderTopColor: theme.colors.borderSubtle,
+                }}
+              >
+                <View style={{ width: AGENDA_RAIL_WIDTH }} />
+                <Text variant="footnote" color="tertiary">
+                  {formatGapRange(row.fromKey, row.toKey)} · Nothing scheduled
+                </Text>
+              </View>
+            );
+        }
       })}
     </View>
   );

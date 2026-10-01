@@ -242,6 +242,7 @@ export function CalendarScreen() {
             byDateKey={byDateKey}
             timeZone={timeZone}
             hourCycle={hourCycle}
+            weekStartsOn={weekStartsOn}
             now={now}
             onPressOccurrence={(occurrence) => openEvent(occurrence.event.id)}
           />
