@@ -10,7 +10,11 @@
 type TimeOfDay = 'morning' | 'lunch' | 'afternoon' | 'evening';
 
 type Activity = {
-  /** `{name}` is replaced with a random first name. */
+  /**
+   * `{colleague}` and `{friend}` are replaced with a random work or personal
+   * contact. Contacts are relationships, not first names, so examples never
+   * read like an invented person.
+   */
   label: string;
   times: readonly TimeOfDay[];
   /** Also works with no time at all, e.g. "haircut sometime next week". */
@@ -18,35 +22,40 @@ type Activity = {
   weekendOnly?: boolean;
 };
 
-const NAMES = [
-  'Andrew',
-  'Priya',
-  'Sam',
-  'Maya',
-  'Jordan',
-  'Leo',
-  'Nina',
-  'Chris',
-  'Aisha',
-  'Tom',
-  'Elena',
-  'Marcus',
-  'Sofia',
-  'Ben',
-  'Hana',
-  'Omar',
+const COLLEAGUES = [
+  'my manager',
+  'the team',
+  'a client',
+  'my mentor',
+  'a recruiter',
+  'the design team',
+  'a new hire',
+  'my cofounder',
+] as const;
+
+const FRIENDS = [
+  'Mom',
+  'Dad',
+  'my sister',
+  'my brother',
+  'an old friend',
+  'my roommate',
+  'the neighbors',
+  'my college friends',
 ] as const;
 
 const ACTIVITIES: readonly Activity[] = [
-  { label: '15-minute check-in with {name}', times: ['morning', 'afternoon'], flexible: true },
-  { label: '30-minute call with {name}', times: ['morning', 'afternoon'], flexible: true },
-  { label: '1:1 with {name}', times: ['morning', 'afternoon'], flexible: true },
-  { label: 'intro call with {name}', times: ['morning', 'afternoon'], flexible: true },
-  { label: 'catch-up with {name}', times: ['afternoon', 'evening'], flexible: true },
-  { label: 'coffee with {name}', times: ['morning', 'afternoon'] },
-  { label: 'lunch with {name}', times: ['lunch'] },
-  { label: 'dinner with {name}', times: ['evening'] },
-  { label: 'drinks with {name}', times: ['evening'] },
+  { label: '15-minute check-in with {colleague}', times: ['morning', 'afternoon'], flexible: true },
+  { label: '30-minute call with {colleague}', times: ['morning', 'afternoon'], flexible: true },
+  { label: '1:1 with my manager', times: ['morning', 'afternoon'], flexible: true },
+  { label: 'intro call with {colleague}', times: ['morning', 'afternoon'], flexible: true },
+  { label: 'catch-up with {friend}', times: ['afternoon', 'evening'], flexible: true },
+  { label: 'coffee with {colleague}', times: ['morning', 'afternoon'] },
+  { label: 'coffee with {friend}', times: ['morning', 'afternoon'] },
+  { label: 'lunch with {colleague}', times: ['lunch'] },
+  { label: 'lunch with {friend}', times: ['lunch'] },
+  { label: 'dinner with {friend}', times: ['evening'] },
+  { label: 'drinks with {friend}', times: ['evening'] },
   { label: 'team standup', times: ['morning'] },
   { label: 'sprint planning', times: ['morning'] },
   { label: 'design review', times: ['morning', 'afternoon'], flexible: true },
@@ -74,7 +83,7 @@ const ACTIVITIES: readonly Activity[] = [
   { label: 'study session', times: ['afternoon', 'evening'], flexible: true },
   { label: 'book club', times: ['evening'] },
   { label: 'hike', times: ['morning'], weekendOnly: true },
-  { label: 'brunch with {name}', times: ['lunch'], weekendOnly: true },
+  { label: 'brunch with {friend}', times: ['lunch'], weekendOnly: true },
   { label: 'farmers market trip', times: ['morning'], weekendOnly: true },
   { label: 'bike ride', times: ['morning', 'afternoon'], weekendOnly: true },
   { label: 'meal prep', times: ['afternoon'], weekendOnly: true },
@@ -123,7 +132,9 @@ function pick<T>(items: readonly T[], random: Random): T {
 }
 
 function composePrompt(activity: Activity, random: Random): string {
-  const label = activity.label.replace('{name}', pick(NAMES, random));
+  const label = activity.label
+    .replace('{colleague}', () => pick(COLLEAGUES, random))
+    .replace('{friend}', () => pick(FRIENDS, random));
   if (activity.flexible && random() < 0.2) {
     return `${label} ${pick(FLEXIBLE_WINDOWS, random)}`;
   }
