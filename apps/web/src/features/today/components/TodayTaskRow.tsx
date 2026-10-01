@@ -1,7 +1,7 @@
 import { describeTaskDue, formatDuration, isNotablePriority, PRIORITY_LABELS } from '@cal/domain';
 import type { TaskList } from '@cal/schemas';
 
-import { CheckIcon, ClockSnoozeIcon, TrashIcon } from './TodayIcons';
+import { CheckIcon, ClockIcon, ClockSnoozeIcon, TrashIcon } from './TodayIcons';
 import styles from './TodayView.module.css';
 import type { TaskWithTags } from '../../tasks/api/tasks.api';
 
@@ -87,7 +87,10 @@ export function TodayTaskRow({
           )}
 
           {task.estimatedMinutes !== null && task.estimatedMinutes > 0 && (
-            <span className={styles.durationPill}>⏱ {formatDuration(task.estimatedMinutes)}</span>
+            <span className={styles.durationPill}>
+              <ClockIcon />
+              {formatDuration(task.estimatedMinutes)}
+            </span>
           )}
         </div>
       </button>

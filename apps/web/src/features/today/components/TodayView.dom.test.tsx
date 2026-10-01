@@ -123,7 +123,7 @@ function transitionEnd(element: Element, propertyName: string) {
 }
 
 async function openQuickAdd(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: '+ Quick Add' }));
+  await user.click(screen.getByRole('button', { name: 'Quick Add' }));
   await waitFor(() => expect(quickAddInput()).toHaveFocus());
 }
 

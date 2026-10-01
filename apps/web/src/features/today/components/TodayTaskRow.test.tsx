@@ -89,7 +89,7 @@ describe('TodayTaskRow', () => {
     expect(html).toContain('>High</span>');
     expect(html).toContain(`${styles.duePill} ${styles.dueToday}`);
     expect(html).toContain('>Today, 4:00 PM</span>');
-    expect(html).toContain(`class="${styles.durationPill}">⏱ 1h 30m</span>`);
+    expect(html).toMatch(new RegExp(`class="${styles.durationPill}"><svg[^]*?</svg>1h 30m</span>`));
 
     findButton(TodayTaskRow(input), 'Open task details: Prepare agenda')?.props.onClick?.();
     expect(input.onOpen).toHaveBeenCalledWith(task.id);

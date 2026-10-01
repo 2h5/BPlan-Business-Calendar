@@ -1,9 +1,19 @@
 import type { HourCycle, TaskList } from '@cal/schemas';
+import type { ReactNode } from 'react';
 
-import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, TasksEmptyIcon } from './TodayIcons';
+import {
+  AlertTriangleIcon,
+  CalendarIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CrescentIcon,
+  TasksEmptyIcon,
+} from './TodayIcons';
 import { TodayTaskRow } from './TodayTaskRow';
 import styles from './TodayView.module.css';
 import type { TaskWithTags } from '../../tasks/api/tasks.api';
+
+type TodayTaskGroupKey = 'overdue' | 'dueToday' | 'unscheduled';
 
 export interface TodayTaskGroupsProps {
   overdue: readonly TaskWithTags[];
@@ -42,6 +52,36 @@ export function TodayTaskGroups({
   onSnoozeTask,
   onDeleteTask,
 }: TodayTaskGroupsProps) {
+  const groups = [
+    {
+      key: 'overdue',
+      label: 'Overdue',
+      tasks: overdue,
+      icon: <AlertTriangleIcon />,
+      isOverdue: true,
+    },
+    {
+      key: 'dueToday',
+      label: 'Due Today',
+      tasks: dueToday,
+      icon: <CalendarIcon />,
+      isOverdue: false,
+    },
+    {
+      key: 'unscheduled',
+      label: 'Flexible Focus',
+      tasks: unscheduled,
+      icon: <CrescentIcon />,
+      isOverdue: false,
+    },
+  ] as const satisfies readonly {
+    key: TodayTaskGroupKey;
+    label: string;
+    tasks: readonly TaskWithTags[];
+    icon: ReactNode;
+    isOverdue: boolean;
+  }[];
+
   return (
     <>
       {/* Task Groups */}
@@ -56,78 +96,40 @@ export function TodayTaskGroups({
         </div>
       ) : (
         <div className={styles.taskGroupsList}>
-          {/* Overdue Section */}
-          {overdue.length > 0 && (
-            <div className={styles.taskSection}>
-              <div className={styles.taskSectionHeaderOverdue}>
-                <AlertTriangleIcon />
-                <span>Overdue</span>
-                <span className={styles.taskSectionBadgeOverdue}>{overdue.length}</span>
+          {groups.map(({ key, label, tasks, icon, isOverdue }) => {
+            if (tasks.length === 0) return null;
+            return (
+              <div key={key} className={styles.taskSection}>
+                <div
+                  className={isOverdue ? styles.taskSectionHeaderOverdue : styles.taskSectionHeader}
+                >
+                  <span className={styles.taskSectionIcon}>{icon}</span>
+                  <span>{label}</span>
+                  <span
+                    className={isOverdue ? styles.taskSectionBadgeOverdue : styles.taskSectionBadge}
+                  >
+                    {tasks.length}
+                  </span>
+                </div>
+                <div className={styles.taskSectionRows}>
+                  {tasks.map((task) => (
+                    <TodayTaskRow
+                      key={task.id}
+                      task={task}
+                      lists={lists}
+                      now={now}
+                      timeZone={timeZone}
+                      hourCycle={hourCycle}
+                      onOpen={onOpenTask}
+                      onToggle={onToggleTask}
+                      onSnooze={onSnoozeTask}
+                      onDelete={onDeleteTask}
+                    />
+                  ))}
+                </div>
               </div>
-              {overdue.map((task) => (
-                <TodayTaskRow
-                  key={task.id}
-                  task={task}
-                  lists={lists}
-                  now={now}
-                  timeZone={timeZone}
-                  hourCycle={hourCycle}
-                  onOpen={onOpenTask}
-                  onToggle={onToggleTask}
-                  onSnooze={onSnoozeTask}
-                  onDelete={onDeleteTask}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Due Today Section */}
-          {dueToday.length > 0 && (
-            <div className={styles.taskSection}>
-              <div className={styles.taskSectionHeader}>
-                <span>Due Today</span>
-                <span className={styles.taskSectionBadge}>{dueToday.length}</span>
-              </div>
-              {dueToday.map((task) => (
-                <TodayTaskRow
-                  key={task.id}
-                  task={task}
-                  lists={lists}
-                  now={now}
-                  timeZone={timeZone}
-                  hourCycle={hourCycle}
-                  onOpen={onOpenTask}
-                  onToggle={onToggleTask}
-                  onSnooze={onSnoozeTask}
-                  onDelete={onDeleteTask}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Unscheduled / Flexible Section */}
-          {unscheduled.length > 0 && (
-            <div className={styles.taskSection}>
-              <div className={styles.taskSectionHeader}>
-                <span>Flexible Focus</span>
-                <span className={styles.taskSectionBadge}>{unscheduled.length}</span>
-              </div>
-              {unscheduled.map((task) => (
-                <TodayTaskRow
-                  key={task.id}
-                  task={task}
-                  lists={lists}
-                  now={now}
-                  timeZone={timeZone}
-                  hourCycle={hourCycle}
-                  onOpen={onOpenTask}
-                  onToggle={onToggleTask}
-                  onSnooze={onSnoozeTask}
-                  onDelete={onDeleteTask}
-                />
-              ))}
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
 

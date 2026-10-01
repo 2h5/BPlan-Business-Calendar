@@ -321,7 +321,8 @@ export function TodayView() {
               className={styles.quickAddTriggerButton}
               onClick={handleOpenQuickAdd}
             >
-              + Quick Add
+              <PlusIcon />
+              <span>Quick Add</span>
             </button>
           </div>
 
