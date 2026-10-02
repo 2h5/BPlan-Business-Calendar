@@ -1,6 +1,7 @@
 # Mobile Component Refactor — Active Tracker
 
-Status (2026-10-01): IN PROGRESS on branch `refactor/mobile-editor-findtime`.
+Status (2026-10-01): CODE COMPLETE AND VERIFIED on branch
+`refactor/mobile-editor-findtime`; ON-DEVICE SMOKE CHECK PENDING.
 
 This tracker covers the targeted break-up of the two mobile components that
 had outgrown one responsibility. It is a behaviour-preserving refactor: no
@@ -68,10 +69,10 @@ under [Pending](#pending).
 
 ### Phase 3 — Verification
 
-- [ ] `pnpm --filter @cal/mobile test`
-- [ ] `pnpm --filter @cal/mobile typecheck`
-- [ ] `pnpm lint`, `pnpm format:check`
-- [ ] `pnpm verify` (full)
+- [x] `pnpm --filter @cal/mobile test`
+- [x] `pnpm --filter @cal/mobile typecheck`
+- [x] `pnpm lint`, `pnpm format:check`
+- [x] `pnpm verify` (full)
 
 ## Pending
 
@@ -86,4 +87,14 @@ On-device smoke check when the simulator is available:
 
 ## Checkpoint log
 
-_(appended as phases land)_
+### 2026-10-01 — Phases 1–3
+
+- `aa822c4` — event editor: `EventEditorSheet.tsx` 492 → 239 lines; logic in
+  `event-form.ts` / `event-alerts.ts` (unit-tested), `useEventForm`, and
+  `EventColorPicker`, `EventAlertPicker`, `EventDateTimeField`.
+- `5dd97da` — Find Time: `FindTimeBox.tsx` 581 → 235 lines; logic in
+  `find-time-box-state.ts` (unit-tested), `useFindTimeAutoClose`, and
+  `FindTimeProposalResults`, `FindTimeReadback`, `FindTimeNotices`.
+- `pnpm verify` passed: mobile 9 files / 114 tests (was 6 files), web 881,
+  domain 393. The new tests also pass under device time zones UTC,
+  Asia/Kolkata, Pacific/Auckland, and America/St_Johns.
