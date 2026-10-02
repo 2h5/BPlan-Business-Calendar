@@ -36,7 +36,7 @@ BILLING / PRO
 ├─ RevenueCat webhook/mirror/Pro gate ........ IMPLEMENTED / SHARED + TESTED GATE
 ├─ Web checkout + subscription UI ............ IMPLEMENTED
 ├─ Monthly + annual sandbox lifecycles ....... PROVEN LIVE ON OLD $4.99/$49.99 PRODUCTS
-├─ $2.99 / $29.99 web products (v2) .......... MONTHLY PROVEN LIVE / ANNUAL PENDING
+├─ $2.99 / $29.99 web products (v2) .......... PROVEN LIVE / ANNUAL RENEWAL PENDING
 ├─ Lifecycle + automation Phases 4–6 ......... COMPLETE / PLAN-SCOPED
 ├─ Convergence hardening ..................... DEPLOYED TO SANDBOX/DEV (2026-09-29)
 ├─ Mobile purchase/restore ................... PENDING (MOBILE REVENUECAT SDK)
@@ -60,7 +60,7 @@ CURRENT STATE
    legal/billing gates.
 
 NEXT UP
-├─ 1. Live annual lifecycle on the $29.99 product (fresh test account)
+├─ 1. Live annual renewal on the $29.99 product (fresh test account)
 │     → docs/revenuecat-automation-plan.md, "Next live run — v2 products"
 └─ 2. iPhone in-app purchase (Apple checkout via RevenueCat)
       → docs/mobile-billing-plan.md
@@ -168,7 +168,7 @@ external-verification evidence.
 | Hosted AI deployment/E2E            | Pending                                               |
 | RevenueCat webhook/mirror/Pro gate  | Implemented                                           |
 | Monthly + annual billing lifecycle  | Proven live on the old $4.99/$49.99 products          |
-| $2.99 / $29.99 web products (v2)    | Monthly proven live (2026-10-02); annual pending      |
+| $2.99 / $29.99 web products (v2)    | Proven live (2026-10-02); annual renewal pending      |
 | Billing automation                  | Phases 4–6 complete for sandbox                       |
 | RevenueCat convergence              | Deployed to sandbox/dev; scheduled reconcile pending  |
 | Mobile purchase/restore             | Pending; needs mobile RevenueCat SDK                  |
