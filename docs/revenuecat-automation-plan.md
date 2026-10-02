@@ -1191,10 +1191,11 @@ expiration. The next live run will be the first. Existing sandbox test
 identities subscribed to the old products now fail the plan's product-match
 check by design; use fresh identities.
 
-#### Next live run — v2 products (planned, not started)
+#### Next live run — v2 products (monthly proven, annual pending)
 
 Goal: prove the $2.99 / $29.99 products the same way the old ones were proven.
-Nothing here has run yet. Each purchase, cancellation, and secret change needs
+The monthly half ran on 2026-10-02; see the checkpoint at the end of this
+section. Each purchase, cancellation, and secret change needs
 separate explicit authorization, as before.
 
 Setup:
@@ -1234,6 +1235,37 @@ Annual (about 1-hour sandbox periods):
 Done when both plans pass purchase, renewal, cancellation retaining paid
 access, and expiration revoking Pro across RevenueCat, the mirror, the ledger,
 and server authorization. Record the result here and in the README tracker.
+
+**PROVEN LIVE — v2 monthly lifecycle, 2026-10-02:** this ran locally through
+the approved wrapper rather than the workflow. A fresh Auth identity passed the
+free baseline: RevenueCat customer absent, Pro inactive, and the mirror,
+ledger, and server authorization free. Offline preflight passed with the
+contract on `bplan_pro_monthly_v2` / `bplan_pro_yearly_v2`, and
+`billing:checkout-ready --plan monthly` returned `READY`. One monthly sandbox
+submit action was attempted; browser submission was `UNKNOWN`, authority
+reconciliation confirmed the purchase, and the disposition was `DO NOT RETRY`.
+`assert-user --expect active-pro --plan monthly` passed. The lifecycle read
+showed Product `bplan_pro_monthly_v2` (plan product match YES), active and
+`will_renew` for 06:41:23–06:46:23 UTC, with `INITIAL_PURCHASE` applied by the
+webhook. The renewal observer passed: the same subscription and Product
+advanced to 06:46:23–06:51:23 UTC, RevenueCat Pro, the mirror, and server
+authorization stayed active, and the ledger applied `INITIAL_PURCHASE >
+RENEWAL`.
+
+The separately authorized `billing:lifecycle:cancel -- --plan monthly`
+submitted exactly one cancellation at 06:46:57 UTC. Seven seconds later the
+state was `cancelled-active`: `will_not_renew`, `CANCELLATION` applied, and
+RevenueCat Pro, the mirror, and server authorization still active until
+06:51:23. At 06:51:38 one read reported `LIFECYCLE_PROVIDER_INCONSISTENT`:
+Pro, the mirror, and server authorization had ended, but the provider
+subscription record still read `active`. The old products showed the same
+transient. From 06:52:02 every read passed as `expired`. The subscription was
+`expired` without Pro, the mirror was inactive, and server authorization was
+false. The ledger read `INITIAL_PURCHASE > RENEWAL > CANCELLATION >
+EXPIRATION`, every event applied by the webhook, with no stale, unapplied, or
+duplicate rows. Access was never granted past the paid period. The hosted
+checkout page was not opened to check the $2.99 price. **The v2 monthly
+lifecycle is proven live; the annual run remains.**
 
 #### Monthly lifecycle checkpoint — 2026-09-29
 
