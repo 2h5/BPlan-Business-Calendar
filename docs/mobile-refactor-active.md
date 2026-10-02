@@ -54,17 +54,17 @@ under [Pending](#pending).
 
 ### Phase 2 — Find Time box
 
-- [ ] `scheduling/utils/find-time-box-state.ts` — `deriveFindTimeBoxState`
+- [x] `scheduling/utils/find-time-box-state.ts` — `deriveFindTimeBoxState`
       (pending, can-submit, error precedence, upgrade, finished, has-results,
       idle) and `staleResultsOnEdit` + tests.
-- [ ] `scheduling/hooks/useFindTimeAutoClose.ts` — the follow-up wait and
+- [x] `scheduling/hooks/useFindTimeAutoClose.ts` — the follow-up wait and
       close-up animation.
-- [ ] `scheduling/components/FindTimeProposalResults.tsx` — heading and slot
+- [x] `scheduling/components/FindTimeProposalResults.tsx` — heading and slot
       rows (mirrors the web component of the same name).
-- [ ] `scheduling/components/FindTimeReadback.tsx` — readback chips.
-- [ ] `scheduling/components/FindTimeNotices.tsx` — follow-up prompt,
+- [x] `scheduling/components/FindTimeReadback.tsx` — readback chips.
+- [x] `scheduling/components/FindTimeNotices.tsx` — follow-up prompt,
       clarification, scheduled confirmation, and error notices.
-- [ ] `FindTimeBox.tsx` reduced to the field, submit routing, and composition.
+- [x] `FindTimeBox.tsx` reduced to the field, submit routing, and composition.
 
 ### Phase 3 — Verification
 
