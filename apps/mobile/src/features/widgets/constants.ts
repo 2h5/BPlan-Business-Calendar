@@ -9,8 +9,12 @@
 /** Mirrors `ios.entitlements['com.apple.security.application-groups']` in app.json. */
 export const WIDGET_APP_GROUP = 'group.com.example.calendarapp';
 
-/** The widget's `kind`, used to ask WidgetKit to redraw it. */
-export const WIDGET_KIND = 'CalendarWidget';
+/**
+ * Every widget's `kind`, used to ask WidgetKit to redraw them: the Calendar
+ * widget and Up Next (Lock Screen and small). Each must match `static let kind`
+ * on its Swift `Widget`.
+ */
+export const WIDGET_KINDS = ['CalendarWidget', 'UpNextWidget'] as const;
 
 export const WIDGET_STORAGE_KEYS = {
   /** The JSON snapshot the widget renders. Written by the app only. */

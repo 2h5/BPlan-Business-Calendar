@@ -1,4 +1,4 @@
-# iOS Home Screen widgets
+# iOS widgets
 
 A running log for the widget work on the `ios` branch. Newest status first;
 update it whenever the widget changes.
@@ -13,7 +13,8 @@ update it whenever the widget changes.
 | Calendar widget — Week view                   | Built (v2)                               |
 | Calendar widget — Agenda view                 | Built (v2)                               |
 | Default view per widget (Edit Widget)         | Built (v2)                               |
-| "Next up" small widget                        | Not started                              |
+| Up Next — small Home Screen / StandBy         | Built (v3)                               |
+| Up Next — Lock Screen (rect, circle, inline)  | Built (v3)                               |
 | Control Center "New event" button (iOS 18+)   | Not started                              |
 | Server push refresh (iOS 26+)                 | Not started                              |
 | Real bundle id + Apple team for the App Group | **Needed before TestFlight**             |
@@ -51,6 +52,43 @@ glance opens where the person chose.
   empty days and anything already over today. Medium uses two columns, with
   later days carrying on in the second. When everything ahead fits, it ends
   with "Clear for two weeks" so the space after reads as intentional.
+
+## Up Next (Lock Screen and small)
+
+A second widget, **Up Next** (`UpNextWidget`), for the places the Calendar
+widget's sizes can't go. It shows the event on now or next today and nothing
+else, so it needs no switcher, no Edit Widget options, and no buttons.
+
+- **Small (Home Screen, StandBy, iPad Lock Screen)** — the weekday and date,
+  then the event in its calendar colour with a live "In 25 min" / "Now · ends
+  in …" countdown, its time, and "+N more today". Once today is done it shows
+  tomorrow's first event.
+- **Lock Screen rectangular** — the time range (or "Now · until …"), the
+  title, then the location or "+N more today". When the day is clear,
+  "No more events" and tomorrow's first event.
+- **Lock Screen circular** — the next start time with AM/PM on its own line;
+  a ring filling through the event while one is on; the date when the day is
+  clear.
+- **Lock Screen inline** (beside the date above the clock) — "8:00 AM Hike",
+  "Now · Hike", or "No more events today".
+
+Every size opens the app on today's day view when tapped. There is
+deliberately no task ticking on the Lock Screen: it would change data on a
+locked phone.
+
+The Lock Screen draws accessory widgets in one tint over the wallpaper, so
+those views use the system's primary/secondary styles instead of the app's
+colours, and the Lock Screen drops container backgrounds — the circular size
+draws its `AccessoryWidgetBackground` inside its own view.
+
+Up Next reads the same snapshot as the Calendar widget; nothing new is
+written. Its timeline adds an entry at every event start and end today, so
+"next" moves on the minute an event begins or ends. The app reloads every
+kind in `WIDGET_KINDS` when it writes a snapshot.
+
+Event titles show on the Lock Screen while the phone is locked, as Apple's
+Calendar does. If that should become optional, mark the title and location
+`.privacySensitive()` so iOS redacts them until Face ID unlocks.
 
 ## What iOS allows (as of iOS 27)
 
@@ -96,18 +134,18 @@ usePendingWidgetToggles  ←───────────────    Set
 
 App side — `apps/mobile/src/features/widgets/`
 
-| File                               | Job                                                                              |
-| ---------------------------------- | -------------------------------------------------------------------------------- |
-| `constants.ts`                     | App Group id, storage keys, size caps. Twin of `SharedStore.swift`.              |
-| `schema.ts`                        | Zod contract for the snapshot and pending ticks. Twin of `WidgetSnapshot.swift`. |
-| `utils/build-snapshot.ts`          | Pure builder for the whole snapshot: months, weeks, days, tasks (tested).        |
-| `utils/event-days.ts`              | Expands and buckets events into local days.                                      |
-| `utils/labels.ts`                  | Weekday/month labels from date keys.                                             |
-| `api/widget-storage.ts`            | The only code that touches App Group storage.                                    |
-| `hooks/useWidgetSnapshotSync.ts`   | Rebuilds and writes the snapshot when data changes.                              |
-| `hooks/usePendingWidgetToggles.ts` | Sends Home Screen ticks on foreground.                                           |
-| `hooks/useForegroundDay.ts`        | Moves the data window on to a new day.                                           |
-| `components/WidgetSync.tsx`        | Mounted once in `app/_layout.tsx`.                                               |
+| File                               | Job                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| `constants.ts`                     | App Group id, widget kinds, storage keys, size caps. Twin of `SharedStore.swift`. |
+| `schema.ts`                        | Zod contract for the snapshot and pending ticks. Twin of `WidgetSnapshot.swift`.  |
+| `utils/build-snapshot.ts`          | Pure builder for the whole snapshot: months, weeks, days, tasks (tested).         |
+| `utils/event-days.ts`              | Expands and buckets events into local days.                                       |
+| `utils/labels.ts`                  | Weekday/month labels from date keys.                                              |
+| `api/widget-storage.ts`            | The only code that touches App Group storage.                                     |
+| `hooks/useWidgetSnapshotSync.ts`   | Rebuilds and writes the snapshot when data changes.                               |
+| `hooks/usePendingWidgetToggles.ts` | Sends Home Screen ticks on foreground.                                            |
+| `hooks/useForegroundDay.ts`        | Moves the data window on to a new day.                                            |
+| `components/WidgetSync.tsx`        | Mounted once in `app/_layout.tsx`.                                                |
 
 Deep links: `calendar?date=YYYY-MM-DD` is handled by
 `features/calendar/hooks/useFocusDateFromParam.ts`; `tasks?taskId=` by the
@@ -115,17 +153,18 @@ existing `useOpenTaskFromParam`.
 
 Widget side — `apps/mobile/targets/widget/` (Swift; `ios/` is generated)
 
-| Folder          | Files                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------- |
-| root            | `CalendarWidgetBundle.swift` (entry), `CalendarWidget.swift` (config, view switch), `expo-target.config.js`   |
-| `Model/`        | `WidgetSnapshot` (decoded JSON), `SharedStore` (App Group), `WidgetClock`, `SampleSnapshot` (gallery preview) |
-| `Provider/`     | `CalendarProvider` (timeline)                                                                                 |
-| `Intents/`      | `CalendarWidgetIntent` (Edit Widget), `SetModeIntent`, `ShiftPageIntent`, `ToggleTaskIntent`                  |
-| `Views/Shared/` | `Theme`, `GlassAware`, `ModeSwitcher`, `PageArrows`, `StackedHeader`, `EventRow`, `EventChip`, `TaskRow`, …   |
-| `Views/Month/`  | `MonthWidgetView`, `MonthHeader`, `MonthGrid`                                                                 |
-| `Views/Week/`   | `WeekWidgetView`, `WeekStrip` (medium), `WeekTimeGrid` (large+), `WeekDayLane` (blocks, lanes, now line)      |
-| `Views/Today/`  | `TodayWidgetView`, `TodayHeader`, `UpNextCard`                                                                |
-| `Views/Agenda/` | `AgendaWidgetView` (with `AgendaPlan`, which fills the room day by day)                                       |
+| Folder          | Files                                                                                                                                   |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| root            | `CalendarWidgetBundle.swift` (entry), `CalendarWidget.swift` (config, view switch), `UpNextWidget.swift`, `expo-target.config.js`       |
+| `Model/`        | `WidgetSnapshot` (decoded JSON), `SharedStore` (App Group), `WidgetClock`, `UpNext` (now/next pick), `SampleSnapshot` (gallery preview) |
+| `Provider/`     | `CalendarProvider`, `UpNextProvider` (timelines)                                                                                        |
+| `Intents/`      | `CalendarWidgetIntent` (Edit Widget), `SetModeIntent`, `ShiftPageIntent`, `ToggleTaskIntent`                                            |
+| `Views/Shared/` | `Theme`, `GlassAware`, `ModeSwitcher`, `PageArrows`, `StackedHeader`, `EventRow`, `EventChip`, `TaskRow`, …                             |
+| `Views/Month/`  | `MonthWidgetView`, `MonthHeader`, `MonthGrid`                                                                                           |
+| `Views/Week/`   | `WeekWidgetView`, `WeekStrip` (medium), `WeekTimeGrid` (large+), `WeekDayLane` (blocks, lanes, now line)                                |
+| `Views/Today/`  | `TodayWidgetView`, `TodayHeader`, `UpNextCard`                                                                                          |
+| `Views/UpNext/` | `UpNextSmallView`, `LockScreenViews` (rectangular, circular, inline)                                                                    |
+| `Views/Agenda/` | `AgendaWidgetView` (with `AgendaPlan`, which fills the room day by day)                                                                 |
 
 Rule of thumb: one view or one job per file, aim under ~150 lines. A new view
 (a three-day view, say) gets its own folder under `Views/` and its own case in
@@ -196,6 +235,12 @@ Clear. It is guidance, not a toggle, because no toggle could work.
   version 2 — the widget ignores a snapshot of any other version.
 
 ## Log
+
+- **2026-10-03** — v3: Up Next widget — small Home Screen/StandBy size and
+  Lock Screen rectangular, circular, and inline. The app now reloads every
+  widget kind. Settings card gains Lock Screen steps. Verified on the
+  iPhone 18 Pro simulator (iOS 27) with real data: all three Lock Screen
+  sizes on the Lock Screen, and the small size in the widget gallery.
 
 - **2026-10-03** — v2: Week and Agenda views; four-view icon switcher; a
   Default View per widget under Edit Widget, with view state per widget kind
