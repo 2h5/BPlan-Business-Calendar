@@ -60,9 +60,7 @@ CURRENT STATE
    legal/billing gates.
 
 NEXT UP
-├─ 1. Live annual renewal on the $29.99 product (fresh test account)
-│     → docs/revenuecat-automation-plan.md, "Next live run — v2 products"
-└─ 2. iPhone in-app purchase (Apple checkout via RevenueCat)
+└─ 1. iPhone in-app purchase (Apple checkout via RevenueCat)
       → docs/mobile-billing-plan.md
 ```
 
