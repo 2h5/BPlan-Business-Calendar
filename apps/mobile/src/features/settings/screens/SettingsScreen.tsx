@@ -18,6 +18,7 @@ import { APP_NAME } from '../../../lib/brand';
 import { useAuth, useAuthActions } from '../../auth';
 import { useConnections } from '../../integrations/hooks/useIntegrations';
 import { NotificationSettingsCard } from '../../notifications';
+import { WidgetGuideCard } from '../../widgets';
 import { AppearanceCard } from '../components/AppearanceCard';
 import { CalendarsCard } from '../components/CalendarsCard';
 import { PlanCard } from '../components/PlanCard';
@@ -138,6 +139,8 @@ export function SettingsScreen() {
       <CalendarsCard />
 
       <AppearanceCard />
+
+      <WidgetGuideCard />
 
       <NotificationSettingsCard />
 

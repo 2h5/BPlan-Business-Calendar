@@ -13,6 +13,7 @@
     "doctor": "npx expo-doctor"
   },
   "dependencies": {
+    "@bacons/apple-targets": "4.0.7",
     "@cal/domain": "workspace:*",
     "@cal/schemas": "workspace:*",
     "@cal/types": "workspace:*",

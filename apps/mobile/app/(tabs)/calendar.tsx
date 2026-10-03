@@ -1,8 +1,14 @@
 import { Screen } from '@cal/ui';
+import { useLocalSearchParams } from 'expo-router';
 
+import { useFocusDateFromParam } from '../../src/features/calendar/hooks/useFocusDateFromParam';
 import { CalendarScreen } from '../../src/features/calendar/screens/CalendarScreen';
 
 export default function CalendarScreenRoute() {
+  // The Home Screen widget deep-links here with the day to open.
+  const { date } = useLocalSearchParams<{ date?: string }>();
+  useFocusDateFromParam(date);
+
   // The day and week timelines scroll internally, so the Screen must not add
   // a second vertical ScrollView around them. They run under the floating tab
   // bar and pad their own ends, so no bottom inset here.

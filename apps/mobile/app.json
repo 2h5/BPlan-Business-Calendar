@@ -16,11 +16,16 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCalendarsFullAccessUsageDescription": "Show your device calendar events alongside the ones you create here.",
         "NSRemindersFullAccessUsageDescription": "Import your Apple Reminders as tasks."
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.example.calendarapp"]
       }
     },
     "android": {
       "package": "com.example.calendarapp",
-      "adaptiveIcon": { "backgroundColor": "#0B0D12" },
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0D12"
+      },
       "edgeToEdgeEnabled": true
     },
     "plugins": [
@@ -37,7 +42,9 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#F4F6F8",
-          "dark": { "backgroundColor": "#0B0D12" },
+          "dark": {
+            "backgroundColor": "#0B0D12"
+          },
           "resizeMode": "contain"
         }
       ],
@@ -47,7 +54,8 @@
           "minimum": "15.1"
         }
       ],
-      "./plugins/with-scene-delegate"
+      "./plugins/with-scene-delegate",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true

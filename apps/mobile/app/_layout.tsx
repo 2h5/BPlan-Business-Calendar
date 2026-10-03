@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '../src/features/auth';
 import { ProUpgradeModal } from '../src/features/billing/components/ProUpgradeModal';
 import { ReminderSync } from '../src/features/notifications';
 import { AppearanceProvider } from '../src/features/settings/appearance/AppearanceProvider';
+import { WidgetSync } from '../src/features/widgets';
 import { ErrorBoundary } from '../src/lib/errors/ErrorBoundary';
 import { queryClient } from '../src/lib/query/query-client';
 
@@ -106,6 +107,7 @@ export default function RootLayout() {
             <AuthProvider>
               <ErrorBoundary>
                 <AuthGate />
+                <WidgetSync />
                 <RootStack />
                 <AuthenticatedOverlays />
               </ErrorBoundary>

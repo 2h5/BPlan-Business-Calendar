@@ -6,3 +6,5 @@ ios
 android
 pnpm-lock.yaml
 packages/types/src/database.types.ts
+# Written by @bacons/apple-targets on every prebuild
+apps/mobile/targets/**/Assets.xcassets

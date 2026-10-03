@@ -4,8 +4,22 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@cal/web", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@cal/web",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "mobile",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@cal/mobile",
+        "start"
+      ],
+      "port": 8081
     }
   ]
 }
