@@ -55,10 +55,11 @@ export function useFindTimeAutoClose({
   useEffect(() => {
     if (!finished || focused) return;
     let settle: ReturnType<typeof setTimeout> | undefined;
+    const closeMs = CLOSE_MS * theme.motion.scale;
     const timer = setTimeout(() => {
       setIsClosing(true);
       closing.value = withTiming(1, {
-        duration: CLOSE_MS,
+        duration: closeMs,
         easing: Easing.bezier(...theme.motion.easing.standard),
       });
       settle = setTimeout(() => {
@@ -67,13 +68,21 @@ export function useFindTimeAutoClose({
         // the results again before React removes them.
         if (onFinished) onFinished();
         else setIsClosing(false);
-      }, CLOSE_MS);
+      }, closeMs);
     }, FOLLOW_UP_MS);
     return () => {
       clearTimeout(timer);
       if (settle) clearTimeout(settle);
     };
-  }, [finished, focused, onFinished, reset, closing, theme.motion.easing.standard]);
+  }, [
+    finished,
+    focused,
+    onFinished,
+    reset,
+    closing,
+    theme.motion.easing.standard,
+    theme.motion.scale,
+  ]);
 
   // Reopen only after React has committed the cleared state, for the same reason.
   useEffect(() => {

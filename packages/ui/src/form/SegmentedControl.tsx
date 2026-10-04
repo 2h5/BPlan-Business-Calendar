@@ -65,6 +65,7 @@ export function SegmentedControl<T extends string>({
   style,
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
+  const motionScale = theme.motion.scale;
   const reduceMotion = useReducedMotion();
 
   /** Measured segment geometry, indexed as in `options`. */
@@ -106,8 +107,11 @@ export function SegmentedControl<T extends string>({
       return;
     }
 
-    progress.value = withTiming(selectedIndex, { duration: SLIDE_MS, easing: SLIDE_EASING });
-  }, [selectedIndex, ready, reduceMotion, progress]);
+    progress.value = withTiming(selectedIndex, {
+      duration: SLIDE_MS * motionScale,
+      easing: SLIDE_EASING,
+    });
+  }, [selectedIndex, ready, reduceMotion, progress, motionScale]);
 
   const stops = options.map((_, index) => index);
   const tints = options.map((option) => option.color ?? theme.colors.accent);

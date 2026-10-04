@@ -57,8 +57,11 @@ export function SearchLineArt({ width }: { width: number }) {
   const flow = useSharedValue(0);
   useEffect(() => {
     if (reduceMotion) return;
-    flow.value = withRepeat(withTiming(1, { duration: DASH_FLOW_MS, easing: Easing.linear }), -1);
-  }, [flow, reduceMotion]);
+    flow.value = withRepeat(
+      withTiming(1, { duration: DASH_FLOW_MS * theme.motion.scale, easing: Easing.linear }),
+      -1,
+    );
+  }, [flow, reduceMotion, theme.motion.scale]);
 
   const driftA = useDrift(9000, 0, reduceMotion);
   const driftB = useDrift(11000, 4000, reduceMotion);
@@ -310,13 +313,14 @@ function Dash({
 }
 
 /** A gentle up-and-down loop, started `delay` ms into its cycle. */
-function useDrift(duration: number, delay: number, reduceMotion: boolean) {
+function useDrift(cycleMs: number, delay: number, reduceMotion: boolean) {
+  const duration = cycleMs * useTheme().motion.scale;
   const progress = useSharedValue(0);
 
   useEffect(() => {
     if (reduceMotion) return;
     // Start part-way through so the three groups never bob in step.
-    const start = (delay % duration) / duration;
+    const start = (delay % cycleMs) / cycleMs;
     progress.value = start < 0.5 ? start * 2 : 2 - start * 2;
     progress.value = withRepeat(
       withTiming(start < 0.5 ? 1 : 0, {
@@ -326,7 +330,7 @@ function useDrift(duration: number, delay: number, reduceMotion: boolean) {
       -1,
       true,
     );
-  }, [delay, duration, progress, reduceMotion]);
+  }, [cycleMs, delay, duration, progress, reduceMotion]);
 
   return progress;
 }

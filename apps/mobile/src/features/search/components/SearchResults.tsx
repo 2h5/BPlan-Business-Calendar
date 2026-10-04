@@ -53,8 +53,8 @@ export function SearchResults({
         style={{
           alignItems: 'center',
           gap: theme.spacing.sm,
-          paddingTop: theme.spacing.xxl,
-          paddingBottom: theme.spacing.xxxl,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing.lg,
           paddingHorizontal: theme.spacing.xl,
         }}
       >
@@ -182,8 +182,8 @@ function ResultRow({
 
   return (
     <Animated.View
-      entering={FadeInDown.duration(240)
-        .delay(Math.min(index, STAGGER_CAP) * 20)
+      entering={FadeInDown.duration(240 * theme.motion.scale)
+        .delay(Math.min(index, STAGGER_CAP) * 20 * theme.motion.scale)
         .withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] })}
     >
       <Pressable
@@ -316,18 +316,18 @@ function SkeletonRow({ index }: { index: number }) {
   useEffect(() => {
     if (reduceMotion) return;
     pulse.value = withRepeat(
-      withTiming(0.45, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+      withTiming(0.45, { duration: 600 * theme.motion.scale, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     );
-  }, [pulse, reduceMotion]);
+  }, [pulse, reduceMotion, theme.motion.scale]);
 
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
   const block = { backgroundColor: theme.colors.surfaceElevated, borderRadius: theme.radius.sm };
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200).delay(index * 60)}
+      entering={FadeIn.duration(200 * theme.motion.scale).delay(index * 60 * theme.motion.scale)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -358,7 +358,7 @@ function SearchState({
 
   return (
     <Animated.View
-      entering={FadeIn.duration(180)}
+      entering={FadeIn.duration(180 * theme.motion.scale)}
       accessibilityRole={onRetry ? 'alert' : 'summary'}
       style={{
         minHeight: 132,

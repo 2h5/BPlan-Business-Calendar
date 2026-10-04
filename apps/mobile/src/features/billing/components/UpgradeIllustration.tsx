@@ -74,10 +74,17 @@ export function UpgradeIllustration({ width = 190 }: { width?: number }) {
   useEffect(() => {
     if (reduceMotion) return;
     const loop = (ms: number) =>
-      withRepeat(withTiming(1, { duration: ms / 2, easing: Easing.inOut(Easing.ease) }), -1, true);
+      withRepeat(
+        withTiming(1, {
+          duration: (ms / 2) * theme.motion.scale,
+          easing: Easing.inOut(Easing.ease),
+        }),
+        -1,
+        true,
+      );
     twinkle.value = loop(TWINKLE_MS);
     float.value = loop(FLOAT_MS);
-  }, [reduceMotion, twinkle, float]);
+  }, [reduceMotion, twinkle, float, theme.motion.scale]);
 
   // Worklets cannot call `u`, so the distance is scaled up front.
   const floatDistance = u(-3);

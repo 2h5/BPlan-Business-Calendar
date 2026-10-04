@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { Appearance, useColorScheme } from 'react-native';
 
+import { FAST_MOTION_STORAGE_KEY, motionScaleFor, parseFastMotion } from './motion-speed';
 import {
   THEME_STORAGE_KEY,
   isValidThemeMode,
@@ -26,6 +27,9 @@ export interface AppearanceContextValue {
   /** What that currently resolves to, after the OS has its say. */
   scheme: ColorScheme;
   setMode: (mode: ThemeMode) => void;
+  /** Every animation at twice its normal speed. */
+  fastMotion: boolean;
+  setFastMotion: (fastMotion: boolean) => void;
 }
 
 /** The web's theme cross-fade (`::view-transition-*` in global.css). */
@@ -45,14 +49,20 @@ const AppearanceContext = createContext<AppearanceContextValue | null>(null);
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const systemScheme = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('auto');
+  const [fastMotion, setFastMotionState] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     void (async () => {
       try {
-        const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (active && isValidThemeMode(stored)) setModeState(stored);
+        const [storedMode, storedFastMotion] = await Promise.all([
+          AsyncStorage.getItem(THEME_STORAGE_KEY),
+          AsyncStorage.getItem(FAST_MOTION_STORAGE_KEY),
+        ]);
+        if (!active) return;
+        if (isValidThemeMode(storedMode)) setModeState(storedMode);
+        setFastMotionState(parseFastMotion(storedFastMotion));
       } catch (error) {
         logError(error);
       }
@@ -69,17 +79,29 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
    * underneath, and the snapshot fades out. Without the native module (or
    * with Reduce Motion) the change is instant.
    */
-  const setMode = useCallback((next: ThemeMode) => {
-    void AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(logError);
+  const setMode = useCallback(
+    (next: ThemeMode) => {
+      void AsyncStorage.setItem(THEME_STORAGE_KEY, next).catch(logError);
 
-    void (async () => {
-      const covered = await beginThemeCrossfade();
-      setModeState(next);
-      if (covered) afterNextPaint(() => finishThemeCrossfade(CROSSFADE_MS));
-    })();
+      void (async () => {
+        const covered = await beginThemeCrossfade();
+        setModeState(next);
+        if (covered) {
+          const durationMs = CROSSFADE_MS * motionScaleFor(fastMotion);
+          afterNextPaint(() => finishThemeCrossfade(durationMs));
+        }
+      })();
+    },
+    [fastMotion],
+  );
+
+  const setFastMotion = useCallback((next: boolean) => {
+    void AsyncStorage.setItem(FAST_MOTION_STORAGE_KEY, String(next)).catch(logError);
+    setFastMotionState(next);
   }, []);
 
   const scheme = resolveThemeMode(mode, systemScheme);
+  const motionScale = motionScaleFor(fastMotion);
 
   /**
    * The native chrome the app does not draw itself — the tab bar, alerts, the
@@ -92,13 +114,15 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   }, [mode]);
 
   const value = useMemo<AppearanceContextValue>(
-    () => ({ mode, scheme, setMode }),
-    [mode, scheme, setMode],
+    () => ({ mode, scheme, setMode, fastMotion, setFastMotion }),
+    [mode, scheme, setMode, fastMotion, setFastMotion],
   );
 
   return (
     <AppearanceContext.Provider value={value}>
-      <ThemeProvider scheme={scheme}>{children}</ThemeProvider>
+      <ThemeProvider scheme={scheme} motionScale={motionScale}>
+        {children}
+      </ThemeProvider>
     </AppearanceContext.Provider>
   );
 }

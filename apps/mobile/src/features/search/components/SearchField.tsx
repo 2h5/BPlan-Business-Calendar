@@ -18,6 +18,8 @@ export interface SearchFieldProps {
   onChangeText: (value: string) => void;
   /** Runs the accent sweep along the bottom edge while a query is in flight. */
   isSearching: boolean;
+  /** Focuses the input (raising the keyboard) once this turns true. */
+  shouldFocus: boolean;
 }
 
 const FIELD_HEIGHT = 56;
@@ -31,11 +33,15 @@ const SWEEP_MS = 900;
 const SWEEP_SLICES = 9;
 
 /** The Search page's hero field: the web `.searchBox`, focus ring and progress sweep included. */
-export function SearchField({ value, onChangeText, isSearching }: SearchFieldProps) {
+export function SearchField({ value, onChangeText, isSearching, shouldFocus }: SearchFieldProps) {
   const theme = useTheme();
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
   const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (shouldFocus) inputRef.current?.focus();
+  }, [shouldFocus]);
 
   return (
     <View
@@ -79,7 +85,6 @@ export function SearchField({ value, onChangeText, isSearching }: SearchFieldPro
           accessibilityLabel="Search workspace"
           autoCorrect={false}
           autoCapitalize="none"
-          autoFocus
           clearButtonMode="never"
           returnKeyType="search"
           style={{
@@ -91,7 +96,10 @@ export function SearchField({ value, onChangeText, isSearching }: SearchFieldPro
           }}
         />
         {value ? (
-          <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)}>
+          <Animated.View
+            entering={FadeIn.duration(160 * theme.motion.scale)}
+            exiting={FadeOut.duration(120 * theme.motion.scale)}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Clear search"
@@ -122,20 +130,21 @@ export function SearchField({ value, onChangeText, isSearching }: SearchFieldPro
 
 function ProgressSweep({ active, width }: { active: boolean; width: number }) {
   const theme = useTheme();
+  const motionScale = theme.motion.scale;
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   const visible = useSharedValue(0);
   const band = width * SWEEP_FRACTION;
 
   useEffect(() => {
-    visible.value = withTiming(active ? 1 : 0, { duration: 200 });
+    visible.value = withTiming(active ? 1 : 0, { duration: 200 * motionScale });
     if (!active || reduceMotion) return;
     progress.value = 0;
     progress.value = withRepeat(
-      withTiming(1, { duration: SWEEP_MS, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
+      withTiming(1, { duration: SWEEP_MS * motionScale, easing: Easing.bezier(0.45, 0, 0.55, 1) }),
       -1,
     );
-  }, [active, progress, reduceMotion, visible]);
+  }, [active, progress, reduceMotion, visible, motionScale]);
 
   const style = useAnimatedStyle(() => ({
     opacity: visible.value,

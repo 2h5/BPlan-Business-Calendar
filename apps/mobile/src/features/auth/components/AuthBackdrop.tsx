@@ -52,8 +52,11 @@ export function AuthBackdrop() {
   const drift = useSharedValue(0);
   useEffect(() => {
     if (reduceMotion) return;
-    drift.value = withRepeat(withTiming(1, { duration: PERIOD_MS, easing: Easing.linear }), -1);
-  }, [drift, reduceMotion]);
+    drift.value = withRepeat(
+      withTiming(1, { duration: PERIOD_MS * theme.motion.scale, easing: Easing.linear }),
+      -1,
+    );
+  }, [drift, reduceMotion, theme.motion.scale]);
 
   const gridStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -drift.value * CELL_H }],

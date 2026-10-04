@@ -9,12 +9,14 @@ export interface ThemeProviderProps {
   children: ReactNode;
   /** Omit to follow the system appearance. */
   scheme?: ColorScheme;
+  /** Multiplies every animation's duration; 0.5 is twice as fast. Defaults to 1. */
+  motionScale?: number;
 }
 
-export function ThemeProvider({ children, scheme }: ThemeProviderProps) {
+export function ThemeProvider({ children, scheme, motionScale = 1 }: ThemeProviderProps) {
   const systemScheme = useColorScheme();
   const resolved: ColorScheme = scheme ?? (systemScheme === 'light' ? 'light' : 'dark');
-  const theme = useMemo(() => themeFor(resolved), [resolved]);
+  const theme = useMemo(() => themeFor(resolved, motionScale), [resolved, motionScale]);
 
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
 }

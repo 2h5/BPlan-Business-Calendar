@@ -18,7 +18,7 @@ import Animated, {
 
 import { EventChip } from './EventChip';
 import type { EventOccurrence } from '../hooks/useCalendarWindow';
-import { LIFT, PICK_UP_MS, useDragLift } from '../hooks/useDragLift';
+import { PICK_UP_MS, useDragLift } from '../hooks/useDragLift';
 import { dateKeyToInstant, shiftDateKey } from '../utils/window';
 
 export interface EventMove {
@@ -94,7 +94,8 @@ export function DraggableEventChip({
 }: DraggableEventChipProps) {
   const theme = useTheme();
   const lift = useDragLift(onDragChange);
-  const { dragX, dragY, dragging, lifted, pickedUp, putDown, slotChanged, cancel } = lift;
+  const { dragX, dragY, dragging, lifted, liftSpring, pickedUp, putDown, slotChanged, cancel } =
+    lift;
 
   const startMinute = Math.round(
     (occurrence.start - dateKeyToInstant(dateKey, timeZone).getTime()) / 60_000,
@@ -145,7 +146,7 @@ export function DraggableEventChip({
     .activateAfterLongPress(PICK_UP_MS)
     .onStart(() => {
       dragging.value = true;
-      lifted.value = withSpring(1, LIFT);
+      lifted.value = withSpring(1, liftSpring);
       runOnJS(pickedUp)();
     })
     .onUpdate((event) => {
@@ -175,7 +176,7 @@ export function DraggableEventChip({
     })
     .onFinalize(() => {
       dragging.value = false;
-      lifted.value = withSpring(0, LIFT);
+      lifted.value = withSpring(0, liftSpring);
       runOnJS(putDown)();
     });
 

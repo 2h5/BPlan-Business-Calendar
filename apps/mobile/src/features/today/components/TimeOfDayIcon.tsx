@@ -48,11 +48,14 @@ export function TimeOfDayIcon({ isDaytime }: TimeOfDayIconProps) {
     if (reduceMotion) return;
     breath.value = 0;
     breath.value = withRepeat(
-      withTiming(1, { duration: BREATHE_MS / 2, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1, {
+        duration: (BREATHE_MS / 2) * theme.motion.scale,
+        easing: Easing.inOut(Easing.ease),
+      }),
       -1,
       true,
     );
-  }, [breath, reduceMotion]);
+  }, [breath, reduceMotion, theme.motion.scale]);
 
   const haloStyle = useAnimatedStyle(() => ({
     opacity: interpolate(breath.value, [0, 1], [0.75, 1]),
