@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useTheme } from '@cal/ui';
+import { useEffect, useMemo, useState } from 'react';
 import type { LayoutChangeEvent } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
 import {
@@ -14,7 +15,7 @@ import {
 const TURN_FRACTION = 0.25;
 /** Flick speed, points per second, that turns the page regardless of distance. */
 const FLICK_VELOCITY = 500;
-const SLIDE = { duration: 280, easing: Easing.out(Easing.cubic) };
+const SLIDE_MS = 280;
 
 /**
  * Horizontal paging for the calendar views: the neighbouring pages follow the
@@ -31,6 +32,11 @@ const SLIDE = { duration: 280, easing: Easing.out(Easing.cubic) };
  * epoch); `onChange` receives how many pages a finished turn moved.
  */
 export function usePageSwipe(index: number, onChange: (delta: number) => void) {
+  const motionScale = useTheme().motion.scale;
+  const slide = useMemo(
+    () => ({ duration: SLIDE_MS * motionScale, easing: Easing.out(Easing.cubic) }),
+    [motionScale],
+  );
   const [width, setWidth] = useState(0);
   const [baseIndex] = useState(index);
   const slot = index - baseIndex;
@@ -50,8 +56,8 @@ export function usePageSwipe(index: number, onChange: (delta: number) => void) {
     if (distance < 0.001) return;
     // One page away the neighbour is already drawn, so it can slide in; any
     // further and the pages in between were never rendered, so jump.
-    position.value = distance <= 1.001 ? withTiming(slot, SLIDE) : slot;
-  }, [slot, committed, position]);
+    position.value = distance <= 1.001 ? withTiming(slot, slide) : slot;
+  }, [slot, committed, position, slide]);
 
   const pan = Gesture.Pan()
     // Claim the touch only after clear horizontal travel, so taps still land
@@ -83,7 +89,7 @@ export function usePageSwipe(index: number, onChange: (delta: number) => void) {
       else if (travelled < -TURN_FRACTION) step = -1;
 
       const target = from + step;
-      position.value = withTiming(target, SLIDE, (finished) => {
+      position.value = withTiming(target, slide, (finished) => {
         if (!finished) return;
         const delta = target - committed.value;
         if (delta === 0) return;

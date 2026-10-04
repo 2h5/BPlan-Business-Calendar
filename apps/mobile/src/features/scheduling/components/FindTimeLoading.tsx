@@ -45,8 +45,11 @@ export function FindTimeLoading() {
 
   useEffect(() => {
     if (reduceMotion) return;
-    spin.value = withRepeat(withTiming(1, { duration: SPARKLE_MS, easing: Easing.linear }), -1);
-  }, [reduceMotion, spin]);
+    spin.value = withRepeat(
+      withTiming(1, { duration: SPARKLE_MS * theme.motion.scale, easing: Easing.linear }),
+      -1,
+    );
+  }, [reduceMotion, spin, theme.motion.scale]);
 
   const sparkleStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${spin.value * 360}deg` }],
@@ -96,7 +99,7 @@ export function FindTimeLoading() {
 
       <View style={{ gap: theme.spacing.sm }}>
         {[0, 1, 2].map((row) => (
-          <SkeletonSlotRow key={row} delayMs={row * ROW_STAGGER_MS} />
+          <SkeletonSlotRow key={row} delayMs={row * ROW_STAGGER_MS * theme.motion.scale} />
         ))}
       </View>
     </View>
@@ -125,9 +128,15 @@ function SkeletonSlotRow({ delayMs }: { delayMs: number }) {
     progress.value = 0;
     progress.value = withDelay(
       delayMs,
-      withRepeat(withTiming(1, { duration: SHIMMER_MS, easing: Easing.inOut(Easing.quad) }), -1),
+      withRepeat(
+        withTiming(1, {
+          duration: SHIMMER_MS * theme.motion.scale,
+          easing: Easing.inOut(Easing.quad),
+        }),
+        -1,
+      ),
     );
-  }, [animating, delayMs, progress]);
+  }, [animating, delayMs, progress, theme.motion.scale]);
 
   const bandStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -bandWidth + progress.value * (width + bandWidth) }],

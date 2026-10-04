@@ -1,5 +1,5 @@
-import { Text } from '@cal/ui';
-import { Fragment } from 'react';
+import { Text, useTheme } from '@cal/ui';
+import { Fragment, useMemo } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
@@ -22,7 +22,8 @@ const ENTER_DELAY_MS = 20;
  * the outgoing text is not cut short mid-exit ("Septen…"), and what follows it
  * — the year after a month — slides across instead of jumping.
  */
-const RESIZE = LinearTransition.duration(ENTER_MS).easing(Easing.out(Easing.cubic));
+const resizeFor = (motionScale: number) =>
+  LinearTransition.duration(ENTER_MS * motionScale).easing(Easing.out(Easing.cubic));
 
 export interface CalendarHeadingProps {
   /**
@@ -62,23 +63,29 @@ export interface CalendarHeadingProps {
  * all, which is the one case this component exists to avoid.
  */
 export function CalendarHeading({ segments, direction }: CalendarHeadingProps) {
+  const motionScale = useTheme().motion.scale;
+  const enterMs = ENTER_MS * motionScale;
+  const enterDelayMs = ENTER_DELAY_MS * motionScale;
+  const exitMs = EXIT_MS * motionScale;
+  const resize = useMemo(() => resizeFor(motionScale), [motionScale]);
+
   // Later: the new text drops in from above as the old drops away below.
   // Earlier mirrors it, rolling up.
   const enter: EntryExitAnimationFunction = () => {
     'worklet';
-    const ease = { duration: ENTER_MS, easing: Easing.out(Easing.cubic) };
+    const ease = { duration: enterMs, easing: Easing.out(Easing.cubic) };
     return {
       initialValues: { opacity: 0, transform: [{ translateY: -direction.value * TRAVEL }] },
       animations: {
-        opacity: withDelay(ENTER_DELAY_MS, withTiming(1, ease)),
-        transform: [{ translateY: withDelay(ENTER_DELAY_MS, withTiming(0, ease)) }],
+        opacity: withDelay(enterDelayMs, withTiming(1, ease)),
+        transform: [{ translateY: withDelay(enterDelayMs, withTiming(0, ease)) }],
       },
     };
   };
 
   const exit: EntryExitAnimationFunction = () => {
     'worklet';
-    const ease = { duration: EXIT_MS, easing: Easing.in(Easing.cubic) };
+    const ease = { duration: exitMs, easing: Easing.in(Easing.cubic) };
     return {
       initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
       animations: {
@@ -96,7 +103,7 @@ export function CalendarHeading({ segments, direction }: CalendarHeadingProps) {
           <Fragment key={index}>
             {/* A fixed space, so spacing matches a single line of text. */}
             {index > 0 ? <Text variant="title3"> </Text> : null}
-            <Animated.View style={{ overflow: 'hidden' }} layout={RESIZE}>
+            <Animated.View style={{ overflow: 'hidden' }} layout={resize}>
               <Animated.View key={segment} entering={enter} exiting={exit}>
                 <Text variant="title3" numberOfLines={1}>
                   {segment}

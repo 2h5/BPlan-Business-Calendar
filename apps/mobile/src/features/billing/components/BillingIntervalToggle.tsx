@@ -99,8 +99,11 @@ export function BillingIntervalToggle({
       return;
     }
 
-    progress.value = withTiming(selectedIndex, { duration: SLIDE_MS, easing: SLIDE_EASING });
-  }, [selectedIndex, ready, reduceMotion, progress]);
+    progress.value = withTiming(selectedIndex, {
+      duration: SLIDE_MS * theme.motion.scale,
+      easing: SLIDE_EASING,
+    });
+  }, [selectedIndex, ready, reduceMotion, progress, theme.motion.scale]);
 
   /** `interpolate` needs at least two stops; with two segments these are [0, 1]. */
   const stops = OPTIONS.map((_, index) => index);

@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -50,11 +51,15 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const { height: viewportHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
+  const wasVisible = useRef(visible);
 
   const translateY = useSharedValue(viewportHeight);
   const backdrop = useSharedValue(0);
 
   useEffect(() => {
+    const isClosing = wasVisible.current && !visible;
+    wasVisible.current = visible;
+
     if (visible) {
       translateY.value = viewportHeight;
       backdrop.value = 0;
@@ -71,6 +76,9 @@ export function BottomSheet({
       return () => cancelAnimationFrame(frame);
     }
 
+    // Lower the keyboard with the sheet; otherwise it lingers until the
+    // modal unmounts at the end of the slide.
+    if (isClosing) Keyboard.dismiss();
     backdrop.value = withTiming(0, { duration: theme.motion.duration.fast });
     translateY.value = withTiming(
       viewportHeight,

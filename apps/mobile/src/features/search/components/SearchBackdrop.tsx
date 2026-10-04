@@ -75,7 +75,7 @@ export function SearchBackdrop() {
 
   return (
     <Animated.View
-      entering={FadeIn.duration(600)}
+      entering={FadeIn.duration(600 * theme.motion.scale)}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
@@ -128,8 +128,8 @@ function Twinkle({ star, index }: { star: Star; index: number }) {
   const phase = useSharedValue(0);
 
   // Spread the twinkles so they never pulse together.
-  const duration = 4000 + (index % 5) * 1000;
-  const delay = Math.round(((index * 1.37) % 6) * 1000);
+  const duration = (4000 + (index % 5) * 1000) * theme.motion.scale;
+  const delay = Math.round(((index * 1.37) % 6) * 1000 * theme.motion.scale);
 
   useEffect(() => {
     if (reduceMotion) return;

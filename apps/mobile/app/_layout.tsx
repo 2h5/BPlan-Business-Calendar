@@ -12,10 +12,16 @@ import { UndoToast } from '../src/components/app-shell/UndoToast';
 import { AuthProvider, useAuth } from '../src/features/auth';
 import { ProUpgradeModal } from '../src/features/billing/components/ProUpgradeModal';
 import { ReminderSync } from '../src/features/notifications';
-import { AppearanceProvider } from '../src/features/settings/appearance/AppearanceProvider';
+import {
+  AppearanceProvider,
+  useAppearance,
+} from '../src/features/settings/appearance/AppearanceProvider';
 import { WidgetSync } from '../src/features/widgets';
 import { ErrorBoundary } from '../src/lib/errors/ErrorBoundary';
 import { queryClient } from '../src/lib/query/query-client';
+
+/** How long iOS takes to push a screen; react-native-screens' own default too. */
+const NATIVE_PUSH_MS = 500;
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -52,6 +58,16 @@ function AuthGate() {
  */
 function RootStack() {
   const theme = useTheme();
+  const { fastMotion } = useAppearance();
+  // iOS's own push has a fixed length and ignores the app's animation speed,
+  // so Fast animations swaps in react-native-screens' copy of it, which
+  // takes a duration.
+  const push = fastMotion
+    ? ({
+        animation: 'simple_push',
+        animationDuration: NATIVE_PUSH_MS * theme.motion.scale,
+      } as const)
+    : ({ animation: 'default' } as const);
 
   return (
     <Stack
@@ -72,13 +88,13 @@ function RootStack() {
           headerShown: true,
           title: 'Connections',
           headerLeft: () => <HeaderBackButton label="Settings" />,
-          animation: 'default',
+          ...push,
         }}
       />
       {/* Search opens over whichever tab you were on, so it is a stack screen
           rather than a hidden tab — a hidden tab is not a navigable route. It
           draws its own top bar so the backdrop reaches the top edge. */}
-      <Stack.Screen name="search" options={{ animation: 'default' }} />
+      <Stack.Screen name="search" options={push} />
     </Stack>
   );
 }

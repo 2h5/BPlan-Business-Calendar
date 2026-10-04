@@ -1,7 +1,7 @@
 import { Card, Text, useTheme, type IconName } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Pressable, View } from 'react-native';
+import { Pressable, Switch, View } from 'react-native';
 
 import { APP_NAME } from '../../../lib/brand';
 import { useAppearance } from '../appearance/AppearanceProvider';
@@ -18,10 +18,13 @@ const ICON: Record<ThemeMode, IconName> = {
   dark: 'moon-outline',
 };
 
-/** The web's Appearance section: three preview tiles, the active one outlined. */
+/**
+ * The web's Appearance section: three preview tiles, the active one outlined,
+ * plus the app-only Fast animations switch.
+ */
 export function AppearanceCard() {
   const theme = useTheme();
-  const { mode, setMode } = useAppearance();
+  const { mode, setMode, fastMotion, setFastMotion } = useAppearance();
 
   const select = (next: ThemeMode) => {
     if (next === mode) return;
@@ -46,6 +49,31 @@ export function AppearanceCard() {
             />
           ))}
         </View>
+      </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.md,
+          paddingHorizontal: theme.spacing.xl,
+          paddingVertical: theme.spacing.lg,
+          borderTopWidth: theme.borderWidth.hairline,
+          borderTopColor: theme.colors.borderSubtle,
+        }}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="body">Fast animations</Text>
+          <Text variant="footnote" color="tertiary">
+            Everything moves twice as fast
+          </Text>
+        </View>
+        <Switch
+          value={fastMotion}
+          onValueChange={setFastMotion}
+          accessibilityLabel="Fast animations"
+          trackColor={{ true: theme.colors.accent, false: theme.colors.border }}
+        />
       </View>
     </Card>
   );

@@ -73,8 +73,8 @@ export function RollingPrice({ value, amount, variant = 'title1' }: RollingPrice
     }
 
     progress.value = 0;
-    progress.value = withTiming(1, { duration: ROLL_MS, easing: ROLL_EASING });
-  }, [value, amount, shown, reduceMotion, arriving, direction, progress]);
+    progress.value = withTiming(1, { duration: ROLL_MS * theme.motion.scale, easing: ROLL_EASING });
+  }, [value, amount, shown, reduceMotion, arriving, direction, progress, theme.motion.scale]);
 
   return (
     <View style={{ height: lineHeight, overflow: 'hidden' }}>

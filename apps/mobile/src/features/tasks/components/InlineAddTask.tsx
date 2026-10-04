@@ -2,7 +2,7 @@ import { DURATION_PRESETS, formatDuration } from '@cal/domain';
 import type { TaskList, TaskPriority } from '@cal/schemas';
 import { Chip, Text, useTheme } from '@cal/ui';
 import { Ionicons } from '@expo/vector-icons';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Keyboard, Pressable, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
@@ -54,23 +54,34 @@ const PRIORITY_CHIP_LABEL: Record<PriorityChoice, string> = {
 
 const CHANGE_MS = 180;
 const EASE_OUT = Easing.out(Easing.cubic);
-/** Pickers and the error fade in and out while the card resizes around them. */
-const APPEAR = FadeIn.duration(CHANGE_MS);
-const DISAPPEAR = FadeOut.duration(120);
-/** Chips slide aside as a neighbour's label grows or shrinks. */
-const SHIFT = LinearTransition.duration(CHANGE_MS).easing(EASE_OUT);
 
-/** A chip whose value just changed settles in from slightly small and faint. */
-const SETTLE: EntryExitAnimationFunction = () => {
-  'worklet';
-  return {
-    initialValues: { opacity: 0.4, transform: [{ scale: 0.92 }] },
-    animations: {
-      opacity: withTiming(1, { duration: CHANGE_MS }),
-      transform: [{ scale: withTiming(1, { duration: CHANGE_MS, easing: EASE_OUT }) }],
-    },
-  };
-};
+/** The card's change animations, built for the current motion speed. */
+function useChangeMotion() {
+  const scale = useTheme().motion.scale;
+  return useMemo(() => {
+    const changeMs = CHANGE_MS * scale;
+    /** A chip whose value just changed settles in from slightly small and faint. */
+    const settle: EntryExitAnimationFunction = () => {
+      'worklet';
+      return {
+        initialValues: { opacity: 0.4, transform: [{ scale: 0.92 }] },
+        animations: {
+          opacity: withTiming(1, { duration: changeMs }),
+          transform: [{ scale: withTiming(1, { duration: changeMs, easing: EASE_OUT }) }],
+        },
+      };
+    };
+    return {
+      changeMs,
+      /** Pickers and the error fade in and out while the card resizes around them. */
+      appear: FadeIn.duration(changeMs),
+      disappear: FadeOut.duration(120 * scale),
+      /** Chips slide aside as a neighbour's label grows or shrinks. */
+      shift: LinearTransition.duration(changeMs).easing(EASE_OUT),
+      settle,
+    };
+  }, [scale]);
+}
 
 export interface InlineAddTaskProps {
   lists: readonly TaskList[];
@@ -87,6 +98,7 @@ export interface InlineAddTaskProps {
  */
 export function InlineAddTask({ lists, defaultListId }: InlineAddTaskProps) {
   const theme = useTheme();
+  const { appear } = useChangeMotion();
   const [open, setOpen] = useState(false);
   // What the card grows out of and folds back into, so the swap is seamless.
   const [rowHeight, setRowHeight] = useState(44);
@@ -104,7 +116,7 @@ export function InlineAddTask({ lists, defaultListId }: InlineAddTaskProps) {
           onClose={() => setOpen(false)}
         />
       ) : (
-        <Animated.View entering={APPEAR}>
+        <Animated.View entering={appear}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add a task"
@@ -138,6 +150,7 @@ function AddTaskCard({
   onClose,
 }: InlineAddTaskProps & { fromHeight: number; onClose: () => void }) {
   const theme = useTheme();
+  const { appear, disappear } = useChangeMotion();
   const timeZone = useUserTimeZone();
   const createTask = useCreateTask();
 
@@ -228,7 +241,7 @@ function AddTaskCard({
       </View>
 
       {error ? (
-        <Animated.View entering={APPEAR} exiting={DISAPPEAR}>
+        <Animated.View entering={appear} exiting={disappear}>
           <Text variant="footnote" style={{ color: theme.colors.danger }}>
             {error}
           </Text>
@@ -339,9 +352,10 @@ function AddTaskCard({
  * replays the settle whenever `changeKey` — the chip's value — changes.
  */
 function ChipSlot({ changeKey, children }: { changeKey: string; children: ReactNode }) {
+  const { shift, settle } = useChangeMotion();
   return (
-    <Animated.View layout={SHIFT}>
-      <Animated.View key={changeKey} entering={SETTLE}>
+    <Animated.View layout={shift}>
+      <Animated.View key={changeKey} entering={settle}>
         {children}
       </Animated.View>
     </Animated.View>
@@ -351,7 +365,8 @@ function ChipSlot({ changeKey, children }: { changeKey: string; children: ReactN
 /** The checkbox ring, easing to the warning colour as high priority comes and goes. */
 function PriorityRing({ high }: { high: boolean }) {
   const theme = useTheme();
-  const progress = useDerivedValue(() => withTiming(high ? 1 : 0, { duration: CHANGE_MS }));
+  const { changeMs } = useChangeMotion();
+  const progress = useDerivedValue(() => withTiming(high ? 1 : 0, { duration: changeMs }));
   const ringStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(
       progress.value,
@@ -369,10 +384,11 @@ function PriorityRing({ high }: { high: boolean }) {
 
 function OptionRow({ children }: { children: ReactNode }) {
   const theme = useTheme();
+  const { appear, disappear } = useChangeMotion();
   return (
     <Animated.View
-      entering={APPEAR}
-      exiting={DISAPPEAR}
+      entering={appear}
+      exiting={disappear}
       style={{
         flexDirection: 'row',
         flexWrap: 'wrap',

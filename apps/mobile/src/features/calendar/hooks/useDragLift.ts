@@ -1,5 +1,6 @@
+import { scaleSpring, useTheme } from '@cal/ui';
 import * as Haptics from 'expo-haptics';
-import { useCallback, type RefObject } from 'react';
+import { useCallback, useMemo, type RefObject } from 'react';
 import type { ViewStyle } from 'react-native';
 import type { GestureType } from 'react-native-gesture-handler';
 import {
@@ -12,7 +13,7 @@ import {
 /** How long a finger must rest on an event before it lifts out of the grid. */
 export const PICK_UP_MS = 220;
 const LIFT = { damping: 18, stiffness: 220 };
-const RETURN = { duration: 140 };
+const RETURN_MS = 140;
 
 export interface DragLift {
   /** Live offset while the finger is down. */
@@ -22,6 +23,8 @@ export interface DragLift {
   dragging: SharedValue<boolean>;
   /** 0 flat in the grid, 1 fully lifted; each view's gesture springs it. */
   lifted: SharedValue<number>;
+  /** The spring `lifted` moves on, at the current motion speed. */
+  liftSpring: typeof LIFT;
   /** Style for the wrapper: the offset, the lift, and the shadow under it. */
   style: ReturnType<typeof useAnimatedStyle<ViewStyle>>;
   /** Call from `onStart`, through `runOnJS`. */
@@ -62,6 +65,9 @@ export interface DragLift {
  * — onto the UI thread, which Reanimated warns about on every style update.
  */
 export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLift {
+  const motionScale = useTheme().motion.scale;
+  const liftSpring = useMemo(() => scaleSpring(LIFT, motionScale), [motionScale]);
+  const returnMs = RETURN_MS * motionScale;
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   const settledX = useSharedValue(0);
@@ -102,9 +108,9 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
 
   const cancel = useCallback(() => {
     'worklet';
-    dragX.value = withTiming(0, RETURN);
-    dragY.value = withTiming(0, RETURN);
-  }, [dragX, dragY]);
+    dragX.value = withTiming(0, { duration: returnMs });
+    dragY.value = withTiming(0, { duration: returnMs });
+  }, [dragX, dragY, returnMs]);
 
   const applyBlocking = useCallback(
     (gesture: GestureType, blocking?: (RefObject<unknown> | GestureType)[]) => {
@@ -139,6 +145,7 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
     dragY,
     dragging,
     lifted,
+    liftSpring,
     style,
     pickedUp,
     putDown,
@@ -148,5 +155,3 @@ export function useDragLift(onDragChange?: (dragging: boolean) => void): DragLif
     applyBlocking,
   };
 }
-
-export { LIFT };

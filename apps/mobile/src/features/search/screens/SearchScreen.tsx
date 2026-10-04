@@ -1,4 +1,5 @@
 import { Text, useTheme } from '@cal/ui';
+import { useNavigation } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StatusBar, View } from 'react-native';
 import Animated, { Easing, FadeIn, LinearTransition } from 'react-native-reanimated';
@@ -23,11 +24,21 @@ import {
 const DEBOUNCE_MS = 220;
 
 /** The panel grows and shrinks to each new view, as the web viewport does. */
-const PANEL_RESIZE = LinearTransition.duration(280).easing(Easing.bezier(0.22, 1, 0.36, 1));
+const panelResizeFor = (motionScale: number) =>
+  LinearTransition.duration(280 * motionScale).easing(Easing.bezier(0.22, 1, 0.36, 1));
+
+/** The slice of the native-stack navigator this screen listens to. */
+interface StackTransitionEvents {
+  addListener(
+    type: 'transitionEnd',
+    listener: (event: { data: { closing: boolean } }) => void,
+  ): () => void;
+}
 
 /** Search events and tasks by the words users actually remember. */
 export function SearchScreen() {
   const theme = useTheme();
+  const panelResize = useMemo(() => panelResizeFor(theme.motion.scale), [theme.motion.scale]);
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const normalized = query.trim();
@@ -39,6 +50,18 @@ export function SearchScreen() {
   const openTask = useTaskEditorStore((state) => state.openTask);
   const timeZone = profile?.timezone ?? 'UTC';
   const hourCycle = profile?.hourCycle ?? 'h23';
+  const navigation = useNavigation<StackTransitionEvents>();
+  const [hasEntered, setHasEntered] = useState(false);
+
+  // Raise the keyboard only once the push settles: focusing mid-push makes iOS
+  // carry the keyboard in sideways with the page instead of up from the bottom.
+  useEffect(
+    () =>
+      navigation.addListener('transitionEnd', (event) => {
+        if (!event.data.closing) setHasEntered(true);
+      }),
+    [navigation],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(normalized), DEBOUNCE_MS);
@@ -97,7 +120,10 @@ export function SearchScreen() {
           gap: theme.spacing.xl,
         }}
       >
-        <Animated.View entering={FadeIn.duration(240)} style={{ gap: theme.spacing.xs }}>
+        <Animated.View
+          entering={FadeIn.duration(240 * theme.motion.scale)}
+          style={{ gap: theme.spacing.xs }}
+        >
           <Text variant="title1" accessibilityRole="header">
             Find anything
           </Text>
@@ -106,10 +132,15 @@ export function SearchScreen() {
           </Text>
         </Animated.View>
 
-        <SearchField value={query} onChangeText={setQuery} isSearching={isSearching} />
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          isSearching={isSearching}
+          shouldFocus={hasEntered}
+        />
 
         <Animated.View
-          layout={PANEL_RESIZE}
+          layout={panelResize}
           style={{
             overflow: 'hidden',
             borderRadius: theme.radius.xl,

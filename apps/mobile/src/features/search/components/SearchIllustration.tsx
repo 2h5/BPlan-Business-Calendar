@@ -304,7 +304,8 @@ export function SearchIllustration({ width = 220 }: { width?: number }) {
 }
 
 /** A 0→1 progress value that loops for as long as motion is allowed. */
-function useLoop(duration: number, reduceMotion: boolean, mirror = true): SharedValue<number> {
+function useLoop(cycleMs: number, reduceMotion: boolean, mirror = true): SharedValue<number> {
+  const duration = cycleMs * useTheme().motion.scale;
   const progress = useSharedValue(0);
 
   useEffect(() => {

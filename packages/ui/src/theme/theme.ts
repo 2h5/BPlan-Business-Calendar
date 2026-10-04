@@ -1,5 +1,6 @@
 import { type ColorTokens, darkColors, lightColors } from './colors';
-import { borderWidth, elevation, motion, radius, spacing } from './tokens';
+import { motionAt, type MotionTokens } from './motion';
+import { borderWidth, elevation, radius, spacing } from './tokens';
 import { typography } from './typography';
 
 export type ColorScheme = 'light' | 'dark';
@@ -11,7 +12,7 @@ export interface Theme {
   radius: typeof radius;
   elevation: typeof elevation;
   borderWidth: typeof borderWidth;
-  motion: typeof motion;
+  motion: MotionTokens;
   typography: typeof typography;
   /** Standard horizontal page inset. Cards align to this. */
   screenPadding: number;
@@ -28,7 +29,7 @@ const base = {
   radius,
   elevation,
   borderWidth,
-  motion,
+  motion: motionAt(1),
   typography,
   screenPadding: spacing.xl,
   hitSlopSize: 44,
@@ -39,5 +40,8 @@ const base = {
 export const darkTheme: Theme = { scheme: 'dark', colors: darkColors, ...base };
 export const lightTheme: Theme = { scheme: 'light', colors: lightColors, ...base };
 
-export const themeFor = (scheme: ColorScheme): Theme =>
-  scheme === 'dark' ? darkTheme : lightTheme;
+/** `motionScale` below 1 speeds every animation up — see `MotionTokens.scale`. */
+export function themeFor(scheme: ColorScheme, motionScale = 1): Theme {
+  const theme = scheme === 'dark' ? darkTheme : lightTheme;
+  return motionScale === 1 ? theme : { ...theme, motion: motionAt(motionScale) };
+}

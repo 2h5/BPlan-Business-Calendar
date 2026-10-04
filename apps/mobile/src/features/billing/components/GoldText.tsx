@@ -1,4 +1,4 @@
-import { Text, type TextProps } from '@cal/ui';
+import { Text, useTheme, type TextProps } from '@cal/ui';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, {
@@ -44,6 +44,7 @@ export function GoldText({ children, variant = 'body', cycleMs = 3000 }: GoldTex
   // A shimmering advert is exactly what this setting is meant to silence.
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
+  const motionScale = useTheme().motion.scale;
 
   const animating = width > 0 && !reduceMotion;
   /** Crossing time is fixed, so a longer cycle only lengthens the wait. */
@@ -52,8 +53,11 @@ export function GoldText({ children, variant = 'body', cycleMs = 3000 }: GoldTex
   useEffect(() => {
     if (!animating) return;
     progress.value = 0;
-    progress.value = withRepeat(withTiming(1, { duration: cycleMs, easing: Easing.linear }), -1);
-  }, [animating, cycleMs, progress]);
+    progress.value = withRepeat(
+      withTiming(1, { duration: cycleMs * motionScale, easing: Easing.linear }),
+      -1,
+    );
+  }, [animating, cycleMs, progress, motionScale]);
 
   const bandStyle = useAnimatedStyle(() => ({
     transform: [

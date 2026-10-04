@@ -1,5 +1,6 @@
 import { BottomSheet, Button, Chip, Text, TextField, useTheme } from '@cal/ui';
-import { Alert, Switch, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Alert, Switch, View, type TextInput } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 import { EventAlertPicker } from './EventAlertPicker';
@@ -16,6 +17,8 @@ import { toEventPayload, withStart } from '../utils/event-form';
 /** The form's scroll height with the keyboard down, and the least it shrinks to. */
 const SCROLL_MAX_HEIGHT = 470;
 const MIN_SCROLL_HEIGHT = 140;
+/** Lets the sheet mostly rise before the keyboard follows it up. */
+const TITLE_FOCUS_DELAY_MS = 220;
 
 export interface EventEditorSheetProps {
   visible: boolean;
@@ -50,6 +53,18 @@ export function EventEditorSheet({
   const createEvent = useCreateEvent();
   const updateEvent = useUpdateEvent();
   const removeEvent = useDeleteEvent();
+  const titleRef = useRef<TextInput>(null);
+  const isEditing = eventId !== null;
+
+  // A new event starts in the title, but only once the sheet is on its way up.
+  useEffect(() => {
+    if (!visible || isEditing) return;
+    const timer = setTimeout(
+      () => titleRef.current?.focus(),
+      TITLE_FOCUS_DELAY_MS * theme.motion.scale,
+    );
+    return () => clearTimeout(timer);
+  }, [visible, isEditing, theme.motion.scale]);
 
   const { form, patch, error, setError } = useEventForm({
     visible,
@@ -64,7 +79,6 @@ export function EventEditorSheet({
 
   if (!form) return null;
 
-  const isEditing = eventId !== null;
   const isSaving = createEvent.isPending || updateEvent.isPending;
   const selectedCalendar = calendars?.find((c) => c.id === form.calendarId);
   const isReadOnly = selectedCalendar?.isReadOnly ?? false;
@@ -141,6 +155,7 @@ export function EventEditorSheet({
         contentContainerStyle={{ gap: theme.spacing.lg, paddingBottom: theme.spacing.sm }}
       >
         <TextField
+          ref={titleRef}
           label="Title"
           value={form.title}
           onChangeText={(title) => {
@@ -148,7 +163,6 @@ export function EventEditorSheet({
             if (error) setError(null);
           }}
           placeholder="What is it?"
-          autoFocus={!isEditing}
           error={error ?? undefined}
         />
 
