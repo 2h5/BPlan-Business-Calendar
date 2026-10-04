@@ -1,6 +1,4 @@
-import { calculateBillingIntervalSavings, PRO_PLAN } from '@cal/domain';
-import { Button, Text, useTheme } from '@cal/ui';
-import { Ionicons } from '@expo/vector-icons';
+import { Text, useTheme } from '@cal/ui';
 import { useState } from 'react';
 import { Modal, ScrollView, type TextStyle, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,11 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BillingIntervalToggle, type BillingInterval } from './BillingIntervalToggle';
 import { LiquidGlassCloseButton } from './LiquidGlassCloseButton';
 import { PlanTierCard } from './PlanTierCard';
+import { PurchaseFooter } from './PurchaseFooter';
 import { RollingPrice } from './RollingPrice';
 import { UpgradeIllustration } from './UpgradeIllustration';
 import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
+import { isPurchasingSupported } from '../api/purchases.api';
+import { useManageSubscription, usePurchaseFlow, useStorePlans } from '../hooks/usePurchases';
 import { usePlanState } from '../hooks/useSubscription';
+import { buildPaywallPrices } from '../utils/paywall-prices';
 
 /**
  * Short, side-by-side lists — the long-form descriptions live on the web
@@ -43,10 +45,8 @@ const ART_WIDTH = 190;
 const COPY_INSET = 112;
 const ART_LIFT = 64;
 
-/** What annual billing saves, as the web page works it out. */
-const SAVINGS = calculateBillingIntervalSavings(PRO_PLAN.monthlyPrice, PRO_PLAN.annualPrice);
-/** The annual price as a monthly figure, for the comparison in the price note. */
-const ANNUAL_PER_MONTH = PRO_PLAN.annualPrice / 12;
+/** Apple requires the renewal terms next to the price of a subscription. */
+const RENEWAL_TERMS = 'Renews automatically until cancelled in your App Store settings.';
 
 /**
  * The upgrade prompt, mounted at the root so Settings can open it over
@@ -64,8 +64,9 @@ export function ProUpgradeModal() {
   // says "Current plan" where it would otherwise sell, as the web page does.
   const { isPro } = usePlanState();
 
-  /** Set when the upgrade button is pressed — see the note it reveals. */
-  const [showPurchaseNote, setShowPurchaseNote] = useState(false);
+  const storePlans = useStorePlans();
+  const flow = usePurchaseFlow();
+  const manage = useManageSubscription();
   /**
    * Which price is being shown. Starts monthly: it is the smaller number, and
    * the annual segment carries the saving that argues for the other one.
@@ -75,8 +76,21 @@ export function ProUpgradeModal() {
   const isAnnual = interval === 'annual';
   const [closeRowHeight, setCloseRowHeight] = useState(0);
 
+  const plans = storePlans.data ?? null;
+  const prices = buildPaywallPrices(plans?.monthly, plans?.annual);
+  const price = isAnnual ? prices.annual : prices.monthly;
+  const selectedPlan = isAnnual ? plans?.annual : plans?.monthly;
+  const unavailableReason = !isPurchasingSupported()
+    ? 'In-app purchase isn’t set up in this build yet.'
+    : storePlans.isPending
+      ? 'Loading prices from the App Store…'
+      : !selectedPlan
+        ? 'Couldn’t load prices from the App Store. Close and try again.'
+        : null;
+
   const dismiss = () => {
-    setShowPurchaseNote(false);
+    flow.reset();
+    manage.reset();
     close();
   };
 
@@ -160,8 +174,14 @@ export function ProUpgradeModal() {
 
           <BillingIntervalToggle
             value={interval}
-            onChange={setInterval}
-            savingsPercentage={SAVINGS.savingsPercentage}
+            onChange={(next) => {
+              // A failure on the other plan no longer applies; a payment does.
+              if (flow.state.phase === 'failed' || flow.state.phase === 'nothing-to-restore') {
+                flow.reset();
+              }
+              setInterval(next);
+            }}
+            savingsPercentage={prices.savingsPercentage}
           />
 
           <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
@@ -177,70 +197,37 @@ export function ProUpgradeModal() {
               summary="AI scheduling"
               badge="Most popular"
               highlighted
-              price={
-                <RollingPrice
-                  value={`$${(isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice).toFixed(2)}`}
-                  amount={isAnnual ? PRO_PLAN.annualPrice : PRO_PLAN.monthlyPrice}
-                />
-              }
+              price={<RollingPrice value={price.label} amount={price.amount} />}
               period={isAnnual ? '/ year' : '/ month'}
               features={PRO_FEATURES}
             />
           </View>
         </ScrollView>
 
-        <View
-          style={{
-            gap: theme.spacing.sm,
-            paddingHorizontal: theme.spacing.xl,
-            paddingTop: theme.spacing.md,
-            borderTopWidth: theme.borderWidth.hairline,
-            borderTopColor: theme.colors.borderSubtle,
+        <PurchaseFooter
+          isPro={isPro}
+          priceNote={
+            isAnnual
+              ? `${prices.annual.label} billed yearly (${prices.annualPerMonthLabel}/mo). Save ${prices.savingsLabel}. ${RENEWAL_TERMS}`
+              : `${prices.monthly.label} billed monthly. ${RENEWAL_TERMS}`
+          }
+          unavailableReason={unavailableReason}
+          flow={flow.state}
+          onPurchase={() => {
+            if (selectedPlan) flow.purchase(selectedPlan);
           }}
-        >
-          {isPro ? (
-            <View
-              accessibilityRole="text"
-              style={{
-                minHeight: 48,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: theme.radius.md,
-                borderWidth: theme.borderWidth.hairline,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surfaceRaised,
-              }}
-            >
-              <Text variant="bodyStrong" color="success">
-                Current plan
-              </Text>
-            </View>
-          ) : (
-            <Button
-              label="Continue with Pro"
-              size="lg"
-              fullWidth
-              trailingIcon={
-                <Ionicons name="arrow-forward" size={18} color={theme.colors.onAccent} />
-              }
-              onPress={() => setShowPurchaseNote(true)}
-            />
-          )}
-          {/* What the button would charge, so the choice above is never lost. */}
-          <Text variant="footnote" color="tertiary" align="center">
-            {isAnnual
-              ? `$${PRO_PLAN.annualPrice.toFixed(2)} billed yearly ($${ANNUAL_PER_MONTH.toFixed(2)}/mo). Save $${SAVINGS.savingsDollars.toFixed(2)}.`
-              : `$${PRO_PLAN.monthlyPrice.toFixed(2)} billed monthly. Cancel anytime.`}
-          </Text>
-          {!isPro && showPurchaseNote ? (
-            // Honest rather than decorative: there is no purchase SDK in this
-            // build, so the button cannot open a real checkout yet.
-            <Text variant="footnote" color="tertiary" align="center">
-              In-app purchase is not set up in this build yet.
-            </Text>
-          ) : null}
-          {isPro ? <Button label="Done" variant="ghost" fullWidth onPress={dismiss} /> : null}
-        </View>
+          onRestore={flow.restore}
+          onManage={isPurchasingSupported() ? () => manage.mutate() : null}
+          isManaging={manage.isPending}
+          manageNote={
+            manage.data === false
+              ? 'This subscription isn’t managed through the App Store. If you subscribed on the web, manage it from your account there.'
+              : manage.isError
+                ? 'Couldn’t open subscription settings. Please try again.'
+                : null
+          }
+          onDone={dismiss}
+        />
       </View>
     </Modal>
   );

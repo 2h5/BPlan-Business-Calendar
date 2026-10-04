@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Local development seed.
 --
--- Applied by `supabase db reset`. Creates one confirmed test user; the auth
+-- Applied by `supabase db reset`. Creates two confirmed test users; the auth
 -- triggers from migration 0001/0002 give it a profile and default calendar.
 --
 --   email:    dev@example.com
@@ -75,3 +75,46 @@ on conflict (user_id, entitlement) do nothing;
 insert into public.ai_rate_limit_overrides (user_id, rate_limit_per_hour, note)
 values ('11111111-1111-1111-1111-111111111111', 1000, 'dev seed high limit')
 on conflict (user_id) do nothing;
+
+-- ----------------------------------------------------------------------------
+-- A second user on the free plan, for testing upgrade and in-app purchase.
+--
+--   email:    free@example.com
+--   password: password123
+-- ----------------------------------------------------------------------------
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, confirmation_token, recovery_token,
+  email_change_token_new, email_change, raw_app_meta_data,
+  raw_user_meta_data, created_at, updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '22222222-2222-2222-2222-222222222222',
+  'authenticated', 'authenticated',
+  'free@example.com',
+  extensions.crypt('password123', extensions.gen_salt('bf')),
+  now(),
+  '', '', '', '',
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Free Tester"}'::jsonb,
+  now(), now()
+)
+on conflict (id) do nothing;
+
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+)
+values (
+  extensions.gen_random_uuid(),
+  '22222222-2222-2222-2222-222222222222',
+  '22222222-2222-2222-2222-222222222222',
+  '{"sub":"22222222-2222-2222-2222-222222222222","email":"free@example.com"}'::jsonb,
+  'email', now(), now(), now()
+)
+on conflict do nothing;
+
+update public.profiles
+set timezone = 'America/New_York', week_starts_on = 1
+where id = '22222222-2222-2222-2222-222222222222';

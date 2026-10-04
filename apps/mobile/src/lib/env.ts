@@ -12,6 +12,14 @@ const envSchema = z
     supabaseAnonKey: z.string().min(20, 'EXPO_PUBLIC_SUPABASE_ANON_KEY is missing'),
     appEnv: clientAppEnvSchema.default('development'),
     sentryDsn: z.string().optional(),
+    /**
+     * RevenueCat's public iOS SDK key. A `test_` key points at RevenueCat's
+     * Test Store; without one, in-app purchase is unavailable in this build.
+     */
+    revenueCatIosKey: z.string().min(1).optional(),
+    /** Shown on the upgrade page, as Apple requires for subscriptions. */
+    billingTermsUrl: z.string().url('EXPO_PUBLIC_BILLING_TERMS_URL must be a URL').optional(),
+    billingPrivacyUrl: z.string().url('EXPO_PUBLIC_BILLING_PRIVACY_URL must be a URL').optional(),
   })
   .superRefine((value, ctx) =>
     refinePublicSupabaseConfig(value, ctx, {
@@ -25,6 +33,9 @@ const parsed = envSchema.safeParse({
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   appEnv: process.env.EXPO_PUBLIC_APP_ENV,
   sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY || undefined,
+  billingTermsUrl: process.env.EXPO_PUBLIC_BILLING_TERMS_URL || undefined,
+  billingPrivacyUrl: process.env.EXPO_PUBLIC_BILLING_PRIVACY_URL || undefined,
 });
 
 if (!parsed.success) {
