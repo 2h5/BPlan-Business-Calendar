@@ -88,4 +88,9 @@ export const queryKeys = {
   },
 
   subscription: () => ['subscription'] as const,
+
+  purchases: {
+    /** The store's iOS plans and their localized prices. */
+    offering: () => ['purchases', 'offering'] as const,
+  },
 } as const;

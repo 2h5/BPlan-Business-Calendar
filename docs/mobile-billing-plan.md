@@ -2,6 +2,8 @@
 
 Status: **PLANNED — NOT STARTED (written 2026-09-30)**
 
+Progress is tracked in [`mobile-billing-active.md`](mobile-billing-active.md).
+
 This is the plan for selling BPlan Pro inside the iPhone app. It completes the
 open items in [Sprint 6 Phase 5](sprint-6-active.md#phase-5--revenuecat)
 (purchase, restore) and the one open state in Phase 6 (purchase restored).

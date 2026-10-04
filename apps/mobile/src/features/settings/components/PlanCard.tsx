@@ -6,6 +6,7 @@ import { Pressable, View, type ViewStyle } from 'react-native';
 import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { GoldText } from '../../billing/components/GoldText';
+import { RestorePurchasesRow } from '../../billing/components/RestorePurchasesRow';
 import { usePlanState } from '../../billing/hooks/useSubscription';
 
 const TITLE = `Upgrade to ${PRO_PLAN_NAME}`;
@@ -186,6 +187,7 @@ function UpgradeRow() {
         </Text>
         <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
       </Pressable>
+      <RestorePurchasesRow />
     </Card>
   );
 }

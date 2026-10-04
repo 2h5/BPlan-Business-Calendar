@@ -37,3 +37,34 @@ export async function fetchSubscription(userId: string): Promise<Subscription | 
     expiresAt: row.expires_at,
   });
 }
+
+const accessRefreshSchema = z.object({
+  status: z.enum([
+    'REPAIRED',
+    'CONVERGED',
+    'STALE',
+    'UNVERIFIED',
+    'LEASE_LOST',
+    'RETRY',
+    'BACKING_OFF',
+    'IN_PROGRESS',
+    'RECENTLY_VERIFIED',
+  ]),
+  retryAfterSeconds: z.number().int().positive().optional(),
+});
+
+export type AccessRefreshStatus = z.infer<typeof accessRefreshSchema>['status'];
+
+/**
+ * Ask the server to re-read the signed-in user's entitlement from RevenueCat
+ * and repair the mirror, the same call the web makes. Used right after a store
+ * purchase or restore, when the webhook may not have landed yet. The server
+ * decides everything; this call can never grant access by itself.
+ */
+export async function requestAccessRefresh(): Promise<AccessRefreshStatus> {
+  const { data, error } = await supabase.functions.invoke<unknown>('revenuecat-refresh', {
+    body: {},
+  });
+  if (error) throw toAppError(error);
+  return accessRefreshSchema.parse(data).status;
+}

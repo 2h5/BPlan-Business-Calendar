@@ -11,6 +11,7 @@ import { HeaderBackButton } from '../src/components/app-shell/HeaderBackButton';
 import { UndoToast } from '../src/components/app-shell/UndoToast';
 import { AuthProvider, useAuth } from '../src/features/auth';
 import { ProUpgradeModal } from '../src/features/billing/components/ProUpgradeModal';
+import { PurchasesSync } from '../src/features/billing/components/PurchasesSync';
 import { ReminderSync } from '../src/features/notifications';
 import {
   AppearanceProvider,
@@ -124,6 +125,7 @@ export default function RootLayout() {
               <ErrorBoundary>
                 <AuthGate />
                 <WidgetSync />
+                <PurchasesSync />
                 <RootStack />
                 <AuthenticatedOverlays />
               </ErrorBoundary>

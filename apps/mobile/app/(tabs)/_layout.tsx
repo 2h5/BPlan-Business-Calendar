@@ -1,16 +1,12 @@
 import { useTheme } from '@cal/ui';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 
-import { useAuth } from '../../src/features/auth';
-
 export default function TabsLayout() {
   const theme = useTheme();
-  const { isAuthenticated } = useAuth();
 
-  // Signing out clears the session a moment before AuthGate navigates away;
-  // unmount the tabs first so no screen renders signed-out data hooks.
-  if (!isAuthenticated) return null;
-
+  // Stays mounted through sign-out: removing the native tab bar while it is
+  // on screen trips react-native-screens' "exactly 1 focused tab" check and
+  // crashes debug builds. Each tab's content sits inside <SignedIn> instead.
   return (
     <NativeTabs
       iconColor={{ default: theme.colors.textTertiary, selected: theme.colors.accent }}
