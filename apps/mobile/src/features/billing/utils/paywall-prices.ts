@@ -11,60 +11,98 @@ export interface PaywallPrice {
   amount: number;
   /** The store's own localized string, e.g. "$2.99" or "2,99 €". */
   label: string;
+  currencyCode: string;
+}
+
+export interface PaywallSavings {
+  /** Whole-number percentage the annual plan saves over twelve months. */
+  percentage: number;
+  label: string;
 }
 
 export interface PaywallPrices {
-  monthly: PaywallPrice;
-  annual: PaywallPrice;
-  /** Whole-number percentage the annual plan saves over twelve months. */
-  savingsPercentage: number;
-  savingsLabel: string;
-  annualPerMonthLabel: string;
+  /** Null when the store sells other plans but not this one. */
+  monthly: PaywallPrice | null;
+  annual: PaywallPrice | null;
+  /** Null unless both plans are priced in the same currency. */
+  savings: PaywallSavings | null;
+  annualPerMonthLabel: string | null;
+  /** The Free plan's "0", in the same currency as Pro. */
+  freeLabel: string;
   /** False while showing the built-in USD list prices instead of the store's. */
   fromStore: boolean;
 }
 
 /**
- * The prices on the upgrade page. Uses the store's localized prices when both
- * plans are known — Apple shows the buyer's own currency and the page must
- * match the payment sheet — and the list prices in USD otherwise.
+ * The prices on the upgrade page.
+ *
+ * Once the store has priced any plan, every price on the page comes from the
+ * store — Apple shows the buyer's own currency and the page must match the
+ * payment sheet. A plan the store didn't return is shown as missing, never as
+ * a USD list price next to a purchasable plan in another currency. The USD
+ * list prices appear only when the store priced nothing, when nothing can be
+ * bought anyway.
  */
 export function buildPaywallPrices(
   monthly: PriceInput | null | undefined,
   annual: PriceInput | null | undefined,
   locale?: string,
 ): PaywallPrices {
-  if (monthly && annual && monthly.currencyCode === annual.currencyCode) {
-    return build(
-      { amount: monthly.price, label: monthly.priceString },
-      { amount: annual.price, label: annual.priceString },
-      monthly.currencyCode,
-      true,
-      locale,
-    );
+  if (!monthly && !annual) {
+    const usd = (amount: number): PaywallPrice => ({
+      amount,
+      label: format(amount, 'USD', locale),
+      currencyCode: 'USD',
+    });
+    return build(usd(PRO_PLAN.monthlyPrice), usd(PRO_PLAN.annualPrice), false, locale);
   }
-  const usd = (amount: number) => ({ amount, label: format(amount, 'USD', locale) });
-  return build(usd(PRO_PLAN.monthlyPrice), usd(PRO_PLAN.annualPrice), 'USD', false, locale);
+  return build(fromStore(monthly), fromStore(annual), true, locale);
+}
+
+function fromStore(input: PriceInput | null | undefined): PaywallPrice | null {
+  if (!input) return null;
+  return { amount: input.price, label: input.priceString, currencyCode: input.currencyCode };
 }
 
 function build(
-  monthly: PaywallPrice,
-  annual: PaywallPrice,
-  currencyCode: string,
-  fromStore: boolean,
+  monthly: PaywallPrice | null,
+  annual: PaywallPrice | null,
+  isFromStore: boolean,
   locale: string | undefined,
 ): PaywallPrices {
-  const savings = calculateBillingIntervalSavings(monthly.amount, annual.amount);
+  const currencyCode = (monthly ?? annual)?.currencyCode ?? 'USD';
+  const comparable = monthly && annual && monthly.currencyCode === annual.currencyCode;
+  const savings = comparable
+    ? calculateBillingIntervalSavings(monthly.amount, annual.amount)
+    : null;
+
   return {
     monthly,
     annual,
-    savingsPercentage: savings.savingsPercentage,
-    savingsLabel: format(savings.savingsDollars, currencyCode, locale),
-    annualPerMonthLabel: format(annual.amount / 12, currencyCode, locale),
-    fromStore,
+    savings:
+      savings && savings.savingsPercentage > 0
+        ? {
+            percentage: savings.savingsPercentage,
+            label: format(savings.savingsDollars, currencyCode, locale),
+          }
+        : null,
+    annualPerMonthLabel: annual ? format(annual.amount / 12, annual.currencyCode, locale) : null,
+    freeLabel: format(0, currencyCode, locale, 0),
+    fromStore: isFromStore,
   };
 }
 
-function format(amount: number, currency: string, locale: string | undefined): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+function format(
+  amount: number,
+  currency: string,
+  locale: string | undefined,
+  minimumFractionDigits?: number,
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    ...(minimumFractionDigits === undefined
+      ? {}
+      : { minimumFractionDigits, maximumFractionDigits: minimumFractionDigits }),
+  }).format(amount);
 }

@@ -92,5 +92,10 @@ export const queryKeys = {
   purchases: {
     /** The store's iOS plans and their localized prices. */
     offering: () => ['purchases', 'offering'] as const,
+    /**
+     * Mutation key shared by every buy/restore/re-check, so the upgrade page
+     * and Settings can see each other's store action and never run two.
+     */
+    storeAction: () => ['purchases', 'store-action'] as const,
   },
 } as const;
