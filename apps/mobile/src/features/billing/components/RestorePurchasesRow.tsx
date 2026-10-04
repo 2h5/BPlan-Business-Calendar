@@ -59,7 +59,7 @@ function resultText(
     case 'done':
       return { text: 'Purchase restored. Pro is on.', tone: 'success' };
     case 'unconfirmed':
-      return { text: 'Purchase found. Pro will switch on in a moment.', tone: 'secondary' };
+      return { text: 'Payment received. Pro will switch on shortly.', tone: 'secondary' };
     case 'nothing-to-restore':
       return { text: 'No previous purchases for this Apple ID.', tone: 'secondary' };
     case 'failed':

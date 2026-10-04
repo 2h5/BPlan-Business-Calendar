@@ -237,13 +237,37 @@ where the logic is pure; the hook and UI changes still need a simulator pass
 offered a second purchase — the webhook maps `SUBSCRIPTION_PAUSED` and
 `BILLING_ISSUE` to `active` (`revenuecat-webhook/events.ts`).
 
+**Second Codex review (of `5ab049c`, merged as `249d348`)** — all three
+confirmed and fixed:
+
+10. **A failed plan re-check could still enable buying (P2).** A free
+    account's cached answer is `null`, not `undefined`, so after a failed
+    refetch `isUnavailable` stayed false and the stale "Free" allowed a
+    purchase — a web subscriber could buy again. **Fix:** buying needs a
+    successful read newer than the moment the page opened.
+    `usePlanState` exposes `lastCheckFailed` and `checkedAt`;
+    `purchaseBlocker` (moved to `utils/purchase-gate.ts`) blocks on any failed
+    latest read or an answer older than `openedAt`. The Plan card's display
+    is unchanged (it still shows the last answer).
+11. **The unconfirmed lock wasn't shared between flows (P2).** It lived in
+    each `usePurchaseFlow`'s own mutation, so after Settings → Restore found
+    a purchase but confirmation timed out, the paywall could sell between
+    re-check rounds. **Fix:** the lock moved to a shared Zustand store
+    (`src/store/purchase-lock.store.ts`; client-only knowledge, not a mirrored
+    row), keyed by user. Every flow reads it, the confirming flow writes it
+    (`nextPurchaseLock`), and automatic re-checks are scheduled by every
+    mounted flow but run by the first to fire (`queryClient.isMutating`).
+12. **Annual announced as "Monthly billing" to VoiceOver (P3)** when savings
+    were hidden. The fallback label is now `LABELS[option]`.
+
 **Known limits (accepted for now)**
 
 - The unconfirmed lock lives in memory. If the app is killed mid-confirmation
   the lock is gone on relaunch; the App Store blocks a second subscription in
   the same group, and the server converges through webhook/reconcile.
 - No hook-level tests (the mobile suite has no React renderer); the pure
-  parts — `await-pro`, `paywall-prices` — are covered (13 tests).
+  parts — `await-pro`, `paywall-prices`, `purchase-gate` — are covered
+  (24 tests).
 
 ### A5. Re-prove after the review fixes (simulator, not done yet)
 
@@ -257,6 +281,14 @@ offered a second purchase — the webhook maps `SUBSCRIPTION_PAUSED` and
 - [ ] Sign out with an unconfirmed payment, sign in as another user → clean
       page.
 - [ ] Settings → Restore disabled while the paywall's purchase is confirming.
+- [ ] Open the paywall once (Free cached), stop local Supabase, reopen →
+      "Couldn't check your current plan", no buy; restart and Try again →
+      buy enabled.
+- [ ] Settings → Restore with confirmation timing out (refresh within the
+      cooldown) → open the paywall → "Payment received", buy locked, Check
+      again available.
+- [ ] VoiceOver on the billing toggle reads "Annual billing" when no saving
+      is shown.
 
 ---
 
@@ -302,6 +334,9 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 
 Newest first. One line per finished item, with the date and commit if any.
 
+- 2026-10-04 — Second review fixes (A4 #10–12): buying needs a successful
+  plan read since the page opened; unconfirmed-payment lock shared across
+  the paywall and Settings; toggle accessibility label. `pnpm verify` passes.
 - 2026-10-04 — Review fixes (A4): purchase lock survives closing the page,
   buying needs a successful plan check, confirmation honours server
   cooldowns with auto re-check and "Check again", prices never mix store and
