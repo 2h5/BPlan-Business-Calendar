@@ -31,13 +31,17 @@ export interface PlanState {
   isUnavailable: boolean;
   /** A read is in flight, so the answer above may be about to change. */
   isChecking: boolean;
+  /** The latest read failed, even if an earlier answer is still shown. */
+  lastCheckFailed: boolean;
+  /** When the shown answer was last read successfully (epoch ms; 0 = never). */
+  checkedAt: number;
   /** Re-read the plan. Stable across renders. */
   retry: () => void;
 }
 
 /** What plan the account is on, read the same way the web reads it. */
 export function usePlanState(): PlanState {
-  const { data, isPending, isError, isFetching, refetch } = useSubscription();
+  const { data, isPending, isError, isFetching, dataUpdatedAt, refetch } = useSubscription();
   const info = getSubscriptionStatusInfo(data ?? null);
   const retry = useCallback(() => void refetch(), [refetch]);
 
@@ -50,6 +54,10 @@ export function usePlanState(): PlanState {
     // different: the last answer still stands.
     isUnavailable: isError && data === undefined && !isFetching,
     isChecking: isFetching,
+    // Display may keep the last answer after a failed re-read; selling must
+    // not (see `purchaseBlocker`).
+    lastCheckFailed: isError,
+    checkedAt: dataUpdatedAt,
     retry,
   };
 }

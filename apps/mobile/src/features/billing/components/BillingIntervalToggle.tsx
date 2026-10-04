@@ -171,7 +171,7 @@ export function BillingIntervalToggle({
             accessibilityLabel={
               option === 'annual' && savingsPercentage !== null
                 ? `${LABELS.annual}, save ${savingsPercentage} percent`
-                : LABELS.monthly
+                : LABELS[option]
             }
             onPress={() => onChange(option)}
             onLayout={measure(index)}

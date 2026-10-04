@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 import { logError } from '../../../lib/logger';
 import { queryKeys } from '../../../lib/query/query-client';
+import { usePurchaseLockStore } from '../../../store/purchase-lock.store';
 import { useAuth } from '../../auth';
 import { fetchSubscription, requestAccessRefresh } from '../api/billing.api';
 import {
@@ -17,7 +18,13 @@ import {
   restoreStorePurchases,
   type StorePlan,
 } from '../api/purchases.api';
-import { awaitServerPro, DEFAULT_AWAIT_PRO, type AwaitProResult } from '../utils/await-pro';
+import { awaitServerPro, DEFAULT_AWAIT_PRO } from '../utils/await-pro';
+import {
+  activePurchaseLock,
+  nextPurchaseLock,
+  type PurchaseLock,
+  type StoreAction,
+} from '../utils/purchase-gate';
 import { classifyPurchaseError } from '../utils/purchase-outcome';
 
 /**
@@ -50,15 +57,14 @@ export function useStorePlans() {
   });
 }
 
-type StoreAction = 'purchase' | 'restore';
-
 /**
  * Where a store purchase or restore is up to, as the upgrade page shows it.
  *
  * `working` covers the store sheet and the gap between the store taking
  * payment and the server mirror saying Pro. `unconfirmed` means the store took
- * payment but the server hasn't caught up yet; the flow asks the server again
- * at `retryAt`, when its rate limit allows, and the person can ask too.
+ * payment but the server hasn't caught up yet; it is shared by every flow in
+ * the app (see `purchase-lock.store`), and the app asks the server again at
+ * `retryAt`, when its rate limit allows. The person can ask too.
  */
 export type PurchaseFlowState =
   | { phase: 'idle' }
@@ -73,15 +79,16 @@ type FlowRequest =
   | { action: 'restore' }
   | { action: 'recheck'; of: StoreAction; retryAt: number; round: number };
 
+/** This flow's own result. A pending confirmation lives in the shared lock. */
 type Outcome =
   | { kind: 'confirmed'; of: StoreAction }
-  | { kind: 'unconfirmed'; of: StoreAction; retryAt: number; round: number }
+  | { kind: 'unconfirmed' }
   | { kind: 'cancelled' }
   | { kind: 'nothing-to-restore' }
   | { kind: 'failed'; message: string };
 
 /**
- * How many times the flow re-asks the server on its own after a confirmation
+ * How many times the app re-asks the server on its own after a confirmation
  * window closes. Each waits out the server's cooldown, so three covers a few
  * minutes; after that the "Check again" button is the way on.
  */
@@ -103,9 +110,8 @@ export interface PurchaseFlow {
   /** Ask the server again after an unconfirmed payment. */
   recheck: () => void;
   /**
-   * Clear a finished result. A store action in flight, or a payment the
-   * server hasn't confirmed, is kept: forgetting either would unlock the buy
-   * button over a charge that already happened.
+   * Clear a finished result. A store action in flight is kept, and a payment
+   * the server hasn't confirmed stays locked whatever this flow shows.
    */
   reset: () => void;
 }
@@ -115,11 +121,18 @@ export function usePurchaseFlow(): PurchaseFlow {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const isBusy = useIsMutating({ mutationKey: queryKeys.purchases.storeAction() }) > 0;
+  const lock = activePurchaseLock(
+    usePurchaseLockStore((store) => store.lock),
+    userId,
+  );
 
-  const confirmWithServer = async (
+  /** Waits for the server, then records the answer in the shared lock. */
+  const confirm = async (
     id: string,
+    of: StoreAction,
     notBefore: number | null,
-  ): Promise<AwaitProResult> => {
+    round: number,
+  ): Promise<Outcome> => {
     const result = await awaitServerPro(
       {
         refresh: requestAccessRefresh,
@@ -131,19 +144,18 @@ export function usePurchaseFlow(): PurchaseFlow {
       { ...DEFAULT_AWAIT_PRO, notBefore },
     );
     await queryClient.invalidateQueries({ queryKey: queryKeys.subscription() });
-    return result;
-  };
 
-  const confirm = async (
-    id: string,
-    of: StoreAction,
-    notBefore: number | null,
-    round: number,
-  ): Promise<Outcome> => {
-    const result = await confirmWithServer(id, notBefore);
-    return result.confirmed
-      ? { kind: 'confirmed', of }
-      : { kind: 'unconfirmed', of, retryAt: result.retryAt, round };
+    const { lock: current, setLock } = usePurchaseLockStore.getState();
+    setLock(
+      nextPurchaseLock(
+        current,
+        id,
+        result.confirmed
+          ? { kind: 'confirmed' }
+          : { kind: 'unconfirmed', of, retryAt: result.retryAt, round },
+      ),
+    );
+    return result.confirmed ? { kind: 'confirmed', of } : { kind: 'unconfirmed' };
   };
 
   const run = useMutation({
@@ -185,30 +197,38 @@ export function usePurchaseFlow(): PurchaseFlow {
 
   // A result belongs to the account that produced it. The upgrade page lives
   // at the root and outlives sign-out, so without this the next account would
-  // inherit the last one's "payment received" and its locked buy button.
+  // inherit the last one's result, or its locked buy button.
   useEffect(() => {
     resetMutation();
+    const { lock: current, setLock } = usePurchaseLockStore.getState();
+    if (current && current.userId !== userId) setLock(null);
   }, [userId, resetMutation]);
 
   // The server said when it will re-read RevenueCat again; ask then, rather
   // than leave a paid person waiting on a webhook that may never come.
   useEffect(() => {
-    if (outcome?.kind !== 'unconfirmed' || outcome.round >= AUTO_RECHECKS) return;
-    const { of, retryAt, round } = outcome;
+    if (!lock || lock.round >= AUTO_RECHECKS) return;
+    const { of, retryAt, round } = lock;
     const timer = setTimeout(
-      () => mutate({ action: 'recheck', of, retryAt, round: round + 1 }),
+      () => {
+        // Every mounted flow schedules this; the first to fire runs it.
+        if (queryClient.isMutating({ mutationKey: queryKeys.purchases.storeAction() }) > 0) {
+          return;
+        }
+        mutate({ action: 'recheck', of, retryAt, round: round + 1 });
+      },
       Math.max(0, retryAt - Date.now()),
     );
     return () => clearTimeout(timer);
-  }, [outcome, mutate]);
+  }, [lock, mutate, queryClient]);
 
-  const state = toState(isPending, variables, outcome);
+  const state = toState(isPending, variables, outcome, lock);
 
   return {
     state,
     isBusy,
     purchase: (plan) => {
-      if (isBusy || state.phase === 'unconfirmed') return;
+      if (isBusy || lock) return;
       mutate({ action: 'purchase', plan });
     },
     restore: () => {
@@ -216,12 +236,12 @@ export function usePurchaseFlow(): PurchaseFlow {
       mutate({ action: 'restore' });
     },
     recheck: () => {
-      if (isBusy || outcome?.kind !== 'unconfirmed') return;
+      if (isBusy || !lock) return;
       // A manual ask doesn't spend an automatic round.
-      mutate({ action: 'recheck', of: outcome.of, retryAt: outcome.retryAt, round: outcome.round });
+      mutate({ action: 'recheck', of: lock.of, retryAt: lock.retryAt, round: lock.round });
     },
     reset: () => {
-      if (isPending || outcome?.kind === 'unconfirmed') return;
+      if (isPending) return;
       resetMutation();
     },
   };
@@ -231,18 +251,20 @@ function toState(
   isPending: boolean,
   request: FlowRequest | undefined,
   outcome: Outcome | undefined,
+  lock: PurchaseLock | null,
 ): PurchaseFlowState {
   if (isPending && request) return { phase: 'working', action: request.action };
+  if (lock) return { phase: 'unconfirmed', action: lock.of, retryAt: lock.retryAt };
   switch (outcome?.kind) {
     case 'confirmed':
       return { phase: 'done', action: outcome.of };
-    case 'unconfirmed':
-      return { phase: 'unconfirmed', action: outcome.of, retryAt: outcome.retryAt };
     case 'nothing-to-restore':
       return { phase: 'nothing-to-restore' };
     case 'failed':
       return { phase: 'failed', message: outcome.message };
     default:
+      // Includes an `unconfirmed` whose lock has since cleared: confirmed by
+      // another flow, or the account changed.
       return { phase: 'idle' };
   }
 }

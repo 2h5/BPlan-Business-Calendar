@@ -13,8 +13,9 @@ import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { isPurchasingSupported } from '../api/purchases.api';
 import { useManageSubscription, usePurchaseFlow, useStorePlans } from '../hooks/usePurchases';
-import { usePlanState, type PlanState } from '../hooks/useSubscription';
+import { usePlanState } from '../hooks/useSubscription';
 import { buildPaywallPrices, type PaywallPrices } from '../utils/paywall-prices';
+import { PLAN_CHECK_FAILED, purchaseBlocker } from '../utils/purchase-gate';
 
 /**
  * Short, side-by-side lists — the long-form descriptions live on the web
@@ -67,8 +68,12 @@ export function ProUpgradeModal() {
 
   // Re-read the plan whenever the page opens: a subscription bought on the web
   // a minute ago must not be offered again from a five-minute-old answer.
+  // Buying waits for a read newer than `openedAt` (see `purchaseBlocker`).
+  const [openedAt, setOpenedAt] = useState<number | null>(null);
   useEffect(() => {
-    if (isOpen) recheckPlan();
+    if (!isOpen) return;
+    setOpenedAt(Date.now());
+    recheckPlan();
   }, [isOpen, recheckPlan]);
 
   const storePlans = useStorePlans();
@@ -90,15 +95,17 @@ export function ProUpgradeModal() {
   const unavailableReason = purchaseBlocker({
     supported: isPurchasingSupported(),
     plan,
+    openedAt,
     pricesPending: storePlans.isPending,
     pricesFailed: storePlans.isError || storePlans.data === null,
     hasSelectedPlan: Boolean(selectedPlan),
   });
-  const retryUnavailable = plan.isUnavailable
-    ? recheckPlan
-    : storePlans.isError
-      ? () => void storePlans.refetch()
-      : null;
+  const retryUnavailable =
+    unavailableReason === PLAN_CHECK_FAILED
+      ? recheckPlan
+      : storePlans.isError
+        ? () => void storePlans.refetch()
+        : null;
 
   const dismiss = () => {
     // Keeps a purchase in flight, or paid but not yet confirmed: see `reset`.
@@ -243,28 +250,6 @@ export function ProUpgradeModal() {
       </View>
     </Modal>
   );
-}
-
-/**
- * Why the buy button is off, or null when it may be pressed. Buying needs a
- * plan check that succeeded: an unknown plan is not the free plan, and someone
- * who already pays — on the web, say — must not be offered a second
- * subscription because a read failed.
- */
-function purchaseBlocker(input: {
-  supported: boolean;
-  plan: PlanState;
-  pricesPending: boolean;
-  pricesFailed: boolean;
-  hasSelectedPlan: boolean;
-}): string | null {
-  if (!input.supported) return 'In-app purchase isn’t set up in this build yet.';
-  if (input.plan.isUnavailable) return 'Couldn’t check your current plan.';
-  if (input.plan.isLoading || input.plan.isChecking) return 'Checking your current plan…';
-  if (input.pricesPending) return 'Loading prices from the App Store…';
-  if (input.pricesFailed) return 'Couldn’t load prices from the App Store.';
-  if (!input.hasSelectedPlan) return 'This plan isn’t available from the App Store right now.';
-  return null;
 }
 
 function priceNote(isAnnual: boolean, prices: PaywallPrices): string {
