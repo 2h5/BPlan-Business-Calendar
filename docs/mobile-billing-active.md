@@ -19,7 +19,7 @@ Everything that can be done without the $99 Apple fee is done. What is left:
 1. **Founder:** finish the Terms and Privacy pages. The links work, but both
    pages say "DRAFT — NOT FINAL. Do not use this page for production paid
    checkout." Must be final before App Review (Phase D).
-2. **Founder/Eng:** open a PR for `feat/mobile-iap-test-store` (pushed).
+2. **Eng:** run the A5 simulator checks for the review fixes (A4).
 3. **Phase B onward** when ready to pay the $99 (below).
 4. **Later:** confirm the RevenueCat webhook fires for Test Store purchases
    (only matters on the hosted sandbox; local runs use refresh).
@@ -74,13 +74,14 @@ Notes on what was already in the project:
       RevenueCat right after a purchase instead of waiting for the webhook.
 - [x] Hooks (`hooks/usePurchases.ts`): `usePurchaserSync`, `useStorePlans`,
       `usePurchaseFlow` (buy + restore), `useManageSubscription`.
-- [x] `ProUpgradeModal` + new `PurchaseFooter`: store prices (localized, USD
-      list prices only as a fallback), buy the selected plan, renewal terms
-      under the price, Restore Purchases, Terms/Privacy links (shown when
-      configured).
-- [x] After buy/restore: refresh once, poll the mirror ~20 s
-      (`utils/await-pro.ts`), invalidate `queryKeys.subscription()`. The app
-      never grants Pro itself.
+- [x] `ProUpgradeModal` + new `PurchaseFooter`: store prices (localized; USD
+      list prices only when the store priced nothing), buy the selected plan,
+      renewal terms under the price, Restore Purchases, Terms/Privacy links
+      (shown when configured).
+- [x] After buy/restore: ask the server to refresh, poll the mirror for 20 s
+      (`utils/await-pro.ts`), honouring the server's `retryAfterSeconds`;
+      invalidate `queryKeys.subscription()`. The app never grants Pro itself.
+      (Originally refreshed once and polled ~18 s — see Review fixes below.)
 - [x] States: loading prices, not set up in this build, cancelled (silent),
       failed, pending (Ask to Buy), offline, store unavailable, payment
       received but unconfirmed (buy button locked), restored, nothing to
@@ -170,6 +171,93 @@ checked in the last minute; wait a minute between manual tests.
 Note: a release build launched with a `test_` key crashes on purpose, so the
 key can't leak into production.
 
+### A4. Review fixes (Eng, 2026-10-04)
+
+A Codex review of `0092c66` and `0937de7` (merged as `9acca68`) found four
+P2 issues to fix before real Apple billing. All four were confirmed against
+the code and fixed; a follow-up pass found five more, also fixed. Unit-tested
+where the logic is pure; the hook and UI changes still need a simulator pass
+(A5).
+
+**From the review**
+
+1. **Closing the paywall cleared the purchase lock.** `dismiss` called
+   `flow.reset()`, which reset the mutation even while the store sheet or the
+   server confirmation was running. Reopening showed an enabled buy button and
+   the result was lost. **Fix:** `usePurchaseFlow().reset()` now refuses while
+   a store action is in flight or a payment is `unconfirmed`; only finished
+   results (failed, nothing to restore, done) are cleared. The modal is
+   mounted at the root, so the flow survives being closed.
+2. **Unknown plan status still permitted buying.** The paywall read only
+   `isPro` and ignored `isLoading` / `isUnavailable`, so a failed entitlement
+   read let an existing (e.g. web) subscriber buy a second subscription.
+   **Fix:** buying needs a successful plan check — `purchaseBlocker()` in
+   `ProUpgradeModal` blocks while loading, re-checking, or unavailable, with
+   "Try again". The plan is also re-read each time the page opens
+   (`usePlanState` gained `isChecking` and a stable `retry`), so a
+   five-minute-old "free" answer can't sell over a fresh web purchase.
+3. **Confirmation ignored server cooldowns.** It refreshed once and polled
+   ~18 s, even when the server answered `RECENTLY_VERIFIED` / `BACKING_OFF` /
+   `IN_PROGRESS` with `retryAfterSeconds` (e.g. a restore then a purchase
+   within a minute). With no webhook (local runs), a paid user stayed
+   unconfirmed until something else refreshed. **Fix:**
+   `requestAccessRefresh()` now returns `retryAfterSeconds`; `awaitServerPro`
+   never refreshes before it, refreshes again inside the window once a short
+   cooldown lapses, and returns `retryAt` when it runs out. The flow then
+   re-checks automatically at `retryAt` (up to 3 rounds) and the page shows a
+   **Check again** button as the manual recovery path.
+4. **Displayed price could differ from the purchased product.** When either
+   package was missing, both prices fell back to USD constants while the
+   other package stayed purchasable (a €5.99 product shown as $2.99).
+   **Fix:** `buildPaywallPrices` uses each plan's own store price; a missing
+   plan shows "—" and can't be bought; savings appear only when both plans
+   are priced in the same currency. USD list prices appear only when the
+   store priced nothing (nothing is purchasable then).
+
+**Found in the follow-up pass**
+
+5. **Purchase state leaked across accounts.** The root-mounted paywall keeps
+   its flow through sign-out, so (once fix 1 kept results) the next account
+   would inherit "Payment received" and a locked button. **Fix:** the flow
+   resets when `userId` changes.
+6. **Paywall purchase and Settings restore could run at once.** Each had its
+   own `usePurchaseFlow`; after closing the paywall mid-purchase, Settings →
+   Restore could start a second store call. **Fix:** buy, restore and
+   re-check are one mutation under the shared key
+   `queryKeys.purchases.storeAction()`; `isBusy` (via `useIsMutating`) locks
+   both UIs while any of them runs.
+7. **Restore was blocked by unrelated failures.** Restore Purchases was
+   disabled whenever the buy button was (prices loading or failed). Restoring
+   never charges, so it now only waits for another store action.
+8. **Free plan always showed "$0".** It now uses the store currency ("0 €").
+9. **Savings badge without comparable prices.** The toggle's "Save N%" hides
+   when there is no same-currency pair.
+
+**Checked and not an issue:** a paused or billing-issue subscription is not
+offered a second purchase — the webhook maps `SUBSCRIPTION_PAUSED` and
+`BILLING_ISSUE` to `active` (`revenuecat-webhook/events.ts`).
+
+**Known limits (accepted for now)**
+
+- The unconfirmed lock lives in memory. If the app is killed mid-confirmation
+  the lock is gone on relaunch; the App Store blocks a second subscription in
+  the same group, and the server converges through webhook/reconcile.
+- No hook-level tests (the mobile suite has no React renderer); the pure
+  parts — `await-pro`, `paywall-prices` — are covered (13 tests).
+
+### A5. Re-prove after the review fixes (simulator, not done yet)
+
+- [ ] Buy, close the page during "Confirming…", reopen → still confirming,
+      buy button locked; result appears when it lands.
+- [ ] Restore, then buy within a minute → server answers `RECENTLY_VERIFIED`;
+      page shows "Payment received", re-checks on its own after the cooldown
+      and flips to Pro without a webhook.
+- [ ] Stop local Supabase, open the paywall as `free@example.com` → "Couldn't
+      check your current plan" with Try again, no buy.
+- [ ] Sign out with an unconfirmed payment, sign in as another user → clean
+      page.
+- [ ] Settings → Restore disabled while the paywall's purchase is confirming.
+
 ---
 
 ## Phase B — Apple account and store setup (costs $99/year; deferred)
@@ -214,6 +302,12 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 
 Newest first. One line per finished item, with the date and commit if any.
 
+- 2026-10-04 — Review fixes (A4): purchase lock survives closing the page,
+  buying needs a successful plan check, confirmation honours server
+  cooldowns with auto re-check and "Check again", prices never mix store and
+  USD; plus account-switch reset, one store action at a time, restore no
+  longer blocked by prices. `pnpm verify` passes. Simulator re-check (A5)
+  pending.
 - 2026-10-04 — Terms/Privacy links on the paywall; web-subscriber check on
   iPhone (passes, real web purchase still Phase C); sign-out crash fixed;
   duplicate RevenueCat configure warning fixed. `pnpm verify` passes.

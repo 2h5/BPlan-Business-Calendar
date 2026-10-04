@@ -1,5 +1,5 @@
 import { Text, useTheme } from '@cal/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, ScrollView, type TextStyle, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -13,8 +13,8 @@ import { PRO_PLAN_NAME } from '../../../lib/brand';
 import { usePaywallStore } from '../../../store/paywall.store';
 import { isPurchasingSupported } from '../api/purchases.api';
 import { useManageSubscription, usePurchaseFlow, useStorePlans } from '../hooks/usePurchases';
-import { usePlanState } from '../hooks/useSubscription';
-import { buildPaywallPrices } from '../utils/paywall-prices';
+import { usePlanState, type PlanState } from '../hooks/useSubscription';
+import { buildPaywallPrices, type PaywallPrices } from '../utils/paywall-prices';
 
 /**
  * Short, side-by-side lists — the long-form descriptions live on the web
@@ -62,7 +62,14 @@ export function ProUpgradeModal() {
   const close = usePaywallStore((state) => state.close);
   // A subscriber opens this from the Plan card to see what they pay for, so it
   // says "Current plan" where it would otherwise sell, as the web page does.
-  const { isPro } = usePlanState();
+  const plan = usePlanState();
+  const { isPro, retry: recheckPlan } = plan;
+
+  // Re-read the plan whenever the page opens: a subscription bought on the web
+  // a minute ago must not be offered again from a five-minute-old answer.
+  useEffect(() => {
+    if (isOpen) recheckPlan();
+  }, [isOpen, recheckPlan]);
 
   const storePlans = useStorePlans();
   const flow = usePurchaseFlow();
@@ -80,15 +87,21 @@ export function ProUpgradeModal() {
   const prices = buildPaywallPrices(plans?.monthly, plans?.annual);
   const price = isAnnual ? prices.annual : prices.monthly;
   const selectedPlan = isAnnual ? plans?.annual : plans?.monthly;
-  const unavailableReason = !isPurchasingSupported()
-    ? 'In-app purchase isn’t set up in this build yet.'
-    : storePlans.isPending
-      ? 'Loading prices from the App Store…'
-      : !selectedPlan
-        ? 'Couldn’t load prices from the App Store. Close and try again.'
-        : null;
+  const unavailableReason = purchaseBlocker({
+    supported: isPurchasingSupported(),
+    plan,
+    pricesPending: storePlans.isPending,
+    pricesFailed: storePlans.isError || storePlans.data === null,
+    hasSelectedPlan: Boolean(selectedPlan),
+  });
+  const retryUnavailable = plan.isUnavailable
+    ? recheckPlan
+    : storePlans.isError
+      ? () => void storePlans.refetch()
+      : null;
 
   const dismiss = () => {
+    // Keeps a purchase in flight, or paid but not yet confirmed: see `reset`.
     flow.reset();
     manage.reset();
     close();
@@ -181,14 +194,14 @@ export function ProUpgradeModal() {
               }
               setInterval(next);
             }}
-            savingsPercentage={prices.savingsPercentage}
+            savingsPercentage={prices.savings?.percentage ?? null}
           />
 
           <View style={{ flexDirection: 'row', gap: theme.spacing.md }}>
             <PlanTierCard
               name="Free"
               summary="The essentials"
-              price={<RollingPrice value="$0" amount={0} />}
+              price={<RollingPrice value={prices.freeLabel} amount={0} />}
               period={isAnnual ? '/ year' : '/ month'}
               features={FREE_FEATURES}
             />
@@ -197,7 +210,7 @@ export function ProUpgradeModal() {
               summary="AI scheduling"
               badge="Most popular"
               highlighted
-              price={<RollingPrice value={price.label} amount={price.amount} />}
+              price={<RollingPrice value={price?.label ?? '—'} amount={price?.amount ?? 0} />}
               period={isAnnual ? '/ year' : '/ month'}
               features={PRO_FEATURES}
             />
@@ -206,17 +219,16 @@ export function ProUpgradeModal() {
 
         <PurchaseFooter
           isPro={isPro}
-          priceNote={
-            isAnnual
-              ? `${prices.annual.label} billed yearly (${prices.annualPerMonthLabel}/mo). Save ${prices.savingsLabel}. ${RENEWAL_TERMS}`
-              : `${prices.monthly.label} billed monthly. ${RENEWAL_TERMS}`
-          }
+          priceNote={priceNote(isAnnual, prices)}
           unavailableReason={unavailableReason}
+          onRetryUnavailable={retryUnavailable}
           flow={flow.state}
+          isBusy={flow.isBusy}
           onPurchase={() => {
-            if (selectedPlan) flow.purchase(selectedPlan);
+            if (selectedPlan && unavailableReason === null) flow.purchase(selectedPlan);
           }}
-          onRestore={flow.restore}
+          onRestore={isPurchasingSupported() ? flow.restore : null}
+          onRecheck={flow.recheck}
           onManage={isPurchasingSupported() ? () => manage.mutate() : null}
           isManaging={manage.isPending}
           manageNote={
@@ -231,4 +243,37 @@ export function ProUpgradeModal() {
       </View>
     </Modal>
   );
+}
+
+/**
+ * Why the buy button is off, or null when it may be pressed. Buying needs a
+ * plan check that succeeded: an unknown plan is not the free plan, and someone
+ * who already pays — on the web, say — must not be offered a second
+ * subscription because a read failed.
+ */
+function purchaseBlocker(input: {
+  supported: boolean;
+  plan: PlanState;
+  pricesPending: boolean;
+  pricesFailed: boolean;
+  hasSelectedPlan: boolean;
+}): string | null {
+  if (!input.supported) return 'In-app purchase isn’t set up in this build yet.';
+  if (input.plan.isUnavailable) return 'Couldn’t check your current plan.';
+  if (input.plan.isLoading || input.plan.isChecking) return 'Checking your current plan…';
+  if (input.pricesPending) return 'Loading prices from the App Store…';
+  if (input.pricesFailed) return 'Couldn’t load prices from the App Store.';
+  if (!input.hasSelectedPlan) return 'This plan isn’t available from the App Store right now.';
+  return null;
+}
+
+function priceNote(isAnnual: boolean, prices: PaywallPrices): string {
+  if (isAnnual) {
+    if (!prices.annual) return RENEWAL_TERMS;
+    const perMonth = prices.annualPerMonthLabel ? ` (${prices.annualPerMonthLabel}/mo)` : '';
+    const saving = prices.savings ? ` Save ${prices.savings.label}.` : '';
+    return `${prices.annual.label} billed yearly${perMonth}.${saving} ${RENEWAL_TERMS}`;
+  }
+  if (!prices.monthly) return RENEWAL_TERMS;
+  return `${prices.monthly.label} billed monthly. ${RENEWAL_TERMS}`;
 }

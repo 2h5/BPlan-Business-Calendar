@@ -55,16 +55,23 @@ const accessRefreshSchema = z.object({
 
 export type AccessRefreshStatus = z.infer<typeof accessRefreshSchema>['status'];
 
+export interface AccessRefreshResult {
+  status: AccessRefreshStatus;
+  /** Set while the server is rate-limiting or backing off: when to ask again. */
+  retryAfterSeconds: number | null;
+}
+
 /**
  * Ask the server to re-read the signed-in user's entitlement from RevenueCat
  * and repair the mirror, the same call the web makes. Used right after a store
  * purchase or restore, when the webhook may not have landed yet. The server
  * decides everything; this call can never grant access by itself.
  */
-export async function requestAccessRefresh(): Promise<AccessRefreshStatus> {
+export async function requestAccessRefresh(): Promise<AccessRefreshResult> {
   const { data, error } = await supabase.functions.invoke<unknown>('revenuecat-refresh', {
     body: {},
   });
   if (error) throw toAppError(error);
-  return accessRefreshSchema.parse(data).status;
+  const parsed = accessRefreshSchema.parse(data);
+  return { status: parsed.status, retryAfterSeconds: parsed.retryAfterSeconds ?? null };
 }

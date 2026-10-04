@@ -12,9 +12,16 @@ export interface PurchaseFooterProps {
   priceNote: string;
   /** Why buying can't happen right now, or null when it can. */
   unavailableReason: string | null;
+  /** Retries whatever `unavailableReason` describes, when a retry can help. */
+  onRetryUnavailable: (() => void) | null;
   flow: PurchaseFlowState;
+  /** A store action is running here or elsewhere in the app. */
+  isBusy: boolean;
   onPurchase: () => void;
-  onRestore: () => void;
+  /** Null when this build can't talk to the store. */
+  onRestore: (() => void) | null;
+  /** Ask the server again after a payment it hasn't confirmed. */
+  onRecheck: () => void;
   onManage: (() => void) | null;
   isManaging: boolean;
   /** Set when "Manage subscription" found nowhere to send the person. */
@@ -31,9 +38,12 @@ export function PurchaseFooter({
   isPro,
   priceNote,
   unavailableReason,
+  onRetryUnavailable,
   flow,
+  isBusy,
   onPurchase,
   onRestore,
+  onRecheck,
   onManage,
   isManaging,
   manageNote,
@@ -41,6 +51,7 @@ export function PurchaseFooter({
 }: PurchaseFooterProps) {
   const theme = useTheme();
   const working = flow.phase === 'working';
+  const confirming = working && (flow.action === 'purchase' || flow.action === 'recheck');
   const paid = flow.phase === 'unconfirmed' || flow.phase === 'done';
   const status = statusLine(flow, isPro);
 
@@ -73,12 +84,12 @@ export function PurchaseFooter({
         </View>
       ) : (
         <Button
-          label={working && flow.action === 'purchase' ? 'Confirming…' : 'Continue with Pro'}
+          label={confirming ? 'Confirming…' : 'Continue with Pro'}
           size="lg"
           fullWidth
-          loading={working && flow.action === 'purchase'}
+          loading={confirming}
           // Once the store has taken payment, a second tap would buy again.
-          disabled={working || paid || unavailableReason !== null}
+          disabled={isBusy || paid || unavailableReason !== null}
           trailingIcon={<Ionicons name="arrow-forward" size={18} color={theme.colors.onAccent} />}
           onPress={onPurchase}
         />
@@ -104,6 +115,22 @@ export function PurchaseFooter({
         <Text variant="footnote" color="tertiary" align="center">
           {unavailableReason}
         </Text>
+      ) : null}
+
+      {!isPro && !status && unavailableReason && onRetryUnavailable ? (
+        <Button label="Try again" variant="ghost" fullWidth onPress={onRetryUnavailable} />
+      ) : null}
+
+      {/* The recovery path when the server is slow to confirm a payment. The
+          flow also asks again on its own once the server's cooldown is over. */}
+      {!isPro && flow.phase === 'unconfirmed' ? (
+        <Button
+          label="Check again"
+          variant="secondary"
+          fullWidth
+          disabled={isBusy}
+          onPress={onRecheck}
+        />
       ) : null}
 
       {isPro ? (
@@ -135,10 +162,12 @@ export function PurchaseFooter({
           paddingBottom: theme.spacing.xs,
         }}
       >
-        {isPro ? null : (
+        {/* Restoring never charges, so it doesn't wait on the plan check or
+            prices that hold back the buy button. */}
+        {isPro || !onRestore ? null : (
           <FooterLink
             label={working && flow.action === 'restore' ? 'Restoring…' : 'Restore Purchases'}
-            disabled={working || unavailableReason !== null}
+            disabled={isBusy}
             onPress={onRestore}
           />
         )}
@@ -193,8 +222,11 @@ type Tone = 'secondary' | 'success' | 'danger';
 function statusLine(flow: PurchaseFlowState, isPro: boolean): { text: string; tone: Tone } | null {
   switch (flow.phase) {
     case 'working':
-      return flow.action === 'restore'
-        ? { text: 'Checking the App Store for your purchases…', tone: 'secondary' }
+      if (flow.action === 'restore') {
+        return { text: 'Checking the App Store for your purchases…', tone: 'secondary' };
+      }
+      return flow.action === 'recheck'
+        ? { text: 'Checking whether Pro is on yet…', tone: 'secondary' }
         : null;
     case 'done':
       return flow.action === 'restore'
@@ -204,7 +236,7 @@ function statusLine(flow: PurchaseFlowState, isPro: boolean): { text: string; to
       return isPro
         ? { text: 'You’re on Pro.', tone: 'success' }
         : {
-            text: 'Payment received. Pro will switch on in a moment — you can close this page.',
+            text: 'Payment received. Pro will switch on shortly — we’ll keep checking, and you can close this page.',
             tone: 'secondary',
           };
     case 'nothing-to-restore':

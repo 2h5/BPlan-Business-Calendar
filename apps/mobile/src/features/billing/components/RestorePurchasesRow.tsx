@@ -21,8 +21,9 @@ export function RestorePurchasesRow() {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Restore purchases"
-      accessibilityState={{ busy: working, disabled: working }}
-      disabled={working}
+      // Also held while a purchase from the upgrade page is still confirming.
+      accessibilityState={{ busy: flow.isBusy, disabled: flow.isBusy }}
+      disabled={flow.isBusy}
       onPress={flow.restore}
       style={({ pressed }) => [
         {

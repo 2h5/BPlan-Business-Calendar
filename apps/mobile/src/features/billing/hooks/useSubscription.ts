@@ -1,5 +1,6 @@
 import { getSubscriptionStatusInfo, type SubscriptionStatusInfo } from '@cal/domain';
 import { useQuery } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { queryKeys } from '../../../lib/query/query-client';
 import { useAuth } from '../../auth';
@@ -28,6 +29,9 @@ export interface PlanState {
   isLoading: boolean;
   /** The entitlement could not be read and there is no earlier answer to show. */
   isUnavailable: boolean;
+  /** A read is in flight, so the answer above may be about to change. */
+  isChecking: boolean;
+  /** Re-read the plan. Stable across renders. */
   retry: () => void;
 }
 
@@ -35,6 +39,7 @@ export interface PlanState {
 export function usePlanState(): PlanState {
   const { data, isPending, isError, isFetching, refetch } = useSubscription();
   const info = getSubscriptionStatusInfo(data ?? null);
+  const retry = useCallback(() => void refetch(), [refetch]);
 
   return {
     info,
@@ -44,6 +49,7 @@ export function usePlanState(): PlanState {
     // and tell someone who pays for Pro to upgrade. A failed *refetch* is
     // different: the last answer still stands.
     isUnavailable: isError && data === undefined && !isFetching,
-    retry: () => void refetch(),
+    isChecking: isFetching,
+    retry,
   };
 }

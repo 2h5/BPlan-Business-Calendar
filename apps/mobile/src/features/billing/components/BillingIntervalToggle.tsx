@@ -17,8 +17,8 @@ export type BillingInterval = 'monthly' | 'annual';
 export interface BillingIntervalToggleProps {
   value: BillingInterval;
   onChange: (value: BillingInterval) => void;
-  /** Whole percent saved by paying annually, e.g. 16 for "Save 16%". */
-  savingsPercentage: number;
+  /** Whole percent saved by paying annually, e.g. 16 for "Save 16%"; null hides it. */
+  savingsPercentage: number | null;
 }
 
 const OPTIONS: readonly BillingInterval[] = ['monthly', 'annual'];
@@ -169,7 +169,7 @@ export function BillingIntervalToggle({
             accessibilityRole="radio"
             accessibilityState={{ selected: isSelected }}
             accessibilityLabel={
-              option === 'annual'
+              option === 'annual' && savingsPercentage !== null
                 ? `${LABELS.annual}, save ${savingsPercentage} percent`
                 : LABELS.monthly
             }
@@ -187,7 +187,7 @@ export function BillingIntervalToggle({
           >
             <SegmentLabel index={index} progress={progress} label={LABELS[option]} />
 
-            {option === 'annual' ? (
+            {option === 'annual' && savingsPercentage !== null ? (
               // The tinted-wash treatment the rest of the app gives a success
               // badge, rather than a solid fill: quieter next to the accent the
               // selected segment already carries, and still its own colour
