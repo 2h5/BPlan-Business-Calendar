@@ -1,10 +1,11 @@
 import { Screen } from '@cal/ui';
 import { useLocalSearchParams } from 'expo-router';
 
+import { SignedIn } from '../../src/features/auth';
 import { useFocusDateFromParam } from '../../src/features/calendar/hooks/useFocusDateFromParam';
 import { CalendarScreen } from '../../src/features/calendar/screens/CalendarScreen';
 
-export default function CalendarScreenRoute() {
+function CalendarTab() {
   // The Home Screen widget deep-links here with the day to open.
   const { date } = useLocalSearchParams<{ date?: string }>();
   useFocusDateFromParam(date);
@@ -16,5 +17,13 @@ export default function CalendarScreenRoute() {
     <Screen scrollable={false} contentStyle={{ paddingBottom: 0 }}>
       <CalendarScreen />
     </Screen>
+  );
+}
+
+export default function CalendarScreenRoute() {
+  return (
+    <SignedIn>
+      <CalendarTab />
+    </SignedIn>
   );
 }

@@ -1,6 +1,6 @@
 # Mobile Billing — Running Tracker
 
-Status: **TEST STORE PHASE — WORKS END TO END IN THE SIMULATOR (updated 2026-10-04)**
+Status: **TEST STORE PHASE COMPLETE — NEXT IS THE $99 APPLE ACCOUNT (updated 2026-10-04)**
 
 The running log for iPhone in-app purchase. The _why_ and the full design live
 in [`mobile-billing-plan.md`](mobile-billing-plan.md); this file tracks what is
@@ -14,11 +14,14 @@ Owners: **Founder** = dashboards, accounts, money, Apple credentials.
 
 ## Now
 
-1. **Founder:** final Terms of Use and Privacy Policy URLs →
-   `EXPO_PUBLIC_BILLING_TERMS_URL` / `EXPO_PUBLIC_BILLING_PRIVACY_URL`. The
-   paywall hides the links until they're set; Apple requires them.
+Everything that can be done without the $99 Apple fee is done. What is left:
+
+1. **Founder:** finish the Terms and Privacy pages. The links work, but both
+   pages say "DRAFT — NOT FINAL. Do not use this page for production paid
+   checkout." Must be final before App Review (Phase D).
 2. **Founder/Eng:** open a PR for `feat/mobile-iap-test-store` (pushed).
-3. **Later:** confirm the RevenueCat webhook fires for Test Store purchases
+3. **Phase B onward** when ready to pay the $99 (below).
+4. **Later:** confirm the RevenueCat webhook fires for Test Store purchases
    (only matters on the hosted sandbox; local runs use refresh).
 
 ## Decisions
@@ -108,8 +111,22 @@ Notes on what was already in the project:
 - [x] Server confirms a Test Store purchase on its own: with the mirror row
       removed, Settings → Restore purchases called `revenuecat-refresh`,
       which wrote `pro` / `active` and the app flipped to "BPlan Pro ACTIVE".
-- [ ] Web subscriber signs in on iPhone → Pro, no buy button. (Covered by the
-      existing `isPro` path; not run against a real web purchase yet.)
+- [x] Web subscriber signs in on iPhone → Pro, no buy button (2026-10-04).
+      Run as `dev@example.com`, who is seeded Pro in the mirror with no Apple
+      purchase, which is exactly how a web subscriber looks to the phone (the
+      mirror has no store column; web and Apple rows are the same shape).
+      Results: Settings shows "BPlan Pro ACTIVE" with no upgrade or restore
+      row; the plan page shows "Current plan", no buy button, no Restore;
+      Manage subscription explains it isn't an App Store subscription.
+      **Not covered:** a real RevenueCat Web Billing purchase. Web checkout is
+      `disabled` locally, and the purchase tool (`pnpm billing:e2e:sandbox`)
+      targets the hosted sandbox. For a real web subscriber, RevenueCat
+      returns the Web Billing portal as `managementURL`, so Manage should open
+      that instead of the note; check it in Phase C (plan §6).
+- [x] Terms of Use and Privacy Policy links on the plan page
+      (`https://bplan-business-calendar.pages.dev/terms` and `/privacy`), set
+      in `apps/mobile/.env.example` and `.env.local`. Tapping opens the page
+      in an in-app browser.
 
 **Resolved 2026-10-04 with option 1.** Was: locally, `revenuecat-refresh` returns 503:
 the local Supabase isn't serving edge functions with RevenueCat keys, and the
@@ -128,9 +145,20 @@ Test Store purchase. Options (founder decides):
 as sandbox purchases on the right app user ID. Whether the _webhook_ fires for
 them is still unconfirmed; option 1 doesn't need it.
 
-**Unrelated bug found:** signing out crashes the iOS app
-(`[RNScreens] Expected exactly 1 focused tab, got: 0`). Logged as a separate
-task; not caused by billing.
+**Sign-out crash, fixed 2026-10-04.** Signing out crashed debug builds
+(`[RNScreens] Invariant violation. Expected exactly 1 focused tab, got: 0`).
+Cause: `app/(tabs)/_layout.tsx` returned `null` when signed out, which removed
+the native tab bar while it was on screen; react-native-screens 4.16 then
+checks a tab bar with no tabs and its debug-only assert aborts the app
+(release builds skip the check). Fix: the tab bar stays mounted, and each tab
+route wraps its content in `<SignedIn>`
+(`src/features/auth/components/SignedIn.tsx`), so screens that need a user
+still unmount before navigation. Verified: sign out → sign-in screen, no crash
+report. Not caused by billing.
+
+**Also fixed:** "Purchases delegate has already been configured" warning after
+a JS reload. `purchases.api.ts` now asks `Purchases.isConfigured()` instead of
+a module flag that a reload resets.
 
 **Running it locally:** secrets are in `supabase/functions/.env`
 (git-ignored; `REVENUECAT_READONLY_API_KEY`, `REVENUECAT_PROJECT_ID`,
@@ -160,6 +188,11 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 - [ ] Attach iOS products to `pro`; add them to the iOS offering.
 - [ ] Sandbox tester accounts.
 - [ ] Swap `EXPO_PUBLIC_REVENUECAT_IOS_KEY` from `test_` to the App Store key.
+- [ ] Set the build's public values in EAS (`eas env:create`, or `env` in
+      `eas.json`): `EXPO_PUBLIC_REVENUECAT_IOS_KEY`,
+      `EXPO_PUBLIC_BILLING_TERMS_URL`, `EXPO_PUBLIC_BILLING_PRIVACY_URL`, plus
+      the Supabase URL and anon key. `.env.local` is git-ignored, so cloud
+      builds don't see it; without the two URLs the paywall hides the links.
 
 ## Phase C — Apple testing
 
@@ -171,6 +204,7 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 ## Phase D — Release
 
 - [ ] App Review notes, demo account, restore mentioned.
+- [ ] Terms and Privacy pages final (drop the DRAFT banner); see Now.
 - [ ] Terms of Use link in the App Store description.
 - [ ] Production switch-on, together with the web production billing gate.
 
@@ -180,6 +214,9 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 
 Newest first. One line per finished item, with the date and commit if any.
 
+- 2026-10-04 — Terms/Privacy links on the paywall; web-subscriber check on
+  iPhone (passes, real web purchase still Phase C); sign-out crash fixed;
+  duplicate RevenueCat configure warning fixed. `pnpm verify` passes.
 - 2026-10-04 — Local server confirmation working (option 1): RevenueCat
   read-only key in `supabase/functions/.env`; restore in the app writes Pro
   to the mirror and the app shows it.

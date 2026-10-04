@@ -22,7 +22,6 @@ export const IOS_OFFERING_ID = 'bplan_ios';
 /** The entitlement the server gates on. */
 const PRO_ENTITLEMENT = 'pro';
 
-let configured = false;
 /** Serialises identity changes so a purchase never runs mid-switch. */
 let identity: Promise<void> = Promise.resolve();
 
@@ -46,12 +45,13 @@ async function switchTo(appUserID: string): Promise<void> {
   const apiKey = env.revenueCatIosKey;
   if (!isPurchasingSupported() || apiKey === undefined) return;
 
-  if (!configured) {
+  // Asks the SDK rather than a module flag: a JS reload resets module state,
+  // but the native SDK stays configured.
+  if (!(await Purchases.isConfigured())) {
     if (isDevelopment) void Purchases.setLogLevel(LOG_LEVEL.WARN);
     // Configuring with the ID up front avoids creating an anonymous customer
     // that would then have to be merged.
     Purchases.configure({ apiKey, appUserID });
-    configured = true;
     return;
   }
   if ((await Purchases.getAppUserID()) !== appUserID) await Purchases.logIn(appUserID);
@@ -62,7 +62,7 @@ export function forgetPurchaser(): Promise<void> {
   identity = identity
     .catch(() => undefined)
     .then(async () => {
-      if (!configured || (await Purchases.isAnonymous())) return;
+      if (!(await Purchases.isConfigured()) || (await Purchases.isAnonymous())) return;
       await Purchases.logOut();
     });
   return identity;
@@ -93,7 +93,7 @@ export interface StorePlans {
 /** The iOS plans, or null when the offering is missing from RevenueCat. */
 export async function fetchStorePlans(userId: string): Promise<StorePlans | null> {
   await identifyPurchaser(userId);
-  if (!configured) return null;
+  if (!isPurchasingSupported()) return null;
   const offerings = await Purchases.getOfferings();
   // Asked for by name: the project's "current" offering is a leftover default
   // whose products unlock a different entitlement.
@@ -131,7 +131,7 @@ export async function purchaseStorePlan(userId: string, plan: StorePlan): Promis
  */
 export async function restoreStorePurchases(userId: string): Promise<boolean> {
   await identifyPurchaser(userId);
-  if (!configured) return false;
+  if (!isPurchasingSupported()) return false;
   const info = await Purchases.restorePurchases();
   return hasStorePro(info);
 }
@@ -142,7 +142,7 @@ export async function restoreStorePurchases(userId: string): Promise<boolean> {
  */
 export async function fetchManagementUrl(userId: string): Promise<string | null> {
   await identifyPurchaser(userId);
-  if (!configured) return null;
+  if (!isPurchasingSupported()) return null;
   const info = await Purchases.getCustomerInfo();
   return z.string().url().nullable().catch(null).parse(info.managementURL);
 }
