@@ -4,7 +4,7 @@ import WidgetKit
 /// The BPlan Calendar widget: one widget with a Today / Week / Month / Agenda
 /// switcher inside, opening on the view chosen in Edit Widget.
 ///
-/// The `kind` must match `WIDGET_KIND` in `src/features/widgets/constants.ts`,
+/// The `kind` must be listed in `WIDGET_KINDS` in `src/features/widgets/constants.ts`,
 /// which the app uses to ask WidgetKit for a redraw.
 struct CalendarWidget: Widget {
   static let kind = "CalendarWidget"

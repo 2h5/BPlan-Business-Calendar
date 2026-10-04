@@ -10,10 +10,16 @@ const ADD_STEPS = [
   'To pick the view it opens on, touch and hold the widget and tap Edit Widget.',
 ];
 
+const LOCK_SCREEN_STEPS = [
+  'Touch and hold your Lock Screen, then tap Customize and choose Lock Screen.',
+  `Tap the widget area, or the date above the clock, and choose ${APP_NAME}'s Up Next.`,
+];
+
 const GLASS_STEPS = ['On the Home Screen, tap Edit, then Customize.', 'Choose Clear.'];
 
 /**
- * How to add the Home Screen widget and give it the Liquid Glass look.
+ * How to add the widgets — Home Screen and Lock Screen — and give them the
+ * Liquid Glass look.
  *
  * Glass is a Home Screen style the person picks for every widget at once —
  * iOS gives apps no switch for it (see docs/widgets.md) — so this card shows
@@ -26,8 +32,8 @@ export function WidgetGuideCard() {
 
   return (
     <Card
-      eyebrow="Home Screen widget"
-      description="See your month, week, and day, and tick off tasks, without opening the app."
+      eyebrow="Widgets"
+      description="See your month, week, and day, tick off tasks, and keep the next event on your Lock Screen."
       padded={false}
     >
       <View style={{ padding: theme.spacing.xl, gap: theme.spacing.xl }}>
@@ -37,6 +43,11 @@ export function WidgetGuideCard() {
         </View>
 
         <Steps title="Add the widget" steps={ADD_STEPS} />
+        <Steps
+          title="Add it to your Lock Screen"
+          steps={LOCK_SCREEN_STEPS}
+          note="Up Next shows what's on now or next. It also comes in a small Home Screen size, which appears in StandBy."
+        />
         <Steps
           title="Get the Liquid Glass look"
           steps={GLASS_STEPS}

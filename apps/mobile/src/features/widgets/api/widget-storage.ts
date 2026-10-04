@@ -2,7 +2,7 @@ import { ExtensionStorage } from '@bacons/apple-targets';
 import { Platform } from 'react-native';
 
 import { logError } from '../../../lib/logger';
-import { WIDGET_APP_GROUP, WIDGET_KIND, WIDGET_STORAGE_KEYS } from '../constants';
+import { WIDGET_APP_GROUP, WIDGET_KINDS, WIDGET_STORAGE_KEYS } from '../constants';
 import {
   pendingTaskTogglesSchema,
   widgetSnapshotSchema,
@@ -27,7 +27,7 @@ export function writeWidgetSnapshot(snapshot: WidgetSnapshot): void {
   // the widget blank on the Home Screen with nothing in the app to show why.
   const parsed = widgetSnapshotSchema.parse(snapshot);
   storage.set(WIDGET_STORAGE_KEYS.snapshot, JSON.stringify(parsed));
-  ExtensionStorage.reloadWidget(WIDGET_KIND);
+  reloadWidgets();
 }
 
 /** Signing out must not leave someone's calendar on the Home Screen. */
@@ -35,7 +35,11 @@ export function clearWidgetSnapshot(): void {
   if (!isSupported) return;
   storage.remove(WIDGET_STORAGE_KEYS.snapshot);
   storage.remove(WIDGET_STORAGE_KEYS.pendingTaskToggles);
-  ExtensionStorage.reloadWidget(WIDGET_KIND);
+  reloadWidgets();
+}
+
+function reloadWidgets(): void {
+  for (const kind of WIDGET_KINDS) ExtensionStorage.reloadWidget(kind);
 }
 
 /** Ticks the widget recorded since the app last looked. Malformed input is dropped. */

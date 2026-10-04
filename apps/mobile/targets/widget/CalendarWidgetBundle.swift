@@ -5,5 +5,6 @@ import WidgetKit
 struct CalendarWidgetBundle: WidgetBundle {
   var body: some Widget {
     CalendarWidget()
+    UpNextWidget()
   }
 }
