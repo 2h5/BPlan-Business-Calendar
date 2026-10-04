@@ -1,6 +1,6 @@
 # Mobile Billing — Running Tracker
 
-Status: **TEST STORE PHASE — APP CODE DONE AND TESTED IN SIMULATOR; SERVER CONFIRMATION BLOCKED LOCALLY (updated 2026-10-04)**
+Status: **TEST STORE PHASE — WORKS END TO END IN THE SIMULATOR (updated 2026-10-04)**
 
 The running log for iPhone in-app purchase. The _why_ and the full design live
 in [`mobile-billing-plan.md`](mobile-billing-plan.md); this file tracks what is
@@ -14,13 +14,12 @@ Owners: **Founder** = dashboards, accounts, money, Apple credentials.
 
 ## Now
 
-1. **Blocker — Founder decision:** let the server confirm Test Store purchases
-   (see "Blocker" under A3). Until then a purchase ends at "Payment received.
-   Pro will switch on in a moment" and Pro never switches on.
-2. **Founder:** final Terms of Use and Privacy Policy URLs →
+1. **Founder:** final Terms of Use and Privacy Policy URLs →
    `EXPO_PUBLIC_BILLING_TERMS_URL` / `EXPO_PUBLIC_BILLING_PRIVACY_URL`. The
    paywall hides the links until they're set; Apple requires them.
-3. **Eng:** commit branch `feat/mobile-iap-test-store` once reviewed.
+2. **Founder/Eng:** open a PR for `feat/mobile-iap-test-store` (pushed).
+3. **Later:** confirm the RevenueCat webhook fires for Test Store purchases
+   (only matters on the hosted sandbox; local runs use refresh).
 
 ## Decisions
 
@@ -106,11 +105,13 @@ Notes on what was already in the project:
       hand to stand in for the server, then removed) the page flips to
       "You're on BPlan Pro / Current plan / Purchase restored. Pro is on."
 - [x] Settings shows "Restore purchases" under the upgrade row.
-- [ ] Server confirms a Test Store purchase on its own (blocked, below).
+- [x] Server confirms a Test Store purchase on its own: with the mirror row
+      removed, Settings → Restore purchases called `revenuecat-refresh`,
+      which wrote `pro` / `active` and the app flipped to "BPlan Pro ACTIVE".
 - [ ] Web subscriber signs in on iPhone → Pro, no buy button. (Covered by the
       existing `isPro` path; not run against a real web purchase yet.)
 
-**Blocker — server confirmation.** Locally, `revenuecat-refresh` returns 503:
+**Resolved 2026-10-04 with option 1.** Was: locally, `revenuecat-refresh` returns 503:
 the local Supabase isn't serving edge functions with RevenueCat keys, and the
 RevenueCat webhook can't reach `127.0.0.1`. So the mirror never gets the
 Test Store purchase. Options (founder decides):
@@ -130,6 +131,13 @@ them is still unconfirmed; option 1 doesn't need it.
 **Unrelated bug found:** signing out crashes the iOS app
 (`[RNScreens] Expected exactly 1 focused tab, got: 0`). Logged as a separate
 task; not caused by billing.
+
+**Running it locally:** secrets are in `supabase/functions/.env`
+(git-ignored; `REVENUECAT_READONLY_API_KEY`, `REVENUECAT_PROJECT_ID`,
+`REVENUECAT_ENVIRONMENT=SANDBOX`). Start the functions with
+`supabase functions serve --env-file supabase/functions/.env` alongside Metro.
+The server answers `RECENTLY_VERIFIED` (does nothing) if the same user was
+checked in the last minute; wait a minute between manual tests.
 
 Note: a release build launched with a `test_` key crashes on purpose, so the
 key can't leak into production.
@@ -172,6 +180,10 @@ Do this when the app is close to launch. Details in the plan §5 Steps 0–1.
 
 Newest first. One line per finished item, with the date and commit if any.
 
+- 2026-10-04 — Local server confirmation working (option 1): RevenueCat
+  read-only key in `supabase/functions/.env`; restore in the app writes Pro
+  to the mirror and the app shows it.
+- 2026-10-04 — Pushed `feat/mobile-iap-test-store`.
 - 2026-10-04 — A2 code done and A3 simulator run on
   `feat/mobile-iap-test-store` (uncommitted): buy, cancel, fail, restore,
   manage all behave; RevenueCat records purchases on the Supabase user ID.
